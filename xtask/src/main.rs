@@ -1002,11 +1002,11 @@ mod tests {
 
     #[test]
     fn readme_links_follow_the_new_image_and_leave_the_rest() {
-        let text = "[dl](dist/Splat.dmg?raw=true) **[Download Splat-1.0.3.dmg](dist/Splat-1.0.3.dmg?raw=true)** \
+        let text = "[dl](dist/Splat.dmg?raw=true) **[Download Splat-1.0.3.dmg](https://raw.githubusercontent.com/a/splat/main/dist/Splat-1.0.3.dmg)** \
                     Splat.app, `dist/Splat-<version>.dmg`, Splat-1.0.dmg";
         assert_eq!(
             relink(text, "Splat-1.0.4.dmg"),
-            "[dl](dist/Splat-1.0.4.dmg?raw=true) **[Download Splat-1.0.4.dmg](dist/Splat-1.0.4.dmg?raw=true)** \
+            "[dl](dist/Splat-1.0.4.dmg?raw=true) **[Download Splat-1.0.4.dmg](https://raw.githubusercontent.com/a/splat/main/dist/Splat-1.0.4.dmg)** \
              Splat.app, `dist/Splat-<version>.dmg`, Splat-1.0.dmg"
         );
         assert_eq!(image_name_len("Splat-1.0.3.dmg"), Some(15));
