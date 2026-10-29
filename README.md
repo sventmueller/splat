@@ -676,8 +676,10 @@ next build gets exactly that.
 ### Distribution
 
 `cargo xtask dmg` (or `make release`, which runs `make test` first) builds a release, signs it with your Developer ID,
-packs it into a compressed, read-only disk image with a link to Applications, notarizes the image with Apple, staples
-the ticket and checks the result with Gatekeeper. Only an image that passed every step becomes
+notarizes the app with Apple and staples the ticket, packs it into a compressed, read-only disk image with a link to
+Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
+ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
+rounds with the notary service take a few minutes each. Only an image that passed every step becomes
 `dist/Splat-<version>.dmg`, the copy that is committed: it replaces the previous image, the download links in this
 README follow it, and the build number goes up. A failed run leaves `dist/`, the README and VERSION as they were.
 Each release adds the full image, about 10 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
