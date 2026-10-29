@@ -1,0 +1,4 @@
+/* Splat system texts in Polish. */
+
+NSHumanReadableCopyright = "Edytor Markdown";
+"Markdown Document" = "Dokument Markdown";

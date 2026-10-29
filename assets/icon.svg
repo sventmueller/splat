@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <filter id="lift" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#7B3CF0" flood-opacity="0.28"/>
+    </filter>
+    <linearGradient id="paper" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F1F1F5"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="330" y1="250" x2="694" y2="774" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF9A3C"/>
+      <stop offset="0.5" stop-color="#FF3D7F"/>
+      <stop offset="1" stop-color="#7B3CF0"/>
+    </linearGradient>
+  </defs>
+  <!-- Apple's macOS icon template (824 px body, continuous corners, radius 185.4); icons off this outline get a grey frame on macOS 26. -->
+  <path fill="url(#paper)" filter="url(#drop)" d="M 383.41 100.00 L 640.59 100.00 C 722.19 100.00 763.00 100.00 799.79 112.14 L 806.92 113.89 C 854.88 131.34 892.66 169.12 910.11 217.08 L 911.86 224.21 C 924.00 261.00 924.00 301.81 924.00 383.41 L 924.00 640.59 C 924.00 722.19 924.00 763.00 911.86 799.79 L 910.11 806.92 C 892.66 854.88 854.88 892.66 806.92 910.11 L 799.79 911.86 C 763.00 924.00 722.19 924.00 640.59 924.00 L 383.41 924.00 C 301.81 924.00 261.00 924.00 224.21 911.86 L 217.08 910.11 C 169.12 892.66 131.34 854.88 113.89 806.92 L 112.14 799.79 C 100.00 763.00 100.00 722.19 100.00 640.59 L 100.00 383.41 C 100.00 301.81 100.00 261.00 112.14 224.21 L 113.89 217.08 C 131.34 169.12 169.12 131.34 217.08 113.89 L 224.21 112.14 C 261.00 100.00 301.81 100.00 383.41 100.00 Z"/>
+  <path fill="url(#ink)" filter="url(#lift)"
+        d="M490.34 515.86L454.90 317.19A58 58 0 1 1 569.10 317.19L533.66 515.86A22 22 0 0 1 490.34 515.86Z
+           M497.83 495.18L652.17 365.14A58 58 0 1 1 709.26 464.04L519.48 532.69A22 22 0 0 1 497.83 495.18Z
+           M519.48 491.31L709.26 559.96A58 58 0 1 1 652.17 658.86L497.83 528.82A22 22 0 0 1 519.48 491.31Z
+           M533.66 508.14L569.10 706.81A58 58 0 1 1 454.90 706.81L490.34 508.14A22 22 0 0 1 533.66 508.14Z
+           M526.17 528.82L371.83 658.86A58 58 0 1 1 314.74 559.96L504.52 491.31A22 22 0 0 1 526.17 528.82Z
+           M504.52 532.69L314.74 464.04A58 58 0 1 1 371.83 365.14L526.17 495.18A22 22 0 0 1 504.52 532.69Z"/>
+</svg>

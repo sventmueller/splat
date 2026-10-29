@@ -1,0 +1,5 @@
+# Homebrew's Rust ignores this file; rustup and CI install exactly this version, so new lints arrive when it changes.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt", "llvm-tools"]
+profile = "minimal"

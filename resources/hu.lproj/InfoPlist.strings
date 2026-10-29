@@ -1,0 +1,4 @@
+/* Splat system texts in Hungarian. */
+
+NSHumanReadableCopyright = "Markdown-szerkesztő";
+"Markdown Document" = "Markdown-dokumentum";

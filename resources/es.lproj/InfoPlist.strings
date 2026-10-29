@@ -1,0 +1,4 @@
+/* Splat system texts in Spanish. */
+
+NSHumanReadableCopyright = "Editor de Markdown";
+"Markdown Document" = "Documento Markdown";
