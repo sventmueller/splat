@@ -1,0 +1,7 @@
+# Third-party libraries, stored byte for byte as published (vendor.lock): kept out of GitHub's language statistics and diffs.
+resources/js/mermaid.min.js linguist-vendored -diff
+resources/js/tex-svg-full.js linguist-vendored -diff
+resources/js/mathlive.min.js linguist-vendored -diff
+resources/js/plantuml.js linguist-vendored -diff
+resources/js/viz-global.js linguist-vendored -diff
+resources/js/mathlive-fonts/** linguist-vendored

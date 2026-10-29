@@ -1,0 +1,4 @@
+/* Splat system texts in Finnish. */
+
+NSHumanReadableCopyright = "Markdown-editori";
+"Markdown Document" = "Markdown-dokumentti";

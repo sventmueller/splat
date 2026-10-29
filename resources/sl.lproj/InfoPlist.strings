@@ -1,0 +1,4 @@
+/* Splat system texts in Slovenian. */
+
+NSHumanReadableCopyright = "Urejevalnik za Markdown";
+"Markdown Document" = "Dokument Markdown";

@@ -1,0 +1,47 @@
+[workspace]
+members = ["xtask"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.lints.rust]
+# cargo-llvm-cov builds with `--cfg coverage`.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+[package]
+name = "splat"
+# The app version is in VERSION; xtask writes it into Info.plist.
+description = "Markdown editor for macOS with a live, editable preview"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+block2 = "0.6.2"
+comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
+dispatch2 = "0.3"
+objc2 = { version = "0.6.5", features = ["catch-all"] }
+objc2-app-kit = { version = "0.3.2", features = ["objc2-uniform-type-identifiers"] }
+objc2-foundation = "0.3.2"
+objc2-uniform-type-identifiers = "0.3.2"
+objc2-web-kit = "0.3.2"
+svg2pdf = "0.13"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+unicode-width = "0.2"
+
+[features]
+selftest = []
+
+[profile.release]
+lto = "thin"

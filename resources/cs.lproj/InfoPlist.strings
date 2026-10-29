@@ -1,0 +1,4 @@
+/* Splat system texts in Czech. */
+
+NSHumanReadableCopyright = "Editor pro Markdown";
+"Markdown Document" = "Dokument Markdown";

@@ -1,0 +1,4 @@
+/* Splat system texts in Danish. */
+
+NSHumanReadableCopyright = "Markdown-editor";
+"Markdown Document" = "Markdown-dokument";

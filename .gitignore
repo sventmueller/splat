@@ -1,0 +1,10 @@
+/target/
+.DS_Store
+/.playwright-mcp/
+
+# Signing material: the Developer ID key lives in the keychain and its backup in a password manager.
+*.p12
+*.cer
+*.csr
+*.key
+*.pem

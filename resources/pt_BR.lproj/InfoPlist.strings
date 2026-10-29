@@ -1,0 +1,4 @@
+/* Splat system texts in Brazilian Portuguese. */
+
+NSHumanReadableCopyright = "Editor de Markdown";
+"Markdown Document" = "Documento Markdown";

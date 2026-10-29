@@ -1,0 +1,4 @@
+/* Splat system texts in Romanian. */
+
+NSHumanReadableCopyright = "Editor Markdown";
+"Markdown Document" = "Document Markdown";

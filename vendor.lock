@@ -1,0 +1,30 @@
+# Third-party scripts and fonts in resources/js, byte for byte as published.
+# `cargo xtask vendor check` verifies the files; after changing a version and its URL,
+# `cargo xtask vendor fetch` downloads them again and records the new checksums. An ES module, such as
+# plantuml.js, is stored with its closing export turned into globals.
+# path	package	version	url	sha256
+resources/js/mermaid.min.js	mermaid	12.2.0	https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.min.js	a8a6a6f805b074a8261a2825c86f99c8054acb3b35f50bb7e24a4f9f2c3c3b9f
+resources/js/tex-svg-full.js	mathjax	3.2.2	https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js	a4354ff94fd868aea0cc6eaaa79a57fda0588646fc46ee3700a349ee0a11cbe6
+resources/js/mathlive.min.js	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/mathlive.min.js	51e9ab5c4739209a2951a550042dcecb99ad3047269c1d791d09d7d613226eae
+resources/js/mathlive-fonts/KaTeX_AMS-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_AMS-Regular.woff2	0cdd387c9590a1a9f9794560022dbb59654a7d86f187aa0c81495ad42d3a7308
+resources/js/mathlive-fonts/KaTeX_Caligraphic-Bold.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Caligraphic-Bold.woff2	de7701e42cf1f4cf0b766c03fb27977207eee2f4fd5d76fa82188406da43ea4c
+resources/js/mathlive-fonts/KaTeX_Caligraphic-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Caligraphic-Regular.woff2	5d53e70ad607c2352162dec9e0923fb54ecdafaccbf604cd8dcf7d00facb989b
+resources/js/mathlive-fonts/KaTeX_Fraktur-Bold.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Fraktur-Bold.woff2	74444efd593c005e3f4573b44524704c0af0a937fe911cca9e94068d0d140d3f
+resources/js/mathlive-fonts/KaTeX_Fraktur-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Fraktur-Regular.woff2	51814d270d06ff0255dba0799994fa4d8c84d11f09951d47595f4abb1f3602dc
+resources/js/mathlive-fonts/KaTeX_Main-Bold.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Main-Bold.woff2	0f60d1b897938ec918c8ce073092411baf9438f6739465693ff18b0f9d20b021
+resources/js/mathlive-fonts/KaTeX_Main-BoldItalic.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Main-BoldItalic.woff2	99cd42a3c072d918f2f44984a807cf7aa16e13545fd0875fc07c6c65f99e715b
+resources/js/mathlive-fonts/KaTeX_Main-Italic.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Main-Italic.woff2	97479ca6cce906abc961ecac96faa5f9ca2e61b8e7670d475826bcdee9a7c267
+resources/js/mathlive-fonts/KaTeX_Main-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Main-Regular.woff2	c2342cd8b869e01752a9321dc17213fc40d4d04c79688c1d43f2cf316abd7866
+resources/js/mathlive-fonts/KaTeX_Math-BoldItalic.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Math-BoldItalic.woff2	dc47344dbb6cb5b655c8460d561f4df5f501b90c804ad3c6cec65fe322351ab1
+resources/js/mathlive-fonts/KaTeX_Math-Italic.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Math-Italic.woff2	7af58c5ec8f132a2ddde9027c6d7814decce4d3b822a11192a42a20e2e973264
+resources/js/mathlive-fonts/KaTeX_SansSerif-Bold.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_SansSerif-Bold.woff2	e99ae51144bf1232efcc1bfe5add36262c6866b0faab24fa75740e1b98577a62
+resources/js/mathlive-fonts/KaTeX_SansSerif-Italic.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_SansSerif-Italic.woff2	00b26ac825e2095056396e0553b8ac26d3f8ad158c3826e28b4c45b385c4714a
+resources/js/mathlive-fonts/KaTeX_SansSerif-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_SansSerif-Regular.woff2	68e8c73ef42afd3ccec58bf0fba302cce448938e7fc020a5e31f8a952eee1342
+resources/js/mathlive-fonts/KaTeX_Script-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Script-Regular.woff2	036d4e95149b69ff9bcc0cd55771efeb25ffa3947293e69acd78d5ac328c684b
+resources/js/mathlive-fonts/KaTeX_Size1-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Size1-Regular.woff2	6b47c40166b6dbe21a5dfca7718413f2147fd2399be1ba605d8ad39cedf25dfe
+resources/js/mathlive-fonts/KaTeX_Size2-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Size2-Regular.woff2	d04c54219f9eaec6d4d4fd42dfb28785975a4794d6b2fc71e566b9cd6db842dd
+resources/js/mathlive-fonts/KaTeX_Size3-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Size3-Regular.woff2	73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995
+resources/js/mathlive-fonts/KaTeX_Size4-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Size4-Regular.woff2	a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0
+resources/js/mathlive-fonts/KaTeX_Typewriter-Regular.woff2	mathlive	0.111.1	https://cdn.jsdelivr.net/npm/mathlive@0.111.1/fonts/KaTeX_Typewriter-Regular.woff2	71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b
+resources/js/plantuml.js	plantuml	1.2026.6	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.6/plantuml.js	3a68fb51e3311afe998df2e3c97218753512ef03f4467121e9d9ffc0b423e5f5
+resources/js/viz-global.js	plantuml	1.2026.6	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.6/viz-global.js	fc6ca2de83dd4e3fca967d5214122777890a5cd1ab101115a1f716fc84e6dc5e
