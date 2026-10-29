@@ -292,8 +292,9 @@ fn sign(app: &Path, identity: &str, timestamp: bool) -> Result<(), String> {
 
 /// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
-/// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes into the repository: it replaces the previous one
-/// there and in the links of README.md, and the build number goes up.
+/// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
+/// into the repository: it replaces the previous one there and in the links of README.md, and the build number goes
+/// up.
 fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
     let (identity, name) = developer_id()?;
