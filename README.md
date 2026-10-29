@@ -113,6 +113,15 @@ the network unless you ask it to.
 **From the disk image.** Download [`dist/Splat-1.0.2.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.2.dmg), open it and drag Splat onto the Applications folder. The image is signed with a
 Developer ID and notarized by Apple, so it opens without warnings.
 
+**With Homebrew.** The cask lives in a tap of its own:
+
+```sh
+brew install --cask sventmueller/tap/splat
+```
+
+`brew upgrade --cask splat` installs new versions, and `brew uninstall --zap --cask splat` also removes Splat's settings
+and caches.
+
 **From source.** See [Building](#building) for the prerequisites, then:
 
 ```sh
