@@ -290,9 +290,9 @@ fn sign(app: &Path, identity: &str, timestamp: bool) -> Result<(), String> {
         .arg(app))
 }
 
-/// Builds the release app signed with the Developer ID, packs it into a disk image with a link to /Applications
-/// and has Apple notarize the image, so that Gatekeeper opens it on other Macs. Only an image that passed all of
-/// this becomes `dist/Splat-<version>.dmg`, the copy that goes into the repository: it replaces the previous one
+/// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
+/// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
+/// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes into the repository: it replaces the previous one
 /// there and in the links of README.md, and the build number goes up.
 fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
@@ -321,6 +321,16 @@ fn dmg() -> Result<PathBuf, String> {
     println!("signing {version} with {name}");
     sign(&app, &identity, true)?;
     run(Command::new("codesign").args(["--verify", "--strict"]).arg(&app))?;
+    // The image's ticket reaches Gatekeeper only when the image is opened in the Finder; a copy taken out otherwise,
+    // as Homebrew installs it, would need a network connection on first launch.
+    let archive = app.with_extension("zip");
+    run(Command::new("ditto")
+        .args(["-c", "-k", "--keepParent"])
+        .arg(&app)
+        .arg(&archive))?;
+    notarize(&archive)?;
+    fs::remove_file(&archive).map_err(|e| e.to_string())?;
+    run(Command::new("xcrun").args(["stapler", "staple"]).arg(&app))?;
     let image = disk_image(&app)?;
     run(Command::new("codesign")
         .args(["--force", "--sign", &identity, "--timestamp"])
@@ -495,9 +505,8 @@ end tell"#
     run(Command::new("osascript").args(["-e", &script]))
 }
 
-/// Uploads the image to Apple's notary service and waits for the verdict. The ticket also covers the app inside,
-/// so one submission suffices.
-fn notarize(image: &Path) -> Result<(), String> {
+/// Uploads a disk image or zip archive to Apple's notary service and waits for the verdict.
+fn notarize(file: &Path) -> Result<(), String> {
     println!("waiting for Apple's notary service, usually a few minutes");
     let mut submit = Command::new("xcrun");
     submit
@@ -510,7 +519,7 @@ fn notarize(image: &Path) -> Result<(), String> {
             "--output-format",
             "json",
         ])
-        .arg(image)
+        .arg(file)
         .stderr(std::process::Stdio::inherit());
     let out = submit.output().map_err(|e| format!("{submit:?}: {e}"))?;
     let result = String::from_utf8_lossy(&out.stdout);
