@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Splat</title>
+    <item>
+      <title>Splat 1.0.3</title>
+      <pubDate>Sat, 31 Oct 2026 14:15:09 +0000</pubDate>
+      <sparkle:version>1.0.3</sparkle:version>
+      <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg" sparkle:edSignature="+sEigfdVuqe6AJYCriNVQ5x121QlT/w2bd7HVus+PIqVRVyvS4olofeg5cZFY5Vz9ydcFJMlfX5p4w79qLAIBA==" length="10388216" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>

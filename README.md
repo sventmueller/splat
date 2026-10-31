@@ -14,9 +14,9 @@ the network unless you ask it to.
  
 
 
-[![Download Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.2.dmg)
+[![Download Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)
 
-**[Download Splat-1.0.2.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.2.dmg)**: signed and notarized by Apple, for macOS 14 or later on Apple Silicon.
+**[Download Splat-1.0.3.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)**: signed and notarized by Apple, for macOS 14 or later on Apple Silicon.
  
  
 
@@ -119,7 +119,7 @@ Slovenščina · Suomi · Svenska · Tiếng Việt · Türkçe · Ελληνι�
 
 ## Installation
 
-**From the disk image.** Download [`dist/Splat-1.0.2.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.2.dmg), open it and drag Splat onto the Applications folder. The image is signed with a
+**From the disk image.** Download [`dist/Splat-1.0.3.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg), open it and drag Splat onto the Applications folder. The image is signed with a
 Developer ID and notarized by Apple, so it opens without warnings.
 
 **With Homebrew.** The cask lives in a tap of its own:
