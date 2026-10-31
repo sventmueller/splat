@@ -410,7 +410,7 @@ define_class!(
     }
 
     unsafe impl NSSharingServicePickerToolbarItemDelegate for EditorController {
-        // AppKit asks for the items on every toolbar validation, so the file is only rewritten when the menu opens.
+        // AppKit asks for the items on every toolbar validation, so the file gets the text only when the menu opens.
         #[unsafe(method_id(itemsForSharingServicePickerToolbarItem:))]
         fn share_items(&self, _item: &NSSharingServicePickerToolbarItem) -> Retained<NSArray> {
             match self.share_file(false) {
@@ -713,7 +713,7 @@ impl EditorController {
                 st.pending = None;
             }
         }
-        if why == Invalidate::Text || why == Invalidate::Preview {
+        if update::updates_at_once(why, crate::util::storage(self.source()).length()) {
             self.update();
         } else {
             self.refresh();

@@ -1576,6 +1576,16 @@ fn run(mtm: MainThreadMarker, out: &Path) {
                     &format!("{ids:?}"),
                 );
                 window_image(&e.window().unwrap(), &c.out.join("06-toolbar.png"));
+                let unshared = e.share_file(false).and_then(|u| u.path()).map(|p| p.to_string());
+                let unshared_len = unshared
+                    .as_deref()
+                    .and_then(|p| std::fs::metadata(p).ok())
+                    .map(|m| m.len());
+                check(
+                    "the share file holds no text before sharing",
+                    unshared_len == Some(0),
+                    &format!("{unshared:?}: {unshared_len:?} bytes"),
+                );
                 let path = e.share_file(true).and_then(|u| u.path()).map(|p| p.to_string());
                 let content = path.as_deref().and_then(|p| std::fs::read_to_string(p).ok());
                 check(
