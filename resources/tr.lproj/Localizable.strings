@@ -38,7 +38,7 @@
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Yapı taşları akış şemaları, sıralama diyagramları ve Gantt şemaları için kullanılabilir";
 "Bearbeiten" = "Düzen";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Yeni bir düğüme etiketli bağlantı";
-"Bewegen …" = "Taşı…";
+"Bewegen …" = "Şuraya Taşı…";
 "Bild" = "Görüntü";
 "Bild aus einer Datei einfügen" = "Dosyadan görüntü ekle";
 "Bild auswählen, das in das Dokument eingefügt wird." = "Belgeye eklenecek görüntüyü seçin.";
@@ -228,7 +228,7 @@
 "Transformationen" = "Dönüşümler";
 "Trennlinie" = "Bölücü Çizgi";
 "Trennlinie einfügen" = "Bölücü çizgi ekle";
-"Umbenennen …" = "Yeniden Adlandır…";
+"Umbenennen …" = "Adını Değiştir…";
 "Unten nach oben" = "Aşağıdan yukarıya";
 "Unterstrichen" = "Altı Çizgili";
 "Verbindung" = "Bağlantı";

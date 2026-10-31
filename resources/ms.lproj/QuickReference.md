@@ -20,12 +20,12 @@ Garis bawah, serlahan, superskrip dan subskrip bukan Markdown standard, tetapi H
 
 Apabila kursor berada di hujung perkataan, format digunakan pada apa yang anda taip seterusnya; di dalam perkataan, format digunakan pada seluruh perkataan.
 
-## Pengepala
+## Tajuk
 
 ```
-# Pengepala 1
-## Pengepala 2
-### Pengepala 3
+# Tajuk 1
+## Tajuk 2
+### Tajuk 3
 ```
 
 Pintasan: ⌥⌘1 hingga ⌥⌘6, teks badan dengan ⌥⌘0.
@@ -117,7 +117,7 @@ HTML seperti dalam README GitHub dipaparkan: perenggan di tengah, imej bersaiz, 
 
 Return pada baris kosong dalam pratonton memasukkan satu lagi baris kosong, Backspace membuangnya. Dalam sumber, setiap baris itu ialah dua baris kosong tambahan; program Markdown lain memaparkannya sebagai jarak perenggan biasa.
 
-“Masukkan › Senarai Kandungan” memautkan semua pengepala; apabila kursor berada dalam senarai kandungan, senarai itu dikemas kini. ⌘-klik pada entri untuk melompat ke pengepala tersebut.
+“Masukkan › Senarai Kandungan” memautkan semua tajuk; apabila kursor berada dalam senarai kandungan, senarai itu dikemas kini. ⌘-klik pada entri untuk melompat ke tajuk tersebut.
 
 Nota kaki merujuk kepada catatan[^1]. Garis pembahagi dibuat dengan `---`:
 

@@ -6,7 +6,8 @@ mod html;
 use std::collections::HashMap;
 
 use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, diagram_kind, is_math_fence};
-use super::typography::{Mark, Quotes, marks, smarten};
+use super::text::right_to_left;
+use super::typography::{Mark, Open, Quotes, marks, smarten};
 use crate::i18n::t;
 
 /// An image for the document, as PNG or JPEG data, with its size in points.
@@ -48,6 +49,7 @@ pub fn to_docx(doc: &Doc, export: &WordExport) -> Vec<u8> {
         footnote_ix: HashMap::new(),
         last_paragraph: 0,
         gap: false,
+        open: Open::default(),
     };
     let ctx = Ctx::default();
     for block in &doc.blocks {
@@ -98,6 +100,8 @@ struct Writer<'a> {
     last_paragraph: usize,
     /// The next paragraph carries the space the block before it could not have after itself.
     gap: bool,
+    /// Quotes the runs of the paragraph being written left open.
+    open: Open,
 }
 
 impl<'a> Writer<'a> {
@@ -279,11 +283,21 @@ impl<'a> Writer<'a> {
     }
 
     fn raw_paragraph(&mut self, ppr: &str, runs: &str) {
-        let ppr = if std::mem::take(&mut self.gap) {
+        let mut ppr = if std::mem::take(&mut self.gap) {
             with_spacing(ppr, "w:before", GAP)
         } else {
             ppr.to_string()
         };
+        if !ppr.contains("w:val=\"Code\"") && right_to_left(&run_text(runs)) == Some(true) {
+            // Word expects the direction before spacing, indentation and alignment.
+            let at = ["<w:spacing", "<w:ind", "<w:jc"]
+                .iter()
+                .filter_map(|tag| ppr.find(tag))
+                .min()
+                .unwrap_or(ppr.len());
+            ppr.insert_str(at, "<w:bidi/>");
+        }
+        self.open = Open::default();
         self.last_paragraph = self.body.len();
         self.body.push_str("<w:p>");
         if !ppr.is_empty() {
@@ -329,9 +343,11 @@ impl<'a> Writer<'a> {
                 "",
             );
         }
-        self.body.push_str(
-            "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid>",
-        );
+        let mirrored = right_to_left(&self.export.source[table.range.clone()]) == Some(true);
+        self.body.push_str(&format!(
+            "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/>{}<w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid>",
+            if mirrored { "<w:bidiVisual/>" } else { "" }
+        ));
         for _ in alignments {
             self.body.push_str("<w:gridCol/>");
         }
@@ -480,7 +496,7 @@ impl<'a> Writer<'a> {
             .get(..source.floor_char_boundary(at))
             .and_then(|s| s.chars().next_back());
         let shown = match self.export.quotes {
-            Some(q) if !props.code => smarten(literal, before, q),
+            Some(q) if !props.code => smarten(literal, before, q, &mut self.open),
             _ => literal.to_string(),
         };
         let mut done = 0;
@@ -628,6 +644,18 @@ fn asked_size(picture: Picture, width: Option<u32>, height: Option<u32>) -> Pict
         height: h,
         ..picture
     }
+}
+
+/// The text of the runs as the reader sees it, without the escapes that `xml` adds.
+fn run_text(runs: &str) -> String {
+    runs.split("<w:t xml:space=\"preserve\">")
+        .skip(1)
+        .filter_map(|part| part.split("</w:t>").next())
+        .collect::<String>()
+        .replace("&quot;", "\"")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
 }
 
 /// Paragraph properties with `attribute` set on their spacing, unless it is set already; Word requires the spacing
@@ -941,6 +969,38 @@ mod tests {
             at = start + size;
         }
         out
+    }
+
+    #[test]
+    fn right_to_left_paragraphs_and_tables_are_marked_for_word() {
+        let zip = export(
+            "# כותרת\n\n- פריט\n\nEnglish\n\n& \"שלום\" <ברכה>\n\n| שם | ערך |\n|---|---|\n| 1 | 2 |\n\n```\n# הערה\n```\n",
+        );
+        let files = entries(&zip);
+        let document =
+            String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
+        assert!(
+            document.contains("<w:pStyle w:val=\"Heading1\"/><w:bidi/>"),
+            "{document}"
+        );
+        assert!(
+            document.contains("<w:bidi/><w:ind ") || document.contains("</w:numPr><w:bidi/>"),
+            "{document}"
+        );
+        assert!(
+            document.contains("<w:tblStyle w:val=\"TableGrid\"/><w:bidiVisual/>"),
+            "{document}"
+        );
+        assert_eq!(document.matches("<w:bidi/>").count(), 5, "{document}");
+    }
+
+    #[test]
+    fn quotes_without_spaces_pair_across_runs_of_a_paragraph_only() {
+        let zip = export("彼は\"今日は\n晴れ\"です\n\n\"x\"\n");
+        let files = entries(&zip);
+        let document =
+            String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
+        assert!(document.contains("晴れ“です") && document.contains("„x“"), "{document}");
     }
 
     #[test]

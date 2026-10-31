@@ -329,6 +329,7 @@ impl Writer<'_, '_, '_> {
         let table = self.b.table as u32;
         let mut inner = cx.ctx.clone();
         inner.group = self.b.next_group();
+        let start = self.b.paras.len();
         for (row, (r, in_head)) in rows.iter().enumerate() {
             let mut col = 0;
             for cell in cells(r) {
@@ -375,6 +376,7 @@ impl Writer<'_, '_, '_> {
                 col += 1;
             }
         }
+        self.b.set_direction(start, inner.group);
     }
 
     /// A table cell is one paragraph, so block elements inside it run together.

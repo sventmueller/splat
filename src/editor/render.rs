@@ -11,7 +11,7 @@ use objc2_app_kit::{
     NSImageSymbolConfiguration, NSLinkAttributeName, NSMutableParagraphStyle, NSParagraphStyleAttributeName,
     NSStrikethroughStyleAttributeName, NSTextAlignment, NSTextAttachment, NSTextBlock, NSTextBlockLayer,
     NSTextBlockValueType, NSTextTab, NSTextTable, NSTextTableBlock, NSTextTableLayoutAlgorithm, NSToolTipAttributeName,
-    NSUnderlineStyleAttributeName,
+    NSUnderlineStyleAttributeName, NSWritingDirection,
 };
 use objc2_foundation::{
     NSArray, NSAttributedString, NSDictionary, NSMutableAttributedString, NSNumber, NSPoint, NSRect, NSRectEdge,
@@ -157,6 +157,12 @@ impl RenderCtx<'_> {
         continues_group: bool,
     ) -> Retained<NSMutableParagraphStyle> {
         let st = NSMutableParagraphStyle::new();
+        // TextKit 1 aligns a paragraph without an explicit direction by the interface language, not by its text.
+        st.setBaseWritingDirection(match para.style.rtl {
+            Some(true) => NSWritingDirection::RightToLeft,
+            Some(false) => NSWritingDirection::LeftToRight,
+            None => NSWritingDirection::Natural,
+        });
         let s = self.size();
         let style = &para.style;
         let list_indent = style.list_depth as f64 * LIST_INDENT;
@@ -177,7 +183,7 @@ impl RenderCtx<'_> {
             let tab = unsafe {
                 NSTextTab::initWithTextAlignment_location_options(
                     NSTextTab::alloc(),
-                    NSTextAlignment::Left,
+                    NSTextAlignment::Natural,
                     head,
                     &NSDictionary::new(),
                 )
@@ -269,13 +275,19 @@ impl RenderCtx<'_> {
                     );
                     t
                 });
+                let span = (*span).max(1);
+                let column = if style.mirrored {
+                    columns.saturating_sub(col + span)
+                } else {
+                    *col
+                };
                 let cell = NSTextTableBlock::initWithTable_startingRow_rowSpan_startingColumn_columnSpan(
                     NSTextTableBlock::alloc(),
                     t,
                     *row as isize,
                     1,
-                    *col as isize,
-                    (*span).max(1) as isize,
+                    column as isize,
+                    span as isize,
                 );
                 cell.setWidth_type_forLayer(1.0, NSTextBlockValueType::AbsoluteValueType, NSTextBlockLayer::Border);
                 cell.setBorderColor(Some(&NSColor::separatorColor()));
@@ -331,19 +343,24 @@ impl RenderCtx<'_> {
         if style.quote_depth > 0 && !matches!(style.kind, ParaKind::Code { .. } | ParaKind::TableCell { .. }) {
             let b = blocks.groups.entry(style.group).or_insert_with(|| {
                 let b = full_width_block();
+                let edge = if style.mirrored {
+                    NSRectEdge::MaxX
+                } else {
+                    NSRectEdge::MinX
+                };
                 b.setWidth_type_forLayer_edge(
                     3.0,
                     NSTextBlockValueType::AbsoluteValueType,
                     NSTextBlockLayer::Border,
-                    NSRectEdge::MinX,
+                    edge,
                 );
                 let border = style.alert.map_or_else(NSColor::tertiaryLabelColor, alert_color);
-                b.setBorderColor_forEdge(Some(&border), NSRectEdge::MinX);
+                b.setBorderColor_forEdge(Some(&border), edge);
                 b.setWidth_type_forLayer_edge(
                     s * 0.7,
                     NSTextBlockValueType::AbsoluteValueType,
                     NSTextBlockLayer::Padding,
-                    NSRectEdge::MinX,
+                    edge,
                 );
                 b.setWidth_type_forLayer_edge(
                     s * 0.7,

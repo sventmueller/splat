@@ -104,7 +104,7 @@ Terim
 
 [[Not]] aynı klasördeki ya da altındaki bir nota bağlantı verir, ![[Not]] onu gömer. #Etiketler, GitHub ve GitLab projelerinde @ad ve #12 gibi başvurular ve bir BibTeX dosyasından [@doe2020] gibi alıntılar vurgulanır; ⌘-tıklama onları izler. “Görüntü › Tipografik noktalama” dilin tırnak işaretlerini, tirelerini ve üç noktasını kullanır.
 
-### Kendi çapa {#capa}
+### Özel çapa {#capa}
 
 <details>
 <summary>HTML</summary>

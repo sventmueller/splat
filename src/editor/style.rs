@@ -8,12 +8,12 @@ use objc2::runtime::AnyObject;
 use objc2_app_kit::{
     NSAppearance, NSAppearanceNameAccessibilityHighContrastAqua, NSAppearanceNameAccessibilityHighContrastDarkAqua,
     NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor, NSFont, NSFontAttributeName, NSFontManager,
-    NSFontTraitMask, NSFontWeightBold, NSFontWeightRegular, NSForegroundColorAttributeName,
-    NSStrikethroughStyleAttributeName, NSTextStorage,
+    NSFontTraitMask, NSFontWeightBold, NSFontWeightRegular, NSForegroundColorAttributeName, NSMutableParagraphStyle,
+    NSParagraphStyleAttributeName, NSStrikethroughStyleAttributeName, NSTextStorage, NSWritingDirection,
 };
 use objc2_foundation::{NSArray, NSAttributedStringKey, NSDictionary, NSNumber, NSRange};
 
-use crate::markdown::highlight::{Style, Token, changed_region};
+use crate::markdown::highlight::{Style, Token, changed_region, right_to_left_behind_markers};
 use crate::markdown::palette::{self, Appearance, Rgb};
 use crate::markdown::text::Utf16Cursor;
 use crate::util::constant;
@@ -173,5 +173,29 @@ pub fn apply_highlight_changes(
             }
         }
     }
+    set_line_directions(storage, text, start..end.max(start));
     storage.endEditing();
+}
+
+/// TextKit takes a source line's direction from its first letter, for a done task the x of `[x]`; a line begun
+/// before the restyled region would keep a stale direction, so it is cleared.
+fn set_line_directions(storage: &NSTextStorage, text: &str, region: std::ops::Range<usize>) {
+    let rtl = NSMutableParagraphStyle::new();
+    rtl.setBaseWritingDirection(NSWritingDirection::RightToLeft);
+    let mut cursor = Utf16Cursor::new(text);
+    let mut at = text[..region.start].rfind('\n').map_or(0, |i| i + 1);
+    while at < text.len() && at <= region.end {
+        let stop = text[at..].find('\n').map_or(text.len(), |i| at + i);
+        let (a, b) = (cursor.at(at), cursor.at(stop));
+        let line = NSRange::new(a, b - a);
+        // SAFETY: A paragraph style for its key, within the text.
+        unsafe {
+            if right_to_left_behind_markers(&text[at..stop]) {
+                storage.addAttribute_value_range(NSParagraphStyleAttributeName, &rtl, line);
+            } else if at < region.start {
+                storage.removeAttribute_range(NSParagraphStyleAttributeName, line);
+            }
+        }
+        at = stop + 1;
+    }
 }

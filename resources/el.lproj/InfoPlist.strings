@@ -1,0 +1,4 @@
+/* Splat system texts in Greek. */
+
+NSHumanReadableCopyright = "Επεξεργαστής Markdown";
+"Markdown Document" = "Έγγραφο Markdown";

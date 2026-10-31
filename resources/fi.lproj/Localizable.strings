@@ -279,7 +279,7 @@
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Internetin kuvat on estetty: kun ne ladataan, niiden palvelimet saavat tietää, että ja milloin avaat tämän dokumentin.";
 "Bilder laden" = "Lataa kuvat";
 "Dokument zuerst sichern" = "Tallenna dokumentti ensin";
-"Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Liitetyt kuvat tallennetaan tiedostoina dokumentin viereen. Tallenna se ja liitä kuva sitten uudelleen.";
+"Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Sijoitetut kuvat tallennetaan tiedostoina dokumentin viereen. Tallenna dokumentti ja sijoita kuva sitten uudelleen.";
 "Export fehlgeschlagen" = "Vienti epäonnistui";
 "Gliederung ausblenden" = "Kätke jäsennys";
 "Gliederung einblenden" = "Näytä jäsennys";

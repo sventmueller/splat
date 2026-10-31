@@ -1,0 +1,4 @@
+/* Splat system texts in Korean. */
+
+NSHumanReadableCopyright = "Markdown 편집기";
+"Markdown Document" = "Markdown 문서";

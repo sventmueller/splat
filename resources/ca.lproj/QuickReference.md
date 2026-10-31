@@ -100,9 +100,9 @@ Terme
 : Explicació en una llista de definicions
 
 > [!tip]-
-> Feu clic a ▸ per desplegar el quadre.
+> Fes clic a ▸ per desplegar el requadre.
 
-[[Nota]] enllaça una nota de la mateixa carpeta o de més avall, ![[Nota]] la incrusta. Les #etiquetes, les referències com @nom i #12 en projectes de GitHub i GitLab i les cites com [@doe2020] d’un fitxer BibTeX es ressalten; ⌘-clic les segueix. «Visualització › Puntuació tipogràfica» posa les cometes, els guions i els punts suspensius de la llengua.
+[[Nota]] enllaça una nota de la mateixa carpeta o de més avall, ![[Nota]] la incrusta. Les #etiquetes, les referències com @nom i #12 en projectes de GitHub i GitLab i les cites com [@doe2020] d’un fitxer BibTeX es ressalten; ⌘-clic les segueix. «Mostra › Puntuació tipogràfica» posa les cometes, els guions i els punts suspensius de la llengua.
 
 ### Àncora pròpia {#ancora}
 

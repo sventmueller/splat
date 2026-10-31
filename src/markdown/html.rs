@@ -14,8 +14,8 @@ use comrak::options::Plugins;
 use comrak::{Arena, format_html_with_plugins, parse_document};
 
 use super::doc::{AlertKind, Figure, diagram_kind, is_diagram, is_math_fence, options};
-use super::text::LineStarts;
-use super::typography::{Mark, Quotes, marks, smarten};
+use super::text::{LineStarts, right_to_left};
+use super::typography::{Mark, Open, Quotes, marks, smarten};
 use crate::i18n::t;
 
 /// What the page needs from outside the text.
@@ -111,8 +111,15 @@ pub fn to_html(text: &str, export: &Export) -> String {
         .descendants()
         .filter(|n| matches!(n.data().value, NodeValue::Text(_)))
         .collect();
+    let mut paragraph = None;
+    let mut open = Open::default();
     for node in texts {
-        decorate(&arena, node, text, &lines, export);
+        let block = node.ancestors().find(|a| a.data().value.block());
+        if block.map(|b| b as *const AstNode) != paragraph {
+            paragraph = block.map(|b| b as *const AstNode);
+            open = Open::default();
+        }
+        decorate(&arena, node, text, &lines, export, &mut open);
     }
     let anchors = Anchors(Mutex::new(
         super::commands::heading_anchors(&super::doc::parse(text))
@@ -124,6 +131,7 @@ pub fn to_html(text: &str, export: &Export) -> String {
     plugins.render.heading_adapter = Some(&anchors);
     let mut body = String::new();
     let _ = format_html_with_plugins(root, &opts, &mut body, &plugins);
+    let body = with_directions(&body);
     format!(
         "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src 'self' data: https: file:; style-src 'unsafe-inline'\">\n\
@@ -139,12 +147,103 @@ struct Anchors(Mutex<VecDeque<String>>);
 impl HeadingAdapter for Anchors {
     fn enter(&self, output: &mut dyn fmt::Write, heading: &HeadingMeta, _: Option<Sourcepos>) -> fmt::Result {
         let id = self.0.lock().ok().and_then(|mut a| a.pop_front()).unwrap_or_default();
-        write!(output, "<h{} id=\"{}\">", heading.level, escape(&id))
+        write!(output, "<h{} id=\"{}\" dir=\"auto\">", heading.level, escape(&id))
     }
 
     fn exit(&self, output: &mut dyn fmt::Write, heading: &HeadingMeta) -> fmt::Result {
         writeln!(output, "</h{}>", heading.level)
     }
+}
+
+/// Paragraphs, list items and terms take the direction of their first letter, so Hebrew and Arabic read right to left.
+/// Quotes, callouts, lists and tables take the direction of their text as a whole, as in the preview, set explicitly:
+/// a browser resolving `dir="auto"` skips descendants that have a direction of their own. Code stays left to right.
+fn with_directions(body: &str) -> String {
+    const LEAVES: [&str; 4] = ["<p>", "<li>", "<dt>", "<dd>"];
+    const CONTAINERS: [(&str, &str); 5] = [
+        ("<blockquote", "blockquote"),
+        ("<ul", "ul"),
+        ("<ol", "ol"),
+        ("<table", "table"),
+        ("<div class=\"markdown-alert ", "div"),
+    ];
+    let mut out = String::with_capacity(body.len() + body.len() / 4);
+    let mut at = 0;
+    while let Some(i) = body[at..].find('<').map(|i| at + i) {
+        out.push_str(&body[at..i]);
+        let rest = &body[i..];
+        if let Some(leaf) = LEAVES.iter().find(|leaf| rest.starts_with(**leaf)) {
+            out.push_str(&leaf[..leaf.len() - 1]);
+            out.push_str(" dir=\"auto\">");
+            at = i + leaf.len();
+        } else if let Some((_, name)) = CONTAINERS
+            .iter()
+            .find(|(open, name)| rest.starts_with(open) && opens(rest, name))
+        {
+            let element = &body[i..element_end(body, i, name)];
+            let dir = if reads_right_to_left(element) { "rtl" } else { "ltr" };
+            out.push_str(&format!("<{name} dir=\"{dir}\""));
+            at = i + 1 + name.len();
+        } else {
+            out.push('<');
+            at = i + 1;
+        }
+    }
+    out.push_str(&body[at..]);
+    out
+}
+
+/// Whether `html` starts with an opening tag named `name`, not with a longer name.
+fn opens(html: &str, name: &str) -> bool {
+    html.strip_prefix('<')
+        .and_then(|r| r.strip_prefix(name))
+        .is_some_and(|r| r.starts_with([' ', '>']))
+}
+
+/// The end of the element opening at `start`, after its closing tag, or the end of `html`.
+fn element_end(html: &str, start: usize, name: &str) -> usize {
+    let close = format!("</{name}>");
+    let mut depth = 0;
+    let mut at = start;
+    while let Some(i) = html[at..].find('<').map(|i| at + i) {
+        if html[i..].starts_with(&close) {
+            depth -= 1;
+            at = i + close.len();
+            if depth == 0 {
+                return at;
+            }
+        } else {
+            depth += usize::from(opens(&html[i..], name));
+            at = i + 1;
+        }
+    }
+    html.len()
+}
+
+/// Whether the first letter of an element's text, outside tags, entities and code blocks, reads right to left. A
+/// callout decides by its body, and by its title only when the body has no letters.
+fn reads_right_to_left(element: &str) -> bool {
+    let text = |with_title: bool| {
+        let mut out = String::new();
+        let mut rest = element;
+        while let Some(c) = rest.chars().next() {
+            let skip = if rest.starts_with("<pre") {
+                rest.find("</pre>").map_or(rest.len(), |e| e + "</pre>".len())
+            } else if !with_title && rest.starts_with("<p class=\"markdown-alert-title\"") {
+                rest.find("</p>").map_or(rest.len(), |e| e + "</p>".len())
+            } else if c == '<' {
+                rest.find('>').map_or(rest.len(), |e| e + 1)
+            } else if c == '&' {
+                rest.find(';').map_or(1, |e| e + 1)
+            } else {
+                out.push(c);
+                c.len_utf8()
+            };
+            rest = &rest[skip..];
+        }
+        out
+    };
+    right_to_left(&text(false)).or_else(|| right_to_left(&text(true))) == Some(true)
 }
 
 fn rewrite<'a>(node: &'a AstNode<'a>, export: &Export) {
@@ -267,7 +366,14 @@ fn rewrite<'a>(node: &'a AstNode<'a>, export: &Export) {
 }
 
 /// Typographic punctuation, tags, references and citations in running text, as in the preview.
-fn decorate<'a>(arena: &'a Arena<'a>, node: &'a AstNode<'a>, text: &str, lines: &LineStarts, export: &Export) {
+fn decorate<'a>(
+    arena: &'a Arena<'a>,
+    node: &'a AstNode<'a>,
+    text: &str,
+    lines: &LineStarts,
+    export: &Export,
+    open: &mut Open,
+) {
     if node.ancestors().any(|a| {
         matches!(
             a.data().value,
@@ -286,7 +392,7 @@ fn decorate<'a>(arena: &'a Arena<'a>, node: &'a AstNode<'a>, text: &str, lines: 
     };
     let before = text[..text.floor_char_boundary(start)].chars().next_back();
     let shown = match export.quotes {
-        Some(q) => smarten(&literal, before, q),
+        Some(q) => smarten(&literal, before, q, open),
         None => literal,
     };
     let found = marks(&shown, before, true);
@@ -481,14 +587,14 @@ code, pre { font: 0.9em ui-monospace, Menlo, monospace; background: #f3f3f5; bor
 code { padding: 0.1em 0.3em; }
 pre { padding: 0.8em 1em; overflow-x: auto; }
 pre code { padding: 0; background: none; }
-blockquote { margin: 0; padding: 0 1em; border-left: 3px solid #d2d2d7; color: #555; }
+blockquote { margin: 0; padding: 0 1em; border-inline-start: 3px solid #d2d2d7; color: #555; }
 table { border-collapse: collapse; }
 th, td { border: 1px solid #d2d2d7; padding: 0.35em 0.7em; }
 th { background: #f5f5f7; }
 img { max-width: 100%; }
 mark { background: #fff3a3; }
 hr { border: 0; border-top: 1px solid #d2d2d7; }
-.markdown-alert { border-left: 4px solid #0969da; padding: 0.2em 1em; margin: 1em 0; background: #f6f8fa; }
+.markdown-alert { border-inline-start: 4px solid #0969da; padding: 0.2em 1em; margin: 1em 0; background: #f6f8fa; }
 .markdown-alert-title { font-weight: 600; }
 .markdown-alert-tip { border-color: #1a7f37; }
 .markdown-alert-important { border-color: #8250df; }
@@ -500,7 +606,7 @@ hr { border: 0; border-top: 1px solid #d2d2d7; }
 cite { font-style: normal; color: #7a5c2e; }
 .spoiler:hover { background: none; }
 dt { font-weight: 600; }
-dd { margin: 0 0 0.6em 1.5em; }
+dd { margin: 0 0 0.6em; margin-inline-start: 1.5em; }
 dd > p { margin: 0.2em 0; }
 @media (prefers-color-scheme: dark) {
   body { background: #1e1e1e; color: #e8e8ed; }
@@ -574,18 +680,45 @@ mod tests {
             "# Titel {#eigene-id}\n\n## Zweiter\n\n==hell== x^2^ :rocket: ||geheim|| %%still%% [[Seite|T]] ![[img/eingebettet.png]]\n\n\
              Begriff\n\n: Erklärung\n\n> [!bug]- Absturz\n> Inhalt\n\n```math\nx^2\n```\n",
         );
-        assert!(page.contains("<h1 id=\"eigene-id\">Titel</h1>"), "{page}");
-        assert!(page.contains("<h2 id=\"zweiter\">Zweiter</h2>"), "{page}");
+        assert!(page.contains("<h1 id=\"eigene-id\" dir=\"auto\">Titel</h1>"), "{page}");
+        assert!(page.contains("<h2 id=\"zweiter\" dir=\"auto\">Zweiter</h2>"), "{page}");
         assert!(page.contains("<mark>hell</mark>") && page.contains("<sup>2</sup>") && page.contains("🚀"));
         assert!(page.contains("<span class=\"spoiler\">geheim</span>") && !page.contains("still"));
         assert!(page.contains("href=\"../docs/Seite.md\""), "{page}");
         assert!(page.contains("src=\"data:image/png;base64,UE5H\""), "{page}");
-        assert!(page.contains("<dt>Begriff</dt>"));
+        assert!(page.contains("<dt dir=\"auto\">Begriff</dt>"));
         assert!(
             page.contains("markdown-alert-caution") && page.contains("Absturz"),
             "{page}"
         );
         assert!(page.contains("<img class=\"math\" alt=\"x^2\">"), "{page}");
+    }
+
+    #[test]
+    fn blocks_take_the_direction_of_their_text() {
+        let page = export(
+            "פסקה\n\n- אחד\n\n> \"ציטוט\" & עוד\n>\n> > English\n\n| א | ב |\n|---|---|\n| 1 | 2 |\n\n\
+             3. שלוש\n\n> [!NOTE] כותרת\n\n> [!NOTE] Title\n> גוף\n\n```\nכתוב\n```\n",
+        );
+        for tag in [
+            "<p dir=\"auto\">פסקה",
+            "<ul dir=\"rtl\">\n<li dir=\"auto\">אחד",
+            "<blockquote dir=\"rtl\">\n<p dir=\"auto\">",
+            "<blockquote dir=\"ltr\">\n<p dir=\"auto\">English",
+            "<table dir=\"rtl\">",
+            "<ol dir=\"rtl\" start=\"3\">",
+        ] {
+            assert!(page.contains(tag), "{tag}: {page}");
+        }
+        assert_eq!(
+            page.matches("<div dir=\"rtl\" class=\"markdown-alert ").count(),
+            2,
+            "{page}"
+        );
+        assert!(
+            page.contains("<pre><code>כתוב") && page.contains("border-inline-start"),
+            "{page}"
+        );
     }
 
     #[test]
@@ -609,7 +742,7 @@ mod tests {
         let hidden = export("<a href=\"java&#9;script:x()\">a</a> <a href=\"&#1;javascript:y()\">b</a>\n");
         assert_eq!(hidden.matches("<a href=\"#\">").count(), 2, "{hidden}");
         let details = page.find("<details>\n<summary>Mehr</summary>").expect(&page);
-        let content = page.find("<p>Inhalt</p>").unwrap();
+        let content = page.find("<p dir=\"auto\">Inhalt</p>").unwrap();
         let close = page.find("</details>").unwrap();
         assert!(details < content && content < close, "{page}");
         assert!(page.contains("<kbd>⌘</kbd>"));

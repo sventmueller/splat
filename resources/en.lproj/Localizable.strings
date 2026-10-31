@@ -138,9 +138,9 @@
 "Markierten Text durchstreichen" = "Strike through the selected text";
 "Markierten Text farbig hervorheben" = "Highlight the selected text in colour";
 "Markierten Text fett formatieren" = "Make the selected text bold";
-"Markierten Text hochstellen" = "Raise the selected text";
+"Markierten Text hochstellen" = "Make the selected text superscript";
 "Markierten Text kursiv formatieren" = "Make the selected text italic";
-"Markierten Text tiefstellen" = "Lower the selected text";
+"Markierten Text tiefstellen" = "Make the selected text subscript";
 "Markierten Text unterstreichen" = "Underline the selected text";
 "Matrix" = "Matrix";
 "Meilenstein" = "Milestone";
@@ -276,7 +276,7 @@
 "Öffnen" = "Open";
 "Als HTML exportieren …" = "Export as HTML…";
 "Als Word-Dokument exportieren …" = "Export as Word Document…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Images from the internet are blocked: loading them tells their servers that and when you open this document.";
+"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Images from the internet are blocked: loading them lets their servers know when you open this document.";
 "Bilder laden" = "Load Images";
 "Dokument zuerst sichern" = "Save the Document First";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Pasted images are stored as files next to the document. Save it, then paste the image again.";

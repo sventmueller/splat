@@ -1,0 +1,4 @@
+/* Splat system texts in Japanese. */
+
+NSHumanReadableCopyright = "Markdownエディタ";
+"Markdown Document" = "Markdown書類";

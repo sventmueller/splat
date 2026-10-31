@@ -1560,6 +1560,67 @@ fn run(mtm: MainThreadMarker, out: &Path) {
                     !line.contains('*') && !line.contains('x'),
                     &line,
                 );
+                append(&c.e, "\nEingabe\n");
+            }),
+            step(0.3, |c| {
+                let e = &c.e;
+                e.window().unwrap().makeFirstResponder(Some(e.preview()));
+                let p = storage(e.preview()).string().to_string();
+                let Some(b) = p.rfind("Eingabe") else {
+                    check(
+                        "an input method composes in the preview",
+                        false,
+                        "paragraph not rendered",
+                    );
+                    return;
+                };
+                let end = p[..b].encode_utf16().count() + "Eingabe".encode_utf16().count();
+                e.preview().setSelectedRange(NSRange::new(end, 0));
+                compose(e.preview(), "にほん");
+            }),
+            step(0.15, |c| compose(c.e.preview(), "にほんご")),
+            step(0.15, |c| {
+                let composing = c.e.preview().hasMarkedText();
+                let before = source(&c.e);
+                type_in_preview(&c.e, "日本語");
+                let s = source(&c.e);
+                check(
+                    "an input method composes in the preview",
+                    composing && !before.contains('ほ'),
+                    &format!("marked text {composing}, {}", tail(&before, 30)),
+                );
+                check(
+                    "an input method commits its word once (preview)",
+                    s.contains("\nEingabe日本語\n") && !s.contains('ほ'),
+                    &tail(&s, 30),
+                );
+            }),
+            step(0.3, |c| {
+                let e = &c.e;
+                e.window().unwrap().makeFirstResponder(Some(e.source()));
+                let s = source(e);
+                let end = s.rfind("Eingabe日本語").map_or(s.len(), |b| b + "Eingabe日本語".len());
+                e.source()
+                    .setSelectedRange(NSRange::new(Utf16Map::new(&s).to_u16(end), 0));
+                compose(e.source(), "ni");
+            }),
+            step(0.15, |c| compose(c.e.source(), "nihao")),
+            step(0.15, |c| {
+                check(
+                    "an input method composes in the source",
+                    c.e.source().hasMarkedText(),
+                    &tail(&source(&c.e), 30),
+                );
+                type_in_source(&c.e, "你好");
+            }),
+            step(0.4, |c| {
+                let s = source(&c.e);
+                let p = storage(c.e.preview()).string().to_string();
+                check(
+                    "an input method commits its word once (source)",
+                    s.contains("\nEingabe日本語你好\n") && !s.contains("nihao") && p.contains("Eingabe日本語你好"),
+                    &tail(&s, 30),
+                );
             }),
             step(0.15, |c| {
                 let e = &c.e;
@@ -2363,6 +2424,14 @@ fn keep_typing(left: usize) {
         type_in_source(&e, "w");
         keep_typing(left - 1);
     });
+}
+
+/// Shows `text` as marked text at the caret, as an input method does while a word is being composed.
+fn compose(view: &objc2_app_kit::NSTextView, text: &str) {
+    let caret = NSRange::new(text.encode_utf16().count(), 0);
+    unsafe {
+        view.setMarkedText_selectedRange_replacementRange(&ns(text), caret, NSRange::new(NSNotFound as usize, 0))
+    };
 }
 
 fn type_in_source(e: &EditorController, text: &str) {

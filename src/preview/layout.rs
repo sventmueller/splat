@@ -3,7 +3,8 @@ use std::ops::Range;
 
 use crate::markdown::doc::{AlertKind, Align, Block, BlockKind, DiagramKind, Doc, Inline, InlineKind, ListKind};
 use crate::markdown::incremental::Splice;
-use crate::markdown::typography::{Mark, Quotes, marks, smarten, typographic_source};
+use crate::markdown::text::right_to_left;
+use crate::markdown::typography::{Mark, Open, Quotes, marks, smarten, typographic_source};
 
 mod html;
 
@@ -73,6 +74,10 @@ pub struct ParaStyle {
     pub align: AlignKey,
     /// Rendered from embedded HTML, which is edited in the source only.
     pub html: bool,
+    /// Whether the paragraph reads right to left, from its first letter; `None` without letters.
+    pub rtl: Option<bool>,
+    /// The quote, callout or table around the paragraph reads right to left, which mirrors its border and columns.
+    pub mirrored: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -281,6 +286,8 @@ struct Builder<'a> {
     group: usize,
     table: usize,
     paras: Vec<Para>,
+    /// Quotes the runs of the next paragraph left open so far.
+    open: std::cell::Cell<Open>,
 }
 
 #[derive(Clone, Default)]
@@ -356,6 +363,7 @@ fn build(
         group: 0,
         table: 0,
         paras: Vec::new(),
+        open: Default::default(),
     };
     let old_starts: Vec<usize> = old.iter().map(|o| o.src.start).collect();
     let mut old: Vec<Option<TopBlock>> = old.into_iter().map(Some).collect();
@@ -621,6 +629,8 @@ fn empty_para(at: usize) -> Para {
             alert: None,
             align: AlignKey::Natural,
             html: false,
+            rtl: None,
+            mirrored: false,
         },
         runs: vec![],
         src: at..at,
@@ -770,6 +780,11 @@ impl Builder<'_> {
         mut runs: Vec<Run>,
         insert_at: usize,
     ) {
+        let rtl = if matches!(kind, ParaKind::Code { .. }) {
+            Some(false)
+        } else {
+            right_to_left(&runs.iter().map(|r| r.text.as_str()).collect::<String>())
+        };
         let marker = marker.map(|(m, marker_src)| {
             runs.insert(0, atom(Atom::Marker, &marker_text(&m), marker_src));
             m
@@ -786,11 +801,51 @@ impl Builder<'_> {
                 alert: ctx.alert,
                 align: ctx.align,
                 html: ctx.html,
+                rtl,
+                mirrored: false,
             },
             runs,
             src,
             insert_at,
         });
+        self.open.set(Open::default());
+    }
+
+    /// Mirrors the paragraphs of `group` since `start` when the group's text reads right to left; callout titles and
+    /// code do not count, as they keep their own language, but a title takes the direction of its callout.
+    fn set_direction(&mut self, start: usize, group: usize) {
+        let text: String = self.paras[start..]
+            .iter()
+            .filter(|p| p.style.group == group && !matches!(p.style.kind, ParaKind::AlertTitle | ParaKind::Code { .. }))
+            .flat_map(|p| &p.runs)
+            .filter(|r| !matches!(r.map, RunMap::Atom { atom: Atom::Marker, .. }))
+            .map(|r| r.text.as_str())
+            .collect();
+        // A callout without letters in its body, or folded, reads in the direction of its title.
+        let title = self.paras[start..]
+            .iter()
+            .find(|p| p.style.group == group && p.style.kind == ParaKind::AlertTitle)
+            .and_then(|p| p.style.rtl);
+        let mirrored = right_to_left(&text).or(title) == Some(true);
+        for p in &mut self.paras[start..] {
+            if p.style.group == group {
+                p.style.mirrored = mirrored;
+                if p.style.kind == ParaKind::AlertTitle {
+                    p.style.rtl = Some(mirrored);
+                }
+            }
+        }
+        if mirrored {
+            // TextKit places table cells left to right in text order, whatever column they name. Tables nested in a
+            // quote or callout have a group of their own and were mirrored by their own call.
+            let row = |p: &Para| match p.style.kind {
+                ParaKind::TableCell { table, row, .. } if p.style.group == group => Some((table, row)),
+                _ => None,
+            };
+            for cells in self.paras[start..].chunk_by_mut(|a, b| row(a).is_some() && row(a) == row(b)) {
+                cells.reverse();
+            }
+        }
     }
 
     fn block(&mut self, block: &Block, ctx: &Ctx, marker: Option<(Marker, Range<usize>)>) {
@@ -833,6 +888,7 @@ impl Builder<'_> {
                     group: self.next_group(),
                     ..ctx.clone()
                 };
+                let start = self.paras.len();
                 let mut marker = marker;
                 if block.children.is_empty() {
                     self.push_para(
@@ -847,6 +903,7 @@ impl Builder<'_> {
                 for child in &block.children {
                     self.block(child, &inner, marker.take());
                 }
+                self.set_direction(start, inner.group);
             }
             BlockKind::Alert {
                 kind,
@@ -876,6 +933,7 @@ impl Builder<'_> {
                         },
                     ));
                 }
+                let start = self.paras.len();
                 self.push_para(
                     ParaKind::AlertTitle,
                     &inner,
@@ -889,6 +947,7 @@ impl Builder<'_> {
                         self.block(child, &inner, None);
                     }
                 }
+                self.set_direction(start, inner.group);
             }
             BlockKind::DefinitionList => {
                 let mut marker = marker;
@@ -1114,6 +1173,7 @@ impl Builder<'_> {
                 let group = self.next_group();
                 let inner = Ctx { group, ..ctx.clone() };
                 let columns = alignments.len();
+                let start = self.paras.len();
                 let mut marker = marker;
                 for (row_index, row) in block.children.iter().enumerate() {
                     let header = matches!(row.kind, BlockKind::TableRow { header: true });
@@ -1146,6 +1206,7 @@ impl Builder<'_> {
                         }
                     }
                 }
+                self.set_direction(start, group);
             }
             BlockKind::FootnoteDefinition { name, label, number } => {
                 let inner = Ctx {
@@ -1342,7 +1403,12 @@ impl Builder<'_> {
     fn text_runs(&self, literal: &str, src: Range<usize>, style: &RunStyle, runs: &mut Vec<Run>) {
         let before = self.text[..src.start].chars().next_back();
         let shown = match self.resolver.quotes() {
-            Some(quotes) if !style.code && !style.html => smarten(literal, before, quotes),
+            Some(quotes) if !style.code && !style.html => {
+                let mut open = self.open.get();
+                let shown = smarten(literal, before, quotes, &mut open);
+                self.open.set(open);
+                shown
+            }
             _ => literal.to_string(),
         };
         let whole = self.aligned(&shown, src.clone(), style.clone());
@@ -1659,6 +1725,68 @@ mod tests {
     }
 
     #[test]
+    fn right_to_left_text_mirrors_its_quote_callout_and_table() {
+        let t = "פסקה\n\n- [x] משימה\n\n> [!NOTE]\n> הערה\n\n> Quote\n\n| שם | ערך |\n|---|---|\n| 1 | 2 |\n\n```\n# הערה\n```\n";
+        let d = parse(t);
+        let l = layout(t, &d, &NoImages, None);
+        let paras: Vec<&Para> = l.blocks.iter().flat_map(|b| &b.paras).collect();
+        let rtl: Vec<Option<bool>> = paras.iter().map(|p| p.style.rtl).collect();
+        let mirrored: Vec<bool> = paras.iter().map(|p| p.style.mirrored).collect();
+        assert_eq!(
+            rtl,
+            [
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(true),
+                Some(false),
+                Some(true),
+                Some(true),
+                None,
+                None,
+                Some(false)
+            ]
+        );
+        assert_eq!(
+            mirrored,
+            [false, false, true, true, false, true, true, true, true, false]
+        );
+        let cells: Vec<&str> = paras[5..9].iter().map(|p| p.runs[0].text.as_str()).collect();
+        assert_eq!(cells, ["ערך", "שם", "2", "1"]);
+    }
+
+    #[test]
+    fn a_table_in_a_quote_and_a_callout_without_body_take_their_own_direction() {
+        let cells = |t: &str| -> (Vec<String>, Vec<bool>) {
+            let d = parse(t);
+            let l = layout(t, &d, &NoImages, None);
+            l.blocks
+                .iter()
+                .flat_map(|b| &b.paras)
+                .filter(|p| matches!(p.style.kind, ParaKind::TableCell { .. }))
+                .map(|p| (p.runs[0].text.clone(), p.style.mirrored))
+                .unzip()
+        };
+        let table = "> | א | ב |\n> |---|---|\n> | 1 | 2 |\n";
+        assert_eq!(
+            cells(&format!("> שלום\n>\n{table}")),
+            (vec!["ב".into(), "א".into(), "2".into(), "1".into()], vec![true; 4])
+        );
+        assert_eq!(cells(&format!("> [!NOTE]\n> הערה\n>\n{table}")).0, ["ב", "א", "2", "1"]);
+        assert_eq!(
+            cells("> שלום\n>\n> | a | b |\n> |---|---|\n> | 1 | 2 |\n"),
+            (vec!["a".into(), "b".into(), "1".into(), "2".into()], vec![false; 4])
+        );
+        for t in ["> [!NOTE] הערה\n", "> [!NOTE]- הערה\n> תוכן\n"] {
+            let d = parse(t);
+            let l = layout(t, &d, &NoImages, None);
+            let title = &l.blocks[0].paras[0];
+            assert_eq!(title.style.kind, ParaKind::AlertTitle, "{t}");
+            assert_eq!((title.style.rtl, title.style.mirrored), (Some(true), true), "{t}");
+        }
+    }
+
+    #[test]
     fn paragraphs_lists_and_tables() {
         let t = "# Titel\n\nText **fett**\n\n- a\n- [x] b\n\n| h | i |\n|---|---|\n| 1 |   |\n";
         let d = parse(t);
@@ -1790,6 +1918,22 @@ mod tests {
                 )
             })
         }
+    }
+
+    #[test]
+    fn quotes_without_spaces_pair_across_line_breaks_and_formatting() {
+        let t = "彼は\"今日は\n晴れ\"です\n\n\"**強調**\"と\"言\"\n";
+        let d = parse(t);
+        let l = layout(t, &d, &Surroundings, None);
+        let shown: Vec<String> = l.blocks[..2]
+            .iter()
+            .map(|b| b.paras[0].runs.iter().map(|r| r.text.as_str()).collect())
+            .collect();
+        assert!(
+            shown[0].starts_with("彼は„今日は") && shown[0].ends_with("晴れ“です"),
+            "{shown:?}"
+        );
+        assert_eq!(shown[1], "„強調“と„言“");
     }
 
     #[test]

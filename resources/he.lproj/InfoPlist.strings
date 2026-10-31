@@ -1,0 +1,4 @@
+/* Splat system texts in Hebrew. */
+
+NSHumanReadableCopyright = "עורך Markdown";
+"Markdown Document" = "מסמך Markdown";

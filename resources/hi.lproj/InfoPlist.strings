@@ -1,0 +1,4 @@
+/* Splat system texts in Hindi. */
+
+NSHumanReadableCopyright = "Markdown एडिटर";
+"Markdown Document" = "Markdown दस्तावेज़";

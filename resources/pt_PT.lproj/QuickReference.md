@@ -20,12 +20,12 @@ Sublinhado, destaque, expoente e índice não são Markdown padrão, mas sim HTM
 
 Com o cursor no fim de uma palavra, a formatação aplica-se ao que escrever a seguir; dentro de uma palavra, formata a palavra inteira.
 
-## Cabeçalhos
+## Títulos
 
 ```
-# Cabeçalho 1
-## Cabeçalho 2
-### Cabeçalho 3
+# Título 1
+## Título 2
+### Título 3
 ```
 
 Atalhos: ⌥⌘1 a ⌥⌘6, corpo de texto com ⌥⌘0.
@@ -117,7 +117,7 @@ O HTML dos README do GitHub é apresentado: parágrafos centrados, imagens com t
 
 Return numa linha vazia da pré-visualização insere outra linha vazia, e Delete remove-a. No código-fonte, isso corresponde a duas linhas vazias adicionais; outros programas de Markdown mostram-nas como espaçamento normal entre parágrafos.
 
-“Inserir › Índice” cria hiperligações para todos os cabeçalhos; com o cursor dentro do índice, este é atualizado. ⌘-clique numa entrada para saltar para o cabeçalho.
+“Inserir › Índice” cria hiperligações para todos os títulos; com o cursor dentro do índice, este é atualizado. ⌘-clique numa entrada para saltar para o título.
 
 As notas de rodapé remetem para anotações[^1]. Uma linha divisória cria-se com `---`:
 
