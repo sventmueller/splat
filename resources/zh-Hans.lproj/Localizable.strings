@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "前置全部窗口";
 "Alles auswählen" = "全选";
 "Als PDF exportieren …" = "导出为PDF…";
+"Als Standard-App für Markdown festlegen" = "设为 Markdown 的默认 App";
 "Alternative" = "备选";
 "Andere ausblenden" = "隐藏其他";
 "Anfrage" = "请求";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "剪切";
 "Auswahl anzeigen" = "跳到所选内容";
 "Auswahl suchen" = "使用所选内容查找";
+"Automatisch nach Updates suchen" = "自动检查更新";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "流程图、时序图和甘特图可使用构建块";
 "Bearbeiten" = "编辑";
 "Beschriftete Verbindung zu einem neuen Knoten" = "连接到新节点的带标签连线";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid 代码";
 "Mermaid-Diagramm einfügen" = "插入 Mermaid 图表";
 "Mit Beschriftung" = "带标签";
+"Nach Updates suchen …" = "检查更新…";
 "Nachricht" = "消息";
 "Nachricht zwischen zwei Teilnehmern" = "两个参与者之间的消息";
 "Nein" = "否";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "重新命名…";
 "Unten nach oben" = "从下到上";
 "Unterstrichen" = "下划线";
+"Updates automatisch laden und installieren" = "自动下载并安装更新";
 "Verbindung" = "连线";
 "Vergrößern" = "放大";
 "Verkleinern" = "缩小";

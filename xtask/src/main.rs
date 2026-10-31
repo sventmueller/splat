@@ -10,6 +10,31 @@ const BUNDLE_ID: &str = "local.splat";
 const SIGNING_IDENTITY: &str = "Splat Local Signing";
 /// Created once with `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`.
 const NOTARY_PROFILE: &str = "notary";
+/// Sparkle, the update framework release builds carry, from its GitHub release; the checksum pins the archive.
+const SPARKLE_VERSION: &str = "2.10.1";
+const SPARKLE_SHA256: &str = "1a856d2a9edb8e628de88121d7be04cf0e2167f8641650b78fca00b14244cf27";
+/// Public half of the EdDSA key that signs updates. Sparkle's `generate_keys` keeps the private half in the login
+/// keychain; installed copies accept only updates signed with it, so losing it ends updates for them.
+const UPDATE_KEY: &str = "21sUy80rKTKlgQLPk+T7UrAkoqVQ+VV+6rfHKVAL4EU=";
+/// Where GitHub serves the committed `dist/` folder: the disk image and the update feed.
+const DOWNLOADS: &str = "https://raw.githubusercontent.com/sventmueller/splat/main/dist";
+const MINIMUM_SYSTEM: &str = "14.0";
+/// A file type only the self-test bundle declares, so the self-test can make itself the default app for it without
+/// touching any other association.
+const PROBE_TYPE: &str = "local.splat.selftest.probe";
+const LSREGISTER: &str =
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+/// The self-test signs with the local certificate, which has no Team ID; without this, the hardened runtime refuses
+/// to load Sparkle.
+const SELFTEST_ENTITLEMENTS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>
+"#;
 const ICON_SIZES: [(u32, &str); 10] = [
     (16, "16x16"),
     (32, "16x16@2x"),
@@ -113,7 +138,20 @@ fn next_build(built: &str) -> Result<(), String> {
 
 /// Selftest and debug builds are separate apps: they leave the user's settings, recent documents and Markdown file
 /// association alone, and macOS cannot mistake an outdated debug build for Splat when it opens a document.
-fn info_plist(version: &str, languages: &[String], variant: Option<&str>) -> String {
+/// Whether a build carries Sparkle, and which feed it reads.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Updates {
+    /// Local builds: the hardened runtime loads Sparkle only with the app's Team ID, which the local certificate
+    /// lacks, and an update must not replace a build of one's own.
+    Off,
+    /// The disk image, signed with the Developer ID.
+    Published,
+    /// The self-test: a feed that does not exist, no question about automatic checks, and an entitlement that lets
+    /// the locally signed app load Sparkle.
+    Selftest,
+}
+
+fn info_plist(version: &str, languages: &[String], variant: Option<&str>, updates: Updates) -> String {
     let (bundle_id, rank) = match variant {
         Some(variant) => (format!("{BUNDLE_ID}.{}", variant.to_lowercase()), "None"),
         None => (BUNDLE_ID.to_string(), "Default"),
@@ -122,6 +160,39 @@ fn info_plist(version: &str, languages: &[String], variant: Option<&str>) -> Str
         .iter()
         .map(|l| format!("\t\t<string>{l}</string>\n"))
         .collect();
+    let feed = |url: &str| {
+        format!(
+            "\t<key>SUFeedURL</key>\n\t<string>{url}</string>\n\t<key>SUPublicEDKey</key>\n\t<string>{UPDATE_KEY}</string>\n"
+        )
+    };
+    let updates = match updates {
+        Updates::Off => String::new(),
+        Updates::Published => feed(&format!("{DOWNLOADS}/appcast.xml")),
+        Updates::Selftest => {
+            feed("https://127.0.0.1:9/appcast.xml") + "\t<key>SUEnableAutomaticChecks</key>\n\t<false/>\n"
+        }
+    };
+    let (probe_handler, probe_type) = if variant == Some("Selftest") {
+        (
+            format!(
+                "\t\t<dict>\n\t\t\t<key>CFBundleTypeName</key>\n\t\t\t<string>Self-test Probe</string>\n\
+                 \t\t\t<key>CFBundleTypeRole</key>\n\t\t\t<string>Viewer</string>\n\
+                 \t\t\t<key>LSHandlerRank</key>\n\t\t\t<string>Owner</string>\n\
+                 \t\t\t<key>LSItemContentTypes</key>\n\t\t\t<array>\n\t\t\t\t<string>{PROBE_TYPE}</string>\n\t\t\t</array>\n\
+                 \t\t</dict>\n"
+            ),
+            format!(
+                "\t<key>UTExportedTypeDeclarations</key>\n\t<array>\n\t\t<dict>\n\
+                 \t\t\t<key>UTTypeIdentifier</key>\n\t\t\t<string>{PROBE_TYPE}</string>\n\
+                 \t\t\t<key>UTTypeConformsTo</key>\n\t\t\t<array>\n\t\t\t\t<string>public.data</string>\n\t\t\t</array>\n\
+                 \t\t\t<key>UTTypeTagSpecification</key>\n\t\t\t<dict>\n\t\t\t\t<key>public.filename-extension</key>\n\
+                 \t\t\t\t<array>\n\t\t\t\t\t<string>splatprobe</string>\n\t\t\t\t</array>\n\t\t\t</dict>\n\
+                 \t\t</dict>\n\t</array>\n"
+            ),
+        )
+    } else {
+        (String::new(), String::new())
+    };
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -151,14 +222,14 @@ fn info_plist(version: &str, languages: &[String], variant: Option<&str>) -> Str
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
+	<string>{MINIMUM_SYSTEM}</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Markdown editor</string>
-	<key>CFBundleDocumentTypes</key>
+{updates}	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
@@ -174,8 +245,8 @@ fn info_plist(version: &str, languages: &[String], variant: Option<&str>) -> Str
 			<key>NSDocumentClass</key>
 			<string>MDDocument</string>
 		</dict>
-	</array>
-	<key>UTImportedTypeDeclarations</key>
+{probe_handler}	</array>
+{probe_type}	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>
 			<key>UTTypeIdentifier</key>
@@ -223,16 +294,24 @@ fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
 /// Release builds raise the build number; debug and selftest builds leave it.
 fn bundle(release: bool, selftest: bool) -> Result<PathBuf, String> {
     let version = version()?;
-    let app = assemble(release, selftest, &version)?;
-    sign(&app, signing_identity()?, false)?;
+    let app = assemble(release, selftest, &version, false)?;
+    let entitlements = if selftest {
+        let path = target_dir().join("selftest.entitlements");
+        fs::write(&path, SELFTEST_ENTITLEMENTS).map_err(|e| e.to_string())?;
+        Some(path)
+    } else {
+        None
+    };
+    sign(&app, signing_identity()?, false, entitlements.as_deref())?;
     if release && !selftest {
         next_build(&version)?;
     }
     Ok(app)
 }
 
-/// Builds the app bundle, unsigned.
-fn assemble(release: bool, selftest: bool, version: &str) -> Result<PathBuf, String> {
+/// Builds the app bundle, unsigned. `distribution` is the build signed with the Developer ID; it and the self-test
+/// carry Sparkle, see `Updates`.
+fn assemble(release: bool, selftest: bool, version: &str, distribution: bool) -> Result<PathBuf, String> {
     let root = root();
     let mut build = Command::new(env!("CARGO"));
     build.current_dir(&root).args(["build", "--package", PACKAGE]);
@@ -249,6 +328,11 @@ fn assemble(release: bool, selftest: bool, version: &str) -> Result<PathBuf, Str
         Some("Selftest")
     } else {
         (!release).then_some("Debug")
+    };
+    let updates = match (distribution, selftest) {
+        (true, _) => Updates::Published,
+        (false, true) => Updates::Selftest,
+        (false, false) => Updates::Off,
     };
     let app = target.join(match variant {
         Some(variant) => format!("{APP} {variant}.app"),
@@ -270,7 +354,7 @@ fn assemble(release: bool, selftest: bool, version: &str) -> Result<PathBuf, Str
         .filter_map(|e| e.file_name().to_str()?.strip_suffix(".lproj").map(str::to_string))
         .collect();
     languages.sort();
-    fs::write(&plist, info_plist(version, &languages, variant)).map_err(|e| e.to_string())?;
+    fs::write(&plist, info_plist(version, &languages, variant, updates)).map_err(|e| e.to_string())?;
     run(Command::new("plutil").arg("-lint").arg("-s").arg(&plist))?;
     copy_dir(&root.join("resources"), &resources)?;
     let icns = root.join("assets").join("AppIcon.icns");
@@ -278,23 +362,86 @@ fn assemble(release: bool, selftest: bool, version: &str) -> Result<PathBuf, Str
         fs::copy(&icns, resources.join("AppIcon.icns")).map_err(|e| e.to_string())?;
     }
     fs::write(contents.join("PkgInfo"), "APPL????").map_err(|e| e.to_string())?;
+    if updates != Updates::Off {
+        let frameworks = contents.join("Frameworks");
+        fs::create_dir_all(&frameworks).map_err(|e| e.to_string())?;
+        let framework = frameworks.join("Sparkle.framework");
+        let sparkle = sparkle()?;
+        run(Command::new("ditto")
+            .arg(sparkle.join("Sparkle.framework"))
+            .arg(&framework))?;
+        fs::copy(sparkle.join("LICENSE"), resources.join("LICENSE-sparkle")).map_err(|e| e.to_string())?;
+        // Only a sandboxed app needs Sparkle's XPC services.
+        fs::remove_dir_all(framework.join("Versions/B/XPCServices")).map_err(|e| e.to_string())?;
+        fs::remove_file(framework.join("XPCServices")).map_err(|e| e.to_string())?;
+    }
     Ok(app)
 }
 
-/// Notarization requires the secure timestamp; local builds skip it, since it needs a request to Apple.
-fn sign(app: &Path, identity: &str, timestamp: bool) -> Result<(), String> {
-    run(Command::new("codesign")
+/// Sparkle's release archive, downloaded once into target/, also for measured builds elsewhere, checked against its
+/// pinned checksum and unpacked: the framework and its `bin/` tools for signing updates.
+fn sparkle() -> Result<PathBuf, String> {
+    let target = root().join("target");
+    let dir = target.join(format!("sparkle-{SPARKLE_VERSION}"));
+    if dir.join("Sparkle.framework").exists() {
+        return Ok(dir);
+    }
+    let archive = target.join(format!("Sparkle-{SPARKLE_VERSION}.tar.xz"));
+    let url = format!(
+        "https://github.com/sparkle-project/Sparkle/releases/download/{SPARKLE_VERSION}/Sparkle-{SPARKLE_VERSION}.tar.xz"
+    );
+    run(Command::new("curl")
+        .args(["-fsSL", "--proto", "=https", "--proto-redir", "=https", "-o"])
+        .arg(&archive)
+        .arg(&url))?;
+    let actual = sha256(&archive)?;
+    if actual != SPARKLE_SHA256 {
+        fs::remove_file(&archive).map_err(|e| e.to_string())?;
+        return Err(format!("{url} has checksum {actual}, expected {SPARKLE_SHA256}"));
+    }
+    let unpacking = target.join(format!("sparkle-{SPARKLE_VERSION}.partial"));
+    if unpacking.exists() {
+        fs::remove_dir_all(&unpacking).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&unpacking).map_err(|e| e.to_string())?;
+    run(Command::new("tar").arg("-xf").arg(&archive).arg("-C").arg(&unpacking))?;
+    fs::rename(&unpacking, &dir).map_err(|e| e.to_string())?;
+    fs::remove_file(&archive).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Notarization requires the secure timestamp; local builds skip it, since it needs a request to Apple. Sparkle's
+/// helpers are signed first, inside out, as its documentation prescribes instead of `--deep`.
+fn sign(app: &Path, identity: &str, timestamp: bool, entitlements: Option<&Path>) -> Result<(), String> {
+    let sparkle = app.join("Contents/Frameworks/Sparkle.framework");
+    let mut parts = Vec::new();
+    if sparkle.exists() {
+        parts.extend([
+            sparkle.join("Versions/B/Autoupdate"),
+            sparkle.join("Versions/B/Updater.app"),
+            sparkle,
+        ]);
+    }
+    parts.push(app.to_path_buf());
+    for part in parts {
+        let mut codesign = Command::new("codesign");
         // Hardened runtime: no injected libraries, no debugger attaching, no writable code pages.
-        .args(["--force", "--sign", identity, "--options", "runtime"])
-        .arg(if timestamp { "--timestamp" } else { "--timestamp=none" })
-        .arg(app))
+        codesign
+            .args(["--force", "--sign", identity, "--options", "runtime"])
+            .arg(if timestamp { "--timestamp" } else { "--timestamp=none" });
+        if let Some(entitlements) = entitlements.filter(|_| part == app) {
+            codesign.arg("--entitlements").arg(entitlements);
+        }
+        run(codesign.arg(&part))?;
+    }
+    Ok(())
 }
 
 /// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
 /// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
-/// into the repository: it replaces the previous one there and in the links of README.md, and the build number goes
-/// up.
+/// into the repository: it replaces older ones there and in the links of README.md, `dist/appcast.xml` offers it
+/// to installed copies, and the build number goes up.
 fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
     let (identity, name) = developer_id()?;
@@ -308,7 +455,21 @@ fn dmg() -> Result<PathBuf, String> {
              `xcrun notarytool store-credentials {NOTARY_PROFILE} --apple-id <Apple ID> --team-id <team ID>`"
         )
     })?;
-    let app = assemble(true, false, &version)?;
+    let tools = sparkle()?.join("bin");
+    let generate_keys = tools.join("generate_keys");
+    let key = stdout(Command::new(&generate_keys).arg("-p")).map_err(|e| {
+        format!(
+            "{e}\nno update signing key in the keychain; import its backup with `{} -f <file>`",
+            generate_keys.display()
+        )
+    })?;
+    if key.trim() != UPDATE_KEY {
+        return Err(format!(
+            "the keychain's update signing key {} is not UPDATE_KEY {UPDATE_KEY}",
+            key.trim()
+        ));
+    }
+    let app = assemble(true, false, &version, true)?;
     // A coverage build in target/release, as a manual `cargo llvm-cov` run leaves, would write measurement files on
     // users' Macs.
     let load_commands = stdout(
@@ -320,7 +481,7 @@ fn dmg() -> Result<PathBuf, String> {
         return Err("the release binary carries coverage counters; run `cargo clean --release` and try again".into());
     }
     println!("signing {version} with {name}");
-    sign(&app, &identity, true)?;
+    sign(&app, &identity, true, None)?;
     run(Command::new("codesign").args(["--verify", "--strict"]).arg(&app))?;
     // The image's ticket reaches Gatekeeper only when the image is opened in the Finder; a copy taken out otherwise,
     // as Homebrew installs it, would need a network connection on first launch.
@@ -352,12 +513,25 @@ fn dmg() -> Result<PathBuf, String> {
     fs::create_dir_all(&dist).map_err(|e| e.to_string())?;
     let file = format!("{APP}-{version}.dmg");
     let published = dist.join(&file);
+    let signature = stdout(Command::new(tools.join("sign_update")).arg(&image))?;
+    let date = stdout(
+        Command::new("date")
+            .env("LC_ALL", "C")
+            .args(["-u", "+%a, %d %b %Y %H:%M:%S +0000"]),
+    )?;
     // Copied rather than renamed: target/ may be a link to another volume.
     fs::copy(&image, &published).map_err(|e| format!("{}: {e}", published.display()))?;
     fs::remove_file(&image).map_err(|e| e.to_string())?;
+    let feed_path = dist.join("appcast.xml");
+    // GitHub's raw server caches the feed for up to five minutes, so the image the old feed offers stays one release.
+    let offered = fs::read_to_string(&feed_path)
+        .ok()
+        .and_then(|old| offered_image(&old).map(str::to_string));
+    let feed = appcast(&version, &file, signature.trim(), date.trim())?;
+    fs::write(&feed_path, feed).map_err(|e| e.to_string())?;
     for entry in fs::read_dir(&dist).map_err(|e| e.to_string())?.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name != file && image_name_len(&name) == Some(name.len()) {
+        if name != file && Some(&name) != offered.as_ref() && image_name_len(&name) == Some(name.len()) {
             run(Command::new("trash").arg(entry.path()))?;
         }
     }
@@ -366,6 +540,37 @@ fn dmg() -> Result<PathBuf, String> {
     fs::write(&readme, relink(&text, &file)).map_err(|e| e.to_string())?;
     next_build(&version)?;
     Ok(published)
+}
+
+/// The update feed Sparkle reads: the newest disk image with the EdDSA signature and length `sign_update` printed for
+/// it. Older Macs than `MINIMUM_SYSTEM` are not offered it.
+fn appcast(version: &str, image: &str, signature: &str, date: &str) -> Result<String, String> {
+    if !signature.starts_with("sparkle:edSignature=\"") || !signature.contains(" length=\"") {
+        return Err(format!("sign_update printed {signature:?}"));
+    }
+    Ok(format!(
+        r#"<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>{APP}</title>
+    <item>
+      <title>{APP} {version}</title>
+      <pubDate>{date}</pubDate>
+      <sparkle:version>{version}</sparkle:version>
+      <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>{MINIMUM_SYSTEM}</sparkle:minimumSystemVersion>
+      <enclosure url="{DOWNLOADS}/{image}" {signature} type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
+"#
+    ))
+}
+
+/// The name of the disk image an update feed offers.
+fn offered_image(appcast: &str) -> Option<&str> {
+    let url = appcast.split("<enclosure url=\"").nth(1)?.split('"').next()?;
+    url.strip_prefix(DOWNLOADS)?.strip_prefix('/')
 }
 
 /// Length of the disk image name `Splat.dmg` or `Splat-<version>.dmg` at the start of `s`.
@@ -709,7 +914,7 @@ fn vendor(fetch: bool) -> Result<(), String> {
         let (path, url, recorded) = (root.join(fields[0]), fields[3], fields[4]);
         if fetch {
             run(Command::new("curl")
-                .args(["-fsSL", "--proto", "=https", "-o"])
+                .args(["-fsSL", "--proto", "=https", "--proto-redir", "=https", "-o"])
                 .arg(&path)
                 .arg(url))?;
             classic_script(&path)?;
@@ -738,6 +943,8 @@ fn vendor(fetch: bool) -> Result<(), String> {
 fn run_selftest(args: &[String]) -> Result<(), String> {
     let mode = args.first().map(String::as_str).ok_or(USAGE)?;
     let app = bundle(true, true)?;
+    // Launched by its path, the app would stay unknown to Launch Services, and with it the probe type.
+    run(Command::new(LSREGISTER).arg("-f").arg(&app))?;
     let binary = app.join("Contents/MacOS").join(APP);
     let work = root().join("target/selftest");
     let _ = fs::remove_dir_all(&work);
@@ -1002,6 +1209,33 @@ mod tests {
             true,
         );
         assert!(library.is_empty());
+    }
+
+    #[test]
+    fn only_the_distributed_build_looks_for_updates_and_the_feed_offers_the_signed_image() {
+        let languages = ["de".to_string()];
+        let release = info_plist("1.0.4", &languages, None, Updates::Published);
+        assert!(release.contains(&format!("<string>{DOWNLOADS}/appcast.xml</string>")));
+        assert!(release.contains(&format!("<key>SUPublicEDKey</key>\n\t<string>{UPDATE_KEY}</string>")));
+        assert!(!info_plist("1.0.4", &languages, None, Updates::Off).contains("SUFeedURL"));
+        let selftest = info_plist("1.0.4", &languages, Some("Selftest"), Updates::Selftest);
+        assert!(selftest.contains("<string>https://127.0.0.1:9/appcast.xml</string>") && selftest.contains(PROBE_TYPE));
+        assert!(selftest.contains("<key>SUEnableAutomaticChecks</key>\n\t<false/>"));
+        let feed = appcast(
+            "1.0.4",
+            "Splat-1.0.4.dmg",
+            "sparkle:edSignature=\"c2ln\" length=\"42\"",
+            "Sat, 31 Oct 2026 12:00:00 +0000",
+        )
+        .unwrap();
+        assert!(feed.contains(&format!(
+            "<enclosure url=\"{DOWNLOADS}/Splat-1.0.4.dmg\" sparkle:edSignature=\"c2ln\" length=\"42\" \
+             type=\"application/octet-stream\"/>"
+        )));
+        assert!(feed.contains("<sparkle:version>1.0.4</sparkle:version>"));
+        assert_eq!(offered_image(&feed), Some("Splat-1.0.4.dmg"));
+        assert_eq!(offered_image("<rss/>"), None);
+        assert!(appcast("1.0.4", "Splat-1.0.4.dmg", "ERROR: no key", "").is_err());
     }
 
     #[test]

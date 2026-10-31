@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Đưa tất cả lên phía trước";
 "Alles auswählen" = "Chọn tất cả";
 "Als PDF exportieren …" = "Xuất dưới dạng PDF…";
+"Als Standard-App für Markdown festlegen" = "Đặt làm Ứng dụng Mặc định cho Markdown";
 "Alternative" = "Nhánh thay thế";
 "Andere ausblenden" = "Ẩn các mục khác";
 "Anfrage" = "Yêu cầu";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Cắt";
 "Auswahl anzeigen" = "Chuyển đến Lựa chọn";
 "Auswahl suchen" = "Sử dụng lựa chọn để tìm";
+"Automatisch nach Updates suchen" = "Tự động Kiểm tra Bản cập nhật";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Có khối dựng cho lưu đồ, sơ đồ tuần tự và biểu đồ Gantt";
 "Bearbeiten" = "Sửa";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Kết nối có nhãn tới một nút mới";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mã Mermaid";
 "Mermaid-Diagramm einfügen" = "Chèn sơ đồ Mermaid";
 "Mit Beschriftung" = "Có nhãn";
+"Nach Updates suchen …" = "Kiểm tra Bản cập nhật…";
 "Nachricht" = "Tin nhắn";
 "Nachricht zwischen zwei Teilnehmern" = "Tin nhắn giữa hai người tham gia";
 "Nein" = "Không";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Đổi tên…";
 "Unten nach oben" = "Dưới lên trên";
 "Unterstrichen" = "Gạch chân";
+"Updates automatisch laden und installieren" = "Tự động Tải về và Cài đặt Bản cập nhật";
 "Verbindung" = "Kết nối";
 "Vergrößern" = "Phóng to";
 "Verkleinern" = "Thu nhỏ";

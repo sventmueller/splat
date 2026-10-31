@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Tuo kaikki eteen";
 "Alles auswählen" = "Valitse kaikki";
 "Als PDF exportieren …" = "Vie PDF:nä…";
+"Als Standard-App für Markdown festlegen" = "Aseta Markdownin oletusapiksi";
 "Alternative" = "Vaihtoehto";
 "Andere ausblenden" = "Kätke muut";
 "Anfrage" = "Pyyntö";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Leikkaa";
 "Auswahl anzeigen" = "Siirry valintaan";
 "Auswahl suchen" = "Käytä valintaa etsinnässä";
+"Automatisch nach Updates suchen" = "Etsi päivityksiä automaattisesti";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Rakennuspalikoita on vuokaavioille sekä sekvenssi- ja Gantt-kaavioille";
 "Bearbeiten" = "Muokkaa";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Tekstillä varustettu yhteys uuteen solmuun";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid-koodi";
 "Mermaid-Diagramm einfügen" = "Lisää Mermaid-kaavio";
 "Mit Beschriftung" = "Tekstillä";
+"Nach Updates suchen …" = "Etsi päivityksiä…";
 "Nachricht" = "Viesti";
 "Nachricht zwischen zwei Teilnehmern" = "Viesti kahden osallistujan välillä";
 "Nein" = "Ei";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Nimeä uudelleen…";
 "Unten nach oben" = "Alhaalta ylös";
 "Unterstrichen" = "Alleviivaa";
+"Updates automatisch laden und installieren" = "Lataa ja asenna päivitykset automaattisesti";
 "Verbindung" = "Yhteys";
 "Vergrößern" = "Lähennä";
 "Verkleinern" = "Loitonna";

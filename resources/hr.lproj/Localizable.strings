@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Postavi sve naprijed";
 "Alles auswählen" = "Odaberi sve";
 "Als PDF exportieren …" = "Eksportiraj kao PDF…";
+"Als Standard-App für Markdown festlegen" = "Postavi kao standardnu aplikaciju za Markdown";
 "Alternative" = "Alternativa";
 "Andere ausblenden" = "Sakrij ostalo";
 "Anfrage" = "Zahtjev";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Izreži";
 "Auswahl anzeigen" = "Idi na odabir";
 "Auswahl suchen" = "Upotrijebi odabir za traženje";
+"Automatisch nach Updates suchen" = "Automatski traži ažuriranja";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Gradivni blokovi postoje za dijagrame toka, dijagrame slijeda i Ganttove dijagrame";
 "Bearbeiten" = "Uredi";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Veza s oznakom prema novom čvoru";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid kod";
 "Mermaid-Diagramm einfügen" = "Umetni Mermaid dijagram";
 "Mit Beschriftung" = "S oznakom";
+"Nach Updates suchen …" = "Potraži ažuriranja…";
 "Nachricht" = "Poruka";
 "Nachricht zwischen zwei Teilnehmern" = "Poruka između dvaju sudionika";
 "Nein" = "Ne";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Preimenuj…";
 "Unten nach oben" = "Odozdo prema gore";
 "Unterstrichen" = "Podcrtano";
+"Updates automatisch laden und installieren" = "Automatski preuzmi i instaliraj ažuriranja";
 "Verbindung" = "Veza";
 "Vergrößern" = "Uvećaj";
 "Verkleinern" = "Umanji";

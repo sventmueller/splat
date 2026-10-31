@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Trazer Todas para a Frente";
 "Alles auswählen" = "Selecionar Tudo";
 "Als PDF exportieren …" = "Exportar como PDF…";
+"Als Standard-App für Markdown festlegen" = "Definir como App Padrão para Markdown";
 "Alternative" = "Alternativa";
 "Andere ausblenden" = "Ocultar Outros";
 "Anfrage" = "Solicitação";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Cortar";
 "Auswahl anzeigen" = "Saltar para Seleção";
 "Auswahl suchen" = "Usar Seleção para Buscar";
+"Automatisch nach Updates suchen" = "Buscar Atualizações Automaticamente";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Há blocos de construção para fluxogramas, diagramas de sequência e de Gantt";
 "Bearbeiten" = "Editar";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Conexão com rótulo para um novo nó";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Código Mermaid";
 "Mermaid-Diagramm einfügen" = "Inserir um diagrama Mermaid";
 "Mit Beschriftung" = "Com rótulo";
+"Nach Updates suchen …" = "Buscar Atualizações…";
 "Nachricht" = "Mensagem";
 "Nachricht zwischen zwei Teilnehmern" = "Mensagem entre dois participantes";
 "Nein" = "Não";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Renomear…";
 "Unten nach oben" = "De baixo para cima";
 "Unterstrichen" = "Sublinhado";
+"Updates automatisch laden und installieren" = "Baixar e Instalar Atualizações Automaticamente";
 "Verbindung" = "Conexão";
 "Vergrößern" = "Ampliar";
 "Verkleinern" = "Reduzir";

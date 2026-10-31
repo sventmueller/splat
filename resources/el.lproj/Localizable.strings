@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Μεταφορά όλων σε πρώτο πλάνο";
 "Alles auswählen" = "Επιλογή όλων";
 "Als PDF exportieren …" = "Εξαγωγή ως PDF…";
+"Als Standard-App für Markdown festlegen" = "Ορισμός ως προεπιλεγμένης εφαρμογής για Markdown";
 "Alternative" = "Εναλλακτική";
 "Andere ausblenden" = "Απόκρυψη άλλων";
 "Anfrage" = "Αίτημα";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Αποκοπή";
 "Auswahl anzeigen" = "Μετάβαση στην επιλογή";
 "Auswahl suchen" = "Χρήση επιλογής για εύρεση";
+"Automatisch nach Updates suchen" = "Αυτόματος έλεγχος για ενημερώσεις";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Υπάρχουν δομικά στοιχεία για διαγράμματα ροής, ακολουθίας και Gantt";
 "Bearbeiten" = "Επεξεργασία";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Σύνδεση με ετικέτα προς νέο κόμβο";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Κώδικας Mermaid";
 "Mermaid-Diagramm einfügen" = "Εισαγωγή διαγράμματος Mermaid";
 "Mit Beschriftung" = "Με ετικέτα";
+"Nach Updates suchen …" = "Έλεγχος για ενημερώσεις…";
 "Nachricht" = "Μήνυμα";
 "Nachricht zwischen zwei Teilnehmern" = "Μήνυμα μεταξύ δύο συμμετεχόντων";
 "Nein" = "Όχι";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Μετονομασία…";
 "Unten nach oben" = "Κάτω προς πάνω";
 "Unterstrichen" = "Υπογράμμιση";
+"Updates automatisch laden und installieren" = "Αυτόματη λήψη και εγκατάσταση ενημερώσεων";
 "Verbindung" = "Σύνδεση";
 "Vergrößern" = "Μεγέθυνση";
 "Verkleinern" = "Σμίκρυνση";

@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "הבאת כל החלונות קדימה";
 "Alles auswählen" = "בחירת הכול";
 "Als PDF exportieren …" = "ייצוא כ-PDF…";
+"Als Standard-App für Markdown festlegen" = "הגדרה כיישום ברירת המחדל עבור Markdown";
 "Alternative" = "חלופה";
 "Andere ausblenden" = "הסתרת יישומים אחרים";
 "Anfrage" = "בקשה";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "גזירה";
 "Auswahl anzeigen" = "מעבר לבחירה";
 "Auswahl suchen" = "שימוש במלל שנבחר לחיפוש";
+"Automatisch nach Updates suchen" = "חיפוש עדכונים באופן אוטומטי";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "אבני בניין זמינות לתרשימי זרימה, רצף וגאנט";
 "Bearbeiten" = "עריכה";
 "Beschriftete Verbindung zu einem neuen Knoten" = "חיבור עם תווית לצומת חדש";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "קוד Mermaid";
 "Mermaid-Diagramm einfügen" = "הוספת תרשים Mermaid";
 "Mit Beschriftung" = "עם תווית";
+"Nach Updates suchen …" = "חיפוש עדכונים…";
 "Nachricht" = "הודעה";
 "Nachricht zwischen zwei Teilnehmern" = "הודעה בין שני משתתפים";
 "Nein" = "לא";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "שינוי שם…";
 "Unten nach oben" = "מלמטה למעלה";
 "Unterstrichen" = "קו תחתון";
+"Updates automatisch laden und installieren" = "הורדה והתקנה של עדכונים באופן אוטומטי";
 "Verbindung" = "חיבור";
 "Vergrößern" = "הגדלה";
 "Verkleinern" = "הקטנה";

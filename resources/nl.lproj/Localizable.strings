@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Alles op voorgrond";
 "Alles auswählen" = "Selecteer alles";
 "Als PDF exportieren …" = "Exporteer als pdf…";
+"Als Standard-App für Markdown festlegen" = "Stel in als standaardapp voor Markdown";
 "Alternative" = "Alternatief";
 "Andere ausblenden" = "Verberg andere";
 "Anfrage" = "Verzoek";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Knip";
 "Auswahl anzeigen" = "Ga naar selectie";
 "Auswahl suchen" = "Gebruik selectie voor zoekopdracht";
+"Automatisch nach Updates suchen" = "Zoek automatisch naar updates";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Er zijn bouwstenen voor stroom-, sequentie- en Gantt-diagrammen";
 "Bearbeiten" = "Wijzig";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Verbinding met label naar een nieuw knooppunt";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid-code";
 "Mermaid-Diagramm einfügen" = "Voeg een Mermaid-diagram in";
 "Mit Beschriftung" = "Met label";
+"Nach Updates suchen …" = "Zoek naar updates…";
 "Nachricht" = "Bericht";
 "Nachricht zwischen zwei Teilnehmern" = "Bericht tussen twee deelnemers";
 "Nein" = "Nee";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Wijzig naam…";
 "Unten nach oben" = "Van beneden naar boven";
 "Unterstrichen" = "Onderstreept";
+"Updates automatisch laden und installieren" = "Download en installeer updates automatisch";
 "Verbindung" = "Verbinding";
 "Vergrößern" = "Zoom in";
 "Verkleinern" = "Zoom uit";

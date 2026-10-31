@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Összes előtérbe hozása";
 "Alles auswählen" = "Összes kijelölése";
 "Als PDF exportieren …" = "Exportálás PDF-ként…";
+"Als Standard-App für Markdown festlegen" = "Beállítás alapértelmezett appként a Markdownhoz";
 "Alternative" = "Alternatíva";
 "Andere ausblenden" = "Többi elrejtése";
 "Anfrage" = "Kérés";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Kivágás";
 "Auswahl anzeigen" = "Ugrás a kijelölésre";
 "Auswahl suchen" = "Kijelölés használata kereséshez";
+"Automatisch nach Updates suchen" = "Frissítések automatikus keresése";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Építőelemek folyamatábrákhoz, szekvencia- és Gantt-diagramokhoz érhetők el";
 "Bearbeiten" = "Szerkesztés";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Feliratos kapcsolat egy új csomóponthoz";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid-kód";
 "Mermaid-Diagramm einfügen" = "Mermaid-diagram beszúrása";
 "Mit Beschriftung" = "Felirattal";
+"Nach Updates suchen …" = "Frissítések keresése…";
 "Nachricht" = "Üzenet";
 "Nachricht zwischen zwei Teilnehmern" = "Üzenet két résztvevő között";
 "Nein" = "Nem";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Átnevezés…";
 "Unten nach oben" = "Lentről felfelé";
 "Unterstrichen" = "Aláhúzás";
+"Updates automatisch laden und installieren" = "Frissítések automatikus letöltése és telepítése";
 "Verbindung" = "Kapcsolat";
 "Vergrößern" = "Felnagyítás";
 "Verkleinern" = "Lekicsinyítés";

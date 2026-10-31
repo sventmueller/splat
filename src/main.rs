@@ -3,6 +3,7 @@ mod document;
 mod editor;
 mod large_alloc;
 mod menu;
+mod updates;
 mod util;
 
 use objc2::runtime::ProtocolObject;
@@ -32,6 +33,7 @@ fn main() {
     app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
     let delegate = app::AppDelegate::new(mtm);
     app.setDelegate(Some(ProtocolObject::from_ref(&*delegate)));
+    updates::start(mtm);
     menu::install(&app, mtm);
     app.run();
 }

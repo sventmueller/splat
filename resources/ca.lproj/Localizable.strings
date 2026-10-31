@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Porta‑ho tot a primer pla";
 "Alles auswählen" = "Selecciona‑ho tot";
 "Als PDF exportieren …" = "Exporta com a PDF…";
+"Als Standard-App für Markdown festlegen" = "Defineix com a app per omissió per a Markdown";
 "Alternative" = "Alternativa";
 "Andere ausblenden" = "Oculta la resta";
 "Anfrage" = "Sol·licitud";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Retalla";
 "Auswahl anzeigen" = "Ves a la selecció";
 "Auswahl suchen" = "Utilitza la selecció per cercar";
+"Automatisch nach Updates suchen" = "Cerca actualitzacions automàticament";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Hi ha blocs per a diagrames de flux, de seqüència i de Gantt";
 "Bearbeiten" = "Edita";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Connexió amb etiqueta a un node nou";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Codi Mermaid";
 "Mermaid-Diagramm einfügen" = "Insereix un diagrama Mermaid";
 "Mit Beschriftung" = "Amb etiqueta";
+"Nach Updates suchen …" = "Cerca actualitzacions…";
 "Nachricht" = "Missatge";
 "Nachricht zwischen zwei Teilnehmern" = "Missatge entre dos participants";
 "Nein" = "No";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Canvia el nom…";
 "Unten nach oben" = "De baix a dalt";
 "Unterstrichen" = "Subratllat";
+"Updates automatisch laden und installieren" = "Descarrega i instal·la actualitzacions automàticament";
 "Verbindung" = "Connexió";
 "Vergrößern" = "Apropa";
 "Verkleinern" = "Allunya";

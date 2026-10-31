@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Lägg alla överst";
 "Alles auswählen" = "Markera allt";
 "Als PDF exportieren …" = "Exportera som PDF…";
+"Als Standard-App für Markdown festlegen" = "Ställ in som förvald app för Markdown";
 "Alternative" = "Alternativ";
 "Andere ausblenden" = "Göm övriga";
 "Anfrage" = "Förfrågan";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Klipp ut";
 "Auswahl anzeigen" = "Gå till markering";
 "Auswahl suchen" = "Använd markering för sökning";
+"Automatisch nach Updates suchen" = "Leta efter uppdateringar automatiskt";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Byggblock finns för flödesscheman, sekvensdiagram och Gantt-scheman";
 "Bearbeiten" = "Redigera";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Koppling med etikett till en ny nod";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid-kod";
 "Mermaid-Diagramm einfügen" = "Infoga ett Mermaid-diagram";
 "Mit Beschriftung" = "Med etikett";
+"Nach Updates suchen …" = "Leta efter uppdateringar…";
 "Nachricht" = "Meddelande";
 "Nachricht zwischen zwei Teilnehmern" = "Meddelande mellan två deltagare";
 "Nein" = "Nej";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Byt namn…";
 "Unten nach oben" = "Nedifrån och upp";
 "Unterstrichen" = "Understrykning";
+"Updates automatisch laden und installieren" = "Hämta och installera uppdateringar automatiskt";
 "Verbindung" = "Koppling";
 "Vergrößern" = "Zooma in";
 "Verkleinern" = "Zooma ut";
