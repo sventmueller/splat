@@ -9,7 +9,7 @@ in either one: whatever you write in the preview becomes a minimal change to the
 stay byte-for-byte identical and your Git diffs stay clean. Splat reads the Markdown you already use: CommonMark and
 GitHub Flavored Markdown, GitHub alerts, Obsidian wiki links, embeds and callouts, Pandoc and Typora extensions,
 embedded HTML, LaTeX formulas, and Mermaid, Graphviz and PlantUML diagrams, all rendered offline. Export to PDF, HTML
-or Word in one click. It is written in Rust on genuine AppKit controls, speaks 24 languages, and sends nothing over
+or Word in one click. It is written in Rust on genuine AppKit controls, speaks 35 languages, and sends nothing over
 the network unless you ask it to.
  
 
@@ -32,10 +32,15 @@ the network unless you ask it to.
 [![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
-![24 interface languages](https://img.shields.io/badge/languages-24-4C9A2A)
+![35 interface languages](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Offline by default](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Signed with Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#license)
+
+Bahasa Indonesia · Bahasa Melayu · Català · Čeština · Dansk · Deutsch · English · Español · Français · Hrvatski ·
+Italiano · Magyar · Nederlands · Norsk · Polski · Português (Brasil) · Português (Portugal) · Română · Slovenčina ·
+Slovenščina · Suomi · Svenska · Tiếng Việt · Türkçe · Ελληνικά · Русский · Українська · עברית‎ · العربية‎ · हिन्दी ·
+ไทย · 한국어 · 日本語 · 简体中文 · 繁體中文
 
 ## Contents
 
@@ -99,7 +104,11 @@ the network unless you ask it to.
 - **Fast with big files.** A keystroke in a 10 MB document takes about 25 ms.
 - **Private and careful.** Images from the web load only after you allow them, links to other apps ask first, and
   everything that decodes untrusted image data runs in sandboxed helper processes.
-- **In your language.** The interface and the built-in Markdown quick reference come in 24 languages.
+- **In your language.** The interface and the built-in Markdown quick reference come in 35 languages: Arabic, Catalan,
+  Chinese (Simplified), Chinese (Traditional), Croatian, Czech, Danish, Dutch, English, Finnish, French, German, Greek,
+  Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Polish, Portuguese (Brazil),
+  Portuguese (Portugal), Romanian, Russian, Slovak, Slovenian, Spanish, Swedish, Thai, Turkish, Ukrainian and
+  Vietnamese.
 
 ## Requirements
 
@@ -358,9 +367,10 @@ and images keep only `http`, `https`, `mailto` and relative addresses.
 ### Typographic punctuation
 
 **View › Typographic Punctuation** shows straight quotes as the quotation marks of your interface language, `--` as an
-en dash, `---` as an em dash and `...` as an ellipsis. In German, `"Ja"` becomes „Ja“, in French «Oui». The source
-keeps the plain characters; the preview and all exports show the typographic ones. The setting is off until you turn
-it on.
+en dash, `---` as an em dash and `...` as an ellipsis. In German, `"Ja"` becomes „Ja“, in French «Oui», in Japanese
+「はい」, also where Chinese and Japanese set quotes without a space; Hebrew abbreviations such as `צה"ל` get their
+gershayim, צה״ל. The source keeps the plain characters; the preview and all exports show the typographic ones. The
+setting is off until you turn it on.
 
 ### Syntax overview
 
@@ -502,15 +512,22 @@ Splat has no settings window: the few options live where they apply, in **View**
 
 ## Languages
 
-The interface, the menus and the Markdown quick reference are translated into 24 languages:
+The interface, the menus and the Markdown quick reference are translated into 35 languages:
 
-Catalan, Croatian, Czech, Danish, Dutch, English, Finnish, French, German, Hungarian, Indonesian, Italian, Malay,
-Norwegian, Polish, Portuguese (Brazil), Portuguese (Portugal), Romanian, Slovak, Slovenian, Spanish, Swedish, Turkish
-and Vietnamese.
+Arabic, Catalan, Chinese (Simplified), Chinese (Traditional), Croatian, Czech, Danish, Dutch, English, Finnish, French,
+German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Polish, Portuguese
+(Brazil), Portuguese (Portugal), Romanian, Russian, Slovak, Slovenian, Spanish, Swedish, Thai, Turkish, Ukrainian and
+Vietnamese.
 
 Splat follows the language order in **System Settings › General › Language & Region**; you can also pick a language
 for Splat alone there under **Applications**. Without a translation for your language, it uses English. Menu terms
 follow Apple's own translations, so Splat reads like the rest of your Mac.
+
+Hebrew and Arabic text reads right to left wherever it appears, whatever the interface language: each paragraph,
+heading and list item takes the direction of its first letter, quotes and callouts draw their bar on the right, and a
+table whose text starts right to left lists its columns from the right. Code blocks stay left to right. The PDF, HTML
+and Word exports keep these directions. With Hebrew or Arabic as the system language, macOS also mirrors the window,
+so the preview sits on the left.
 
 ## Keyboard shortcuts
 
@@ -770,7 +787,7 @@ untouched.
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
   subclass).
-- `src/i18n.rs` with `resources/*.lproj`: 24 languages; the keys are the German texts.
+- `src/i18n.rs` with `resources/*.lproj`: 35 languages; the keys are the German texts.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
   returns after big edits.
 - `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](vendor.lock).

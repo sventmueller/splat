@@ -1,0 +1,4 @@
+/* Splat system texts in Traditional Chinese. */
+
+NSHumanReadableCopyright = "Markdown 編輯器";
+"Markdown Document" = "Markdown 文件";

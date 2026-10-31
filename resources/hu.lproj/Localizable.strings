@@ -38,7 +38,7 @@
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Építőelemek folyamatábrákhoz, szekvencia- és Gantt-diagramokhoz érhetők el";
 "Bearbeiten" = "Szerkesztés";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Feliratos kapcsolat egy új csomóponthoz";
-"Bewegen …" = "Áthelyezés…";
+"Bewegen …" = "Áthelyezés ide…";
 "Bild" = "Kép";
 "Bild aus einer Datei einfügen" = "Kép beszúrása fájlból";
 "Bild auswählen, das in das Dokument eingefügt wird." = "Válassza ki a dokumentumba beszúrandó képet.";
@@ -170,7 +170,7 @@
 "Phase {}" = "{}. fázis";
 "Projektplan" = "Projektterv";
 "Raute (Entscheidung)" = "Rombusz (döntés)";
-"Rechteck" = "Négyszög";
+"Rechteck" = "Téglalap";
 "Rechts" = "Jobbra";
 "Rechts nach links" = "Jobbról balra";
 "Rechtschreibung automatisch korrigieren" = "Helyesírás automatikus javítása";
@@ -286,7 +286,7 @@
 "Metadaten" = "Metaadatok";
 "Sichern …" = "Mentés…";
 "Details" = "Részletek";
-"Hinweisbox auf- oder zuklappen" = "Kiemelés kibontása vagy összecsukása";
+"Hinweisbox auf- oder zuklappen" = "Megjegyzésdoboz kibontása vagy összecsukása";
 "Typografische Satzzeichen" = "Tipográfiai írásjelek";
 "Verborgener Text: Zum Lesen markieren" = "Rejtett szöveg: jelölje ki az olvasáshoz";
 "⌘-Klick sucht den Tag im Dokument" = "A ⌘-kattintás megkeresi a címkét a dokumentumban";

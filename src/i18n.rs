@@ -182,7 +182,7 @@ mod tests {
             }
         }
         if only_language().is_none() {
-            assert!(languages >= 23, "{languages} translations");
+            assert!(languages >= 34, "{languages} translations");
         }
     }
 

@@ -1,0 +1,4 @@
+/* Splat system texts in Ukrainian. */
+
+NSHumanReadableCopyright = "Редактор Markdown";
+"Markdown Document" = "Документ Markdown";

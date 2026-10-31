@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::code::{self, CodeToken};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, walk_blocks};
-use super::text::{LineStarts, common_prefix, common_suffix};
+use super::text::{LineStarts, common_prefix, common_suffix, right_to_left};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -224,6 +224,42 @@ fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
     }
 }
 
+/// Whether a source line reads right to left once its Markdown markers are skipped, though a marker with a Latin
+/// letter, as `[x]` or `[!NOTE]`, starts it and would make it read left to right.
+pub fn right_to_left_behind_markers(line: &str) -> bool {
+    let mut rest = line;
+    let (mut quote, mut item) = (false, false);
+    loop {
+        let before = rest;
+        let trimmed = rest.trim_start_matches(['>', ' ', '\t']);
+        quote |= rest[..rest.len() - trimmed.len()].contains('>');
+        rest = trimmed;
+        if let Some(r) = rest
+            .strip_prefix(['-', '*', '+'])
+            .filter(|r| r.starts_with([' ', '\t']))
+        {
+            (rest, item) = (r.trim_start_matches([' ', '\t']), true);
+        }
+        let digits = rest.len() - rest.trim_start_matches(|c: char| c.is_ascii_digit()).len();
+        if let Some(r) = rest[digits..].strip_prefix(['.', ')']).filter(|_| digits > 0) {
+            (rest, item) = (r.trim_start_matches([' ', '\t']), true);
+        }
+        if item && let Some(r) = ["[ ]", "[x]", "[X]"].iter().find_map(|task| rest.strip_prefix(task)) {
+            (rest, item) = (r, false);
+        }
+        if quote
+            && rest.starts_with("[!")
+            && let Some(end) = rest.find(']')
+        {
+            rest = rest[end + 1..].trim_start_matches(['-', '+']);
+        }
+        if rest == before {
+            break;
+        }
+    }
+    right_to_left(rest) == Some(true) && right_to_left(line) != Some(true)
+}
+
 /// Byte offsets of `|` characters that delimit table cells. GFM splits cells on every unescaped pipe,
 /// including pipes inside code spans.
 pub fn unescaped_pipes(line: &str) -> Vec<usize> {
@@ -441,6 +477,18 @@ mod tests {
     fn styled(t: &str) -> Vec<(&str, Style)> {
         let d = parse(t);
         highlight(t, &d).into_iter().map(|(r, s)| (&t[r], s)).collect()
+    }
+
+    #[test]
+    fn a_done_task_in_hebrew_reads_right_to_left() {
+        assert!(right_to_left_behind_markers("- [x] משימה"));
+        assert!(right_to_left_behind_markers("> 1. [X] مهمة"));
+        assert!(right_to_left_behind_markers("> [!NOTE]- הערה"));
+        assert!(!right_to_left_behind_markers("- [ ] משימה"));
+        assert!(!right_to_left_behind_markers("- [x] task"));
+        assert!(!right_to_left_behind_markers("2024 [x] שנה"));
+        assert!(!right_to_left_behind_markers("[x] משימה"));
+        assert!(!right_to_left_behind_markers("[!NOTE] הערה"));
     }
 
     #[test]

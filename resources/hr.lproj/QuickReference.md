@@ -79,7 +79,7 @@ flowchart LR
     B --> C[PDF]
 ```
 
-Klik na formulu ili dijagram u pregledu otvara urednik, kao i kad kursor dođe na njih; Esc ga zatvara bez promjena. Formule se mogu uređivati vizualno ili kao LaTeX; gradivni blokovi umeću razlomke, korijene, zbrojeve i simbole, a Tab skače na sljedeće rezervirano mjesto □. Za dijagrame toka, dijagrame slijeda i Ganttove dijagrame postoje gradivni blokovi za čvorove, veze, poruke i zadatke. Urednik odmah prikazuje pogreške u kodu.
+Klik na formulu ili dijagram u pregledu otvara uređivač, kao i kad kursor dođe na njih; Esc ga zatvara bez promjena. Formule se mogu uređivati vizualno ili kao LaTeX; gradivni blokovi umeću razlomke, korijene, zbrojeve i simbole, a Tab skače na sljedeće rezervirano mjesto □. Za dijagrame toka, dijagrame slijeda i Ganttove dijagrame postoje gradivni blokovi za čvorove, veze, poruke i zadatke. Uređivač odmah prikazuje pogreške u kodu.
 
 Formule mogu stajati i u blokovima `math` ili između `\(` i `\)`. Graphviz i PlantUML dijagrami pišu se u blokove `dot` i `plantuml`:
 

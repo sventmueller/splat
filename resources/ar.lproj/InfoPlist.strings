@@ -1,0 +1,4 @@
+/* Splat system texts in Arabic. */
+
+NSHumanReadableCopyright = "محرر Markdown";
+"Markdown Document" = "مستند Markdown";

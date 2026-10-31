@@ -14,12 +14,25 @@ pub struct Quotes {
 
 const APOSTROPHE: char = '’';
 
+/// The quotes left open by the text smartened so far. Chinese and Japanese quotes pair by count rather than by
+/// spacing, so the count carries from one run of a paragraph to the next.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Open {
+    double: bool,
+    single: bool,
+}
+
 /// `text` with straight quotes turned into `quotes`, `--` and `---` into dashes and `...` into an ellipsis.
-/// `before` is the character in front of the text, which decides whether a quote opens or closes.
-pub fn smarten(text: &str, before: Option<char>, quotes: Quotes) -> String {
+/// `before` is the character in front of the text, which decides whether a quote opens or closes; `open` comes from
+/// the earlier runs of the same paragraph.
+pub fn smarten(text: &str, before: Option<char>, quotes: Quotes, open: &mut Open) -> String {
     let mut out = String::with_capacity(text.len());
     let mut prev = before;
     let mut rest = text;
+    let Open {
+        double: mut double_open,
+        single: mut single_open,
+    } = *open;
     while let Some(c) = rest.chars().next() {
         let (replacement, used) = if rest.starts_with("---") {
             ('—', 3)
@@ -29,17 +42,36 @@ pub fn smarten(text: &str, before: Option<char>, quotes: Quotes) -> String {
             ('…', 3)
         } else {
             let opens = prev.is_none_or(|p| p.is_whitespace() || "([{<–—-/".contains(p));
+            // Chinese and Japanese set quotes without a space, so only the pairing tells opening from closing.
+            let unspaced = prev.is_some_and(is_cjk);
+            let next = rest[c.len_utf8()..].chars().next();
+            // Hebrew abbreviates with geresh and gershayim, as in ג׳ירפה and צה״ל, which ASCII writes as quotes.
+            let in_hebrew = prev.is_some_and(is_hebrew) && next.is_some_and(is_hebrew);
             match c {
-                '"' if opens => (quotes.open, 1),
-                '"' => (quotes.close, 1),
-                '\'' if opens => (quotes.open_single, 1),
+                '"' if in_hebrew => ('״', 1),
+                '\'' if in_hebrew => ('׳', 1),
+                '"' => {
+                    double_open = opens || unspaced && !double_open;
+                    (if double_open { quotes.open } else { quotes.close }, 1)
+                }
                 // Inside a word, as in "don't", it is an apostrophe.
-                '\'' if prev.is_some_and(char::is_alphanumeric)
-                    && rest[1..].chars().next().is_some_and(char::is_alphanumeric) =>
+                '\'' if !unspaced
+                    && prev.is_some_and(char::is_alphanumeric)
+                    && next.is_some_and(char::is_alphanumeric) =>
                 {
                     (APOSTROPHE, 1)
                 }
-                '\'' => (quotes.close_single, 1),
+                '\'' => {
+                    single_open = opens || unspaced && !single_open;
+                    (
+                        if single_open {
+                            quotes.open_single
+                        } else {
+                            quotes.close_single
+                        },
+                        1,
+                    )
+                }
                 c => (c, c.len_utf8()),
             }
         };
@@ -47,7 +79,32 @@ pub fn smarten(text: &str, before: Option<char>, quotes: Quotes) -> String {
         prev = Some(replacement);
         rest = &rest[used..];
     }
+    *open = Open {
+        double: double_open,
+        single: single_open,
+    };
     out
+}
+
+fn is_hebrew(c: char) -> bool {
+    matches!(c, '\u{05D0}'..='\u{05EA}')
+}
+
+/// Vowel signs, tone marks and other marks that belong to the letter before them, in the scripts Splat speaks.
+fn combining_mark(c: char) -> bool {
+    matches!(c,
+        '\u{0300}'..='\u{036F}'
+        | '\u{0591}'..='\u{05BD}' | '\u{05BF}' | '\u{05C1}'..='\u{05C2}' | '\u{05C4}'..='\u{05C5}' | '\u{05C7}'
+        | '\u{0610}'..='\u{061A}' | '\u{064B}'..='\u{065F}' | '\u{0670}' | '\u{06D6}'..='\u{06ED}'
+        | '\u{0900}'..='\u{0903}' | '\u{093A}'..='\u{094F}' | '\u{0951}'..='\u{0957}' | '\u{0962}'..='\u{0963}'
+        | '\u{0E31}' | '\u{0E34}'..='\u{0E3A}' | '\u{0E47}'..='\u{0E4E}'
+        | '\u{200C}'..='\u{200D}' | '\u{3099}'..='\u{309A}')
+}
+
+/// Characters of Chinese and Japanese text, which runs without spaces: the CJK blocks from radicals to unified
+/// ideographs, compatibility ideographs, half- and full-width forms, and the ideographs beyond the BMP.
+fn is_cjk(c: char) -> bool {
+    matches!(c, '\u{2E80}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}' | '\u{FF00}'..='\u{FFEF}' | '\u{20000}'..='\u{3FFFF}')
 }
 
 /// How many source bytes at the start of `source` the typographic character `shown` stands for.
@@ -56,8 +113,8 @@ pub fn typographic_source(shown: char, source: &str) -> Option<usize> {
         '—' => "---",
         '–' => "--",
         '…' => "...",
-        '„' | '“' | '”' | '«' | '»' | '‟' => "\"",
-        '‚' | '‘' | '’' | '‹' | '›' | '‛' => "'",
+        '„' | '“' | '”' | '«' | '»' | '‟' | '「' | '」' | '״' => "\"",
+        '‚' | '‘' | '’' | '‹' | '›' | '‛' | '『' | '』' | '׳' => "'",
         _ => return None,
     };
     if source.starts_with(ascii) {
@@ -89,7 +146,7 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
     let mut i = 0;
     while i < text.len() {
         let c = text[i..].chars().next().unwrap_or(' ');
-        let at_word_start = prev.is_none_or(|p| p.is_whitespace() || "([{,;".contains(p));
+        let at_word_start = prev.is_none_or(|p| p.is_whitespace() || "([{,;（［｛【「『，；、،؛".contains(p));
         if c == '['
             && text[i + 1..].starts_with('@')
             && let Some(len) = text[i..].find(']')
@@ -111,7 +168,7 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
         if at_word_start && matches!(c, '#' | '@' | '!') {
             let name_len: usize = text[i + 1..]
                 .chars()
-                .take_while(|&n| n.is_alphanumeric() || matches!(n, '_' | '-' | '/'))
+                .take_while(|&n| n.is_alphanumeric() || combining_mark(n) || matches!(n, '_' | '-' | '/'))
                 .map(char::len_utf8)
                 .sum();
             let name = text[i + 1..i + 1 + name_len].trim_end_matches(['-', '/']);
@@ -155,13 +212,58 @@ mod tests {
     #[test]
     fn quotes_dashes_and_ellipses_follow_the_language() {
         assert_eq!(
-            smarten("\"Ja\" -- sagt 'er' ... don't --- \"x\"", None, GERMAN),
+            smarten(
+                "\"Ja\" -- sagt 'er' ... don't --- \"x\"",
+                None,
+                GERMAN,
+                &mut Open::default()
+            ),
             "„Ja“ – sagt ‚er‘ … don’t — „x“"
         );
-        assert_eq!(smarten("\"", Some('a'), GERMAN), "“");
+        assert_eq!(smarten("\"", Some('a'), GERMAN, &mut Open::default()), "“");
         assert_eq!(typographic_source('„', "\"x"), Some(1));
         assert_eq!(typographic_source('—', "---"), Some(3));
         assert_eq!(typographic_source('–', "-"), None);
+    }
+
+    #[test]
+    fn chinese_and_japanese_quotes_pair_without_spaces() {
+        const JAPANESE: Quotes = Quotes {
+            open: '「',
+            close: '」',
+            open_single: '『',
+            close_single: '』',
+        };
+        assert_eq!(
+            smarten(
+                "彼は\"今日は'晴れ'です\"と言った。\"はい\"",
+                None,
+                JAPANESE,
+                &mut Open::default()
+            ),
+            "彼は「今日は『晴れ』です」と言った。「はい」"
+        );
+        assert_eq!(
+            smarten("Er sagte \"日本\" und \"x\"", None, GERMAN, &mut Open::default()),
+            "Er sagte „日本“ und „x“"
+        );
+        let mut open = Open::default();
+        let first = smarten("彼は\"今日は", None, JAPANESE, &mut open);
+        let second = smarten("晴れ\"です", Some('\n'), JAPANESE, &mut open);
+        assert_eq!(first + &second, "彼は「今日は晴れ」です");
+        assert_eq!(typographic_source('「', "\"x"), Some(1));
+        const STRAIGHT: Quotes = Quotes {
+            open: '"',
+            close: '"',
+            open_single: '\'',
+            close_single: '\'',
+        };
+        assert_eq!(
+            smarten("צה\"ל וג'ירפה \"כן\"", None, STRAIGHT, &mut Open::default()),
+            "צה״ל וג׳ירפה \"כן\""
+        );
+        assert_eq!(typographic_source('״', "\"ל"), Some(1));
+        assert_eq!(typographic_source('』', "'"), Some(1));
     }
 
     #[test]
@@ -184,5 +286,17 @@ mod tests {
         );
         let outside = marks(text, None, false);
         assert!(outside.iter().all(|(_, m)| !matches!(m, Mark::Reference(_))));
+        let scripts = "#แท็ก #हिन्दी فكرة،#وسوم";
+        let found: Vec<&str> = marks(scripts, None, false)
+            .into_iter()
+            .map(|(r, _)| &scripts[r])
+            .collect();
+        assert_eq!(found, ["#แท็ก", "#हिन्दी", "#وسوم"]);
+        let chinese = "想法，#灵感、#12（@anna）和C#语言";
+        let found: Vec<&str> = marks(chinese, None, true)
+            .into_iter()
+            .map(|(r, _)| &chinese[r])
+            .collect();
+        assert_eq!(found, ["#灵感", "#12", "@anna"]);
     }
 }

@@ -4,12 +4,12 @@
 "Abbrechen" = "Zrušiť";
 "Abgerundet" = "Zaoblený";
 "Ablage" = "Súbor";
-"Absatz" = "Odstavec";
-"Absatz als Hinweis-, Tipp- oder Warnbox formatieren" = "Zmení odstavec na rámček s poznámkou, tipom alebo upozornením";
-"Absatz als Überschrift oder Fließtext formatieren" = "Naformátuje odstavec ako nadpis alebo základný text";
+"Absatz" = "Odsek";
+"Absatz als Hinweis-, Tipp- oder Warnbox formatieren" = "Zmení odsek na rámček s poznámkou, tipom alebo upozornením";
+"Absatz als Überschrift oder Fließtext formatieren" = "Naformátuje odsek ako nadpis alebo základný text";
 "Abschnitt" = "Sekcia";
-"Absätze als Zitat formatieren" = "Naformátuje odstavce ako citáciu";
-"Absätze in eine Liste umwandeln" = "Zmení odstavce na zoznam";
+"Absätze als Zitat formatieren" = "Naformátuje odseky ako citáciu";
+"Absätze in eine Liste umwandeln" = "Zmení odseky na zoznam";
 "Adresse und angezeigten Text eingeben." = "Zadajte adresu a zobrazovaný text.";
 "Adresse:" = "Adresa:";
 "Alle Fenster zusammenführen" = "Zlúčiť všetky okná";
@@ -294,4 +294,4 @@
 "Splat wurde unerwartet beendet" = "Splat bol neočakávane ukončený";
 "Der Text der geöffneten Dokumente wurde in einem eigenen Ordner gesichert." = "Text otvorených dokumentov bol uložený do samostatného priečinka.";
 "Im Finder zeigen" = "Zobraziť vo Finderi";
-"OK" = "OK";
+"OK" = "Potvrdiť";

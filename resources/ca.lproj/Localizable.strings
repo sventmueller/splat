@@ -48,7 +48,7 @@
 "Code" = "Codi";
 "Codeblock" = "Bloc de codi";
 "Codeblock in einer Programmiersprache einfügen" = "Insereix un bloc de codi en un llenguatge de programació";
-"Darstellung" = "Visualització";
+"Darstellung" = "Mostra";
 "Darstellung fehlgeschlagen" = "No s’ha pogut renderitzar";
 "Datenbank" = "Base de dades";
 "Diagramm" = "Diagrama";
@@ -261,7 +261,7 @@
 "Zeilen (inklusive Kopfzeile):" = "Files (inclosa la capçalera):";
 "Zeilenumbruch" = "Salt de línia";
 "Zelle wechseln" = "Canvia de cel·la";
-"Zentriert" = "Centre";
+"Zentriert" = "Centrat";
 "Zitat" = "Cita";
 "Zoomen" = "Zoom";
 "Zuletzt gesicherte Version" = "Darrera versió desada";
@@ -286,9 +286,9 @@
 "Metadaten" = "Metadades";
 "Sichern …" = "Desa…";
 "Details" = "Detalls";
-"Hinweisbox auf- oder zuklappen" = "Desplegar o plegar el quadre";
+"Hinweisbox auf- oder zuklappen" = "Desplegar o plegar el requadre";
 "Typografische Satzzeichen" = "Puntuació tipogràfica";
-"Verborgener Text: Zum Lesen markieren" = "Text ocult: seleccioneu-lo per llegir-lo";
+"Verborgener Text: Zum Lesen markieren" = "Text ocult: selecciona’l per llegir-lo";
 "⌘-Klick sucht den Tag im Dokument" = "⌘-clic cerca l’etiqueta al document";
 "⌘-Klick öffnet den Verweis" = "⌘-clic obre la referència";
 "Splat wurde unerwartet beendet" = "Splat s’ha tancat inesperadament";

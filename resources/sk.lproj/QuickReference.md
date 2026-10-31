@@ -55,7 +55,7 @@ fn main() {
 Jazyk uvedený za tromi opačnými apostrofmi zapne farebné zvýrazňovanie syntaxe. „Formát › Blok kódu“ ponúka bežné jazyky a zmení ich aj pre existujúci blok.
 
 > [!TIP]
-> Informačné rámčeky sú k dispozícii ako Poznámka, Tip, Dôležité, Upozornenie a Pozor („Formát › Informačný rámček“ naformátuje odstavec pri kurzore).
+> Informačné rámčeky sú k dispozícii ako Poznámka, Tip, Dôležité, Upozornenie a Pozor („Formát › Informačný rámček“ naformátuje odsek pri kurzore).
 
 ## Tabuľky
 
@@ -115,7 +115,7 @@ HTML ako v README na GitHube sa zobrazí: zarovnané odseky, obrázky s veľkos�
 
 ## Ostatné
 
-Return na prázdnom riadku náhľadu vloží ďalší prázdny riadok, Backspace ho odstráni. V zdrojovom texte sú na to dva prázdne riadky navyše; iné programy pre Markdown ich zobrazia ako bežnú medzeru medzi odstavcami.
+Return na prázdnom riadku náhľadu vloží ďalší prázdny riadok, Backspace ho odstráni. V zdrojovom texte sú na to dva prázdne riadky navyše; iné programy pre Markdown ich zobrazia ako bežnú medzeru medzi odsekmi.
 
 „Vložiť › Obsah“ vytvorí odkazy na všetky nadpisy; keď je kurzor v obsahu, obsah sa aktualizuje. ⌘-kliknutím na položku prejdete na nadpis.
 

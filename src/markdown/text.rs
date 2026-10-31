@@ -102,6 +102,14 @@ pub fn utf16_len(s: &str) -> usize {
     b.iter().filter(|&&x| (x as i8) >= -0x40).count() + b.iter().filter(|&&x| x >= 0xF0).count()
 }
 
+/// Whether `text` reads right to left: its first letter is Hebrew, Arabic or another right-to-left script, which is
+/// how the Unicode bidirectional algorithm picks the direction of a paragraph. `None` for a text without letters.
+pub fn right_to_left(text: &str) -> Option<bool> {
+    text.chars()
+        .find(|c| c.is_alphabetic())
+        .map(|c| matches!(c, '\u{0590}'..='\u{08FF}' | '\u{FB1D}'..='\u{FDFF}' | '\u{FE70}'..='\u{FEFF}'))
+}
+
 /// Length of the common byte prefix of two texts.
 pub fn common_prefix(a: &[u8], b: &[u8]) -> usize {
     const CHUNK: usize = 4096;
@@ -192,6 +200,14 @@ impl<'a> Utf16Cursor<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_first_letter_decides_the_direction() {
+        assert_eq!(right_to_left("12. • משימה"), Some(true));
+        assert_eq!(right_to_left("«النص» English"), Some(true));
+        assert_eq!(right_to_left("Splat בעברית"), Some(false));
+        assert_eq!(right_to_left("١٢٣ ..."), None);
+    }
 
     #[test]
     fn cursor_inside_a_character_counts_up_to_it() {

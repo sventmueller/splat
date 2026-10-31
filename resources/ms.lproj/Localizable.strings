@@ -6,7 +6,7 @@
 "Ablage" = "Fail";
 "Absatz" = "Perenggan";
 "Absatz als Hinweis-, Tipp- oder Warnbox formatieren" = "Jadikan perenggan kotak nota, petua atau amaran";
-"Absatz als Überschrift oder Fließtext formatieren" = "Formatkan perenggan sebagai pengepala atau teks badan";
+"Absatz als Überschrift oder Fließtext formatieren" = "Formatkan perenggan sebagai tajuk atau teks badan";
 "Abschnitt" = "Bahagian";
 "Absätze als Zitat formatieren" = "Formatkan perenggan sebagai petikan";
 "Absätze in eine Liste umwandeln" = "Tukar perenggan kepada senarai";
@@ -38,7 +38,7 @@
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Blok binaan tersedia untuk carta alir, rajah jujukan dan carta Gantt";
 "Bearbeiten" = "Edit";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Sambungan berlabel ke nod baharu";
-"Bewegen …" = "Alihkan Ke…";
+"Bewegen …" = "Alih ke…";
 "Bild" = "Imej";
 "Bild aus einer Datei einfügen" = "Masukkan imej daripada fail";
 "Bild auswählen, das in das Dokument eingefügt wird." = "Pilih imej untuk dimasukkan ke dalam dokumen.";
@@ -170,7 +170,7 @@
 "Phase {}" = "Fasa {}";
 "Projektplan" = "Pelan projek";
 "Raute (Entscheidung)" = "Wajik (keputusan)";
-"Rechteck" = "Segi empat";
+"Rechteck" = "Segi empat tepat";
 "Rechts" = "Kanan";
 "Rechts nach links" = "Kanan ke kiri";
 "Rechtschreibung automatisch korrigieren" = "Betulkan Ejaan Secara Automatik";
@@ -228,7 +228,7 @@
 "Transformationen" = "Transformasi";
 "Trennlinie" = "Garis Pembahagi";
 "Trennlinie einfügen" = "Masukkan garis pembahagi";
-"Umbenennen …" = "Namakan Semula…";
+"Umbenennen …" = "Nama Semula…";
 "Unten nach oben" = "Bawah ke atas";
 "Unterstrichen" = "Garis Bawah";
 "Verbindung" = "Sambungan";
@@ -268,8 +268,8 @@
 "Zurücksetzen auf" = "Kembali Ke";
 "Öffnen …" = "Buka…";
 "Über Splat" = "Perihal Splat";
-"Überschrift" = "Pengepala";
-"Überschrift {}" = "Pengepala {}";
+"Überschrift" = "Tajuk";
+"Überschrift {}" = "Tajuk {}";
 "⌘-Klick öffnet den Link" = "⌘-klik membuka pautan";
 "Link in einer anderen App öffnen?" = "Buka pautan dalam app lain?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” akan dibuka dengan {}. Buka pautan hanya jika anda mempercayai sumbernya.";

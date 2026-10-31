@@ -6,7 +6,7 @@
 "Ablage" = "Ficheiro";
 "Absatz" = "Parágrafo";
 "Absatz als Hinweis-, Tipp- oder Warnbox formatieren" = "Transformar o parágrafo numa caixa de nota, dica ou aviso";
-"Absatz als Überschrift oder Fließtext formatieren" = "Formatar o parágrafo como cabeçalho ou corpo de texto";
+"Absatz als Überschrift oder Fließtext formatieren" = "Formatar o parágrafo como título ou corpo de texto";
 "Abschnitt" = "Secção";
 "Absätze als Zitat formatieren" = "Formatar os parágrafos como citação";
 "Absätze in eine Liste umwandeln" = "Transformar os parágrafos numa lista";
@@ -268,8 +268,8 @@
 "Zurücksetzen auf" = "Restabelecer";
 "Öffnen …" = "Abrir…";
 "Über Splat" = "Acerca do Splat";
-"Überschrift" = "Cabeçalho";
-"Überschrift {}" = "Cabeçalho {}";
+"Überschrift" = "Título";
+"Überschrift {}" = "Título {}";
 "⌘-Klick öffnet den Link" = "⌘-clique abre a hiperligação";
 "Link in einer anderen App öffnen?" = "Abrir a hiperligação noutra aplicação?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” será aberta com {}. Abra a hiperligação apenas se confiar na origem.";

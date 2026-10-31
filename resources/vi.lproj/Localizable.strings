@@ -235,7 +235,7 @@
 "Vergrößern" = "Phóng to";
 "Verkleinern" = "Thu nhỏ";
 "Visuell" = "Trực quan";
-"Vollbildmodus" = "Vào chế độ toàn màn hình";
+"Vollbildmodus" = "Chuyển sang chế độ toàn màn hình";
 "Vorherigen Tab zeigen" = "Hiển thị Tab Trước";
 "Vorschau" = "Xem trước";
 "Vorschau ausblenden" = "Ẩn Bản xem trước";
@@ -289,8 +289,8 @@
 "Hinweisbox auf- oder zuklappen" = "Mở rộng hoặc thu gọn hộp";
 "Typografische Satzzeichen" = "Dấu câu kiểu chữ in";
 "Verborgener Text: Zum Lesen markieren" = "Văn bản ẩn: chọn để đọc";
-"⌘-Klick sucht den Tag im Dokument" = "⌘-nhấp để tìm thẻ trong tài liệu";
-"⌘-Klick öffnet den Verweis" = "⌘-nhấp để mở tham chiếu";
+"⌘-Klick sucht den Tag im Dokument" = "⌘-bấm để tìm thẻ trong tài liệu";
+"⌘-Klick öffnet den Verweis" = "⌘-bấm để mở tham chiếu";
 "Splat wurde unerwartet beendet" = "Splat đã thoát đột ngột";
 "Der Text der geöffneten Dokumente wurde in einem eigenen Ordner gesichert." = "Văn bản của các tài liệu đang mở đã được lưu vào một thư mục riêng.";
 "Im Finder zeigen" = "Hiển thị trong Finder";
