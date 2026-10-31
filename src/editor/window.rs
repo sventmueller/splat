@@ -494,7 +494,7 @@ impl EditorController {
     }
 
     /// Temporary Markdown file the share menu hands out, so unsaved changes go along; `refresh` writes the current
-    /// text into it.
+    /// text into it. Until then the file stays empty, since AppKit offers no service for a file that does not exist.
     pub(super) fn share_file(&self, refresh: bool) -> Option<Retained<NSURL>> {
         self.ivars().source.get()?;
         let doc = self.document()?;
@@ -516,8 +516,10 @@ impl EditorController {
                 dir.join(name)
             }
         };
-        if refresh || !path.exists() {
+        if refresh {
             std::fs::write(&path, &self.snapshot().text).ok()?;
+        } else if !path.exists() {
+            std::fs::File::create(&path).ok()?;
         }
         let url = NSURL::fileURLWithPath(&ns(path.to_str()?));
         *self.ivars().share_path.borrow_mut() = Some::<PathBuf>(path);

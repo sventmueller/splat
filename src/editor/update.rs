@@ -7,9 +7,9 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use objc2::rc::Weak;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
+use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
 use objc2_app_kit::NSTextStorage;
-use objc2_foundation::NSRange;
+use objc2_foundation::{NSAttributedString, NSRange};
 
 use super::render::RenderCtx;
 use super::scroll::top_offset;
@@ -26,6 +26,18 @@ use crate::util::{ns, perform_later, storage};
 pub(super) const PROGRESSIVE_FROM: usize = 300;
 /// Blocks rendered right away around the visible part when rendering progressively.
 const EAGER_BLOCKS: usize = 120;
+/// A whole new text of this many UTF-16 units or more is parsed in the background, so the window of a large document
+/// opens before its colors and preview are ready.
+const BACKGROUND_FROM: usize = 200_000;
+
+/// Whether `invalidate` updates right away rather than through `refresh`.
+pub(super) fn updates_at_once(why: Invalidate, len_u16: usize) -> bool {
+    match why {
+        Invalidate::Text => len_u16 < BACKGROUND_FROM,
+        Invalidate::Preview => true,
+        Invalidate::Zoom | Invalidate::Appearance | Invalidate::Arrivals | Invalidate::Layout => false,
+    }
+}
 
 pub(super) struct Images {
     pub dark: bool,
@@ -241,8 +253,17 @@ impl EditorController {
         let clip = source.enclosingScrollView().map(|s| s.contentView());
         let origin = clip.as_ref().map(|c| c.bounds().origin);
         let source_storage = storage(source);
+        // A plain string would take the attributes of the replaced text's first character, or TextKit's default font
+        // in an empty view, until the colors arrive from the background.
+        let fonts = self.ivars().state.borrow().fonts.clone();
+        let base = fonts.as_ref().map(style::base_source_attributes);
+        // SAFETY: The attributes have the types their keys expect.
+        let new_text = unsafe {
+            NSAttributedString::initWithString_attributes(NSAttributedString::alloc(), &ns(text), base.as_deref())
+        };
         let silent = self.silently();
-        source_storage.replaceCharactersInRange_withString(NSRange::new(0, source_storage.length()), &ns(text));
+        source_storage
+            .replaceCharactersInRange_withAttributedString(NSRange::new(0, source_storage.length()), &new_text);
         let string = source_storage.string();
         let length = string.length();
         let start = match selection.location.min(length) {
@@ -712,6 +733,22 @@ mod tests {
             );
             let seen = visible.clamp(changed.start, changed.end - 1);
             assert!(eager.contains(&seen), "{eager:?} misses {seen}");
+        }
+    }
+
+    #[test]
+    fn only_a_large_new_text_waits_for_the_background() {
+        assert!(updates_at_once(Invalidate::Text, 0));
+        assert!(updates_at_once(Invalidate::Text, BACKGROUND_FROM - 1));
+        assert!(!updates_at_once(Invalidate::Text, BACKGROUND_FROM));
+        assert!(updates_at_once(Invalidate::Preview, BACKGROUND_FROM));
+        for why in [
+            Invalidate::Zoom,
+            Invalidate::Appearance,
+            Invalidate::Arrivals,
+            Invalidate::Layout,
+        ] {
+            assert!(!updates_at_once(why, 0), "{why:?}");
         }
     }
 }

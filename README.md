@@ -574,6 +574,8 @@ Splat stays responsive with documents of several megabytes:
 - Large previews render the visible part first and the rest while the app is idle. Blocks scrolled into view are
   rendered before they are drawn.
 - Parsing for the preview runs in the background while you type in the source.
+- From about 200 KB, a document opens its window before it is parsed; at 5 MB, the colours and the preview follow
+  about a quarter of a second later.
 
 Documents with footnotes, inline footnotes or `%%` comment blocks are processed in full after each change, as are
 changes to the front matter or close to link reference definitions: around 300 ms per keystroke at 10 MB. Memory grows
