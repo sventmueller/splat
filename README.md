@@ -131,6 +131,12 @@ brew install --cask sventmueller/tap/splat
 `brew upgrade --cask splat` installs new versions, and `brew uninstall --zap --cask splat` also removes Splat's settings
 and caches.
 
+**Updates.** Splat from the disk image or Homebrew keeps itself up to date with [Sparkle](https://sparkle-project.org).
+On the second launch it asks whether it may look for updates on its own, once a day. **Splat › Check for Updates…**
+looks right away; **Check for Updates Automatically** and **Automatically Download and Install Updates** in the same
+menu change your choice later. Splat installs an update only if it carries the developer's signature. A build of your
+own has no updater.
+
 **From source.** See [Building](#building) for the prerequisites, then:
 
 ```sh
@@ -174,6 +180,8 @@ Splat is a regular macOS document app:
 - **Window placement.** The size and position of your last window are remembered, across restarts as well. If a window
   already stands there, the new one opens slightly offset.
 - **The Dock icon.** A click on it after you closed the last window opens a new document.
+- **Open Markdown files in Splat.** **Splat › Set as Default App for Markdown** makes a double-click on a `.md` or
+  `.markdown` file open Splat; macOS asks once to confirm. The item shows a checkmark while Splat is the default.
 
 Files must be UTF-8 text. Splat refuses other encodings rather than guessing and corrupting the text. A byte order
 mark stays, and in a file whose lines all end in CRLF, the lines you add get CRLF as well.
@@ -561,8 +569,9 @@ Splat leaves Apple's standard shortcuts where they are.
 
 A Markdown file can come from anyone, so Splat treats every document as untrusted.
 
-- **No network by default.** Splat has no telemetry and no update check. Formulas and diagrams render locally; the web
-  views that do it cannot reach the network.
+- **No network by default.** Splat has no telemetry. It looks for updates only once you agree or choose **Check for
+  Updates…**: it then loads a small feed file from GitHub, and the request names nothing but the app and its version.
+  Formulas and diagrams render locally; the web views that do it cannot reach the network.
 - **Images from the web** load only after your permission, only over `https`, never from hosts in your local network,
   at most 10 MB each, and in a private session without cookies.
 - **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in helper processes that close
@@ -626,6 +635,9 @@ so macOS keeps a separate list and separate folder permissions for each.
 **HTML or other syntax shows as plain code.** An outdated copy of Splat may have opened the document. Quit it,
 choose **File › Get Info** on the document in the Finder and check that **Open with** names the Splat in your
 Applications folder.
+
+**There is no Check for Updates… in the Splat menu.** Only the version from the disk image or Homebrew updates
+itself; a build of your own has no updater.
 
 **Images from the web do not appear.** Click **Load Images** in the bar above the preview. Only `https` images from
 public hosts load.
@@ -699,16 +711,31 @@ notarizes the app with Apple and staples the ticket, packs it into a compressed,
 Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
 rounds with the notary service take a few minutes each. Only an image that passed every step becomes
-`dist/Splat-<version>.dmg`, the copy that is committed: it replaces the previous image, the download links in this
-README follow it, and the build number goes up. A failed run leaves `dist/`, the README and VERSION as they were.
+`dist/Splat-<version>.dmg`, the copy that is committed: the download links in this README follow it, and the build
+number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
+feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/`, the README and
+VERSION as they were.
 Each release adds the full image, about 10 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
 - a "Developer ID Application" certificate in the keychain
 - a saved login for Apple's notary service with an app-specific password, created once with
   `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
+- the private key that signs updates, in the login keychain. Sparkle's `generate_keys` created it; its public half is
+  `UPDATE_KEY` in [xtask/src/main.rs](xtask/src/main.rs) and inside every installed copy, which accepts only updates
+  signed with it. Keep a backup in a password manager: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exports
+  it, `-f <file>` imports it on another Mac. Without it, installed copies can never be updated again.
 
-If either is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
+If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
 Finder; without that permission, the disk image shows neither its background nor the icon arrangement.
+
+Only the disk image carries the updater, [Sparkle](https://sparkle-project.org), which the build downloads once into
+`target/` from its GitHub release and checks against the checksum in xtask. The hardened runtime loads the framework
+only when it carries the app's Team ID, which the Developer ID signature has and the local certificate lacks; and an
+update must not replace a build of your own. The self-test build carries Sparkle as well, to check the update menu
+against it: with a feed that does not exist, without Sparkle's question on the second launch, and with an entitlement
+that lets the locally signed app load the framework. `dmg` signs the new image with the update key and writes
+`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image, the feed and the README
+together: from then on, installed copies offer the update.
 
 The disk image runs on Apple Silicon only: Homebrew's Rust ships the standard library for the host processor alone.
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
@@ -863,10 +890,13 @@ text and that every quick reference has the outline of the German one.
 | [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid diagrams | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz compiled to WebAssembly, contains Graphviz (EPL-1.0) and Expat (MIT) | MIT |
 | [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML diagrams, compiled to JavaScript | MIT |
+| [Sparkle](https://sparkle-project.org) | 2.10.1 | updates of the disk image version | MIT, with parts under BSD and zlib licenses |
 
 The JavaScript libraries are stored in `resources/js/` exactly as published; [vendor.lock](vendor.lock) records their
 sources and SHA-256 checksums. Their license texts, including those of Graphviz and Expat inside Viz.js, are next to
-them as `resources/js/LICENSE-*` and ship inside the app.
+them as `resources/js/LICENSE-*` and ship inside the app. Sparkle is not stored in the repository: `cargo xtask dmg`
+downloads its release and checks it against the checksum in xtask, and its license ships inside the app as
+`LICENSE-sparkle`.
 
 ## License
 

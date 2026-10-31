@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "모두 앞으로 가져오기";
 "Alles auswählen" = "전체 선택";
 "Als PDF exportieren …" = "PDF로 내보내기…";
+"Als Standard-App für Markdown festlegen" = "Markdown 기본 앱으로 설정";
 "Alternative" = "분기";
 "Andere ausblenden" = "기타 가리기";
 "Anfrage" = "요청";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "오려두기";
 "Auswahl anzeigen" = "선택 부분으로 이동";
 "Auswahl suchen" = "찾기에 선택 부분 사용";
+"Automatisch nach Updates suchen" = "자동으로 업데이트 확인";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "구성 요소는 순서도, 시퀀스 다이어그램, 간트 차트에서 사용할 수 있습니다";
 "Bearbeiten" = "편집";
 "Beschriftete Verbindung zu einem neuen Knoten" = "레이블을 붙여 새로운 노드에 연결";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid 코드";
 "Mermaid-Diagramm einfügen" = "Mermaid 다이어그램 삽입";
 "Mit Beschriftung" = "레이블 포함";
+"Nach Updates suchen …" = "업데이트 확인…";
 "Nachricht" = "메시지";
 "Nachricht zwischen zwei Teilnehmern" = "두 참여자 간의 메시지";
 "Nein" = "아니요";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "이름 변경…";
 "Unten nach oben" = "아래에서 위로";
 "Unterstrichen" = "밑줄체";
+"Updates automatisch laden und installieren" = "자동으로 업데이트 다운로드 및 설치";
 "Verbindung" = "연결";
 "Vergrößern" = "확대";
 "Verkleinern" = "축소";

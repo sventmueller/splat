@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Převést vše do popředí";
 "Alles auswählen" = "Vybrat vše";
 "Als PDF exportieren …" = "Exportovat jako PDF…";
+"Als Standard-App für Markdown festlegen" = "Nastavit jako výchozí aplikaci pro Markdown";
 "Alternative" = "Alternativa";
 "Andere ausblenden" = "Skrýt ostatní";
 "Anfrage" = "Požadavek";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Vyjmout";
 "Auswahl anzeigen" = "Zobrazit výběr";
 "Auswahl suchen" = "Hledat výběr";
+"Automatisch nach Updates suchen" = "Vyhledávat aktualizace automaticky";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Stavební bloky jsou k dispozici pro vývojové, sekvenční a Ganttovy diagramy";
 "Bearbeiten" = "Úpravy";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Spojení s popiskem k novému uzlu";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Kód Mermaid";
 "Mermaid-Diagramm einfügen" = "Vloží diagram Mermaid";
 "Mit Beschriftung" = "S popiskem";
+"Nach Updates suchen …" = "Vyhledat aktualizace…";
 "Nachricht" = "Zpráva";
 "Nachricht zwischen zwei Teilnehmern" = "Zpráva mezi dvěma účastníky";
 "Nein" = "Ne";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Přejmenovat…";
 "Unten nach oben" = "Zdola nahoru";
 "Unterstrichen" = "Podtržené";
+"Updates automatisch laden und installieren" = "Stahovat a instalovat aktualizace automaticky";
 "Verbindung" = "Spojení";
 "Vergrößern" = "Přiblížit";
 "Verkleinern" = "Oddálit";

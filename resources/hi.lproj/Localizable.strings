@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "सभी आगे लाएँ";
 "Alles auswählen" = "सभी चुनें";
 "Als PDF exportieren …" = "PDF के रूप में एक्सपोर्ट करें…";
+"Als Standard-App für Markdown festlegen" = "Markdown के लिए डिफ़ॉल्ट ऐप के रूप में सेट करें";
 "Alternative" = "विकल्प";
 "Andere ausblenden" = "अन्य छिपाएँ";
 "Anfrage" = "अनुरोध";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "कट";
 "Auswahl anzeigen" = "चयन पर जाएँ";
 "Auswahl suchen" = "ढूँढने के लिए चयन का उपयोग करें";
+"Automatisch nach Updates suchen" = "अपडेट अपने आप जाँचें";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "बिल्डिंग ब्लॉक फ़्लोचार्ट, सीक्वेंस डायग्राम और गैंट चार्ट के लिए हैं";
 "Bearbeiten" = "संपादन";
 "Beschriftete Verbindung zu einem neuen Knoten" = "नए नोड तक लेबल वाला कनेक्शन";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid कोड";
 "Mermaid-Diagramm einfügen" = "Mermaid डायग्राम डालें";
 "Mit Beschriftung" = "लेबल सहित";
+"Nach Updates suchen …" = "अपडेट जाँचें…";
 "Nachricht" = "संदेश";
 "Nachricht zwischen zwei Teilnehmern" = "दो प्रतिभागियों के बीच संदेश";
 "Nein" = "नहीं";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "नाम बदलें…";
 "Unten nach oben" = "नीचे से ऊपर";
 "Unterstrichen" = "रेखांकित करें";
+"Updates automatisch laden und installieren" = "अपडेट अपने आप डाउनलोड और इंस्टॉल करें";
 "Verbindung" = "कनेक्शन";
 "Vergrößern" = "ज़ूम इन करें";
 "Verkleinern" = "ज़ूम आउट करें";

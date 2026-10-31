@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Tümünü Öne Getir";
 "Alles auswählen" = "Tümünü Seç";
 "Als PDF exportieren …" = "PDF Olarak Dışa Aktar…";
+"Als Standard-App für Markdown festlegen" = "Markdown İçin Saptanmış Uygulama Olarak Ayarla";
 "Alternative" = "Alternatif";
 "Andere ausblenden" = "Diğerlerini Gizle";
 "Anfrage" = "İstek";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Kes";
 "Auswahl anzeigen" = "Seçime Git";
 "Auswahl suchen" = "Bulmak İçin Seçimi Kullan";
+"Automatisch nach Updates suchen" = "Güncellemeleri Otomatik Olarak Denetle";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Yapı taşları akış şemaları, sıralama diyagramları ve Gantt şemaları için kullanılabilir";
 "Bearbeiten" = "Düzen";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Yeni bir düğüme etiketli bağlantı";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid kodu";
 "Mermaid-Diagramm einfügen" = "Mermaid diyagramı ekle";
 "Mit Beschriftung" = "Etiketli";
+"Nach Updates suchen …" = "Güncellemeleri Denetle…";
 "Nachricht" = "İleti";
 "Nachricht zwischen zwei Teilnehmern" = "İki katılımcı arasında ileti";
 "Nein" = "Hayır";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Adını Değiştir…";
 "Unten nach oben" = "Aşağıdan yukarıya";
 "Unterstrichen" = "Altı Çizgili";
+"Updates automatisch laden und installieren" = "Güncellemeleri Otomatik Olarak İndir ve Yükle";
 "Verbindung" = "Bağlantı";
 "Vergrößern" = "Büyüt";
 "Verkleinern" = "Küçült";

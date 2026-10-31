@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "すべてを手前に移動";
 "Alles auswählen" = "すべてを選択";
 "Als PDF exportieren …" = "PDFとして書き出す…";
+"Als Standard-App für Markdown festlegen" = "Markdownのデフォルトアプリに設定";
 "Alternative" = "分岐";
 "Andere ausblenden" = "ほかを非表示";
 "Anfrage" = "リクエスト";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "カット";
 "Auswahl anzeigen" = "選択部分へジャンプ";
 "Auswahl suchen" = "選択部分を検索に使用";
+"Automatisch nach Updates suchen" = "アップデートを自動的に確認";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "パーツはフローチャート、シーケンス図、ガントチャートで使用できます";
 "Bearbeiten" = "編集";
 "Beschriftete Verbindung zu einem neuen Knoten" = "新しいノードへのラベル付き接続";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaidコード";
 "Mermaid-Diagramm einfügen" = "Mermaid図を挿入します";
 "Mit Beschriftung" = "ラベル付き";
+"Nach Updates suchen …" = "アップデートを確認…";
 "Nachricht" = "メッセージ";
 "Nachricht zwischen zwei Teilnehmern" = "2人の参加者間のメッセージ";
 "Nein" = "いいえ";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "名称変更…";
 "Unten nach oben" = "下から上";
 "Unterstrichen" = "アンダーライン";
+"Updates automatisch laden und installieren" = "アップデートを自動的にダウンロードしてインストール";
 "Verbindung" = "接続";
 "Vergrößern" = "拡大";
 "Verkleinern" = "縮小";

@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Pindahkan Semua ke Depan";
 "Alles auswählen" = "Pilih Semua";
 "Als PDF exportieren …" = "Ekspor sebagai PDF…";
+"Als Standard-App für Markdown festlegen" = "Atur sebagai App Default untuk Markdown";
 "Alternative" = "Alternatif";
 "Andere ausblenden" = "Sembunyikan Lainnya";
 "Anfrage" = "Permintaan";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Potong";
 "Auswahl anzeigen" = "Lompat ke Pilihan";
 "Auswahl suchen" = "Gunakan Pilihan untuk Pencarian";
+"Automatisch nach Updates suchen" = "Periksa Pembaruan Secara Otomatis";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Blok penyusun tersedia untuk diagram alir, diagram urutan, dan diagram Gantt";
 "Bearbeiten" = "Edit";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Koneksi berlabel ke simpul baru";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Kode Mermaid";
 "Mermaid-Diagramm einfügen" = "Sisipkan diagram Mermaid";
 "Mit Beschriftung" = "Berlabel";
+"Nach Updates suchen …" = "Periksa Pembaruan…";
 "Nachricht" = "Pesan";
 "Nachricht zwischen zwei Teilnehmern" = "Pesan antara dua peserta";
 "Nein" = "Tidak";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Ubah Nama…";
 "Unten nach oben" = "Bawah ke atas";
 "Unterstrichen" = "Garis Bawahi";
+"Updates automatisch laden und installieren" = "Unduh dan Instal Pembaruan Secara Otomatis";
 "Verbindung" = "Koneksi";
 "Vergrößern" = "Perbesar";
 "Verkleinern" = "Perkecil";

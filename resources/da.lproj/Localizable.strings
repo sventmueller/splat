@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Anbring alle forrest";
 "Alles auswählen" = "Vælg alt";
 "Als PDF exportieren …" = "Eksporter som PDF…";
+"Als Standard-App für Markdown festlegen" = "Indstil som standardapp til Markdown";
 "Alternative" = "Alternativ";
 "Andere ausblenden" = "Skjul andre";
 "Anfrage" = "Forespørgsel";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Klip";
 "Auswahl anzeigen" = "Hop til det valgte";
 "Auswahl suchen" = "Søg med det valgte";
+"Automatisch nach Updates suchen" = "Søg automatisk efter opdateringer";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Der er byggeklodser til rutediagrammer, sekvens- og Gantt-diagrammer";
 "Bearbeiten" = "Rediger";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Forbindelse med etiket til en ny knude";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid-kode";
 "Mermaid-Diagramm einfügen" = "Indsæt et Mermaid-diagram";
 "Mit Beschriftung" = "Med etiket";
+"Nach Updates suchen …" = "Søg efter opdateringer…";
 "Nachricht" = "Besked";
 "Nachricht zwischen zwei Teilnehmern" = "Besked mellem to deltagere";
 "Nein" = "Nej";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Omdøb…";
 "Unten nach oben" = "Nedefra og op";
 "Unterstrichen" = "Understreget";
+"Updates automatisch laden und installieren" = "Hent og installer opdateringer automatisk";
 "Verbindung" = "Forbindelse";
 "Vergrößern" = "Zoom ind";
 "Verkleinern" = "Zoom ud";

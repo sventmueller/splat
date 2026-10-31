@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Aduceți tot în față";
 "Alles auswählen" = "Selectați tot";
 "Als PDF exportieren …" = "Exportați ca PDF…";
+"Als Standard-App für Markdown festlegen" = "Setați ca aplicație implicită pentru Markdown";
 "Alternative" = "Alternativă";
 "Andere ausblenden" = "Ascundeți restul";
 "Anfrage" = "Cerere";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Tăiați";
 "Auswahl anzeigen" = "Salt la selecție";
 "Auswahl suchen" = "Găsiți selecția";
+"Automatisch nach Updates suchen" = "Căutați automat actualizări";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Există blocuri pentru diagrame de flux, de secvență și Gantt";
 "Bearbeiten" = "Editare";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Conexiune cu etichetă către un nod nou";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Cod Mermaid";
 "Mermaid-Diagramm einfügen" = "Inserați o diagramă Mermaid";
 "Mit Beschriftung" = "Cu etichetă";
+"Nach Updates suchen …" = "Căutați actualizări…";
 "Nachricht" = "Mesaj";
 "Nachricht zwischen zwei Teilnehmern" = "Mesaj între doi participanți";
 "Nein" = "Nu";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Redenumiți…";
 "Unten nach oben" = "De jos în sus";
 "Unterstrichen" = "Subliniat";
+"Updates automatisch laden und installieren" = "Descărcați și instalați automat actualizările";
 "Verbindung" = "Conexiune";
 "Vergrößern" = "Zoom înainte";
 "Verkleinern" = "Zoom înapoi";

@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Все окна — на передний план";
 "Alles auswählen" = "Выбрать все";
 "Als PDF exportieren …" = "Экспортировать как PDF…";
+"Als Standard-App für Markdown festlegen" = "Назначить приложением по умолчанию для Markdown";
 "Alternative" = "Альтернатива";
 "Andere ausblenden" = "Скрыть остальные";
 "Anfrage" = "Запрос";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Вырезать";
 "Auswahl anzeigen" = "Перейти к выбранному";
 "Auswahl suchen" = "Найти выбранное";
+"Automatisch nach Updates suchen" = "Автоматически проверять наличие обновлений";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Готовые блоки есть для блок-схем, диаграмм последовательности и Ганта";
 "Bearbeiten" = "Правка";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Связь с подписью к новому узлу";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Код Mermaid";
 "Mermaid-Diagramm einfügen" = "Вставить диаграмму Mermaid";
 "Mit Beschriftung" = "С подписью";
+"Nach Updates suchen …" = "Проверить наличие обновлений…";
 "Nachricht" = "Сообщение";
 "Nachricht zwischen zwei Teilnehmern" = "Сообщение между двумя участниками";
 "Nein" = "Нет";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Переименовать…";
 "Unten nach oben" = "Снизу вверх";
 "Unterstrichen" = "Подчеркнутый";
+"Updates automatisch laden und installieren" = "Автоматически загружать и устанавливать обновления";
 "Verbindung" = "Связь";
 "Vergrößern" = "Увеличить";
 "Verkleinern" = "Уменьшить";

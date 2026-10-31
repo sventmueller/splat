@@ -3,32 +3,44 @@ use objc2_app_kit::{NSApplication, NSMenu};
 
 use crate::editor::actions::{self, Action, item_with_symbol, with_symbol};
 use crate::i18n::t;
+use crate::updates;
 use crate::util::{item, ns, separator, submenu, tagged};
 
 pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
     let main = NSMenu::initWithTitle(NSMenu::alloc(mtm), &ns(""));
 
     let (services_item, services) = submenu(mtm, t("Dienste"), vec![]);
-    let (app_item, _) = submenu(
-        mtm,
-        "Splat",
-        vec![
-            item(mtm, t("Über Splat"), Some(sel!(orderFrontStandardAboutPanel:)), ""),
-            separator(mtm),
-            services_item,
-            separator(mtm),
-            item(mtm, t("Splat ausblenden"), Some(sel!(hide:)), "cmd+h"),
-            item(
-                mtm,
-                t("Andere ausblenden"),
-                Some(sel!(hideOtherApplications:)),
-                "alt+cmd+h",
-            ),
-            item(mtm, t("Alle einblenden"), Some(sel!(unhideAllApplications:)), ""),
-            separator(mtm),
-            item(mtm, t("Splat beenden"), Some(sel!(terminate:)), "cmd+q"),
-        ],
-    );
+    let mut app_items = vec![
+        item(mtm, t("Über Splat"), Some(sel!(orderFrontStandardAboutPanel:)), ""),
+        separator(mtm),
+    ];
+    let updates = updates::menu_items(mtm);
+    if !updates.is_empty() {
+        app_items.extend(updates);
+        app_items.push(separator(mtm));
+    }
+    app_items.extend([
+        item(
+            mtm,
+            t("Als Standard-App für Markdown festlegen"),
+            Some(sel!(mdOpenMarkdownHere:)),
+            "",
+        ),
+        separator(mtm),
+        services_item,
+        separator(mtm),
+        item(mtm, t("Splat ausblenden"), Some(sel!(hide:)), "cmd+h"),
+        item(
+            mtm,
+            t("Andere ausblenden"),
+            Some(sel!(hideOtherApplications:)),
+            "alt+cmd+h",
+        ),
+        item(mtm, t("Alle einblenden"), Some(sel!(unhideAllApplications:)), ""),
+        separator(mtm),
+        item(mtm, t("Splat beenden"), Some(sel!(terminate:)), "cmd+q"),
+    ]);
+    let (app_item, _) = submenu(mtm, "Splat", app_items);
     app.setServicesMenu(Some(&services));
 
     let (revert_item, _) = submenu(

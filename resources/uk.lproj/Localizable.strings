@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Усі наперед";
 "Alles auswählen" = "Вибрати все";
 "Als PDF exportieren …" = "Експортувати як PDF…";
+"Als Standard-App für Markdown festlegen" = "Зробити основною програмою для Markdown";
 "Alternative" = "Альтернатива";
 "Andere ausblenden" = "Сховати решту";
 "Anfrage" = "Запит";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Вирізати";
 "Auswahl anzeigen" = "Перейти до вибраного";
 "Auswahl suchen" = "Використати вибране для пошуку";
+"Automatisch nach Updates suchen" = "Автоматично перевіряти наявність оновлень";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Готові елементи є для блок-схем, діаграм послідовності й діаграм Ганта";
 "Bearbeiten" = "Редагування";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Зʼєднання з підписом до нового вузла";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Код Mermaid";
 "Mermaid-Diagramm einfügen" = "Вставити діаграму Mermaid";
 "Mit Beschriftung" = "З підписом";
+"Nach Updates suchen …" = "Перевірити наявність оновлень…";
 "Nachricht" = "Повідомлення";
 "Nachricht zwischen zwei Teilnehmern" = "Повідомлення між двома учасниками";
 "Nein" = "Ні";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Перейменувати…";
 "Unten nach oben" = "Знизу догори";
 "Unterstrichen" = "Підкреслення";
+"Updates automatisch laden und installieren" = "Автоматично завантажувати й інсталювати оновлення";
 "Verbindung" = "Зʼєднання";
 "Vergrößern" = "Наблизити";
 "Verkleinern" = "Віддалити";

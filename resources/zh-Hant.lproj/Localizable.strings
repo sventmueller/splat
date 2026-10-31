@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "將此程式所有視窗移至最前";
 "Alles auswählen" = "全選";
 "Als PDF exportieren …" = "輸出為PDF⋯";
+"Als Standard-App für Markdown festlegen" = "設為 Markdown 的預設 App";
 "Alternative" = "條件分支";
 "Andere ausblenden" = "隱藏其他";
 "Anfrage" = "請求";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "剪下";
 "Auswahl anzeigen" = "跳至所選範圍";
 "Auswahl suchen" = "使用所選範圍尋找";
+"Automatisch nach Updates suchen" = "自動檢查更新項目";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "流程圖、循序圖和甘特圖都有可用的組件";
 "Bearbeiten" = "編輯";
 "Beschriftete Verbindung zu einem neuen Knoten" = "以帶標籤的連線連到新節點";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid 程式碼";
 "Mermaid-Diagramm einfügen" = "插入 Mermaid 圖表";
 "Mit Beschriftung" = "帶標籤";
+"Nach Updates suchen …" = "檢查更新項目⋯";
 "Nachricht" = "訊息";
 "Nachricht zwischen zwei Teilnehmern" = "兩位參與者之間的訊息";
 "Nein" = "否";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "重新命名⋯";
 "Unten nach oben" = "由下至上";
 "Unterstrichen" = "底線";
+"Updates automatisch laden und installieren" = "自動下載並安裝更新項目";
 "Verbindung" = "連線";
 "Vergrößern" = "放大";
 "Verkleinern" = "縮小";

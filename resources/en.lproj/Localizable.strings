@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Bring All to Front";
 "Alles auswählen" = "Select All";
 "Als PDF exportieren …" = "Export as PDF…";
+"Als Standard-App für Markdown festlegen" = "Set as Default App for Markdown";
 "Alternative" = "Alternative";
 "Andere ausblenden" = "Hide Others";
 "Anfrage" = "Request";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Cut";
 "Auswahl anzeigen" = "Jump to Selection";
 "Auswahl suchen" = "Use Selection for Find";
+"Automatisch nach Updates suchen" = "Check for Updates Automatically";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Building blocks are available for flowcharts, sequence and Gantt diagrams";
 "Bearbeiten" = "Edit";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Labeled connection to a new node";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Mermaid code";
 "Mermaid-Diagramm einfügen" = "Insert a Mermaid diagram";
 "Mit Beschriftung" = "Labeled";
+"Nach Updates suchen …" = "Check for Updates…";
 "Nachricht" = "Message";
 "Nachricht zwischen zwei Teilnehmern" = "Message between two participants";
 "Nein" = "No";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Rename…";
 "Unten nach oben" = "Bottom to top";
 "Unterstrichen" = "Underline";
+"Updates automatisch laden und installieren" = "Automatically Download and Install Updates";
 "Verbindung" = "Connection";
 "Vergrößern" = "Zoom In";
 "Verkleinern" = "Zoom Out";

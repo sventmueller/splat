@@ -1351,6 +1351,8 @@ fn run(mtm: MainThreadMarker, out: &Path) {
                 }
             }),
             step(0.15, |c| check_context_menu(&c.e)),
+            step(0.05, |c| check_app_menu(c.e.mtm())),
+            step(0.5, |c| check_default_probe(c.e.mtm())),
             step(0.15, |c| {
                 let e = &c.e;
                 let src = source(e);
@@ -2529,6 +2531,91 @@ fn close_popover(e: &EditorController) {
     if let Some(p) = popover {
         p.close();
     }
+}
+
+/// A file type only the self-test bundle declares; see xtask.
+const PROBE_TYPE: &str = "local.splat.selftest.probe";
+
+fn check_app_menu(mtm: MainThreadMarker) {
+    use objc2_app_kit::NSControlStateValueOn;
+    let app = NSApplication::sharedApplication(mtm);
+    let menu = app
+        .mainMenu()
+        .and_then(|m| m.itemAtIndex(0))
+        .and_then(|i| i.submenu())
+        .unwrap();
+    let state = |action: objc2::runtime::Sel| {
+        menu.update();
+        menu.itemArray()
+            .iter()
+            .find(|i| i.action() == Some(action))
+            .map(|i| (i.isEnabled(), i.state() == NSControlStateValueOn))
+    };
+    let is_default = crate::app::opens_markdown();
+    check(
+        "the app menu offers to open Markdown files in Splat, ticked once it does",
+        state(sel!(mdOpenMarkdownHere:)) == Some((!is_default, is_default)),
+        &format!("{:?}, default {is_default}", state(sel!(mdOpenMarkdownHere:))),
+    );
+    let checks = menu
+        .itemArray()
+        .iter()
+        .find(|i| i.action() == Some(sel!(checkForUpdates:)));
+    check(
+        "the app menu checks for updates through Sparkle",
+        checks.is_some_and(|i| i.target().is_some()) && state(sel!(checkForUpdates:)) == Some((true, false)),
+        &format!("{:?}", state(sel!(checkForUpdates:))),
+    );
+    let toggle = |action: objc2::runtime::Sel| unsafe { app.sendAction_to_from(action, None, None) };
+    let was_on = crate::updates::checks_automatically();
+    if was_on {
+        toggle(sel!(mdToggleUpdateChecks:));
+    }
+    let off = (
+        state(sel!(mdToggleUpdateChecks:)),
+        state(sel!(mdToggleUpdateDownloads:)),
+    );
+    toggle(sel!(mdToggleUpdateChecks:));
+    let on = (
+        state(sel!(mdToggleUpdateChecks:)),
+        state(sel!(mdToggleUpdateDownloads:)),
+    );
+    toggle(sel!(mdToggleUpdateDownloads:));
+    let installing = (
+        crate::updates::installs_automatically(),
+        state(sel!(mdToggleUpdateDownloads:)),
+    );
+    toggle(sel!(mdToggleUpdateDownloads:));
+    toggle(sel!(mdToggleUpdateChecks:));
+    let restored = !crate::updates::checks_automatically() && !crate::updates::installs_automatically();
+    if was_on {
+        toggle(sel!(mdToggleUpdateChecks:));
+    }
+    check(
+        "the update settings in the app menu switch Sparkle's options, installing only with automatic checks",
+        off == (Some((true, false)), Some((false, false)))
+            && on == (Some((true, true)), Some((true, false)))
+            && installing == (true, Some((true, true)))
+            && restored,
+        &format!("off {off:?}, on {on:?}, installing {installing:?}, restored {restored}"),
+    );
+    // Only for a type it already opens does macOS change the default without asking the user.
+    if crate::app::opens(PROBE_TYPE) {
+        crate::app::make_default(PROBE_TYPE);
+    }
+}
+
+fn check_default_probe(mtm: MainThreadMarker) {
+    let modal = NSApplication::sharedApplication(mtm).modalWindow();
+    check(
+        "making the app the default for a type it opens needs no confirmation and shows no error",
+        crate::app::opens(PROBE_TYPE) && modal.is_none(),
+        &format!(
+            "opens {}, modal window {}",
+            crate::app::opens(PROBE_TYPE),
+            modal.is_some()
+        ),
+    );
 }
 
 fn check_context_menu(e: &EditorController) {

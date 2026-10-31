@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "إحضار الكل إلى الأمام";
 "Alles auswählen" = "تحديد الكل";
 "Als PDF exportieren …" = "تصدير كملف PDF…";
+"Als Standard-App für Markdown festlegen" = "تعيين كالتطبيق الافتراضي لملفات Markdown";
 "Alternative" = "بديل";
 "Andere ausblenden" = "إخفاء الأخرى";
 "Anfrage" = "طلب";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "قص";
 "Auswahl anzeigen" = "انتقال سريع إلى التحديد";
 "Auswahl suchen" = "استخدام التحديد للبحث";
+"Automatisch nach Updates suchen" = "البحث عن تحديثات تلقائيًا";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "تتوفر وحدات البناء للمخططات الانسيابية والتسلسلية ومخططات جانت";
 "Bearbeiten" = "تعديل";
 "Beschriftete Verbindung zu einem neuen Knoten" = "وصلة مع تسمية إلى عقدة جديدة";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "رمز Mermaid";
 "Mermaid-Diagramm einfügen" = "إدراج مخطط Mermaid";
 "Mit Beschriftung" = "مع تسمية";
+"Nach Updates suchen …" = "البحث عن تحديثات…";
 "Nachricht" = "رسالة";
 "Nachricht zwischen zwei Teilnehmern" = "رسالة بين مشاركين اثنين";
 "Nein" = "لا";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "إعادة تسمية…";
 "Unten nach oben" = "من الأسفل إلى الأعلى";
 "Unterstrichen" = "تسطير";
+"Updates automatisch laden und installieren" = "تنزيل التحديثات وتثبيتها تلقائيًا";
 "Verbindung" = "وصلة";
 "Vergrößern" = "تكبير";
 "Verkleinern" = "تصغير";

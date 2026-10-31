@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "นำทั้งหมดมาด้านหน้า";
 "Alles auswählen" = "เลือกทั้งหมด";
 "Als PDF exportieren …" = "ส่งออกเป็น PDF…";
+"Als Standard-App für Markdown festlegen" = "ตั้งเป็นแอปเริ่มต้นสำหรับ Markdown";
 "Alternative" = "ทางเลือก";
 "Andere ausblenden" = "ซ่อนอื่นๆ";
 "Anfrage" = "คำขอ";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "ตัด";
 "Auswahl anzeigen" = "ข้ามไปยังการเลือก";
 "Auswahl suchen" = "ใช้การเลือกสำหรับค้นหา";
+"Automatisch nach Updates suchen" = "ตรวจหารายการอัปเดตโดยอัตโนมัติ";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "มีบล็อกสำเร็จรูปสำหรับผังงาน แผนภาพลำดับ และแผนภูมิแกนต์";
 "Bearbeiten" = "แก้ไข";
 "Beschriftete Verbindung zu einem neuen Knoten" = "เส้นเชื่อมพร้อมป้ายกำกับไปยังโหนดใหม่";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "โค้ด Mermaid";
 "Mermaid-Diagramm einfügen" = "แทรกแผนภาพ Mermaid";
 "Mit Beschriftung" = "พร้อมป้ายกำกับ";
+"Nach Updates suchen …" = "ตรวจหารายการอัปเดต…";
 "Nachricht" = "ข้อความ";
 "Nachricht zwischen zwei Teilnehmern" = "ข้อความระหว่างผู้เข้าร่วมสองคน";
 "Nein" = "ไม่ใช่";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "เปลี่ยนชื่อ…";
 "Unten nach oben" = "ล่างขึ้นบน";
 "Unterstrichen" = "ขีดเส้นใต้";
+"Updates automatisch laden und installieren" = "ดาวน์โหลดและติดตั้งรายการอัปเดตโดยอัตโนมัติ";
 "Verbindung" = "เส้นเชื่อม";
 "Vergrößern" = "ซูมเข้า";
 "Verkleinern" = "ซูมออก";

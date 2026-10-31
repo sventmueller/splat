@@ -19,6 +19,7 @@
 "Alle nach vorne bringen" = "Umieść wszystko na wierzchu";
 "Alles auswählen" = "Zaznacz wszystko";
 "Als PDF exportieren …" = "Eksportuj jako PDF…";
+"Als Standard-App für Markdown festlegen" = "Ustaw jako domyślną aplikację dla Markdown";
 "Alternative" = "Alternatywa";
 "Andere ausblenden" = "Ukryj pozostałe";
 "Anfrage" = "Zapytanie";
@@ -35,6 +36,7 @@
 "Ausschneiden" = "Wytnij";
 "Auswahl anzeigen" = "Przejdź do zaznaczenia";
 "Auswahl suchen" = "Szukaj zaznaczonego tekstu";
+"Automatisch nach Updates suchen" = "Sprawdzaj uaktualnienia automatycznie";
 "Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme" = "Gotowe elementy są dostępne dla schematów blokowych, diagramów sekwencji i wykresów Gantta";
 "Bearbeiten" = "Edycja";
 "Beschriftete Verbindung zu einem neuen Knoten" = "Połączenie z etykietą do nowego węzła";
@@ -148,6 +150,7 @@
 "Mermaid-Code" = "Kod Mermaid";
 "Mermaid-Diagramm einfügen" = "Wstaw diagram Mermaid";
 "Mit Beschriftung" = "Z etykietą";
+"Nach Updates suchen …" = "Sprawdź uaktualnienia…";
 "Nachricht" = "Wiadomość";
 "Nachricht zwischen zwei Teilnehmern" = "Wiadomość między dwoma uczestnikami";
 "Nein" = "Nie";
@@ -231,6 +234,7 @@
 "Umbenennen …" = "Zmień nazwę…";
 "Unten nach oben" = "Od dołu do góry";
 "Unterstrichen" = "Podkreślenie";
+"Updates automatisch laden und installieren" = "Pobieraj i instaluj uaktualnienia automatycznie";
 "Verbindung" = "Połączenie";
 "Vergrößern" = "Powiększ";
 "Verkleinern" = "Pomniejsz";
