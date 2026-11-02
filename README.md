@@ -617,9 +617,10 @@ Splat stays responsive with documents of several megabytes:
 - From about 200 KB, a document opens its window before it is parsed; at 5 MB, the colours and the preview follow
   about a quarter of a second later.
 
-Documents with footnotes, inline footnotes or `%%` comment blocks are processed in full after each change, as are
-changes to the front matter or close to link reference definitions: around 300 ms per keystroke at 10 MB. Memory grows
-with the file, to roughly 115–160 MB for 1 MB of Markdown and 340–510 MB for 10 MB.
+Some changes are processed in full, at around 300 ms per keystroke at 10 MB: those to a footnote's definition or
+references, next to an inline footnote, at the very end of a document next to a footnote, to the front matter or close
+to link reference definitions, and every change in a document with `%%` comment blocks or with a footnote defined twice
+or inside a quote or list. Memory grows with the file, to roughly 115–160 MB for 1 MB of Markdown and 340–510 MB for 10 MB.
 
 ## Known limitations
 
@@ -852,8 +853,11 @@ The source text in the left text view is the single source of truth.
 2. An update parses the copy, recolours the source only where colours changed, lays out the preview and replaces only
    the blocks whose content changed.
 3. After an edit, only the affected paragraphs are parsed, coloured and laid out again, as long as their neighbours
-   stay the same; `reparse_part_and_color` says when they do not. Documents with footnotes (including `^[…]`) or `%%`
-   comment blocks, changes to the front matter and changes near link reference definitions are processed in full.
+   stay the same; `reparse_part_and_color` says when they do not. Documents with `%%` comment blocks, changes to the
+   front matter and changes near link reference definitions are processed in full. comrak recognizes a footnote
+   reference only with its definition in the same parse and moves definitions behind the text, so the part is parsed
+   with a stand-in definition per label and takes its numbers from the old tree; a change to the references or
+   definitions in the part, or next to an inline footnote, is processed in full.
 4. HTML blocks that open `<details>` or `<div align>` and close it later affect the Markdown blocks in between; a
    reused block must have the same surroundings.
 5. While you type in the source of a document up to 2 MB, the partial update runs immediately; when it does not apply,

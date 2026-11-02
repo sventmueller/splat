@@ -372,14 +372,11 @@ pub fn reusable<'a>(
     old_caret: Option<usize>,
 ) -> impl Fn(usize) -> Option<isize> + 'a {
     move |i| {
-        let shift = if i < splice.new.start {
-            0
-        } else if i >= splice.new.end {
-            splice.delta
-        } else {
+        if splice.new.contains(&i) {
             return None;
-        };
+        }
         let r = &doc.blocks.get(i)?.range;
+        let shift = if r.start >= splice.behind { splice.delta } else { 0 };
         let (start, end) = (shifted(r.start, -shift), shifted(r.end, -shift));
         (!old_caret.is_some_and(|c| start <= c && c <= end)).then_some(shift)
     }
@@ -410,7 +407,9 @@ fn build(
         open: Default::default(),
         embeds: 0,
     };
-    let old_starts: Vec<usize> = old.iter().map(|o| o.src.start).collect();
+    // Footnote definitions comrak moved behind the text break the source order of the blocks.
+    let mut old_starts: Vec<(usize, usize)> = old.iter().enumerate().map(|(k, o)| (o.src.start, k)).collect();
+    old_starts.sort_unstable();
     let mut old: Vec<Option<TopBlock>> = old.into_iter().map(Some).collect();
     let mut parts: Vec<Part> = Vec::with_capacity(doc.blocks.len());
     let wrappers = html_wrappers(&doc.blocks);
@@ -422,9 +421,13 @@ fn build(
         let context = wrapper.key();
         if let Some(shift) = reuse(i) {
             let at = shifted(block.range.start, -shift);
-            let found = old_starts
-                .binary_search(&at)
-                .ok()
+            // An inline note's definition can start where the block with its reference starts, which may be hidden now.
+            let definition = matches!(block.kind, BlockKind::FootnoteDefinition { .. });
+            let found = old_starts[old_starts.partition_point(|s| s.0 < at)..]
+                .iter()
+                .take_while(|s| s.0 == at)
+                .map(|s| s.1)
+                .find(|&k| old[k].as_ref().is_some_and(|o| shows_definition(o) == definition))
                 .and_then(|k| old[k].take())
                 .filter(|o| !o.src.is_empty() && o.src.len() == block.range.len() && o.context == context);
             if let Some(o) = found {
@@ -469,6 +472,13 @@ fn build(
     Layout {
         blocks: parts.into_iter().map(Part::finished).collect(),
     }
+}
+
+fn shows_definition(block: &TopBlock) -> bool {
+    block
+        .paras
+        .first()
+        .is_some_and(|p| matches!(p.style.marker, Some(Marker::Footnote(..))))
 }
 
 /// Only a paragraph ending on the caret's line can show trailing spaces.
@@ -2405,6 +2415,25 @@ mod tests {
         let shown = texts(&again);
         assert_eq!(shown[1], "bbbxxxxx");
         assert_eq!(shown[3..], ["ddd", "eee", "fff", "TAKEN", "hhh"], "{shown:?}");
+    }
+
+    #[test]
+    fn a_definition_is_taken_over_from_its_own_place() {
+        let old = "[^1]: eins\n\naaa[^1]\n\nbbb\n\nccc\n\nddd\n\neee[^2]\n\n^[drei]\n\nfff\n\n[^2]: zwei\n";
+        let new = old.replace("ccc", "cccxxxxx");
+        let mut first = laid(old);
+        let definitions = |l: &Layout| l.blocks.iter().filter(|b| shows_definition(b)).count();
+        assert_eq!(definitions(&first), 3);
+        for block in first.blocks.iter_mut().filter(|b| shows_definition(b)) {
+            block.paras[0].runs[1].text = "TAKEN".to_string();
+        }
+        let mut doc = parse(old);
+        let splice = crate::markdown::incremental::reparse(&mut doc, old, &new).unwrap();
+        let again = relayout(&new, &doc, &NoImages, None, first, &reusable(&splice, &doc, None));
+        let shown: Vec<_> = again.blocks.iter().filter(|b| shows_definition(b)).collect();
+        assert_eq!(shown.len(), 3);
+        assert!(shown.iter().all(|b| b.paras[0].runs[1].text == "TAKEN"), "{shown:?}");
+        para_with(&again, "[3]");
     }
 
     #[test]

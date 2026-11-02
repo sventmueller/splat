@@ -1120,7 +1120,7 @@ fn reparsing_around_an_edit_matches_a_full_parse() {
     let mut spliced = 0;
     for round in 0..rounds(3000) {
         // Several paragraphs, so most edits leave blocks on both sides untouched.
-        // Real footnotes take a full parse, so most documents leave them out; the others hold a reference.
+        // Footnotes mostly take a full parse here, so most documents leave them out; the others hold a reference.
         let with_footnotes = round % 4 == 0;
         let mut old: String = (0..rng.below(6) + 2)
             .map(|_| document(&mut rng))
@@ -1148,6 +1148,113 @@ fn reparsing_around_an_edit_matches_a_full_parse() {
         let piece = if with_footnotes { chosen } else { plain.as_str() };
         let mut new = old.clone();
         new.replace_range(range.clone(), if rng.below(4) == 0 { "" } else { piece });
+        let old_spans = highlight(&old, &doc);
+        let old_caret = (rng.below(2) == 0).then(|| rng.boundary(&old));
+        let old_layout = layout(&old, &doc, &NoImages, old_caret);
+        let parsed = reparse_and_color(&mut doc, &old, &old_spans, &new);
+        let what = format!("edit {range:?} -> {piece:?} of {old:?} -> {new:?}, {:?}", parsed.splice);
+        let full = parse_and_color(&new);
+        assert_eq!(parsed.doc.blocks, full.doc.blocks, "{what}");
+        assert_eq!(parsed.spans, full.spans, "colors: {what}");
+        let Some(splice) = &parsed.splice else {
+            continue;
+        };
+        spliced += 1;
+        let new_caret = (rng.below(2) == 0).then(|| rng.boundary(&new));
+        let reuse = reusable(splice, &parsed.doc, old_caret);
+        let relaid = relayout(&new, &parsed.doc, &NoImages, new_caret, old_layout, &reuse);
+        let fresh = layout(&new, &full.doc, &NoImages, new_caret);
+        assert_eq!(relaid.blocks, fresh.blocks, "layout: {what}");
+    }
+    assert!(spliced > rounds(3000) / 5, "only {spliced} edits were parsed in part");
+}
+
+/// A document whose references all have definitions, written before, between or behind the rest of the text.
+fn document_with_footnotes(rng: &mut Rng) -> String {
+    const PLAIN: &[&str] = &[
+        "Wort und mehr",
+        "Fuß **fett** und *schief*",
+        "# Titel",
+        "- eins\n- zwei",
+        "> Zitat",
+        "```\ncode [^a-z]\n```",
+        "| a | b |\n|---|---|\n| 1 | 2 |",
+        "[Link](https://x.de)",
+        "$$\nx\n$$",
+    ];
+    let notes = rng.below(5) + 1;
+    let place = rng.below(3);
+    let (mut text, mut behind) = (Vec::new(), Vec::new());
+    for i in 0..notes {
+        for _ in 0..rng.below(4) + 1 {
+            text.push(PLAIN[rng.below(PLAIN.len())].to_string());
+        }
+        text.push(match rng.below(3) {
+            0 => format!("Text[^n{i}] weiter"),
+            1 => format!("Mit [^n{i}] und **fett[^n{i}]**"),
+            _ => format!("- Punkt[^n{i}]"),
+        });
+        let definition = match rng.below(4) {
+            0 => format!("[^n{i}]: Note\n    und mehr"),
+            1 => format!("[^n{i}]: Note\n\n    Absatz"),
+            2 if i + 1 < notes => format!("[^n{i}]: Note mit[^n{}]", i + 1),
+            _ => format!("[^n{i}]: Note"),
+        };
+        if place == 0 || (place == 2 && rng.below(2) == 0) {
+            behind.push(definition);
+        } else {
+            text.push(definition);
+        }
+    }
+    for _ in 0..rng.below(3) {
+        text.push(PLAIN[rng.below(PLAIN.len())].to_string());
+    }
+    text.extend(behind);
+    text.join("\n\n") + if rng.below(4) == 0 { "" } else { "\n" }
+}
+
+/// Footnotes keep their numbers, colors and places in the preview when only what lies around them is parsed again.
+#[test]
+fn reparsing_around_footnotes_matches_a_full_parse() {
+    let _limit = limited();
+    const PIECES: &[&str] = &[
+        "x",
+        " ",
+        "ß",
+        "😀",
+        "*",
+        "`",
+        "\n",
+        "\n\n",
+        "[",
+        "]",
+        "^",
+        ":",
+        "    ",
+        "> ",
+        "[^n0]",
+        "[^n1]",
+        "[^neu]",
+        "[^n1]:",
+        "\n[^neu]: Neu\n",
+        "^[i]",
+        "```",
+    ];
+    let mut rng = Rng::new(0x5eed_1ac2_0007);
+    let mut spliced = 0;
+    for _ in 0..rounds(3000) {
+        let old = document_with_footnotes(&mut rng);
+        let typing = rng.below(2) == 0;
+        let range = if typing {
+            let at = rng.boundary(&old);
+            at..at
+        } else {
+            rng.range(&old)
+        };
+        let piece = if typing { "x" } else { PIECES[rng.below(PIECES.len())] };
+        let mut new = old.clone();
+        new.replace_range(range.clone(), if !typing && rng.below(5) == 0 { "" } else { piece });
+        let mut doc = parse(&old);
         let old_spans = highlight(&old, &doc);
         let old_caret = (rng.below(2) == 0).then(|| rng.boundary(&old));
         let old_layout = layout(&old, &doc, &NoImages, old_caret);
@@ -1241,37 +1348,67 @@ fn typing_at_pending_styles_in_the_preview_never_breaks_the_text() {
     assert!(checked > rounds(400) / 10, "only {checked} checks ran");
 }
 
-/// The partial update of a 10 MB document after one keystroke, against a full one: same result, and within a time
-/// limit. Run with `cargo test --release -- --ignored partial_updates`.
-#[test]
-#[ignore]
-fn partial_updates_at_ten_megabytes() {
-    let one = std::fs::read_to_string(concat!(
+fn quick_reference_without_footnotes() -> String {
+    std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/resources/de.lproj/QuickReference.md"
     ))
     .unwrap()
     .replace("[^", "(")
     .replace("^[", "^(")
-    .replace("]:", "] :");
+    .replace("]:", "] :")
+}
+
+/// The partial update of a 10 MB document after one keystroke, against a full one: same result, and within a time
+/// limit. Run with `cargo test --release -- --ignored partial_updates`.
+#[test]
+#[ignore]
+fn partial_updates_at_ten_megabytes() {
+    let one = quick_reference_without_footnotes();
     let mut old = String::new();
     while old.len() < 10 << 20 {
         old.push_str(&one);
         old.push_str("\n\n");
     }
+    keystroke_is_partial(&old, "one keystroke at 10 MB");
+}
+
+/// The same with footnotes, half of them defined next to their references and half behind the text.
+#[test]
+#[ignore]
+fn partial_updates_around_footnotes_at_ten_megabytes() {
+    let one = quick_reference_without_footnotes();
+    let (mut old, mut behind) = (String::new(), String::new());
+    let mut note = 0;
+    while old.len() + behind.len() < 10 << 20 {
+        old.push_str(&one);
+        old.push_str(&format!("\n\nNoted.[^n{note}]\n\n"));
+        let definition = format!("[^n{note}]: A note.\n\n");
+        if note % 2 == 0 {
+            old.push_str(&definition);
+        } else {
+            behind.push_str(&definition);
+        }
+        note += 1;
+    }
+    old.push_str(&behind);
+    keystroke_is_partial(&old, "one keystroke around footnotes at 10 MB");
+}
+
+fn keystroke_is_partial(old: &str, what: &str) {
     let at = old[old.len() / 2..].find("Fett").unwrap() + old.len() / 2;
-    let mut new = old.clone();
+    let mut new = old.to_string();
     new.insert(at, 'x');
-    let mut doc = parse(&old);
-    let spans = highlight(&old, &doc);
-    let old_layout = layout(&old, &doc, &NoImages, None);
+    let mut doc = parse(old);
+    let spans = highlight(old, &doc);
+    let old_layout = layout(old, &doc, &NoImages, None);
     let started = std::time::Instant::now();
     let full = parse(&new);
     let full_spans = highlight(&new, &full);
     let full_layout = layout(&new, &full, &NoImages, None);
     let full_ms = started.elapsed().as_secs_f64() * 1e3;
     let started = std::time::Instant::now();
-    let parsed = reparse_and_color(&mut doc, &old, &spans, &new);
+    let parsed = reparse_and_color(&mut doc, old, &spans, &new);
     let splice = parsed.splice.as_ref().expect("a partial parse");
     let new_layout = relayout(
         &new,
@@ -1285,7 +1422,7 @@ fn partial_updates_at_ten_megabytes() {
     assert_eq!(parsed.doc.blocks, full.blocks);
     assert_eq!(parsed.spans, full_spans);
     assert_eq!(new_layout.blocks, full_layout.blocks);
-    eprintln!("one keystroke at 10 MB: full {full_ms:.0} ms, partial {partial_ms:.0} ms");
+    eprintln!("{what}: full {full_ms:.0} ms, partial {partial_ms:.0} ms");
     assert!(
         partial_ms < 150.0 && partial_ms * 4.0 < full_ms,
         "a keystroke got slower: partial {partial_ms:.0} ms, full {full_ms:.0} ms"
