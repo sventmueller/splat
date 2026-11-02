@@ -42,16 +42,16 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
         ));
     }
     let app = assemble(true, false, &version, true)?;
-    // A coverage build in target/release, as a manual `cargo llvm-cov` run leaves, would write measurement files on
-    // users' Macs.
+    // A coverage build, as a manual `cargo llvm-cov` run can leave, would write measurement files on users' Macs.
     let load_commands = stdout(
         Command::new("otool")
-            .arg("-l")
+            .args(["-arch", "all", "-l"])
             .arg(app.join("Contents/MacOS").join(APP)),
     )?;
     if load_commands.contains("__llvm_prf") {
-        return Err("the release binary carries coverage counters; run `cargo clean --release` and try again".into());
+        return Err("the release binary carries coverage counters; run `cargo clean` and try again".into());
     }
+    check_universal(&app)?;
     println!("signing {version} with {name}");
     sign(&app, &identity, true, None)?;
     run(Command::new("codesign").args(["--verify", "--strict"]).arg(&app))?;

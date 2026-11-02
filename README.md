@@ -22,7 +22,7 @@ the network unless you ask it to.
 
 [![Rust 2024 edition](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![macOS 14 or later](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
-![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-arm64-333333?logo=apple&logoColor=white)
+![Universal: Apple Silicon and Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white)
 [![AppKit via objc2](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2)
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
@@ -145,8 +145,8 @@ the network unless you ask it to.
 
 - macOS 14 Sonoma or later. Splat is developed and tested on macOS 27, where it picks up the Liquid Glass design
   automatically.
-- A Mac with Apple Silicon.
-- About 30 MB of disk space.
+- A Mac with Apple Silicon or an Intel processor.
+- About 45 MB of disk space.
 
 ## Installation
 
@@ -672,7 +672,7 @@ or inside a quote or list. Memory grows with the file, to roughly 115–160 MB f
 - **The visual formula editor** writes LaTeX in MathLive's notation: spaces disappear (`E = mc^2` becomes `E=mc^2`),
   the rendering stays the same.
 - **By design:** no line numbers, no settings window, no Help Book, not in the App Store.
-- **Apple Silicon only.** There is no Intel build.
+- **Tested less on Intel.** The window self-tests run on Apple Silicon only; on Intel, CI runs `cargo test`.
 
 ## Troubleshooting
 
@@ -722,6 +722,7 @@ The [Makefile](Makefile) holds short entry points; `make help` lists them all:
 
 ```sh
 make build                  # target/release/Splat.app, same as cargo xtask bundle --release
+make universal              # target/splat-universal for Apple Silicon and Intel, as the disk image carries it
 make check                  # formatting, clippy without warnings, all tests, vendored libraries; what CI runs
 make test                   # make check, then the self-test without a window
 make test-gui               # self-tests with a window; they occupy the Mac for about four minutes
@@ -766,7 +767,7 @@ rounds with the notary service take a few minutes each. Only an image that passe
 number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
 feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/`, the READMEs and
 VERSION as they were.
-Each release adds the full image, about 10 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
+Each release adds the full image, about 16 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
 - a "Developer ID Application" certificate in the keychain
 - a saved login for Apple's notary service with an app-specific password, created once with
@@ -775,6 +776,7 @@ Each release adds the full image, about 10 MB, to the repository history. It run
   `UPDATE_KEY` in [xtask/src/main.rs](xtask/src/main.rs) and inside every installed copy, which accepts only updates
   signed with it. Keep a backup in a password manager: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exports
   it, `-f <file>` imports it on another Mac. Without it, installed copies can never be updated again.
+- rustup (`brew install rustup`, which leaves Homebrew's Rust in place)
 
 If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
 Finder; without that permission, the disk image shows neither its background nor the icon arrangement.
@@ -788,7 +790,10 @@ that lets the locally signed app load the framework. `dmg` signs the new image w
 `dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image, the feed and the READMEs
 together: from then on, installed copies offer the update.
 
-The disk image runs on Apple Silicon only: Homebrew's Rust ships the standard library for the host processor alone.
+The disk image is a universal binary for Apple Silicon and Intel; other builds are for the host processor alone.
+Homebrew's Rust ships the standard library for the host processor only, so `dmg` builds through rustup, which installs
+the toolchain and targets of [rust-toolchain.toml](rust-toolchain.toml) on first use, and stops if the program or
+Sparkle lacks the code for either processor. `make universal` builds only the program.
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
 permissions for the two.
 
@@ -826,8 +831,8 @@ as the panic hook in `main.rs` that runs only in a crash, are in [xtask](xtask/s
 Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. The
 decoder helper opens its measurement file before it locks itself in, so it is measured as well.
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make check` and `make coverage-library` on Apple
-Silicon for every push to `main` and every pull request. Every night,
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make check`, `make coverage-library` and the universal
+build on Apple Silicon and `cargo test` on Intel for every push to `main` and every pull request. Every night,
 [.github/workflows/nightly.yml](.github/workflows/nightly.yml) runs `make test-long` with new random inputs. The self-tests and the disk image stay on the developer's Mac: they need a screen and the
 signing certificates in the keychain.
 

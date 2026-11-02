@@ -21,6 +21,9 @@ pub(crate) const UPDATE_KEY: &str = "21sUy80rKTKlgQLPk+T7UrAkoqVQ+VV+6rfHKVAL4EU
 
 pub(crate) const MINIMUM_SYSTEM: &str = "14.0";
 
+/// What the disk image runs on: each processor's target for cargo and its architecture for `lipo`.
+pub(crate) const UNIVERSAL: [(&str, &str); 2] = [("aarch64-apple-darwin", "arm64"), ("x86_64-apple-darwin", "x86_64")];
+
 /// A file type only the self-test bundle declares, so the self-test can make itself the default app for it without
 /// touching any other association.
 pub(crate) const PROBE_TYPE: &str = "local.splat.selftest.probe";
@@ -211,21 +214,26 @@ pub(crate) fn bundle(release: bool, selftest: bool) -> Result<PathBuf, String> {
     Ok(app)
 }
 
-/// Builds the app bundle, unsigned. `distribution` is the build signed with the Developer ID; it and the self-test
-/// carry Sparkle, see `Updates`.
+/// Builds the app bundle, unsigned. `distribution` is the build signed with the Developer ID, the only universal one;
+/// it and the self-test carry Sparkle, see `Updates`.
 pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distribution: bool) -> Result<PathBuf, String> {
     let root = root();
-    let mut build = Command::new(env!("CARGO"));
-    build.current_dir(&root).args(["build", "--package", PACKAGE]);
-    if release {
-        build.arg("--release");
-    }
-    if selftest {
-        build.args(["--features", "selftest"]);
-    }
-    run(&mut build)?;
     let profile = if release { "release" } else { "debug" };
     let target = target_dir().join(profile);
+    let program = if distribution {
+        universal_program()?
+    } else {
+        let mut build = Command::new(env!("CARGO"));
+        build.current_dir(&root).args(["build", "--package", PACKAGE]);
+        if release {
+            build.arg("--release");
+        }
+        if selftest {
+            build.args(["--features", "selftest"]);
+        }
+        run(&mut build)?;
+        target.join(PACKAGE)
+    };
     let variant = if selftest {
         Some("Selftest")
     } else {
@@ -247,7 +255,7 @@ pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distributio
     let macos = contents.join("MacOS");
     let resources = contents.join("Resources");
     files::create_dir_all(&macos)?;
-    files::copy(target.join(PACKAGE), macos.join(APP))?;
+    files::copy(&program, macos.join(APP))?;
     let plist = contents.join("Info.plist");
     // Every resources/<language>.lproj is a localization; macOS picks one from the user's preferred languages.
     let mut languages: Vec<String> = files::read_dir(root.join("resources"))?
@@ -277,6 +285,75 @@ pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distributio
         files::remove_file(framework.join("XPCServices"))?;
     }
     Ok(app)
+}
+
+/// The release program for Apple Silicon and Intel in one file, through rustup with the toolchain rust-toolchain.toml
+/// names, since Homebrew's Rust ships the standard library for the host processor alone.
+pub(crate) fn universal_program() -> Result<PathBuf, String> {
+    let root = root();
+    let rustup = rustup()?;
+    run(Command::new(&rustup).current_dir(&root).args(["toolchain", "install"]))?;
+    let tool = |name: &str| {
+        stdout(Command::new(&rustup).current_dir(&root).args(["which", name])).map(|path| path.trim().to_string())
+    };
+    let mut build = Command::new(tool("cargo")?);
+    // Cargo would otherwise run the rustc first on the PATH, which may be Homebrew's.
+    build
+        .current_dir(&root)
+        .env("RUSTC", tool("rustc")?)
+        .args(["build", "--package", PACKAGE, "--release"]);
+    let mut join = Command::new("lipo");
+    join.arg("-create");
+    for (target, _) in UNIVERSAL {
+        build.args(["--target", target]);
+        join.arg(target_dir().join(target).join("release").join(PACKAGE));
+    }
+    run(&mut build)?;
+    let program = target_dir().join(format!("{PACKAGE}-universal"));
+    run(join.arg("-output").arg(&program))?;
+    Ok(program)
+}
+
+/// rustup from the PATH, or from Homebrew, which keeps it off the PATH beside its own Rust.
+fn rustup() -> Result<PathBuf, String> {
+    let on_path = Command::new("rustup")
+        .arg("--version")
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if on_path {
+        return Ok("rustup".into());
+    }
+    stdout(Command::new("brew").args(["--prefix", "rustup"]))
+        .map(|prefix| Path::new(prefix.trim()).join("bin/rustup"))
+        .ok()
+        .filter(|path| path.exists())
+        .ok_or_else(|| "the universal program needs rustup; install it with `brew install rustup`".into())
+}
+
+/// The architectures of `UNIVERSAL` that are not in the output of `lipo -archs`.
+pub(crate) fn missing_architectures(listed: &str) -> Vec<&'static str> {
+    UNIVERSAL
+        .iter()
+        .map(|(_, arch)| *arch)
+        .filter(|arch| !listed.split_whitespace().any(|name| name == *arch))
+        .collect()
+}
+
+/// A program without the code for one processor goes unnoticed on the other and keeps the app from starting on that one.
+pub(crate) fn check_universal(app: &Path) -> Result<(), String> {
+    let sparkle = app.join("Contents/Frameworks/Sparkle.framework/Versions/B");
+    for program in [
+        app.join("Contents/MacOS").join(APP),
+        sparkle.join("Sparkle"),
+        sparkle.join("Autoupdate"),
+        sparkle.join("Updater.app/Contents/MacOS/Updater"),
+    ] {
+        let missing = missing_architectures(&stdout(Command::new("lipo").arg("-archs").arg(&program))?);
+        if !missing.is_empty() {
+            return Err(format!("{} lacks {}", program.display(), missing.join(" and ")));
+        }
+    }
+    Ok(())
 }
 
 /// Sparkle's release archive, downloaded once into target/, also for measured builds elsewhere, checked against its

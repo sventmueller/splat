@@ -1,6 +1,6 @@
 # Entry points only; the build logic lives in xtask/src/main.rs.
 .DEFAULT_GOAL := help
-.PHONY: help build lint check test test-gui test-long mutants coverage coverage-library bench release
+.PHONY: help build universal lint check test test-gui test-long mutants coverage coverage-library bench release
 
 ROUNDS ?= 20000
 
@@ -9,6 +9,9 @@ help: ## List the targets
 
 build: ## Build target/release/Splat.app, signed with the local certificate; raises the build number
 	cargo xtask bundle --release
+
+universal: ## Build target/splat-universal for Apple Silicon and Intel, unsigned, as the disk image carries it; needs rustup
+	cargo xtask universal
 
 lint: ## Formatting and clippy, also with the selftest feature; warnings fail
 	cargo fmt --all --check

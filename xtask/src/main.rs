@@ -40,6 +40,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("bundle") => bundle(release, selftest).map(|p| println!("{}", p.display())),
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
+        Some("universal") => universal_program().map(|p| println!("{}", p.display())),
         Some("icon") => icon(),
         Some("vendor") => match args.get(1).map(String::as_str) {
             None | Some("check") => vendor(false),
@@ -61,7 +62,8 @@ fn main() -> ExitCode {
 
 const FLAGS: [&str; 5] = ["--release", "--selftest", "--stop-after", "--scenarios", "--library"];
 
-pub(crate) const USAGE: &str = "usage: cargo xtask bundle [--release] [--selftest] | dmg | icon | vendor [check|fetch]
+pub(crate) const USAGE: &str =
+    "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | icon | vendor [check|fetch]
        cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] | resize | bench <file.md>
        cargo xtask coverage [--library]";
 
@@ -198,6 +200,13 @@ mod tests {
         assert_eq!(offered_image(&feed), Some("Splat-1.0.4.dmg"));
         assert_eq!(offered_image("<rss/>"), None);
         assert!(appcast("1.0.4", "Splat-1.0.4.dmg", "ERROR: no key", "").is_err());
+    }
+
+    #[test]
+    fn a_program_is_universal_only_with_the_code_for_both_processors() {
+        assert!(missing_architectures("x86_64 arm64\n").is_empty());
+        assert_eq!(missing_architectures("arm64\n"), ["x86_64"]);
+        assert_eq!(missing_architectures("arm64e x86_64h\n"), ["arm64", "x86_64"]);
     }
 
     #[test]
