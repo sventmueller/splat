@@ -37,10 +37,41 @@ the network unless you ask it to.
 ![Signed with Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#license)
 
-Bahasa Indonesia · Bahasa Melayu · Català · Čeština · Dansk · Deutsch · English · Español · Français · Hrvatski ·
-Italiano · Magyar · Nederlands · Norsk · Polski · Português (Brasil) · Português (Portugal) · Română · Slovenčina ·
-Slovenščina · Suomi · Svenska · Tiếng Việt · Türkçe · Ελληνικά · Русский · Українська · עברית‎ · العربية‎ · हिन्दी ·
-ไทย · 한국어 · 日本語 · 简体中文 · 繁體中文
+[Bahasa Indonesia](assets/readme/id/README.md) ·
+[Bahasa Melayu](assets/readme/ms/README.md) ·
+[Català](assets/readme/ca/README.md) ·
+[Čeština](assets/readme/cs/README.md) ·
+[Dansk](assets/readme/da/README.md) ·
+[Deutsch](assets/readme/de/README.md) ·
+**English** ·
+[Español](assets/readme/es/README.md) ·
+[Français](assets/readme/fr/README.md) ·
+[Hrvatski](assets/readme/hr/README.md) ·
+[Italiano](assets/readme/it/README.md) ·
+[Magyar](assets/readme/hu/README.md) ·
+[Nederlands](assets/readme/nl/README.md) ·
+[Norsk](assets/readme/no/README.md) ·
+[Polski](assets/readme/pl/README.md) ·
+[Português (Brasil)](assets/readme/pt_BR/README.md) ·
+[Português (Portugal)](assets/readme/pt_PT/README.md) ·
+[Română](assets/readme/ro/README.md) ·
+[Slovenčina](assets/readme/sk/README.md) ·
+[Slovenščina](assets/readme/sl/README.md) ·
+[Suomi](assets/readme/fi/README.md) ·
+[Svenska](assets/readme/sv/README.md) ·
+[Tiếng Việt](assets/readme/vi/README.md) ·
+[Türkçe](assets/readme/tr/README.md) ·
+[Ελληνικά](assets/readme/el/README.md) ·
+[Русский](assets/readme/ru/README.md) ·
+[Українська](assets/readme/uk/README.md) ·
+[עברית](assets/readme/he/README.md)‎ ·
+[العربية](assets/readme/ar/README.md)‎ ·
+[हिन्दी](assets/readme/hi/README.md) ·
+[ไทย](assets/readme/th/README.md) ·
+[한국어](assets/readme/ko/README.md) ·
+[日本語](assets/readme/ja/README.md) ·
+[简体中文](assets/readme/zh-Hans/README.md) ·
+[繁體中文](assets/readme/zh-Hant/README.md)
 
 ## Contents
 
@@ -729,9 +760,9 @@ notarizes the app with Apple and staples the ticket, packs it into a compressed,
 Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
 rounds with the notary service take a few minutes each. Only an image that passed every step becomes
-`dist/Splat-<version>.dmg`, the copy that is committed: the download links in this README follow it, and the build
+`dist/Splat-<version>.dmg`, the copy that is committed: the download links in this README and its translations follow it, and the build
 number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
-feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/`, the README and
+feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/`, the READMEs and
 VERSION as they were.
 Each release adds the full image, about 10 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
@@ -752,7 +783,7 @@ only when it carries the app's Team ID, which the Developer ID signature has and
 update must not replace a build of your own. The self-test build carries Sparkle as well, to check the update menu
 against it: with a feed that does not exist, without Sparkle's question on the second launch, and with an entitlement
 that lets the locally signed app load the framework. `dmg` signs the new image with the update key and writes
-`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image, the feed and the README
+`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image, the feed and the READMEs
 together: from then on, installed copies offer the update.
 
 The disk image runs on Apple Silicon only: Homebrew's Rust ships the standard library for the host processor alone.
@@ -922,6 +953,9 @@ text and that every quick reference has the outline of the German one.
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown parser | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C runtime, Foundation, blocks | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit, WebKit and Grand Central Dispatch bindings | Zlib, Apache-2.0 or MIT |
+`assets/readme/<language>/` holds this README in that language, its screenshot and the demo document the screenshot
+shows. A change to this README belongs in those copies as well.
+
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formulas and SVG images as vector PDF | MIT or Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | decoding PNG, JPEG, GIF, WebP and BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | aligning table columns | MIT or Apache-2.0 |

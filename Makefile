@@ -44,5 +44,5 @@ bench: ## Open, type and scroll timings: make bench FILE=<file.md>
 	@test -n "$(FILE)" || { echo "usage: make bench FILE=<file.md>"; exit 2; }
 	cargo xtask selftest bench "$(FILE)"
 
-release: test ## After make test: dist/Splat-<version>.dmg, notarized; replaces the old one, links README.md
+release: test ## After make test: dist/Splat-<version>.dmg, notarized; replaces the old one, links the READMEs
 	cargo xtask dmg

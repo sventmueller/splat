@@ -12,7 +12,7 @@ pub(crate) const NOTARY_PROFILE: &str = "notary";
 /// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
 /// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
-/// into the repository: it replaces older ones there and in the links of README.md, `dist/appcast.xml` offers it
+/// into the repository: it replaces older ones there and in the links of the READMEs, `dist/appcast.xml` offers it
 /// to installed copies, and the build number goes up.
 pub(crate) fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
@@ -107,11 +107,24 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             run(Command::new("trash").arg(entry.path()))?;
         }
     }
-    let readme = root().join("README.md");
-    let text = fs::read_to_string(&readme).map_err(|e| format!("{}: {e}", readme.display()))?;
-    files::write(&readme, relink(&text, &file))?;
+    for readme in readmes()? {
+        let text = fs::read_to_string(&readme).map_err(|e| format!("{}: {e}", readme.display()))?;
+        files::write(&readme, relink(&text, &file))?;
+    }
     next_build(&version)?;
     Ok(published)
+}
+
+/// README.md and its translations in `assets/readme/<language>/`.
+fn readmes() -> Result<Vec<PathBuf>, String> {
+    let mut found = vec![root().join("README.md")];
+    for entry in files::read_dir(root().join("assets/readme"))?.flatten() {
+        let readme = entry.path().join("README.md");
+        if readme.is_file() {
+            found.push(readme);
+        }
+    }
+    Ok(found)
 }
 
 /// The update feed Sparkle reads: the newest disk image with the EdDSA signature and length `sign_update` printed for
@@ -339,5 +352,15 @@ mod tests {
         assert_eq!(image_name_len("Splat-1.0.3.dmg"), Some(15));
         assert_eq!(image_name_len("Splat.dmg"), Some(9));
         assert_eq!(image_name_len("Splat-notes.dmg"), None);
+    }
+
+    #[test]
+    fn the_release_relinks_a_readme_of_every_language() {
+        let languages = files::read_dir(root().join("resources"))
+            .unwrap()
+            .flatten()
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "lproj"))
+            .count();
+        assert_eq!(readmes().unwrap().len(), languages);
     }
 }
