@@ -8,9 +8,9 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
  
 
 
-[![Splat’ı macOS için indirin](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)
+[![Splat’ı macOS için indirin](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
 
-**[Splat-1.0.3.dmg dosyasını indirin](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)**: Apple tarafından imzalanmış ve notarize edilmiştir; Apple Silicon ve Intel üzerinde macOS 14 veya üstü için.
+**[Splat-1.0.4.dmg dosyasını indirin](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: Apple tarafından imzalanmış ve notarize edilmiştir; Apple Silicon ve Intel üzerinde macOS 14 veya üstü için.
  
  
 
@@ -132,7 +132,7 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 
 ## Kurulum
 
-**Disk görüntüsünden.** [`dist/Splat-1.0.3.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg) dosyasını indirin, açın ve Splat’ı Applications klasörüne sürükleyin. Görüntü bir Developer ID ile imzalanmış ve Apple tarafından notarize edilmiştir; bu yüzden uyarısız açılır.
+**Disk görüntüsünden.** [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg) dosyasını indirin, açın ve Splat’ı Applications klasörüne sürükleyin. Görüntü bir Developer ID ile imzalanmış ve Apple tarafından notarize edilmiştir; bu yüzden uyarısız açılır.
 
 **Homebrew ile.** Cask kendi tap’inde bulunur:
 

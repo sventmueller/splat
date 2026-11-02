@@ -8,9 +8,9 @@ Splat показывает слева исходный текст Markdown с п
  
 
 
-[![Скачать Splat для macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)
+[![Скачать Splat для macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
 
-**[Скачать Splat-1.0.3.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)**: подписан и заверен Apple, для macOS 14 и новее на Apple Silicon и Intel.
+**[Скачать Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: подписан и заверен Apple, для macOS 14 и новее на Apple Silicon и Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat показывает слева исходный текст Markdown с п
 
 ## Установка
 
-**Из образа диска.** Скачайте [`dist/Splat-1.0.3.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg), откройте его и перетащите Splat в папку «Программы». Образ подписан сертификатом Developer ID и заверен Apple, поэтому открывается без предупреждений.
+**Из образа диска.** Скачайте [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg), откройте его и перетащите Splat в папку «Программы». Образ подписан сертификатом Developer ID и заверен Apple, поэтому открывается без предупреждений.
 
 **Через Homebrew.** Cask находится в собственном tap:
 

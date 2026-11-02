@@ -8,9 +8,9 @@ Splat מציג את קוד המקור של ה-Markdown עם צבעי תחביר 
  
 
 
-[![הורדת Splat ל-macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)
+[![הורדת Splat ל-macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
 
-**[הורדת Splat-1.0.3.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)**: חתום ומאושר (notarized) על ידי Apple, ל-macOS 14 ואילך, ב-Apple Silicon וב-Intel.
+**[הורדת Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: חתום ומאושר (notarized) על ידי Apple, ל-macOS 14 ואילך, ב-Apple Silicon וב-Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat מציג את קוד המקור של ה-Markdown עם צבעי תחביר 
 
 ## התקנה
 
-**מתוך קובץ ה-disk image.** יש להוריד את [`dist/Splat-1.0.3.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg), לפתוח אותו ולגרור את Splat אל תיקיית היישומים (Applications). הקובץ חתום עם Developer ID ומאושר (notarized) על ידי Apple, ולכן נפתח בלי אזהרות.
+**מתוך קובץ ה-disk image.** יש להוריד את [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg), לפתוח אותו ולגרור את Splat אל תיקיית היישומים (Applications). הקובץ חתום עם Developer ID ומאושר (notarized) על ידי Apple, ולכן נפתח בלי אזהרות.
 
 **עם Homebrew.** ה-cask נמצא ב-tap נפרד:
 

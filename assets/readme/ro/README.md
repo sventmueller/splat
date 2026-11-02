@@ -8,9 +8,9 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
  
 
 
-[![Descărcați Splat pentru macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)
+[![Descărcați Splat pentru macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
 
-**[Descărcați Splat-1.0.3.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg)**: semnat și notarizat de Apple, pentru macOS 14 sau mai nou, pe Apple Silicon și Intel.
+**[Descărcați Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: semnat și notarizat de Apple, pentru macOS 14 sau mai nou, pe Apple Silicon și Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 
 ## Instalare
 
-**Din imaginea de disc.** Descărcați [`dist/Splat-1.0.3.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.3.dmg), deschideți-o și trageți Splat în dosarul Aplicații. Imaginea este semnată cu un Developer ID și notarizată de Apple, deci se deschide fără avertismente.
+**Din imaginea de disc.** Descărcați [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg), deschideți-o și trageți Splat în dosarul Aplicații. Imaginea este semnată cu un Developer ID și notarizată de Apple, deci se deschide fără avertismente.
 
 **Cu Homebrew.** Cask-ul se află într-un tap propriu:
 
