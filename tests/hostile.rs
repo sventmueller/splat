@@ -18,8 +18,16 @@ use splat::preview::layout::{Resolver, layout, relayout, reusable};
 use splat::preview::map::{Index, Shown, preview_offset};
 
 const STACK: usize = 2 << 20;
-/// An unoptimized build takes ten times as long for linear work too.
-const LIMIT: Duration = Duration::from_secs(if cfg!(debug_assertions) { 100 } else { 10 });
+/// An unoptimized build takes ten times as long for linear work too. On Intel the system allocator can spend a minute on
+/// such documents moving its regions back and forth, so there the limit only catches endless loops, while Apple Silicon
+/// holds the same code to time.
+const LIMIT: Duration = Duration::from_secs(if cfg!(debug_assertions) {
+    100
+} else if cfg!(target_arch = "x86_64") {
+    300
+} else {
+    10
+});
 const MAX_PAIRED: usize = 16;
 
 struct Everything;
