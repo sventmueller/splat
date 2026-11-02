@@ -116,8 +116,8 @@ pub fn table(window: &NSWindow, done: impl Fn(usize, usize) + 'static) {
     );
     let handler = RcBlock::new(move |response: NSModalResponse| {
         if response == NSAlertFirstButtonReturn {
-            let r = rows.integerValue().clamp(2, 100) as usize;
-            let c = cols.integerValue().clamp(1, 30) as usize;
+            let r = crate::util::to_usize(rows.integerValue().clamp(2, 100));
+            let c = crate::util::to_usize(cols.integerValue().clamp(1, 30));
             done(r, c);
         }
     });

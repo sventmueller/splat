@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diagramă: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Fișierul nu este text UTF-8 și nu poate fi deschis ca Markdown.";
 "Dienste" = "Servicii";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Acest document este prea mare pentru previzualizare. Puteți continua să editați textul.";
 "Dokument als PDF exportieren" = "Exportați documentul ca PDF";
 "Dokument drucken" = "Tipăriți documentul";
 "Dokument jetzt prüfen" = "Verificați documentul acum";

@@ -1,3 +1,4 @@
+use crate::markdown::text::line_start;
 use std::ops::Range;
 
 use crate::i18n::{n, t};
@@ -139,14 +140,14 @@ pub fn next_placeholder(text: &str, caret: usize, backwards: bool) -> Option<Ran
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiagramKind {
+pub enum MermaidKind {
     Flowchart,
     Sequence,
     Gantt,
     Other,
 }
 
-pub fn diagram_kind(code: &str) -> DiagramKind {
+pub fn diagram_kind(code: &str) -> MermaidKind {
     let first = code
         .lines()
         .map(str::trim)
@@ -154,10 +155,10 @@ pub fn diagram_kind(code: &str) -> DiagramKind {
         .unwrap_or("");
     let word = first.split_whitespace().next().unwrap_or("");
     match word {
-        "flowchart" | "graph" => DiagramKind::Flowchart,
-        "sequenceDiagram" => DiagramKind::Sequence,
-        "gantt" => DiagramKind::Gantt,
-        _ => DiagramKind::Other,
+        "flowchart" | "graph" => MermaidKind::Flowchart,
+        "sequenceDiagram" => MermaidKind::Sequence,
+        "gantt" => MermaidKind::Gantt,
+        _ => MermaidKind::Other,
     }
 }
 
@@ -336,6 +337,7 @@ fn count_tasks(code: &str, prefix: &str) -> usize {
 }
 
 /// Code change for a toolbar action, inserted after the line holding the caret.
+#[expect(clippy::too_many_lines, reason = "one case per action, each a short template")]
 pub fn diagram_snippet(code: &str, caret: usize, action: DiagramAction, today: &str) -> DiagramEdit {
     if let DiagramAction::Direction(dir) = action {
         let header_end = code.find('\n').unwrap_or(code.len());
@@ -351,8 +353,8 @@ pub fn diagram_snippet(code: &str, caret: usize, action: DiagramAction, today: &
     }
     let caret = caret.min(code.len());
     let line_end = code[caret..].find('\n').map_or(code.len(), |i| caret + i);
-    let line_start = code[..line_end].rfind('\n').map_or(0, |i| i + 1);
-    let caret_indent = code[line_start..line_end].len() - code[line_start..line_end].trim_start().len();
+    let line_begin = line_start(code, line_end);
+    let caret_indent = code[line_begin..line_end].len() - code[line_begin..line_end].trim_start().len();
     let indent = " ".repeat(caret_indent.max(4));
     let (body, select): (String, Range<usize>) = match action {
         DiagramAction::Node(shape) => {
@@ -464,6 +466,71 @@ pub fn diagram_snippet(code: &str, caret: usize, action: DiagramAction, today: &
 mod tests {
     use super::*;
 
+    const ACTIONS: [DiagramAction; 14] = [
+        DiagramAction::Node(Shape::Rectangle),
+        DiagramAction::Node(Shape::Diamond),
+        DiagramAction::Edge,
+        DiagramAction::LabeledEdge,
+        DiagramAction::Direction("LR"),
+        DiagramAction::Group,
+        DiagramAction::Participant,
+        DiagramAction::Message,
+        DiagramAction::Reply,
+        DiagramAction::Note,
+        DiagramAction::Loop,
+        DiagramAction::Alternative,
+        DiagramAction::Section,
+        DiagramAction::Task,
+    ];
+
+    /// Whatever stands in the editor and wherever the caret is, an action leaves all that stood there and selects something
+    /// of what it wrote.
+    #[test]
+    fn every_action_adds_to_any_diagram_and_selects_within_what_it_wrote() {
+        let diagrams = [
+            "",
+            "flowchart TD\n    A[Start] --> B{Ende}\n",
+            "sequenceDiagram\n    participant A\n    A->>B: ä\n",
+            "gantt\n    title T\n    section S\n    Aufgabe :a1, 2026-01-01, 3d\n",
+            "kein Diagramm 😀",
+        ];
+        for code in diagrams {
+            let mut carets: Vec<usize> = code.char_indices().map(|(i, _)| i).collect();
+            carets.push(code.len());
+            for caret in carets {
+                for action in ACTIONS {
+                    let edit = diagram_snippet(code, caret, action, "2026-11-02");
+                    assert!(edit.range.end <= code.len(), "{action:?} at {caret} of {code:?}");
+                    assert!(
+                        code.is_char_boundary(edit.range.start) && code.is_char_boundary(edit.range.end),
+                        "{action:?} at {caret} of {code:?}"
+                    );
+                    assert!(edit.select.end <= edit.text.len(), "{action:?}: {edit:?}");
+                    let _ = &edit.text[edit.select.clone()];
+                    if !matches!(action, DiagramAction::Direction(_)) {
+                        assert!(edit.range.is_empty(), "{action:?} only adds: {edit:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_formula_template_takes_the_selection_and_shows_what_is_left_to_fill() {
+        assert_eq!(formula_insert("\\frac{□}{□}", "x").0, "\\frac{x}{□}");
+        let (text, next) = formula_insert("\\frac{□}{□}", "");
+        assert_eq!(&text[next.unwrap()], "□");
+        assert_eq!(mathlive_template("\\frac{□}{□}"), "\\frac{#@}{#?}");
+        assert_eq!(formula_insert("\\alpha", "").1, None);
+        let text = "a□b□";
+        assert_eq!(next_placeholder(text, 0, false), Some(1..4));
+        assert_eq!(next_placeholder(text, 2, false), Some(5..8));
+        assert_eq!(next_placeholder(text, 8, false), Some(1..4), "wraps around");
+        assert_eq!(next_placeholder(text, 8, true), Some(5..8));
+        assert_eq!(next_placeholder(text, 5, true), Some(1..4));
+        assert_eq!(next_placeholder("nichts", 0, false), None);
+    }
+
     fn apply(code: &str, e: &DiagramEdit) -> (String, String) {
         let mut s = code.to_string();
         s.replace_range(e.range.clone(), &e.text);
@@ -488,7 +555,7 @@ mod tests {
     #[test]
     fn flowchart_snippets_continue_from_the_last_node() {
         let code = "flowchart TD\n    A[Start] --> B{Entscheidung}\n    B -->|Ja| C[Weiter]";
-        assert_eq!(diagram_kind(code), DiagramKind::Flowchart);
+        assert_eq!(diagram_kind(code), MermaidKind::Flowchart);
         assert_eq!(flow_nodes(code), vec!["A", "B", "C"]);
         let (s, sel) = apply(code, &diagram_snippet(code, code.len(), DiagramAction::Edge, ""));
         assert!(s.ends_with("\n    C --> D[Text]"), "{s}");

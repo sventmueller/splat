@@ -76,13 +76,14 @@ unsafe impl GlobalAlloc for LargeAlloc {
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        // SAFETY: The alignment comes from a valid layout and GlobalAlloc::realloc requires the size to fit it.
-        let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
+        let Ok(new_layout) = Layout::from_size_align(new_size, layout.align()) else {
+            return std::ptr::null_mut();
+        };
         if !is_large(&layout) && !is_large(&new_layout) {
             // SAFETY: Both layouts are small, so the block came from the system allocator.
             return unsafe { System.realloc(ptr, layout, new_size) };
         }
-        // SAFETY: The new layout is valid, see above.
+        // SAFETY: A checked layout, whose size GlobalAlloc::realloc requires to be greater than zero.
         let new = unsafe { self.alloc(new_layout) };
         if !new.is_null() {
             // SAFETY: Both blocks hold at least the copied length and do not overlap; the old one is freed once.
@@ -101,12 +102,12 @@ mod tests {
     fn large_blocks_survive_growth_and_shrinking() {
         let mut v: Vec<u8> = Vec::with_capacity(10);
         for i in 0..3_000_000u32 {
-            v.push(i as u8);
+            v.push(i.to_le_bytes()[0]);
         }
-        assert!(v.iter().enumerate().all(|(i, &b)| b == i as u8));
+        assert!(v.iter().enumerate().all(|(i, &b)| b == i.to_le_bytes()[0]));
         v.truncate(1000);
         v.shrink_to_fit();
-        assert!(v.iter().enumerate().all(|(i, &b)| b == i as u8));
+        assert!(v.iter().enumerate().all(|(i, &b)| b == i.to_le_bytes()[0]));
         let zeroed = vec![0u64; 1 << 20];
         assert!(zeroed.iter().all(|&x| x == 0));
     }

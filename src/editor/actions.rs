@@ -293,7 +293,7 @@ pub fn code_block_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
         NSMenuItem::separatorItem(mtm),
     ];
     for (n, (_, title)) in code::MENU.iter().enumerate() {
-        items.push(tagged(mtm, Action::CodeBlock, title, "", n as isize + 1));
+        items.push(tagged(mtm, Action::CodeBlock, title, "", crate::util::to_isize(n) + 1));
     }
     items
 }
@@ -303,7 +303,7 @@ pub fn alert_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
     AlertKind::ALL
         .iter()
         .enumerate()
-        .map(|(n, kind)| tagged(mtm, Action::Alert, t(kind.label()), "", n as isize))
+        .map(|(n, kind)| tagged(mtm, Action::Alert, t(kind.label()), "", crate::util::to_isize(n)))
         .collect()
 }
 
@@ -312,7 +312,7 @@ pub fn diagram_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
     [n("Flussdiagramm"), n("Sequenzdiagramm"), n("Gantt-Diagramm")]
         .iter()
         .enumerate()
-        .map(|(tag, title)| tagged(mtm, Action::Diagram, t(title), "", tag as isize))
+        .map(|(tag, title)| tagged(mtm, Action::Diagram, t(title), "", crate::util::to_isize(tag)))
         .collect()
 }
 
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(Action::Alert.checked(&active, 0), Some(false));
         assert_eq!(Action::Rule.checked(&active, 0), None);
         assert_eq!(alert_kind(-1), None);
-        assert_eq!(alert_kind(AlertKind::ALL.len() as isize), None);
+        assert_eq!(alert_kind(crate::util::to_isize(AlertKind::ALL.len())), None);
     }
 
     #[test]

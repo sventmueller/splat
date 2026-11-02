@@ -5,6 +5,7 @@
 pub mod actions;
 mod atom;
 mod atom_edit;
+mod attributes;
 pub mod decoder;
 mod dialogs;
 mod editing;
@@ -19,29 +20,32 @@ mod outline;
 mod progressive;
 mod remote;
 mod render;
+mod render_queue;
 mod safe_image;
 mod scroll;
 mod selection;
 #[cfg(feature = "selftest")]
 pub mod selftest;
+mod shadow;
+mod state;
 mod style;
 mod sync;
 mod toolbar;
 mod update;
 mod views;
+mod webkit;
 mod window;
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, ProtocolObject, Sel};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
-    NSAppearanceCustomization, NSMenu, NSMenuItem, NSMenuItemValidation, NSPopover, NSPopoverDelegate, NSScrollView,
-    NSSharingService, NSSharingServicePicker, NSSharingServicePickerDelegate, NSSharingServicePickerToolbarItem,
+    NSAppearanceCustomization, NSMenu, NSMenuItem, NSMenuItemValidation, NSPopoverDelegate, NSSharingService,
+    NSSharingServicePicker, NSSharingServicePickerDelegate, NSSharingServicePickerToolbarItem,
     NSSharingServicePickerToolbarItemDelegate, NSSplitViewItem, NSTextDelegate, NSTextStorage, NSTextStorageDelegate,
     NSTextStorageEditActions, NSTextView, NSTextViewDelegate, NSToolbar, NSToolbarDelegate, NSToolbarItem,
     NSToolbarItemIdentifier, NSToolbarItemValidation, NSWindow, NSWindowController, NSWindowDelegate,
@@ -49,75 +53,19 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSCoder, NSNotification, NSObjectProtocol, NSRange, NSRect, NSUndoManager};
 
 use crate::document::MdDocument;
-use crate::markdown::commands::{Active, InlineStyle, Pending};
-use crate::markdown::doc::Doc;
-use crate::preview::layout::Layout;
-use crate::preview::map::Index;
+use crate::markdown::commands::{Active, InlineStyle};
+use crate::markdown::text::Shown;
 use crate::util::ns;
 use actions::Action;
 
+pub use crate::util::panic_is_contained;
+pub use images::{look_at_images, watch_memory};
+pub use shadow::{discard_copies, keep_copies};
+
 use images::ImageStore;
-use scroll::ScrollSpan;
-use style::SourceFonts;
-use sync::{Blocks, Snapshot};
+use state::{Invalidate, State};
+use sync::SourceCopy;
 use views::{PreviewTextView, SourceTextView};
-
-/// What the controller knows about the document, derived from the source text of version `version`.
-#[derive(Default)]
-struct State {
-    text: String,
-    version: u64,
-    doc: Doc,
-    layout: Layout,
-    index: Index,
-    blocks: Blocks,
-    caret: Option<usize>,
-    zoom: f64,
-    fonts: Option<SourceFonts>,
-    /// Preview range (before the change) the user edited directly, and the length delta.
-    dirty_preview: Option<(Range<usize>, isize)>,
-    rendered_dark: Option<bool>,
-    stale: Stale,
-    /// Styles for the next typed text, valid while the source still equals the stored text.
-    pending: Option<(Pending, String)>,
-    /// Syntax colors currently applied to the source view.
-    spans: std::sync::Arc<Vec<(Range<usize>, crate::markdown::highlight::Style)>>,
-    /// Source and preview UTF-16 ranges of every top-level block, for scroll synchronisation; built on first use.
-    scroll_spans: Option<Rc<Vec<ScrollSpan>>>,
-}
-
-impl State {
-    /// The state was computed from the text `snap` holds; equal versions save comparing the texts.
-    fn is_current(&self, snap: &Snapshot) -> bool {
-        self.version == snap.version || self.text == snap.text
-    }
-}
-
-/// What the next update rebuilds although the source text is unchanged.
-#[derive(Default, Clone, Copy)]
-struct Stale {
-    /// The syntax colors of the whole source.
-    colors: bool,
-    /// The layout, which may now show rendered formulas, diagrams or images.
-    layout: bool,
-}
-
-/// Why the editor redraws although the source text did not change; see `EditorController::invalidate`.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Invalidate {
-    /// The whole text was replaced, e.g. after loading or reverting.
-    Text,
-    /// The fonts changed.
-    Zoom,
-    /// Light and dark appearance switched.
-    Appearance,
-    /// The preview no longer matches what the controller knows, e.g. after an edit it could not follow.
-    Preview,
-    /// Rendered formulas, diagrams or loaded images arrived.
-    Arrivals,
-    /// A setting changed what the preview shows for the same text.
-    Layout,
-}
 
 #[derive(Clone, PartialEq)]
 struct ActiveKey {
@@ -128,60 +76,9 @@ struct ActiveKey {
     pending: Option<(usize, Vec<InlineStyle>)>,
 }
 
-/// The source text as last read from the view, kept in step with every edit.
-#[derive(Default)]
-struct SourceCopy {
-    snapshot: RefCell<Option<Rc<Snapshot>>>,
-    /// Counts the character edits of the source storage.
-    version: Cell<u64>,
-    /// Raised by every update; a background result for an older generation is outdated.
-    generation: Cell<u64>,
-    latest_job: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    update_scheduled: Cell<bool>,
-}
-
-/// The selection of the focused view, shown as highlight in the other one.
-#[derive(Default)]
-struct Marks {
-    /// The source selection while the preview has the focus. The source then shows it as a highlight: a text view
-    /// without focus draws its own selection grey, whatever colour is set for it.
-    source_mirror: Cell<Option<NSRange>>,
-    /// Ranges currently highlighted as the other view's selection.
-    source: Cell<Option<NSRange>>,
-    preview: Cell<Option<NSRange>>,
-}
-
-/// An open popover editing the source of a formula or diagram in place.
-struct AtomEdit {
-    popover: Retained<NSPopover>,
-    view: Retained<NSTextView>,
-    start: usize,
-    len: Cell<usize>,
-    original: String,
-    cancelled: Cell<bool>,
-    range_start: usize,
-    kind: atom::AtomKind,
-    diagram: crate::markdown::snippets::DiagramKind,
-    status: Retained<objc2_app_kit::NSTextField>,
-    scroll: Retained<NSScrollView>,
-    editor_frame: NSRect,
-    visual: Cell<bool>,
-    /// Text just inserted for a new formula, removed again if the editor closes without one.
-    inserted: Cell<Option<(usize, usize)>>,
-    /// The document counts as edited while the editor holds changes, so quitting saves them.
-    marked_edited: Cell<bool>,
-}
-
-#[derive(Default)]
-struct Atoms {
-    edit: RefCell<Option<AtomEdit>>,
-    /// Start of the formula or diagram whose editor just closed; the caret resting on it does not reopen it.
-    closed: Cell<Option<usize>>,
-}
-
 /// A change the preview announced before applying it, as range of its old text and replacement.
 enum Announced {
-    Edit(Range<usize>, String),
+    Edit(Range<Shown>, String),
     /// Several changes or one without text: found by comparing the texts afterwards.
     Unknown,
 }
@@ -195,9 +92,10 @@ pub struct Ivars {
     outline_item: OnceCell<Retained<NSSplitViewItem>>,
     state: RefCell<State>,
     copy: SourceCopy,
-    marks: Marks,
-    atoms: Atoms,
+    marks: selection::Marks,
+    atoms: atom::Atoms,
     images: RefCell<ImageStore>,
+    arrivals: update::Arrivals,
     remote_allowed: Cell<bool>,
     /// The bar above the preview offering to load images from the web.
     remote_banner: OnceCell<Retained<objc2_app_kit::NSView>>,
@@ -283,19 +181,24 @@ define_class!(
                 self.atom_text_changed();
             } else if self.is_preview(notification.object().as_deref()) {
                 self.preview_changed();
-            } else if self.source_typed_with_pending() {
-            } else if self.preview_focused() {
-                self.update();
-            } else {
-                self.schedule_update();
+            } else if !self.source_typed_with_pending() {
+                if self.preview_focused() {
+                    self.update();
+                } else {
+                    self.schedule_update();
+                }
             }
         }
     }
 
     unsafe impl NSTextViewDelegate for EditorController {
         #[unsafe(method_id(undoManagerForTextView:))]
-        fn text_view_undo_manager(&self, _view: &NSTextView) -> Option<Retained<NSUndoManager>> {
-            self.undo_manager()
+        fn text_view_undo_manager(&self, view: &NSTextView) -> Option<Retained<NSUndoManager>> {
+            let editing = self.ivars().atoms.edit.try_borrow().ok();
+            match editing.as_ref().and_then(|e| e.as_ref()) {
+                Some(edit) if std::ptr::eq(&*edit.view, view) => Some(edit.undo.clone()),
+                _ => self.undo_manager(),
+            }
         }
 
         #[unsafe(method(textView:shouldChangeTextInRanges:replacementStrings:))]
@@ -315,7 +218,7 @@ define_class!(
                 self.preview_selection_changed();
             } else if self.is_source(notification.object().as_deref()) {
                 self.drop_pending_unless_at(None);
-                if self.ivars().marks.source_mirror.get().is_none() {
+                if !self.ivars().marks.mirrors_source() {
                     self.mark_source_selection_in_preview();
                 }
             }
@@ -335,14 +238,14 @@ define_class!(
         #[unsafe(method(textView:doubleClickedOnCell:inRect:atIndex:))]
         fn double_clicked_cell(&self, view: &NSTextView, _cell: &AnyObject, frame: NSRect, index: usize) {
             if self.is_preview(Some(view)) {
-                self.edit_atom_at_preview(index, Some(frame));
+                self.edit_atom_at_preview(Shown(index), Some(frame));
             }
         }
 
         #[unsafe(method(textView:clickedOnCell:inRect:atIndex:))]
         fn clicked_cell(&self, view: &NSTextView, _cell: &AnyObject, frame: NSRect, index: usize) {
             if self.is_preview(Some(view)) {
-                self.edit_atom_at_preview(index, Some(frame));
+                self.edit_atom_at_preview(Shown(index), Some(frame));
             }
         }
 
@@ -437,7 +340,7 @@ define_class!(
     impl EditorController {
         #[unsafe(method(flushUpdate))]
         fn flush_update(&self) {
-            self.ivars().copy.update_scheduled.set(false);
+            self.ivars().copy.update_ran();
             self.refresh();
         }
 
@@ -451,10 +354,20 @@ define_class!(
             self.request_renders();
         }
 
-        #[unsafe(method(applyArrivedImages))]
-        fn apply_arrived_images(&self) {
+        #[unsafe(method(applyArrivedRenders))]
+        fn apply_arrived_renders(&self) {
             self.invalidate(Invalidate::Arrivals);
             self.refresh_atom_status();
+        }
+
+        #[unsafe(method(showArrivedImages))]
+        fn show_arrived_images_now(&self) {
+            self.show_arrived_images();
+        }
+
+        #[unsafe(method(previewEditSettled))]
+        fn preview_edit_settled_now(&self) {
+            self.preview_edit_settled();
         }
 
         #[unsafe(method(openAtomUnderCaret))]
@@ -474,7 +387,7 @@ define_class!(
         #[unsafe(method(undoDidChange:))]
         fn undo_did_change(&self, _notification: &NSNotification) {
             self.ivars().scroll_after_undo.set(true);
-            if self.ivars().marks.source_mirror.get().is_some() {
+            if self.ivars().marks.mirrors_source() {
                 self.set_source_selection(self.source().selectedRange());
             }
             // With TextKit 2, undoing in the source sends no textDidChange.
@@ -493,7 +406,7 @@ define_class!(
             unsafe {
                 coder.encodeBool_forKey(collapsed, &ns("previewCollapsed"));
                 coder.encodeBool_forKey(outline, &ns("outlineShown"));
-                coder.encodeDouble_forKey(self.ivars().state.borrow().zoom, &ns("zoom"));
+                coder.encodeDouble_forKey(self.ivars().state.borrow().zoom(), &ns("zoom"));
             }
         }
 
@@ -683,35 +596,10 @@ impl EditorController {
     /// The one way to make the editor redraw what its text alone would not change: marks what is outdated, then
     /// updates.
     fn invalidate(&self, why: Invalidate) {
-        {
-            let mut guard = self.ivars().state.borrow_mut();
-            let st = &mut *guard;
-            match why {
-                Invalidate::Text | Invalidate::Zoom | Invalidate::Appearance => {
-                    st.stale.colors = true;
-                    st.blocks.forget();
-                    st.dirty_preview = None;
-                }
-                Invalidate::Preview => {
-                    st.blocks.forget();
-                    st.dirty_preview = None;
-                }
-                Invalidate::Layout => {
-                    st.stale.layout = true;
-                    st.blocks.forget();
-                    st.dirty_preview = None;
-                }
-                Invalidate::Arrivals => {
-                    st.stale.layout = true;
-                    // A loaded image keeps the block's text, so its key would not change on its own.
-                    let layout = &st.layout;
-                    st.blocks
-                        .invalidate(|i| layout.blocks.get(i).is_some_and(update::shows_image));
-                }
-            }
-            if why == Invalidate::Text {
-                st.pending = None;
-            }
+        self.ivars().state.borrow_mut().invalidate(why);
+        // The renderer may have dropped pictures for memory, which only a request brings back.
+        if matches!(why, Invalidate::Zoom | Invalidate::Appearance | Invalidate::Layout) {
+            self.schedule_render_requests();
         }
         if update::updates_at_once(why, crate::util::storage(self.source()).length()) {
             self.update();
@@ -735,14 +623,18 @@ fn relayout_all() {
 }
 
 /// Where `emergency_save` leaves the texts, for `offer_recovered` to point to after the next start.
-fn recovery_dir() -> Option<PathBuf> {
+pub(crate) fn recovery_dir() -> Option<PathBuf> {
     // Self-test builds keep their copies with their other output, away from the user's.
     #[cfg(feature = "selftest")]
-    if let Some(out) = std::env::var_os("SPLAT_SELFTEST_OUT") {
-        return Some(PathBuf::from(out).join("Recovery"));
+    {
+        let out = std::env::var_os("SPLAT_SELFTEST_OUT").map_or_else(std::env::temp_dir, PathBuf::from);
+        Some(out.join("Recovery"))
     }
-    let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join("Library/Application Support/Splat/Recovery"))
+    #[cfg(not(feature = "selftest"))]
+    {
+        let home = std::env::var_os("HOME")?;
+        Some(PathBuf::from(home).join("Library/Application Support/Splat/Recovery"))
+    }
 }
 
 /// Writes the text of every open document to a recovery folder; runs from the panic hook right before the app
@@ -766,21 +658,30 @@ pub fn emergency_save() -> Vec<PathBuf> {
             .unwrap_or_default()
     });
     let mut written = Vec::new();
+    let mut failed = false;
     for (n, editor) in editors.iter().enumerate() {
         let Some(source) = editor.ivars().source.get() else {
             continue;
         };
-        let name = editor
-            .ivars()
-            .document
-            .load()
-            .map(|d| d.displayName().to_string())
-            .unwrap_or_else(|| "Dokument".into())
-            .replace(['/', ':'], "-");
+        let document = editor.ivars().document.load();
+        // What is saved anyway need not lie around a second time.
+        if document.as_ref().is_some_and(|d| !d.isDocumentEdited()) {
+            continue;
+        }
+        let name = crate::util::file_name_of(
+            &document.map_or_else(|| "Dokument".to_string(), |d| d.displayName().to_string()),
+        );
         let path = dir.join(format!("{name}-{stamp}-{n}.md"));
         if std::fs::write(&path, string_of(&source.string())).is_ok() {
             written.push(path);
+        } else {
+            failed = true;
         }
+    }
+    // These are newer than the copies, and the next start would offer both; if one is missing, the copies are all that
+    // is left of its text.
+    if !failed {
+        discard_copies();
     }
     written
 }

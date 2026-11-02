@@ -2,20 +2,16 @@
 //! raw HTML is kept only for the few tags Splat's own formatting writes, links keep only harmless schemes, and a
 //! content security policy forbids scripts even if something slipped through.
 
-use std::collections::VecDeque;
-use std::fmt;
-use std::sync::Mutex;
+use std::collections::HashMap;
 
-use comrak::adapters::{HeadingAdapter, HeadingMeta};
-use std::cell::RefCell;
-
-use comrak::nodes::{AlertType, Ast, AstNode, LineColumn, NodeAlert, NodeLink, NodeValue, Sourcepos};
-use comrak::options::Plugins;
-use comrak::{Arena, format_html_with_plugins, parse_document};
-
-use super::doc::{AlertKind, Figure, diagram_kind, is_diagram, is_math_fence, options};
-use super::text::{LineStarts, right_to_left};
-use super::typography::{Mark, Open, Quotes, marks, smarten};
+use super::commands::heading_anchors;
+use super::doc::{
+    AlertKind, Align, Block, BlockKind, Figure, Inline, InlineKind, ListKind, Piece, code_figure, parse, plain_text,
+};
+use super::markup::{self, Element, Node, is_void, kept_in_exports, read_tag, stray_closes};
+use super::style::html_element;
+use super::text::right_to_left;
+use super::typography::{Mark, Open, Quotes, before_text, marks, smarten};
 use crate::i18n::t;
 
 /// What the page needs from outside the text.
@@ -35,414 +31,475 @@ pub struct Export<'a> {
     pub citation: &'a dyn Fn(&str) -> Option<String>,
 }
 
-/// HTML elements a document may embed, as GitHub allows them; any other element gives way to its content.
-const KEPT_TAGS: [&str; 52] = [
-    "p",
-    "div",
-    "span",
-    "center",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "b",
-    "strong",
-    "i",
-    "em",
-    "u",
-    "ins",
-    "s",
-    "del",
-    "strike",
-    "mark",
-    "sup",
-    "sub",
-    "code",
-    "kbd",
-    "samp",
-    "tt",
-    "pre",
-    "br",
-    "hr",
-    "img",
-    "a",
-    "ul",
-    "ol",
-    "li",
-    "blockquote",
-    "details",
-    "summary",
-    "table",
-    "thead",
-    "tbody",
-    "tfoot",
-    "tr",
-    "td",
-    "th",
-    "dl",
-    "dt",
-    "dd",
-    "small",
-    "abbr",
-    "cite",
-    "q",
-    "figure",
-];
 /// Attributes kept on embedded HTML; addresses are checked separately.
 const KEPT_ATTRIBUTES: [&str; 11] = [
     "align", "title", "alt", "width", "height", "colspan", "rowspan", "start", "open", "href", "src",
 ];
-const VOID_TAGS: [&str; 3] = ["br", "hr", "img"];
 
 pub fn to_html(text: &str, export: &Export) -> String {
-    let arena = Arena::new();
-    let mut opts = options();
-    // Raw HTML is filtered node by node below, which the default escaping cannot do for single tags.
-    opts.render.r#unsafe = true;
-    let root = parse_document(&arena, text, &opts);
-    let nodes: Vec<_> = root.descendants().collect();
-    for node in nodes {
-        rewrite(node, export);
-    }
-    let lines = LineStarts::new(text);
-    let texts: Vec<_> = root
-        .descendants()
-        .filter(|n| matches!(n.data().value, NodeValue::Text(_)))
-        .collect();
-    let mut paragraph = None;
-    let mut open = Open::default();
-    for node in texts {
-        let block = node.ancestors().find(|a| a.data().value.block());
-        if block.map(|b| b as *const AstNode) != paragraph {
-            paragraph = block.map(|b| b as *const AstNode);
-            open = Open::default();
-        }
-        decorate(&arena, node, text, &lines, export, &mut open);
-    }
-    let anchors = Anchors(Mutex::new(
-        super::commands::heading_anchors(&super::doc::parse(text))
+    let doc = parse(text);
+    let mut page = Page {
+        text,
+        export,
+        anchors: heading_anchors(&doc)
             .into_iter()
-            .map(|h| h.2)
+            .map(|h| (h.range.start, h.anchor))
             .collect(),
-    ));
-    let mut plugins = Plugins::default();
-    plugins.render.heading_adapter = Some(&anchors);
-    let mut body = String::new();
-    let _ = format_html_with_plugins(root, &opts, &mut body, &plugins);
-    let body = with_directions(&body);
+        notes: Vec::new(),
+        open: Open::default(),
+        body: String::with_capacity(text.len() + text.len() / 2),
+    };
+    for block in &doc.blocks {
+        page.block(block);
+    }
+    page.footnotes();
     format!(
         "<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n\
          <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src 'self' data: https: file:; style-src 'unsafe-inline'\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>{}</title>\n<style>{STYLE}</style>\n\
-         </head>\n<body>\n<article>\n{body}</article>\n</body>\n</html>\n",
-        escape(export.title)
+         </head>\n<body>\n<article>\n{}</article>\n</body>\n</html>\n",
+        escape(export.title),
+        page.body,
     )
-}
-
-/// Gives every heading the anchor the document's links and its table of contents point to.
-struct Anchors(Mutex<VecDeque<String>>);
-
-impl HeadingAdapter for Anchors {
-    fn enter(&self, output: &mut dyn fmt::Write, heading: &HeadingMeta, _: Option<Sourcepos>) -> fmt::Result {
-        let id = self.0.lock().ok().and_then(|mut a| a.pop_front()).unwrap_or_default();
-        write!(output, "<h{} id=\"{}\" dir=\"auto\">", heading.level, escape(&id))
-    }
-
-    fn exit(&self, output: &mut dyn fmt::Write, heading: &HeadingMeta) -> fmt::Result {
-        writeln!(output, "</h{}>", heading.level)
-    }
 }
 
 /// Paragraphs, list items and terms take the direction of their first letter, so Hebrew and Arabic read right to left.
 /// Quotes, callouts, lists and tables take the direction of their text as a whole, as in the preview, set explicitly:
 /// a browser resolving `dir="auto"` skips descendants that have a direction of their own. Code stays left to right.
-fn with_directions(body: &str) -> String {
-    const LEAVES: [&str; 4] = ["<p>", "<li>", "<dt>", "<dd>"];
-    const CONTAINERS: [(&str, &str); 5] = [
-        ("<blockquote", "blockquote"),
-        ("<ul", "ul"),
-        ("<ol", "ol"),
-        ("<table", "table"),
-        ("<div class=\"markdown-alert ", "div"),
-    ];
-    let mut out = String::with_capacity(body.len() + body.len() / 4);
-    let mut at = 0;
-    while let Some(i) = body[at..].find('<').map(|i| at + i) {
-        out.push_str(&body[at..i]);
-        let rest = &body[i..];
-        if let Some(leaf) = LEAVES.iter().find(|leaf| rest.starts_with(**leaf)) {
-            out.push_str(&leaf[..leaf.len() - 1]);
-            out.push_str(" dir=\"auto\">");
-            at = i + leaf.len();
-        } else if let Some((_, name)) = CONTAINERS
-            .iter()
-            .find(|(open, name)| rest.starts_with(open) && opens(rest, name))
-        {
-            let element = &body[i..element_end(body, i, name)];
-            let dir = if reads_right_to_left(element) { "rtl" } else { "ltr" };
-            out.push_str(&format!("<{name} dir=\"{dir}\""));
-            at = i + 1 + name.len();
-        } else {
-            out.push('<');
-            at = i + 1;
+fn direction(right_to_left: Option<bool>) -> &'static str {
+    if right_to_left == Some(true) { "rtl" } else { "ltr" }
+}
+
+/// Whether the first letter in `blocks`, outside code, reads right to left; `None` without letters.
+fn blocks_direction(blocks: &[Block]) -> Option<bool> {
+    blocks.iter().find_map(|block| match &block.kind {
+        BlockKind::CodeBlock { .. } => None,
+        BlockKind::HtmlBlock { literal } => {
+            let mut text = String::new();
+            markup::raw_text(&markup::parse(literal), &mut text);
+            right_to_left(&text)
+        }
+        _ => right_to_left(&plain_text(block.inlines())).or_else(|| blocks_direction(block.children())),
+    })
+}
+
+struct Page<'a> {
+    text: &'a str,
+    export: &'a Export<'a>,
+    /// The anchor of every heading, by where it starts in the source, as links and the table of contents name it.
+    anchors: HashMap<usize, String>,
+    notes: Vec<&'a Block>,
+    /// Quotes the runs of the paragraph being written left open.
+    open: Open,
+    body: String,
+}
+
+/// What surrounds running text and changes what it may turn into.
+#[derive(Clone, Copy, Default)]
+struct Inside {
+    link: bool,
+    code: bool,
+}
+
+impl<'a> Page<'a> {
+    fn children(&mut self, blocks: &'a [Block]) {
+        for block in blocks {
+            self.block(block);
         }
     }
-    out.push_str(&body[at..]);
-    out
-}
 
-/// Whether `html` starts with an opening tag named `name`, not with a longer name.
-fn opens(html: &str, name: &str) -> bool {
-    html.strip_prefix('<')
-        .and_then(|r| r.strip_prefix(name))
-        .is_some_and(|r| r.starts_with([' ', '>']))
-}
-
-/// The end of the element opening at `start`, after its closing tag, or the end of `html`.
-fn element_end(html: &str, start: usize, name: &str) -> usize {
-    let close = format!("</{name}>");
-    let mut depth = 0;
-    let mut at = start;
-    while let Some(i) = html[at..].find('<').map(|i| at + i) {
-        if html[i..].starts_with(&close) {
-            depth -= 1;
-            at = i + close.len();
-            if depth == 0 {
-                return at;
+    fn block(&mut self, block: &'a Block) {
+        match &block.kind {
+            BlockKind::Paragraph => {
+                self.body.push_str("<p dir=\"auto\">");
+                self.leaf(block.inlines());
+                self.body.push_str("</p>\n");
             }
-        } else {
-            depth += usize::from(opens(&html[i..], name));
-            at = i + 1;
-        }
-    }
-    html.len()
-}
-
-/// Whether the first letter of an element's text, outside tags, entities and code blocks, reads right to left. A
-/// callout decides by its body, and by its title only when the body has no letters.
-fn reads_right_to_left(element: &str) -> bool {
-    let text = |with_title: bool| {
-        let mut out = String::new();
-        let mut rest = element;
-        while let Some(c) = rest.chars().next() {
-            let skip = if rest.starts_with("<pre") {
-                rest.find("</pre>").map_or(rest.len(), |e| e + "</pre>".len())
-            } else if !with_title && rest.starts_with("<p class=\"markdown-alert-title\"") {
-                rest.find("</p>").map_or(rest.len(), |e| e + "</p>".len())
-            } else if c == '<' {
-                rest.find('>').map_or(rest.len(), |e| e + 1)
-            } else if c == '&' {
-                rest.find(';').map_or(1, |e| e + 1)
-            } else {
-                out.push(c);
-                c.len_utf8()
-            };
-            rest = &rest[skip..];
-        }
-        out
-    };
-    right_to_left(&text(false)).or_else(|| right_to_left(&text(true))) == Some(true)
-}
-
-fn rewrite<'a>(node: &'a AstNode<'a>, export: &Export) {
-    let replacement = {
-        let mut data = node.data_mut();
-        match &mut data.value {
-            NodeValue::HtmlInline(raw) => {
-                *raw = clean_tag(raw, export);
-                None
+            BlockKind::Heading { level, .. } => {
+                let anchor = self.anchors.get(&block.range.start).map_or("", String::as_str);
+                self.body
+                    .push_str(&format!("<h{level} id=\"{}\" dir=\"auto\">", escape(anchor)));
+                self.leaf(block.inlines());
+                self.body.push_str(&format!("</h{level}>\n"));
             }
-            NodeValue::HtmlBlock(block) => {
+            BlockKind::BlockQuote => {
+                let dir = direction(blocks_direction(block.children()));
+                self.body.push_str(&format!("<blockquote dir=\"{dir}\">\n"));
+                self.children(block.children());
+                self.body.push_str("</blockquote>\n");
+            }
+            BlockKind::Alert { kind, title, .. } => self.alert(block, *kind, title.as_deref()),
+            BlockKind::List { kind, tight } => self.list(block, kind, *tight),
+            BlockKind::CodeBlock { info, literal, .. } => self.code_block(info, literal),
+            BlockKind::HtmlBlock { literal } => {
                 // An element closed in a later block, as `</details>` after the Markdown it wraps, closes here.
-                let closes: String = super::markup::stray_closes(&block.literal)
-                    .into_iter()
-                    .filter(|n| KEPT_TAGS.contains(&n.as_str()))
-                    .map(|n| format!("</{n}>"))
-                    .collect();
-                block.literal = closes + &clean_html(&super::markup::parse(&block.literal), export) + "\n";
-                None
+                for name in stray_closes(literal) {
+                    if kept_in_exports(&name) {
+                        self.body.push_str(&format!("</{name}>"));
+                    }
+                }
+                self.body.push_str(&clean_html(&markup::parse(literal), self.export));
+                self.body.push('\n');
             }
-            NodeValue::Math(math) => (export.figure)(&Figure::Math {
-                tex: &math.literal,
-                display: math.display_math,
-            })
-            .map(NodeValue::HtmlInline),
-            NodeValue::CodeBlock(code) if is_diagram(&code.info) || is_math_fence(&code.info) => {
-                let figure = match diagram_kind(&code.info) {
-                    Some(kind) => Figure::Diagram {
-                        source: &code.literal,
-                        kind,
-                    },
-                    None => Figure::Math {
-                        tex: code.literal.strip_suffix('\n').unwrap_or(&code.literal),
-                        display: true,
-                    },
+            BlockKind::ThematicBreak => self.body.push_str("<hr />\n"),
+            BlockKind::Table { alignments } => self.table(block, alignments),
+            BlockKind::FootnoteDefinition { .. } => self.notes.push(block),
+            BlockKind::MathBlock { literal } => {
+                let figure = Figure::Math {
+                    tex: literal,
+                    display: true,
                 };
-                (export.figure)(&figure).map(|img| {
-                    NodeValue::HtmlBlock(comrak::nodes::NodeHtmlBlock {
-                        block_type: 6,
-                        literal: format!("<p class=\"diagram\">{img}</p>\n"),
-                    })
-                })
+                match (self.export.figure)(&figure) {
+                    Some(img) => self.body.push_str(&format!("<p class=\"diagram\">{img}</p>\n")),
+                    None => self.body.push_str(&format!(
+                        "<p dir=\"auto\"><span data-math-style=\"display\">{}</span></p>\n",
+                        escape(literal)
+                    )),
+                }
             }
-            NodeValue::Link(link) => {
-                link.url = safe_url(&link.url, false, export);
-                None
-            }
-            NodeValue::Image(image) => {
-                image.url = (export.embed)(&image.url).unwrap_or_else(|| safe_url(&image.url, true, export));
-                None
-            }
-            NodeValue::WikiLink(link) => {
-                let target = link.url.clone();
-                if link.embed && crate::preview::layout::is_image_name(&target) {
-                    let url = (export.embed)(&target).unwrap_or_else(|| safe_url(&target, true, export));
-                    Some(NodeValue::Image(Box::new(NodeLink {
-                        url,
-                        title: String::new(),
-                    })))
-                } else {
-                    let file = if target.contains('.') {
-                        target
+            BlockKind::DefinitionList => {
+                self.body.push_str("<dl>\n");
+                for part in block.children().iter().flat_map(|item| item.children()) {
+                    let name = if matches!(part.kind, BlockKind::DefinitionTerm) {
+                        "dt"
                     } else {
-                        format!("{target}.md")
+                        "dd"
                     };
-                    link.url = safe_url(&file, false, export);
-                    None
+                    self.body.push_str(&format!("<{name} dir=\"auto\">"));
+                    match part.children() {
+                        [only] if matches!(only.kind, BlockKind::Paragraph) => self.leaf(only.inlines()),
+                        children => self.children(children),
+                    }
+                    self.body.push_str(&format!("</{name}>\n"));
+                }
+                self.body.push_str("</dl>\n");
+            }
+            BlockKind::Item { .. }
+            | BlockKind::TableRow { .. }
+            | BlockKind::TableCell
+            | BlockKind::DefinitionItem
+            | BlockKind::DefinitionTerm
+            | BlockKind::DefinitionDetails
+            | BlockKind::FrontMatter { .. }
+            | BlockKind::Comment => {}
+        }
+    }
+
+    fn alert(&mut self, block: &'a Block, kind: AlertKind, title: Option<&str>) {
+        let label = title.unwrap_or(t(kind.label()));
+        // A callout decides by its body, and by its title only when the body has no letters.
+        let dir = direction(blocks_direction(block.children()).or_else(|| right_to_left(label)));
+        self.body.push_str(&format!(
+            "<div dir=\"{dir}\" class=\"markdown-alert markdown-alert-{}\">\n<p class=\"markdown-alert-title\">{}</p>\n",
+            kind.keyword().to_ascii_lowercase(),
+            escape(label)
+        ));
+        self.children(block.children());
+        self.body.push_str("</div>\n");
+    }
+
+    fn list(&mut self, block: &'a Block, kind: &ListKind, tight: bool) {
+        let dir = direction(blocks_direction(block.children()));
+        let name = match kind {
+            ListKind::Bullet(_) => "ul",
+            ListKind::Ordered { .. } => "ol",
+        };
+        self.body.push_str(&format!("<{name} dir=\"{dir}\""));
+        if let ListKind::Ordered { start, .. } = kind
+            && *start != 1
+        {
+            self.body.push_str(&format!(" start=\"{start}\""));
+        }
+        self.body.push_str(">\n");
+        for item in block.children() {
+            self.body.push_str("<li dir=\"auto\">");
+            if let BlockKind::Item { task: Some(task), .. } = &item.kind {
+                let checked = if task.checked { " checked" } else { "" };
+                self.body
+                    .push_str(&format!("<input type=\"checkbox\" disabled{checked} /> "));
+            }
+            for child in item.children() {
+                if tight && matches!(child.kind, BlockKind::Paragraph) {
+                    self.leaf(child.inlines());
+                } else {
+                    if !self.body.ends_with('\n') {
+                        self.body.push('\n');
+                    }
+                    self.block(child);
                 }
             }
-            NodeValue::Callout(callout) => {
-                let (kind, github) = super::doc::callout_kind(&callout.callout_type);
-                let custom = node
-                    .children()
-                    .find(|n| matches!(n.data().value, NodeValue::CalloutTitle))
-                    .map(|n| {
-                        let text = super::doc::node_text(n);
-                        n.detach();
-                        text
-                    })
-                    .filter(|t| !t.trim().is_empty());
-                let title = custom.or_else(|| (!github).then(|| super::doc::capitalized(&callout.callout_type)));
-                Some(NodeValue::Alert(Box::new(NodeAlert {
-                    alert_type: match kind {
-                        AlertKind::Note => AlertType::Note,
-                        AlertKind::Tip => AlertType::Tip,
-                        AlertKind::Important => AlertType::Important,
-                        AlertKind::Warning => AlertType::Warning,
-                        AlertKind::Caution => AlertType::Caution,
-                    },
-                    title: Some(title.unwrap_or_else(|| t(kind.label()).to_string())),
-                    multiline: false,
-                    fence_length: 0,
-                    fence_offset: 0,
-                })))
+            self.body.push_str("</li>\n");
+        }
+        self.body.push_str(&format!("</{name}>\n"));
+    }
+
+    fn code_block(&mut self, info: &str, literal: &str) {
+        if let Some(img) = code_figure(info, literal).and_then(|figure| (self.export.figure)(&figure)) {
+            self.body.push_str(&format!("<p class=\"diagram\">{img}</p>\n"));
+            return;
+        }
+        let language = info.split_whitespace().next().unwrap_or("");
+        let class = if language.is_empty() {
+            String::new()
+        } else {
+            format!(" class=\"language-{}\"", escape(language))
+        };
+        self.body
+            .push_str(&format!("<pre><code{class}>{}</code></pre>\n", escape(literal)));
+    }
+
+    fn table(&mut self, table: &'a Block, alignments: &[Align]) {
+        let dir = direction(blocks_direction(table.children()));
+        self.body.push_str(&format!("<table dir=\"{dir}\">\n"));
+        let header_rows = table
+            .children()
+            .iter()
+            .take_while(|row| matches!(row.kind, BlockKind::TableRow { header: true }))
+            .count();
+        let (head, body) = table.children().split_at(header_rows);
+        for (section, rows, cell) in [("thead", head, "th"), ("tbody", body, "td")] {
+            if rows.is_empty() {
+                continue;
             }
-            NodeValue::Alert(alert) => {
-                if alert.title.is_none() {
-                    let kind = match alert.alert_type {
-                        comrak::nodes::AlertType::Note => AlertKind::Note,
-                        comrak::nodes::AlertType::Tip => AlertKind::Tip,
-                        comrak::nodes::AlertType::Important => AlertKind::Important,
-                        comrak::nodes::AlertType::Warning => AlertKind::Warning,
-                        comrak::nodes::AlertType::Caution => AlertKind::Caution,
+            self.body.push_str(&format!("<{section}>\n"));
+            for row in rows {
+                self.body.push_str("<tr>\n");
+                for (col, content) in row.children().iter().enumerate() {
+                    let align = match alignments.get(col).copied().and_then(Align::html_name) {
+                        Some("left") => " align=\"left\"",
+                        Some("center") => " align=\"center\"",
+                        Some("right") => " align=\"right\"",
+                        _ => "",
                     };
-                    alert.title = Some(t(kind.label()).to_string());
+                    self.body.push_str(&format!("<{cell}{align}>"));
+                    self.leaf(content.inlines());
+                    self.body.push_str(&format!("</{cell}>\n"));
                 }
-                None
+                self.body.push_str("</tr>\n");
             }
-            _ => None,
+            self.body.push_str(&format!("</{section}>\n"));
         }
-    };
-    if let Some(value) = replacement {
-        // An alert keeps the callout's content; a replaced HTML block or code block keeps no children.
-        let keeps_children = matches!(value, NodeValue::Alert(_));
-        node.data_mut().value = value;
-        while !keeps_children && let Some(child) = node.first_child() {
-            child.detach();
+        self.body.push_str("</table>\n");
+    }
+
+    fn footnotes(&mut self) {
+        let notes = std::mem::take(&mut self.notes);
+        if notes.is_empty() {
+            return;
         }
+        self.body
+            .push_str("<section class=\"footnotes\" data-footnotes>\n<ol>\n");
+        for note in notes {
+            let BlockKind::FootnoteDefinition { name, .. } = &note.kind else {
+                continue;
+            };
+            let id = escape(name);
+            self.body.push_str(&format!("<li id=\"fn-{id}\" dir=\"auto\">\n"));
+            self.children(note.children());
+            self.body.push_str(&format!(
+                "<a href=\"#fnref-{id}\" class=\"footnote-backref\" data-footnote-backref>↩</a>\n</li>\n"
+            ));
+        }
+        self.body.push_str("</ol>\n</section>\n");
+    }
+
+    /// The running text of a block.
+    fn leaf(&mut self, inlines: &[Inline]) {
+        self.open = Open::default();
+        self.inlines(inlines, Inside::default());
+    }
+
+    fn inlines(&mut self, inlines: &[Inline], around: Inside) {
+        for inline in inlines {
+            self.inline(inline, around);
+        }
+    }
+
+    fn inline(&mut self, i: &Inline, around: Inside) {
+        // A pair of HTML tags keeps its tags, cleaned, whatever it means to the other outputs.
+        if let Some((open, close)) = self.html_tags(i) {
+            self.body.push_str(&clean_tag(open, self.export));
+            let code = matches!(i.kind, InlineKind::Kbd);
+            let link = matches!(i.kind, InlineKind::Link { .. });
+            self.inlines(
+                &i.children,
+                Inside {
+                    link: around.link || link,
+                    code: around.code || code,
+                },
+            );
+            self.body.push_str(&clean_tag(close, self.export));
+            return;
+        }
+        match i.piece() {
+            Piece::Text(t) => self.text(t, i.range.start, around),
+            Piece::SoftBreak => self.body.push('\n'),
+            Piece::LineBreak => self.body.push_str("<br />\n"),
+            Piece::Code(code) => self.body.push_str(&format!("<code>{}</code>", escape(code))),
+            Piece::Html(raw) => self.body.push_str(&clean_tag(raw, self.export)),
+            Piece::Styled => match html_element(&i.kind) {
+                Some(name) => self.wrapped(name, i, around),
+                None if matches!(i.kind, InlineKind::Spoiler) => {
+                    self.body.push_str("<span class=\"spoiler\">");
+                    self.inlines(&i.children, around);
+                    self.body.push_str("</span>");
+                }
+                None => self.inlines(&i.children, around),
+            },
+            Piece::Link { url, title } => {
+                let url = safe_url(url, false, self.export);
+                self.link(&url, title, i, around);
+            }
+            Piece::WikiPage(target) => {
+                let file = if target.contains('.') {
+                    target.to_string()
+                } else {
+                    format!("{target}.md")
+                };
+                let url = safe_url(&file, false, self.export);
+                self.link(&url, "", i, around);
+            }
+            // Written as a tag, it keeps its size and all else the tag says.
+            Piece::Picture(_) if matches!(i.kind, InlineKind::HtmlImage { .. }) => {
+                let tag = self.text.get(i.range.clone()).unwrap_or("");
+                self.body.push_str(&clean_tag(tag, self.export));
+            }
+            Piece::Picture(picture) => {
+                let src = self.image_source(picture.url);
+                self.image(&src, &picture.alt, picture.title);
+            }
+            Piece::FootnoteRef { name, ix } => {
+                let id = escape(name);
+                self.body.push_str(&format!(
+                    "<sup class=\"footnote-ref\"><a href=\"#fn-{id}\" id=\"fnref-{id}\" data-footnote-ref>{ix}</a></sup>"
+                ));
+            }
+            Piece::Math { literal, display } => {
+                let figure = Figure::Math { tex: literal, display };
+                match (self.export.figure)(&figure) {
+                    Some(img) => self.body.push_str(&img),
+                    None => {
+                        let style = if display { "display" } else { "inline" };
+                        self.body
+                            .push_str(&format!("<span data-math-style=\"{style}\">{}</span>", escape(literal)));
+                    }
+                }
+            }
+            Piece::Emoji(emoji) => self.body.push_str(&escape(emoji)),
+            Piece::Hidden => {}
+        }
+    }
+
+    /// The opening and closing tag in the source of an inline written as HTML.
+    fn html_tags(&self, i: &Inline) -> Option<(&'a str, &'a str)> {
+        let first = i.children.first()?;
+        let last = i.children.last()?;
+        let open = self.text.get(i.range.start..first.range.start)?;
+        let close = self.text.get(last.range.end..i.range.end)?;
+        (open.starts_with('<') && close.starts_with("</")).then_some((open, close))
+    }
+
+    fn wrapped(&mut self, name: &str, i: &Inline, around: Inside) {
+        self.body.push_str(&format!("<{name}>"));
+        let code = matches!(i.kind, InlineKind::Kbd);
+        self.inlines(
+            &i.children,
+            Inside {
+                code: around.code || code,
+                ..around
+            },
+        );
+        self.body.push_str(&format!("</{name}>"));
+    }
+
+    fn link(&mut self, url: &str, title: &str, i: &Inline, around: Inside) {
+        self.body.push_str(&format!("<a href=\"{}\"", escape(url)));
+        if !title.is_empty() {
+            self.body.push_str(&format!(" title=\"{}\"", escape(title)));
+        }
+        self.body.push('>');
+        self.inlines(&i.children, Inside { link: true, ..around });
+        self.body.push_str("</a>");
+    }
+
+    fn image_source(&self, url: &str) -> String {
+        (self.export.embed)(url).unwrap_or_else(|| safe_url(url, true, self.export))
+    }
+
+    fn image(&mut self, src: &str, alt: &str, title: &str) {
+        self.body
+            .push_str(&format!("<img src=\"{}\" alt=\"{}\"", escape(src), escape(alt)));
+        if !title.is_empty() {
+            self.body.push_str(&format!(" title=\"{}\"", escape(title)));
+        }
+        self.body.push_str(" />");
+    }
+
+    /// Running text, with typographic punctuation, tags, references and citations as in the preview.
+    fn text(&mut self, literal: &str, at: usize, around: Inside) {
+        if around.code {
+            self.body.push_str(&escape(literal));
+            return;
+        }
+        let before = before_text(self.text, at);
+        let shown = match self.export.quotes {
+            Some(quotes) => smarten(literal, before, quotes, &mut self.open),
+            None => literal.to_string(),
+        };
+        if around.link {
+            self.body.push_str(&escape(&shown));
+            return;
+        }
+        let mut done = 0;
+        for (range, mark) in marks(&shown, before, true) {
+            let piece = &shown[range.clone()];
+            let replacement = match &mark {
+                Mark::Tag(name) => Some(format!("<span class=\"tag\">#{}</span>", escape(name))),
+                Mark::Reference(reference) => (self.export.reference)(reference)
+                    .map(|url| format!("<a href=\"{}\">{}</a>", escape(&url), escape(reference))),
+                Mark::Citation(keys) => {
+                    let names: Option<Vec<String>> = keys.iter().map(|k| (self.export.citation)(k)).collect();
+                    let shown_as = names.map_or_else(|| piece.to_string(), |n| format!("({})", n.join("; ")));
+                    Some(format!("<cite>{}</cite>", escape(&shown_as)))
+                }
+            };
+            let Some(replacement) = replacement else { continue };
+            self.body.push_str(&escape(&shown[done..range.start]));
+            self.body.push_str(&replacement);
+            done = range.end;
+        }
+        self.body.push_str(&escape(&shown[done..]));
     }
 }
 
-/// Typographic punctuation, tags, references and citations in running text, as in the preview.
-fn decorate<'a>(
-    arena: &'a Arena<'a>,
-    node: &'a AstNode<'a>,
-    text: &str,
-    lines: &LineStarts,
-    export: &Export,
-    open: &mut Open,
-) {
-    if node.ancestors().any(|a| {
-        matches!(
-            a.data().value,
-            NodeValue::Link(_) | NodeValue::Image(_) | NodeValue::WikiLink(_) | NodeValue::Heading(_)
-        )
-    }) {
-        return;
-    }
-    let (literal, start) = {
-        let data = node.data();
-        let NodeValue::Text(t) = &data.value else { return };
-        let at = lines
-            .start(data.sourcepos.start.line, data.sourcepos.start.column)
-            .min(text.len());
-        (t.to_string(), at)
-    };
-    let before = text[..text.floor_char_boundary(start)].chars().next_back();
-    let shown = match export.quotes {
-        Some(q) => smarten(&literal, before, q, open),
-        None => literal,
-    };
-    let found = marks(&shown, before, true);
-    let new = |value: NodeValue| {
-        arena.alloc(AstNode::new(RefCell::new(Ast::new(
-            value,
-            LineColumn { line: 0, column: 0 },
-        ))))
-    };
-    let mut at = 0;
-    for (range, mark) in found {
-        let replacement = match &mark {
-            Mark::Tag(name) => Some(NodeValue::HtmlInline(format!(
-                "<span class=\"tag\">#{}</span>",
-                escape(name)
-            ))),
-            Mark::Reference(r) => (export.reference)(r)
-                .map(|url| NodeValue::HtmlInline(format!("<a href=\"{}\">{}</a>", escape(&url), escape(r)))),
-            Mark::Citation(keys) => {
-                let names: Option<Vec<String>> = keys.iter().map(|k| (export.citation)(k)).collect();
-                Some(NodeValue::HtmlInline(format!(
-                    "<cite>{}</cite>",
-                    escape(&names.map_or_else(|| shown[range.clone()].to_string(), |n| format!("({})", n.join("; "))))
-                )))
-            }
-        };
-        let Some(replacement) = replacement else { continue };
-        if range.start > at {
-            node.insert_before(new(NodeValue::Text(shown[at..range.start].to_string().into())));
+/// The direction an embedded element gets, as Markdown's blocks of the same kind get it.
+fn element_direction(e: &Element) -> Option<&'static str> {
+    match e.name.as_str() {
+        "p" | "li" | "dt" | "dd" => Some("auto"),
+        "blockquote" | "ul" | "ol" | "table" => {
+            let mut text = String::new();
+            markup::raw_text(&e.children, &mut text);
+            Some(direction(right_to_left(&text)))
         }
-        node.insert_before(new(replacement));
-        at = range.end;
+        _ => None,
     }
-    node.data_mut().value = NodeValue::Text(shown[at..].to_string().into());
 }
 
 /// Embedded HTML with only the elements and attributes a page may show without running anything.
-fn clean_html(nodes: &[super::markup::Node], export: &Export) -> String {
+fn clean_html(nodes: &[Node], export: &Export) -> String {
     let mut out = String::new();
     for node in nodes {
         match node {
-            super::markup::Node::Text { text, .. } => out.push_str(&escape(text)),
-            super::markup::Node::Element(e) => {
+            Node::Text { text, .. } => out.push_str(&escape(text)),
+            Node::Element(e) => {
                 let inner = clean_html(&e.children, export);
-                if !KEPT_TAGS.contains(&e.name.as_str()) {
+                if !kept_in_exports(&e.name) {
                     out.push_str(&inner);
                     continue;
                 }
-                out.push_str(&open_tag(&e.name, &e.attrs, e.align(), export));
-                if VOID_TAGS.contains(&e.name.as_str()) {
+                let align = e.align().and_then(Align::html_name);
+                out.push_str(&open_tag(&e.name, &e.attrs, align, element_direction(e), export));
+                if is_void(&e.name) {
                     continue;
                 }
                 out.push_str(&inner);
@@ -456,7 +513,7 @@ fn clean_html(nodes: &[super::markup::Node], export: &Export) -> String {
     out
 }
 
-fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, export: &Export) -> String {
+fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, dir: Option<&str>, export: &Export) -> String {
     let mut tag = format!("<{name}");
     for (key, value) in attrs {
         if !KEPT_ATTRIBUTES.contains(&key.as_str()) || key == "align" {
@@ -476,6 +533,9 @@ fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, export:
     if let Some(align) = align {
         tag.push_str(&format!(" align=\"{align}\""));
     }
+    if let Some(dir) = dir {
+        tag.push_str(&format!(" dir=\"{dir}\""));
+    }
     tag.push('>');
     tag
 }
@@ -483,16 +543,16 @@ fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, export:
 /// A single inline tag, cleaned like embedded HTML; comments and other elements drop out.
 fn clean_tag(raw: &str, export: &Export) -> String {
     let trimmed = raw.trim();
-    match super::markup::read_tag(trimmed, 0) {
-        Some((super::markup::Tag::Open { name, attrs, .. }, _)) if KEPT_TAGS.contains(&name.as_str()) => {
+    match read_tag(trimmed, 0) {
+        Some((markup::Tag::Open { name, attrs, .. }, _)) if kept_in_exports(&name) => {
             let align = attrs
                 .iter()
                 .find(|(k, _)| k == "align")
                 .map(|(_, v)| v.to_ascii_lowercase())
                 .filter(|v| matches!(v.as_str(), "left" | "center" | "right"));
-            open_tag(&name, &attrs, align.as_deref(), export)
+            open_tag(&name, &attrs, align.as_deref(), None, export)
         }
-        Some((super::markup::Tag::Close { name }, _)) if KEPT_TAGS.contains(&name.as_str()) => format!("</{name}>"),
+        Some((markup::Tag::Close { name }, _)) if kept_in_exports(&name) => format!("</{name}>"),
         _ => String::new(),
     }
 }
@@ -500,20 +560,8 @@ fn clean_tag(raw: &str, export: &Export) -> String {
 /// Web and mail links, in-page anchors and relative paths stay; every other scheme, such as `javascript:` or
 /// `file:`, is dropped. Images may also be embedded PNG, JPEG, GIF or WebP data.
 fn safe_url(url: &str, image: bool, export: &Export) -> String {
-    // Browsers drop tabs and line breaks anywhere in a URL and control characters around it, so `java&#9;script:`
-    // is a scheme to them.
-    let lower: String = url
-        .trim_matches(|c: char| c <= ' ')
-        .chars()
-        .filter(|c| !matches!(c, '\t' | '\n' | '\r'))
-        .collect::<String>()
-        .to_ascii_lowercase();
-    let scheme = lower.find(':').filter(|&i| {
-        lower[..i]
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
-    });
-    match scheme.map(|i| &lower[..i]) {
+    let lower = url.trim().to_ascii_lowercase();
+    match super::url::scheme(url).as_deref() {
         None => (export.rebase)(url),
         Some("http" | "https") => url.to_string(),
         Some("mailto") if !image => url.to_string(),
@@ -727,7 +775,7 @@ mod tests {
             "<p align=\"center\" onclick=\"x()\" style=\"color:red\">\n<img src=\"img/eingebettet.png\" width=\"80\" onerror=\"y()\">\n<a href=\"javascript:z()\">böse</a> <a href=\"https://ok.de\">gut</a>\n</p>\n\n\
              <details>\n<summary>Mehr</summary>\n\nInhalt\n\n</details>\n\nText <kbd>⌘</kbd> <span onmouseover=\"q()\">s</span> <iframe src=\"https://x\"></iframe>\n",
         );
-        assert!(page.contains("<p align=\"center\">"), "{page}");
+        assert!(page.contains("<p align=\"center\" dir=\"auto\">"), "{page}");
         assert!(
             page.contains("<img src=\"data:image/png;base64,UE5H\" width=\"80\">"),
             "{page}"
@@ -746,6 +794,55 @@ mod tests {
         let close = page.find("</details>").unwrap();
         assert!(details < content && content < close, "{page}");
         assert!(page.contains("<kbd>⌘</kbd>"));
+    }
+
+    #[test]
+    fn headings_read_as_in_the_preview_and_keep_their_own_anchors() {
+        let page = export("> # Zitat\n\n# \"Hi\" #tag\n\n# Hi\n\n**\"Hallo\"** [\"Link\" #kein](https://a.de)\n");
+        assert!(page.contains("<h1 id=\"zitat\" dir=\"auto\">Zitat</h1>"), "{page}");
+        assert!(page.contains("„Hi“ <span class=\"tag\">#tag</span></h1>"), "{page}");
+        assert!(page.contains("<h1 id=\"hi\" dir=\"auto\">Hi</h1>"), "{page}");
+        assert!(page.contains("<strong>„Hallo“</strong>"), "{page}");
+        assert!(page.contains(">„Link“ #kein</a>"), "{page}");
+    }
+
+    #[test]
+    fn named_references_in_embedded_html_stay_what_they_are() {
+        let page = export("<p>Caf&eacute;</p>\n");
+        assert!(page.contains("Café"), "{page}");
+        assert!(!page.contains("&amp;eacute;"), "{page}");
+    }
+
+    #[test]
+    fn anchors_of_headings_deeper_than_the_model_goes_do_not_shift_the_others() {
+        let page = export(&format!("{}# tief\n\n# danach\n\n# zuletzt\n", "> ".repeat(70)));
+        assert!(page.contains("<h1 id=\"danach\" dir=\"auto\">danach</h1>"), "{page}");
+        assert!(page.contains("<h1 id=\"zuletzt\" dir=\"auto\">zuletzt</h1>"), "{page}");
+    }
+
+    #[test]
+    fn everything_a_browser_reads_keeps_its_tags() {
+        let page = export(
+            "- [x] fertig\n- [ ] offen\n\n1. a\n\n   b\n\n~~weg~~ ~tief~ <u>unter</u> ![Bild](img/a.png \"T\")\n\n\
+             | L | R |\n|:--|--:|\n| 1 | 2 |\n\nText[^n]\n\n[^n]: Die Note.\n\n```rust\nlet a = 1 < 2;\n```\n\n---\n",
+        );
+        for wanted in [
+            "<input type=\"checkbox\" disabled checked /> fertig</li>",
+            "<input type=\"checkbox\" disabled /> offen</li>",
+            "<li dir=\"auto\">\n<p dir=\"auto\">a</p>\n<p dir=\"auto\">b</p>\n</li>",
+            "<del>weg</del>",
+            "<sub>tief</sub>",
+            "<u>unter</u>",
+            "<img src=\"../docs/img/a.png\" alt=\"Bild\" title=\"T\" />",
+            "<thead>\n<tr>\n<th align=\"left\">L</th>\n<th align=\"right\">R</th>\n</tr>\n</thead>",
+            "<tbody>\n<tr>\n<td align=\"left\">1</td>",
+            "<sup class=\"footnote-ref\"><a href=\"#fn-n\" id=\"fnref-n\" data-footnote-ref>1</a></sup>",
+            "<li id=\"fn-n\" dir=\"auto\">\n<p dir=\"auto\">Die Note.</p>",
+            "<pre><code class=\"language-rust\">let a = 1 &lt; 2;\n</code></pre>",
+            "<hr />",
+        ] {
+            assert!(page.contains(wanted), "{wanted}: {page}");
+        }
     }
 
     #[test]
@@ -778,5 +875,113 @@ mod tests {
         assert!(page.contains("href=\"../docs/notes/b.md\""), "{page}");
         assert!(page.contains(crate::i18n::t("Hinweis")), "{page}");
         assert!(!page.contains("title: x"), "front matter stays out: {page}");
+    }
+
+    #[test]
+    fn the_direction_of_a_page_also_reads_embedded_html() {
+        let direction = |t: &str| blocks_direction(&crate::markdown::doc::parse(t).blocks);
+        assert_eq!(direction("<p>שלום</p>\n"), Some(true));
+        assert_eq!(direction("```\nשלום\n```\n\nabc\n"), Some(false), "code does not count");
+    }
+
+    #[test]
+    fn a_definition_of_anything_but_one_paragraph_keeps_its_blocks() {
+        let page = export("T\n: - a\n");
+        assert!(page.contains("<li"), "{page}");
+    }
+
+    #[test]
+    fn every_alignment_of_a_column_reaches_the_page() {
+        let page = export("| a | b | c |\n|:--|:-:|--:|\n| 1 | 2 | 3 |\n");
+        for align in ["left", "center", "right"] {
+            assert!(page.contains(&format!("align=\"{align}\"")), "{align}: {page}");
+        }
+    }
+
+    #[test]
+    fn no_link_grows_inside_a_link_however_deep() {
+        let links = |t: &str| export(t).matches("<a ").count();
+        assert_eq!(links("[<b>#12</b>](https://x.de)\n"), 1);
+        assert_eq!(links("<a href=\"https://x.de\">#12</a>\n"), 1);
+    }
+
+    #[test]
+    fn keyboard_keys_keep_their_straight_quotes_however_deep() {
+        for t in [
+            "<kbd>\"a\"</kbd>\n",
+            "<kbd><b>\"a\"</b></kbd>\n",
+            "<kbd>**\"a\"**</kbd>\n",
+        ] {
+            let page = export(t);
+            assert!(!page.contains("„a“"), "{t}: {page}");
+        }
+    }
+
+    #[test]
+    fn elements_that_make_paragraphs_elsewhere_stay_apart_here() {
+        let page = export("<section>a</section><section>b</section>\n");
+        assert!(
+            page.contains("<section>a</section>") || page.contains("<section dir=\"auto\">a</section>"),
+            "{page}"
+        );
+        assert!(export("<var>x</var>\n").contains("<var>x</var>"));
+    }
+
+    #[test]
+    fn a_wiki_link_is_a_picture_only_when_embedded_and_a_picture() {
+        assert!(export("![[a.png]]\n").contains("<img"));
+        assert!(!export("[[a.png]]\n").contains("<img"));
+        assert!(!export("![[a.md]]\n").contains("<img"));
+    }
+
+    #[test]
+    fn an_address_in_angle_brackets_is_a_link_and_no_tag() {
+        let page = export("<https://x.de>\n");
+        assert!(page.contains("<a href=\"https://x.de\""), "{page}");
+    }
+
+    #[test]
+    fn a_link_has_a_title_only_when_it_was_given_one() {
+        assert!(export("[a](https://x.de \"t\")\n").contains("title=\"t\""));
+        assert!(!export("[a](https://x.de)\n").contains("title="));
+    }
+
+    #[test]
+    fn embedded_quotes_and_lists_read_in_the_direction_of_their_text() {
+        assert!(export("<blockquote>שלום</blockquote>\n").contains("<blockquote dir=\"rtl\""));
+        assert!(export("<ul><li>שלום</li></ul>\n").contains("<ul dir=\"rtl\""));
+        assert!(export("<table><tr><td>abc</td></tr></table>\n").contains("<table dir=\"ltr\""));
+    }
+
+    #[test]
+    fn an_inline_tag_keeps_its_alignment_whatever_else_it_says() {
+        let page = export("a <span title=\"t\" align=\"right\">b</span>\n");
+        assert!(page.contains("align=\"right\""), "{page}");
+    }
+
+    #[test]
+    fn links_and_pictures_each_allow_their_own_schemes() {
+        let e = Export {
+            title: "",
+            figure: &|_| None,
+            embed: &|_| None,
+            rebase: &|p| p.to_string(),
+            quotes: None,
+            reference: &|_| None,
+            citation: &|_| None,
+        };
+        let png = "data:image/png;base64,AA";
+        assert_eq!(safe_url("mailto:a@b.de", false, &e), "mailto:a@b.de");
+        assert_eq!(safe_url("mailto:a@b.de", true, &e), "#");
+        assert_eq!(safe_url(png, true, &e), png);
+        assert_eq!(safe_url(png, false, &e), "#");
+        assert_eq!(safe_url("data:text/html;base64,AA", true, &e), "#");
+        assert_eq!(safe_url("data:image/svg+xml;base64,AA", true, &e), "#");
+    }
+
+    #[test]
+    fn webp_needs_both_of_its_marks() {
+        assert_eq!(web_image_type(b"RIFF\0\0\0\0AVI "), None);
+        assert_eq!(web_image_type(b"XXXX\0\0\0\0WEBP"), None);
     }
 }

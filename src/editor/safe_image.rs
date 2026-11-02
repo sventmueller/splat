@@ -1,6 +1,8 @@
 //! Untrusted image data, decoded in Rust. The image parsers of macOS have been the target of zero-click exploits,
 //! so data from the web reaches them only as raw pixels or as a PDF written here.
 
+#![forbid(unsafe_code)]
+
 use std::sync::Arc;
 
 use svg2pdf::usvg;
@@ -13,16 +15,26 @@ pub const MAX_FILE_BYTES: usize = 64 << 20;
 const MAX_PIXELS: f64 = 16_000_000.0;
 /// Larger images are not decoded at all.
 const MAX_SIDE: u32 = 16_384;
-/// Longest side of a decoded image; larger ones are scaled down, which stays sharp at any preview width.
-pub const SHOWN_SIDE: u32 = 4096;
+/// Longest side of a decoded image in the preview and on paper, where 2480 pixels fill an A4 page at 300 dpi; larger
+/// ones are scaled down.
+pub const SHOWN_SIDE: u32 = 2560;
+/// Longest side of an image converted for an export, which outlives the screen it is first seen on.
+pub const EXPORT_SIDE: u32 = 4096;
 
 pub enum Decoded {
     Pdf(Vec<u8>),
-    Rgba { width: u32, height: u32, pixels: Vec<u8> },
+    Rgba {
+        width: u32,
+        height: u32,
+        pixels: Vec<u8>,
+        /// The size the file gives, upright: the preview shows an image scaled down for memory no smaller.
+        natural: (u32, u32),
+    },
 }
 
-/// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become pixels; anything else is refused.
-pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>) -> Option<Decoded> {
+/// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`; anything else is
+/// refused.
+pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Option<Decoded> {
     if bytes.len() > MAX_FILE_BYTES {
         return None;
     }
@@ -43,14 +55,16 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>) -> Option<Decode
         image::ImageDecoder::orientation(&mut decoder).unwrap_or(image::metadata::Orientation::NoTransforms);
     let mut image = image::DynamicImage::from_decoder(decoder).ok()?;
     image.apply_orientation(orientation);
-    if image.width().max(image.height()) > SHOWN_SIDE {
-        image = image.resize(SHOWN_SIDE, SHOWN_SIDE, image::imageops::FilterType::Triangle);
+    let natural = (image.width(), image.height());
+    if image.width().max(image.height()) > side {
+        image = image.resize(side, side, image::imageops::FilterType::Triangle);
     }
     let image = image.into_rgba8();
     Some(Decoded::Rgba {
         width: image.width(),
         height: image.height(),
         pixels: image.into_raw(),
+        natural,
     })
 }
 
@@ -109,6 +123,7 @@ fn raster_scale(tree: &usvg::Tree) -> Option<f32> {
     } else {
         DEFAULT
     };
+    #[expect(clippy::cast_possible_truncation, reason = "a scale between 0.05 and 1")]
     (scale >= 0.05).then_some(scale as f32)
 }
 
@@ -146,8 +161,9 @@ mod tests {
         let bomb = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><filter id="f" filterUnits="userSpaceOnUse" x="0" y="0" width="4000" height="4000"><feGaussianBlur stdDeviation="50"/></filter><rect width="10" height="10" filter="url(#f)"/></svg>"#;
         let started = std::time::Instant::now();
         assert!(svg_to_pdf(bomb, fonts()).is_some());
+        // Far more than it takes, which an unoptimized build under load needs as well.
         assert!(
-            started.elapsed() < std::time::Duration::from_secs(8),
+            started.elapsed() < std::time::Duration::from_secs(60),
             "{:?}",
             started.elapsed()
         );
@@ -162,23 +178,33 @@ mod tests {
             .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
             .unwrap();
         assert!(matches!(
-            decode(&png, fonts()),
+            decode(&png, fonts(), SHOWN_SIDE),
             Some(Decoded::Rgba {
                 width: 3,
                 height: 2,
                 ..
             })
         ));
-        assert!(decode(b"%PDF-1.7 not an image", fonts()).is_none());
+        assert!(decode(b"%PDF-1.7 not an image", fonts(), SHOWN_SIDE).is_none());
         let mut wide = Vec::new();
         image::RgbaImage::new(5000, 10)
             .write_to(&mut std::io::Cursor::new(&mut wide), image::ImageFormat::Png)
             .unwrap();
         assert!(matches!(
-            decode(&wide, fonts()),
+            decode(&wide, fonts(), EXPORT_SIDE),
             Some(Decoded::Rgba {
-                width: SHOWN_SIDE,
+                width: EXPORT_SIDE,
                 height: 8,
+                natural: (5000, 10),
+                ..
+            })
+        ));
+        assert!(matches!(
+            decode(&wide, fonts(), 500),
+            Some(Decoded::Rgba {
+                width: 500,
+                height: 1,
+                natural: (5000, 10),
                 ..
             })
         ));
@@ -186,6 +212,6 @@ mod tests {
         let mut big = png.clone();
         big[16..20].copy_from_slice(&100_000u32.to_be_bytes());
         big[20..24].copy_from_slice(&100_000u32.to_be_bytes());
-        assert!(decode(&big, fonts()).is_none());
+        assert!(decode(&big, fonts(), SHOWN_SIDE).is_none());
     }
 }

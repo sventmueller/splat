@@ -4,23 +4,40 @@
 use std::ops::Range;
 
 use super::{
-    ATTACHMENT, AlignKey, Atom, Builder, CharMap, Ctx, ImageAtom, LINE_SEPARATOR, Marker, ParaKind, Run, RunMap,
-    RunStyle, align, align_key, atom, atom_styled,
+    ATTACHMENT, Align, Atom, Builder, CharMap, Ctx, ImageAtom, LINE_SEPARATOR, Link, Marker, ParaKind, Run, RunMap,
+    RunStyle, align, atom, atom_styled, marker_text,
 };
-use crate::markdown::markup::{self, Element, Node};
+use crate::markdown::markup::{self, Element, Node, find, raw_text};
+use crate::markdown::style::{TextStyle, styled_element};
+use crate::markdown::text::count32;
+use crate::markdown::url::is_harmless;
 
 /// Offsets in the HTML literal, which inside a quote lacks the `>` prefixes, as source offsets.
 struct Map<'t> {
     literal: &'t str,
-    chars: CharMap,
-    end: usize,
+    /// `None` if the source does not spell the literal: every piece then points to the whole block.
+    chars: Option<CharMap>,
+    block: Range<usize>,
+    /// Where each char of `literal` starts; a block with thousands of elements asks once per tag.
+    char_starts: std::cell::OnceCell<Vec<usize>>,
 }
 
 impl Map<'_> {
     fn source(&self, range: &Range<usize>) -> Range<usize> {
-        let at = |byte: usize| {
-            let k = self.literal[..byte.min(self.literal.len())].chars().count();
-            self.chars.get(self.literal, k).unwrap_or(self.end)
+        let Some(chars) = &self.chars else {
+            return self.block.clone();
+        };
+        let at = |byte: usize| match chars {
+            CharMap::Verbatim(start) if byte < self.literal.len() => start + byte,
+            CharMap::Verbatim(_) => self.block.end,
+            CharMap::Offsets(base, offsets) => {
+                let starts = self
+                    .char_starts
+                    .get_or_init(|| self.literal.char_indices().map(|(b, _)| b).collect());
+                offsets
+                    .get(starts.partition_point(|&b| b < byte))
+                    .map_or(self.block.end, |&o| base + o as usize)
+            }
         };
         let start = at(range.start);
         start..at(range.end).max(start)
@@ -28,20 +45,26 @@ impl Map<'_> {
 }
 
 #[derive(Clone)]
-struct Cx {
+struct Around {
     ctx: Ctx,
     kind: ParaKind,
     style: RunStyle,
 }
 
-struct Writer<'b, 'a, 't> {
+struct HtmlWriter<'b, 'a, 't> {
     b: &'b mut Builder<'a>,
     map: Map<'t>,
     block: Range<usize>,
     runs: Vec<Run>,
     /// The list or footnote marker the next paragraph starts with.
     marker: Option<(Marker, Range<usize>)>,
+    in_cell: bool,
+    /// Where the current line of a cell starts in `runs`.
+    line_start: usize,
 }
+
+/// Empty cells an HTML table may ask for beyond its real ones.
+const MAX_FILLED_CELLS: usize = 4096;
 
 impl Builder<'_> {
     pub(super) fn html_block(
@@ -53,18 +76,21 @@ impl Builder<'_> {
     ) {
         let chars = align(literal, self.text, range.clone());
         let nodes = markup::parse(literal);
-        let mut w = Writer {
+        let mut w = HtmlWriter {
             b: self,
             map: Map {
                 literal,
                 chars,
-                end: range.end,
+                block: range.clone(),
+                char_starts: Default::default(),
             },
             block: range,
             runs: Vec::new(),
             marker,
+            in_cell: false,
+            line_start: 0,
         };
-        let cx = Cx {
+        let cx = Around {
             ctx: Ctx {
                 html: true,
                 ..ctx.clone()
@@ -77,16 +103,22 @@ impl Builder<'_> {
     }
 }
 
-impl Writer<'_, '_, '_> {
-    fn flush(&mut self, cx: &Cx) {
+impl HtmlWriter<'_, '_, '_> {
+    fn flush(&mut self, cx: &Around) {
         if let Some(last) = self.runs.last_mut()
             && matches!(last.map, RunMap::Atom { atom: Atom::Text, .. })
         {
             let trimmed = last.text.trim_end_matches(' ').len();
             last.text.truncate(trimmed);
         }
-        self.runs.retain(|r| !r.text.is_empty());
+        // Only what came since the last line of a cell: a cell of many lines would otherwise take quadratic time.
+        let tail = self.runs.split_off(self.line_start.min(self.runs.len()));
+        self.runs.extend(tail.into_iter().filter(|r| !r.text.is_empty()));
         if self.runs.is_empty() {
+            return;
+        }
+        if self.in_cell {
+            self.end_line_in_cell();
             return;
         }
         let runs = std::mem::take(&mut self.runs);
@@ -94,6 +126,24 @@ impl Writer<'_, '_, '_> {
         let src = self.block.clone();
         self.b
             .push_para(cx.kind.clone(), &cx.ctx, marker, src.clone(), runs, src.end);
+    }
+
+    /// A table cell is one paragraph, so the paragraphs inside it become its lines.
+    fn end_line_in_cell(&mut self) {
+        let is_end = |r: &Run| r.text.chars().eq([LINE_SEPARATOR]);
+        if self.runs.last().is_none_or(is_end) {
+            return;
+        }
+        if let Some((marker, src)) = self.marker.take() {
+            let shown = format!("{} ", marker_text(&marker).trim_end());
+            self.runs.insert(self.line_start, atom(Atom::Text, &shown, src));
+        }
+        let end = match self.runs.last().map(|r| &r.map) {
+            Some(RunMap::Atom { src, .. }) => src.end,
+            _ => self.block.end,
+        };
+        self.runs.push(atom(Atom::Text, &LINE_SEPARATOR.to_string(), end..end));
+        self.line_start = self.runs.len();
     }
 
     fn text(&mut self, text: &str, range: &Range<usize>, style: &RunStyle) {
@@ -121,7 +171,7 @@ impl Writer<'_, '_, '_> {
         }
     }
 
-    fn nodes(&mut self, nodes: &[Node], cx: &Cx) {
+    fn nodes(&mut self, nodes: &[Node], cx: &Around) {
         for node in nodes {
             match node {
                 Node::Text { text, range } => self.text(text, range, &cx.style),
@@ -130,13 +180,14 @@ impl Writer<'_, '_, '_> {
         }
     }
 
-    fn element(&mut self, e: &Element, cx: &Cx) {
+    fn element(&mut self, e: &Element, cx: &Around) {
         let src = self.map.source(&e.tag);
-        let styled = |f: &dyn Fn(&mut RunStyle)| {
+        if let Some(kind) = styled_element(&e.name) {
             let mut c = cx.clone();
-            f(&mut c.style);
-            c
-        };
+            c.style.text = c.style.text.inside(&kind);
+            self.nodes(&e.children, &c);
+            return;
+        }
         match e.name.as_str() {
             "br" => {
                 if let Some(last) = self.runs.last_mut()
@@ -155,19 +206,10 @@ impl Writer<'_, '_, '_> {
                     self.image(img, src, &cx.style);
                 }
             }
-            "b" | "strong" => self.nodes(&e.children, &styled(&|s| s.bold = true)),
-            "i" | "em" | "cite" | "dfn" | "var" => self.nodes(&e.children, &styled(&|s| s.italic = true)),
-            "u" | "ins" => self.nodes(&e.children, &styled(&|s| s.underline = true)),
-            "s" | "del" | "strike" => self.nodes(&e.children, &styled(&|s| s.strike = true)),
-            "mark" => self.nodes(&e.children, &styled(&|s| s.highlight = true)),
-            "sup" => self.nodes(&e.children, &styled(&|s| s.superscript = true)),
-            "sub" => self.nodes(&e.children, &styled(&|s| s.subscript = true)),
-            "code" | "kbd" | "samp" | "tt" => self.nodes(&e.children, &styled(&|s| s.code = true)),
             "a" => {
-                let href = e.attr("href").filter(|h| markup::safe_url(h)).map(Into::into);
                 let mut c = cx.clone();
-                if href.is_some() {
-                    c.style.link = href;
+                if let Some(href) = e.attr("href").filter(|h| is_harmless(h)) {
+                    c.style.link = Some(Link::Address(href.into()));
                 }
                 self.nodes(&e.children, &c);
             }
@@ -175,13 +217,13 @@ impl Writer<'_, '_, '_> {
                 let level = e.name[1..].parse().unwrap_or(1);
                 self.block(e, cx, ParaKind::Heading(level));
             }
-            "p" | "div" | "center" | "section" | "article" | "header" | "footer" | "main" | "nav" | "aside"
-            | "figure" | "figcaption" | "address" | "summary" => self.block(e, cx, ParaKind::Body),
+            name if markup::makes_paragraphs(name) => self.block(e, cx, ParaKind::Body),
+            "hr" if self.in_cell => self.flush(cx),
             "hr" => {
                 self.flush(cx);
                 let run = atom(Atom::Rule, "\u{00A0}", src);
                 self.runs.push(run);
-                let rule = Cx {
+                let rule = Around {
                     kind: ParaKind::Rule,
                     ..cx.clone()
                 };
@@ -191,12 +233,15 @@ impl Writer<'_, '_, '_> {
                 self.flush(cx);
                 let mut code = String::new();
                 raw_text(&e.children, &mut code);
-                let code = code.trim_matches('\n').to_string();
+                let mut code = code.trim_matches('\n').to_string();
+                if self.in_cell {
+                    code = code.replace('\n', &LINE_SEPARATOR.to_string());
+                }
                 if !code.is_empty() {
                     let mut c = cx.clone();
                     c.kind = ParaKind::Code { info: "".into() };
                     c.ctx.group = self.b.next_group();
-                    c.style.code = true;
+                    c.style.text.code = true;
                     self.runs
                         .push(atom_styled(Atom::Text, &code, self.map.source(&e.range), &c.style));
                     self.flush(&c);
@@ -213,12 +258,12 @@ impl Writer<'_, '_, '_> {
             "ul" | "ol" => self.list(e, cx),
             "dl" => {
                 self.flush(cx);
-                for item in e.children.iter().filter_map(element) {
+                for item in e.children.iter().filter_map(Node::element) {
                     let mut c = cx.clone();
                     if item.name == "dd" {
                         c.ctx.list_depth += 1;
                     } else {
-                        c.style.bold = true;
+                        c.style.text.bold = true;
                     }
                     self.nodes(&item.children, &c);
                     self.flush(&c);
@@ -231,15 +276,11 @@ impl Writer<'_, '_, '_> {
     }
 
     /// A block element: what came before ends its paragraph, and it gets paragraphs of its own.
-    fn block(&mut self, e: &Element, cx: &Cx, kind: ParaKind) {
+    fn block(&mut self, e: &Element, cx: &Around, kind: ParaKind) {
         self.flush(cx);
         let mut c = cx.clone();
         c.kind = kind;
-        if let Some(a) = e
-            .align()
-            .map(align_key)
-            .or((e.name == "center").then_some(AlignKey::Center))
-        {
+        if let Some(a) = e.align().or((e.name == "center").then_some(Align::Center)) {
             c.ctx.align = a;
         }
         self.nodes(&e.children, &c);
@@ -248,7 +289,7 @@ impl Writer<'_, '_, '_> {
 
     fn image(&mut self, e: &Element, src: Range<usize>, style: &RunStyle) {
         let alt = e.attr("alt").unwrap_or("");
-        match e.attr("src").filter(|u| markup::safe_url(u)) {
+        match e.attr("src").filter(|u| is_harmless(u)) {
             Some(url) => self.runs.push(atom_styled(
                 Atom::Image(Box::new(ImageAtom {
                     url: url.into(),
@@ -265,14 +306,14 @@ impl Writer<'_, '_, '_> {
         }
     }
 
-    fn list(&mut self, e: &Element, cx: &Cx) {
+    fn list(&mut self, e: &Element, cx: &Around) {
         self.flush(cx);
         let start: usize = e.attr("start").and_then(|s| s.parse().ok()).unwrap_or(1);
         let depth = cx.ctx.list_depth;
         for (n, item) in e
             .children
             .iter()
-            .filter_map(element)
+            .filter_map(Node::element)
             .filter(|i| i.name == "li")
             .enumerate()
         {
@@ -291,81 +332,76 @@ impl Writer<'_, '_, '_> {
         }
     }
 
-    fn table(&mut self, e: &Element, cx: &Cx) {
+    fn table(&mut self, e: &Element, cx: &Around) {
         self.flush(cx);
-        let mut rows: Vec<(&Element, bool)> = Vec::new();
-        for child in e.children.iter().filter_map(element) {
-            match child.name.as_str() {
-                "tr" => rows.push((child, false)),
-                "thead" | "tbody" | "tfoot" => rows.extend(
-                    child
-                        .children
-                        .iter()
-                        .filter_map(element)
-                        .filter(|r| r.name == "tr")
-                        .map(|r| (r, child.name == "thead")),
-                ),
-                _ => {}
+        let rows = e.rows();
+        if self.in_cell {
+            for (row, _) in &rows {
+                for cell in row.cells() {
+                    self.nodes(&cell.children, cx);
+                    let src = self.map.source(&cell.range);
+                    self.runs.push(atom_styled(Atom::Text, " ", src, &cx.style));
+                }
+                self.flush(cx);
             }
+            return;
         }
-        let cells = |row: &Element| -> Vec<Element> {
-            row.children
-                .iter()
-                .filter_map(element)
-                .filter(|c| c.name == "td" || c.name == "th")
-                .cloned()
-                .collect()
-        };
-        let span = |cell: &Element| cell.pixels("colspan").unwrap_or(1).clamp(1, 64);
         let columns = rows
             .iter()
-            .map(|(r, _)| cells(r).iter().map(span).sum::<u32>())
+            .map(|(r, _)| r.cells().map(Element::span).sum::<u32>())
             .max()
             .unwrap_or(0);
         if columns == 0 {
             return;
         }
+        // Short rows are filled up so that every cell has its background, unless that is what makes a table huge: `<td>`
+        // a few thousand times, then as many `<tr>`, would ask for gigabytes.
+        let cells: usize = rows.iter().map(|(r, _)| r.cells().count()).sum();
+        let fills_rows = rows.len().saturating_mul(columns as usize) <= 2 * cells + MAX_FILLED_CELLS;
         self.b.table += 1;
-        let table = self.b.table as u32;
+        let table = count32(self.b.table);
         let mut inner = cx.ctx.clone();
         inner.group = self.b.next_group();
         let start = self.b.paras.len();
         for (row, (r, in_head)) in rows.iter().enumerate() {
             let mut col = 0;
-            for cell in cells(r) {
+            for cell in r.cells() {
                 let header = *in_head || cell.name == "th";
-                let width = span(&cell).min(columns - col);
-                let c = Cx {
+                let width = cell.span().min(columns - col);
+                let c = Around {
                     ctx: inner.clone(),
                     kind: ParaKind::TableCell {
                         table,
-                        row: row as u32,
+                        row: count32(row),
                         col,
                         header,
-                        align: cell.align().map(align_key).unwrap_or_default(),
+                        align: cell.align().unwrap_or_default(),
                         columns,
                         span: width,
                     },
                     style: RunStyle {
-                        bold: header,
+                        text: TextStyle {
+                            bold: header,
+                            ..cx.style.text
+                        },
                         ..cx.style.clone()
                     },
                 };
-                self.cell(&cell, &c);
+                self.cell(cell, &c);
                 col += width;
                 if col >= columns {
                     break;
                 }
             }
-            while col < columns {
-                let c = Cx {
+            while fills_rows && col < columns {
+                let c = Around {
                     ctx: inner.clone(),
                     kind: ParaKind::TableCell {
                         table,
-                        row: row as u32,
+                        row: count32(row),
                         col,
                         header: *in_head,
-                        align: AlignKey::Natural,
+                        align: Align::None,
                         columns,
                         span: 1,
                     },
@@ -379,40 +415,46 @@ impl Writer<'_, '_, '_> {
         self.b.set_direction(start, inner.group);
     }
 
-    /// A table cell is one paragraph, so block elements inside it run together.
-    fn cell(&mut self, cell: &Element, cx: &Cx) {
-        self.nodes(
-            &cell.children,
-            &Cx {
-                kind: ParaKind::Body,
-                ..cx.clone()
-            },
-        );
+    fn cell(&mut self, cell: &Element, cx: &Around) {
+        self.in_cell = true;
+        self.nodes(&cell.children, cx);
+        self.flush(cx);
+        self.in_cell = false;
+        self.line_start = 0;
         let src = self.map.source(&cell.range);
         let mut runs = std::mem::take(&mut self.runs);
+        if runs.last().is_some_and(|r| r.text.chars().eq([LINE_SEPARATOR])) {
+            runs.pop();
+        }
         for r in &mut runs {
-            r.style.bold |= cx.style.bold;
+            r.style.text.bold |= cx.style.text.bold;
         }
         self.b
             .push_para(cx.kind.clone(), &cx.ctx, None, src.clone(), runs, src.end);
     }
 
-    fn details(&mut self, e: &Element, cx: &Cx) {
+    fn details(&mut self, e: &Element, cx: &Around) {
         self.flush(cx);
         let open = e.attr("open").is_some();
-        let toggle = RunStyle {
-            link: Some("splat-fold".into()),
-            ..cx.style.clone()
+        let chevron = if open { "▾ " } else { "▸ " };
+        let tag = self.map.source(&e.tag);
+        // Without the tag's place in the source there is nothing a click could change.
+        let run = if self.map.chars.is_some() {
+            let toggle = RunStyle {
+                link: Some(Link::Fold),
+                ..cx.style.clone()
+            };
+            atom_styled(Atom::Details { open }, chevron, tag, &toggle)
+        } else {
+            atom_styled(Atom::Text, chevron, tag, &cx.style)
         };
-        self.runs.push(atom_styled(
-            Atom::Details { open },
-            if open { "▾ " } else { "▸ " },
-            self.map.source(&e.tag),
-            &toggle,
-        ));
-        let summary = Cx {
+        self.runs.push(run);
+        let summary = Around {
             style: RunStyle {
-                bold: true,
+                text: TextStyle {
+                    bold: true,
+                    ..cx.style.text
+                },
                 ..cx.style.clone()
             },
             ..cx.clone()
@@ -439,29 +481,29 @@ impl Writer<'_, '_, '_> {
     }
 }
 
-fn element(node: &Node) -> Option<&Element> {
-    match node {
-        Node::Element(e) => Some(e),
-        Node::Text { .. } => None,
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-fn find<'n>(nodes: &'n [Node], name: &str) -> Option<&'n Element> {
-    nodes.iter().filter_map(element).find_map(|e| {
-        if e.name == name {
-            Some(e)
-        } else {
-            find(&e.children, name)
+    #[test]
+    fn source_offsets_are_the_same_with_and_without_a_table_of_chars() {
+        let literal = "<p>ä</p><b>ö</b>";
+        let starts: Vec<u32> = literal.char_indices().map(|(b, _)| count32(b)).collect();
+        let verbatim = Map {
+            literal,
+            chars: Some(CharMap::Verbatim(100)),
+            block: 100..200,
+            char_starts: Default::default(),
+        };
+        let table = Map {
+            literal,
+            chars: Some(CharMap::Offsets(100, starts.into())),
+            block: 100..200,
+            char_starts: Default::default(),
+        };
+        for range in [0..3, 3..5, 9..12, 12..14, 14..literal.len(), 0..literal.len()] {
+            assert_eq!(verbatim.source(&range), table.source(&range), "{range:?}");
         }
-    })
-}
-
-fn raw_text(nodes: &[Node], out: &mut String) {
-    for n in nodes {
-        match n {
-            Node::Text { text, .. } => out.push_str(text),
-            Node::Element(e) if e.name == "br" => out.push('\n'),
-            Node::Element(e) => raw_text(&e.children, out),
-        }
+        assert_eq!(verbatim.source(&(3..literal.len())), 103..200);
     }
 }

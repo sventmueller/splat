@@ -790,6 +790,7 @@ fn is_word(c: char) -> bool {
 }
 
 /// Keywords, strings, comments and numbers in `code`, for the language named by a code block's info string.
+#[expect(clippy::too_many_lines, reason = "one tokenizer loop with a case per kind of token")]
 pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
     let Some(lang) = find(info) else {
         return vec![];
@@ -946,6 +947,67 @@ mod tests {
 
     fn tokens_of<'a>(info: &str, code: &'a str) -> Vec<(&'a str, CodeToken)> {
         tokens(info, code).into_iter().map(|(r, t)| (&code[r], t)).collect()
+    }
+
+    #[test]
+    fn tokens_of_any_text_are_in_order_apart_and_on_character_boundaries() {
+        use crate::fuzz::Rng;
+        const PIECES: [&str; 18] = [
+            "def ", "fn ", "'", "\"", "\"\"\"", "#", "//", "/*", "*/", "<", ">", "--", "%%", "1", "ä", "😀", "\n", "\\",
+        ];
+        let mut rng = Rng::new(0x5eed_c0de_0001);
+        for _ in 0..crate::fuzz::rounds(300) {
+            let code: String = (0..rng.below(30)).map(|_| *rng.pick(&PIECES)).collect();
+            for lang in LANGS {
+                let found = tokens(lang.names[0], &code);
+                let mut at = 0;
+                for (range, _) in found {
+                    assert!(
+                        range.start >= at && range.start < range.end,
+                        "{}: {range:?} of {code:?}",
+                        lang.names[0]
+                    );
+                    assert!(
+                        code.is_char_boundary(range.start) && code.is_char_boundary(range.end),
+                        "{code:?}"
+                    );
+                    at = range.end;
+                }
+                assert!(at <= code.len());
+            }
+        }
+    }
+
+    #[test]
+    fn each_family_of_languages_finds_its_keywords() {
+        for (info, code, keyword) in [
+            ("bash", "if true; then x; fi", "if"),
+            ("sh", "for a in b; do c; done", "for"),
+            ("go", "func main() {}", "func"),
+            ("golang", "func main() {}", "func"),
+            ("js", "const a = 1", "const"),
+            ("javascript", "function f() {}", "function"),
+            ("py", "import os", "import"),
+            ("rs", "let x = 1;", "let"),
+            ("sql", "SELECT a FROM b", "SELECT"),
+            ("mysql", "select a from b", "select"),
+            ("mermaid", "flowchart TD", "flowchart"),
+        ] {
+            assert!(
+                tokens_of(info, code).contains(&(keyword, CodeToken::Keyword)),
+                "{info}: {:?}",
+                tokens_of(info, code)
+            );
+        }
+    }
+
+    #[test]
+    fn a_language_is_named_by_the_first_word_of_the_info_string_in_any_case() {
+        assert!(known("RUST title=\"x\""));
+        assert!(known("python"));
+        assert!(!known("gibtsnicht"));
+        assert!(!known(""));
+        assert!(tokens("gibtsnicht", "fn x").is_empty());
     }
 
     #[test]

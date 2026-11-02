@@ -59,6 +59,7 @@
 "Diagramm: {}" = "مخطط: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "الملف ليس نصًا بترميز UTF-8، ولا يمكن فتحه كملف Markdown.";
 "Dienste" = "خدمات";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "هذا المستند أكبر من أن تعرضه المعاينة. يمكنك مواصلة تحرير النص.";
 "Dokument als PDF exportieren" = "تصدير المستند كملف PDF";
 "Dokument drucken" = "طباعة المستند";
 "Dokument jetzt prüfen" = "تدقيق المستند الآن";

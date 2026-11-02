@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diyagram: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Dosya UTF-8 metni değil ve Markdown olarak açılamıyor.";
 "Dienste" = "Servisler";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Bu belge önizleme için çok büyük. Metni düzenlemeye devam edebilirsiniz.";
 "Dokument als PDF exportieren" = "Belgeyi PDF olarak dışa aktar";
 "Dokument drucken" = "Belgeyi yazdır";
 "Dokument jetzt prüfen" = "Belgeyi Şimdi Denetle";

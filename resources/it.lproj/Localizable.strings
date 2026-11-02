@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diagramma: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Il file non è testo UTF-8 e non può essere aperto come Markdown.";
 "Dienste" = "Servizi";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Questo documento è troppo grande per l’anteprima. Puoi continuare a modificare il testo.";
 "Dokument als PDF exportieren" = "Esporta il documento come PDF";
 "Dokument drucken" = "Stampa il documento";
 "Dokument jetzt prüfen" = "Controlla il documento adesso";

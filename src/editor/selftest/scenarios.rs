@@ -35,10 +35,14 @@ const SVG: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height
                    height=\"10\" fill=\"#3a7\"/></svg>";
 
 thread_local! {
+    /// How many documents were open before a click on a link to a missing file.
+    static MISSING_LINK_DOCUMENTS: Cell<usize> = const { Cell::new(0) };
     /// The source before the step under test, for the step that checks or undoes it.
     static BEFORE: RefCell<String> = const { RefCell::new(String::new()) };
     /// Whether an alert ran modally while `offer_recovered` was called.
     static MODAL_SEEN: Cell<bool> = const { Cell::new(false) };
+    /// The outline's rows before the step under test.
+    static ROWS: Cell<isize> = const { Cell::new(0) };
 }
 
 fn remember(c: &Ctx) {
@@ -89,10 +93,27 @@ fn command(name: &'static str, needle: &'static str, action: Action, tag: isize)
             select_in_source(&c.e, needle);
             remember(c);
             perform(&c.e, action.spec().selector, tag);
-            check(&format!("{name} changes the text"), source(&c.e) != before(), "");
+            let (old, new) = (before(), source(&c.e));
+            check(&format!("{name} changes the text"), new != old, "");
+            check(
+                &format!("{name} changes the text only where the selection is"),
+                changes_only_around(&old, &new, needle, name),
+                &format!("{old:?} -> {new:?}"),
+            );
         }),
         undone(format!("{name} is undone in one step")),
     ]
+}
+
+/// Whether all of `old` up to the block of `needle` and behind it stands in `new` as well. A table command rewrites its
+/// whole table, and a footnote adds its definition at the end of the text.
+fn changes_only_around(old: &str, new: &str, needle: &str, name: &str) -> bool {
+    let Some(at) = old.find(needle) else {
+        return false;
+    };
+    let start = old[..at].rfind("\n\n").map_or(0, |i| i + 2);
+    let end = old[at..].find("\n\n").map_or(old.len(), |i| at + i);
+    new.starts_with(&old[..start]) && (name == "a footnote" || new.ends_with(&old[end..]))
 }
 
 /// Writes the files the test section links to, in every image format the exports handle differently.
@@ -181,7 +202,7 @@ fn proposes(c: &Ctx, name: &str) -> bool {
 }
 
 fn export_steps() -> Vec<Step> {
-    use super::super::export::Format;
+    use super::super::export::ExportKind;
     vec![
         step(0.1, |c| perform(&c.e, Action::ExportHtml.spec().selector, 0)),
         step(0.8, |c| {
@@ -191,7 +212,7 @@ fn export_steps() -> Vec<Step> {
                 "",
             );
             let page = doc_dir(c).join("Export.html");
-            let written = c.e.write_export(Format::Html, "Export", &page);
+            let written = c.e.write_export(ExportKind::Html, "Export", &page);
             let page = std::fs::read_to_string(page).unwrap_or_default();
             check(
                 "HTML export embeds PNG, JPEG, SVG, PDF and TIFF images",
@@ -210,7 +231,7 @@ fn export_steps() -> Vec<Step> {
                 "",
             );
             let path = doc_dir(c).join("Export.docx");
-            let written = c.e.write_export(Format::Word, "Export", &path);
+            let written = c.e.write_export(ExportKind::Word, "Export", &path);
             let docx = std::fs::read(path).unwrap_or_default();
             check(
                 "Word export carries the images",
@@ -218,16 +239,19 @@ fn export_steps() -> Vec<Step> {
                 &format!("{written:?}, {} bytes", docx.len()),
             );
             let failed =
-                c.e.write_export(Format::Html, "Export", Path::new("/System/Export.html"));
+                c.e.write_export(ExportKind::Html, "Export", Path::new("/System/Export.html"));
             if let Err(reason) = &failed {
                 c.e.report_export_failure(reason);
             }
             check("an export to a place without write access fails", failed.is_err(), "");
         }),
-        step(0.8, |c| {
-            check("a failed export says so", sheet(c).is_some(), "no alert");
-            end_sheet(c, NSAlertFirstButtonReturn);
-        }),
+        when(
+            |c| sheet(c).is_some(),
+            |c| {
+                check("a failed export says so", sheet(c).is_some(), "no alert");
+                end_sheet(c, NSAlertFirstButtonReturn);
+            },
+        ),
     ]
 }
 
@@ -238,10 +262,13 @@ fn dialog_steps() -> Vec<Step> {
             remember(c);
             perform(&c.e, Action::Table.spec().selector, 0);
         }),
-        step(0.6, |c| {
-            check("the table dialog opens", sheet(c).is_some(), "no sheet");
-            end_sheet(c, NSAlertFirstButtonReturn);
-        }),
+        when(
+            |c| sheet(c).is_some(),
+            |c| {
+                check("the table dialog opens", sheet(c).is_some(), "no sheet");
+                end_sheet(c, NSAlertFirstButtonReturn);
+            },
+        ),
         step(0.3, |c| {
             let rows = |s: &str| s.lines().filter(|l| l.starts_with('|')).count();
             check(
@@ -279,10 +306,13 @@ fn dialog_steps() -> Vec<Step> {
             remember(c);
             perform(&c.e, Action::Image.spec().selector, 0);
         }),
-        step(1.0, |c| {
-            check("the image dialog opens", sheet(c).is_some(), "no open panel");
-            end_sheet(c, NSModalResponseCancel);
-        }),
+        when(
+            |c| sheet(c).is_some(),
+            |c| {
+                check("the image dialog opens", sheet(c).is_some(), "no open panel");
+                end_sheet(c, NSModalResponseCancel);
+            },
+        ),
         step(0.5, |c| {
             check(
                 "a cancelled image dialog leaves the text",
@@ -366,9 +396,13 @@ fn link_steps() -> Vec<Step> {
             }
             let count = documents(c.e.mtm()).len();
             cmd_click(c, "fehlt.md");
+            MISSING_LINK_DOCUMENTS.set(count);
+        }),
+        // The click arrives a moment later, so what it did shows only then.
+        step(0.7, |c| {
             check(
                 "⌘-click on a missing file opens nothing",
-                documents(c.e.mtm()).len() == count && sheet(c).is_none(),
+                documents(c.e.mtm()).len() == MISSING_LINK_DOCUMENTS.get() && sheet(c).is_none(),
                 "",
             );
             check(
@@ -377,10 +411,13 @@ fn link_steps() -> Vec<Step> {
                 "",
             );
         }),
-        step(0.6, |c| {
-            check("a link to another app asks first", sheet(c).is_some(), "no alert");
-            end_sheet(c, NSAlertFirstButtonReturn);
-        }),
+        when(
+            |c| sheet(c).is_some(),
+            |c| {
+                check("a link to another app asks first", sheet(c).is_some(), "no alert");
+                end_sheet(c, NSAlertFirstButtonReturn);
+            },
+        ),
     ]
 }
 
@@ -528,10 +565,13 @@ fn table_steps() -> Vec<Step> {
             } else {
                 sel!(insertTab:)
             };
+            let from = c.e.source().selectedRange();
+            let handled = c.e.source_command(command);
+            let to = c.e.source().selectedRange();
             check(
                 &format!("{name} in a table moves between its cells"),
-                c.e.source_command(command),
-                "",
+                handled && to.location != from.location,
+                &format!("{from:?} -> {to:?}"),
             );
         }));
         steps.push(step(0.1, |c| {
@@ -569,35 +609,41 @@ fn view_steps() -> Vec<Step> {
             );
             perform(&c.e, Action::ToggleOutline.spec().selector, 0);
         }),
-        step(0.4, |c| {
-            check("the outline opens", c.e.outline_visible(), "");
-            perform(&c.e, Action::ToggleOutline.spec().selector, 0);
-        }),
-        step(0.4, |c| {
-            check("the outline closes", !c.e.outline_visible(), "");
-            let on = super::super::env::typography_on();
-            perform(&c.e, Action::Typography.spec().selector, 0);
-            check(
-                "typographic punctuation switches",
-                super::super::env::typography_on() != on,
-                "",
-            );
-            perform(&c.e, Action::Typography.spec().selector, 0);
-            perform(&c.e, Action::ZoomIn.spec().selector, 0);
-            let zoom = c.e.ivars().state.borrow().zoom;
-            check("zooming in enlarges", zoom > 1.0, &format!("{zoom}"));
-            perform(&c.e, Action::ZoomOut.spec().selector, 0);
-            perform(&c.e, Action::ZoomOut.spec().selector, 0);
-            let zoom = c.e.ivars().state.borrow().zoom;
-            check("zooming out shrinks", zoom < 1.0, &format!("{zoom}"));
-            perform(&c.e, Action::ZoomReset.spec().selector, 0);
-            let zoom = c.e.ivars().state.borrow().zoom;
-            check(
-                "the actual size comes back",
-                (zoom - 1.0).abs() < 1e-9,
-                &format!("{zoom}"),
-            );
-        }),
+        when(
+            |c| c.e.outline_visible(),
+            |c| {
+                check("the outline opens", c.e.outline_visible(), "");
+                perform(&c.e, Action::ToggleOutline.spec().selector, 0);
+            },
+        ),
+        when(
+            |c| !c.e.outline_visible(),
+            |c| {
+                check("the outline closes", !c.e.outline_visible(), "");
+                let on = super::super::env::typography_on();
+                perform(&c.e, Action::Typography.spec().selector, 0);
+                check(
+                    "typographic punctuation switches",
+                    super::super::env::typography_on() != on,
+                    "",
+                );
+                perform(&c.e, Action::Typography.spec().selector, 0);
+                perform(&c.e, Action::ZoomIn.spec().selector, 0);
+                let zoom = c.e.ivars().state.borrow().zoom();
+                check("zooming in enlarges", zoom > 1.0, &format!("{zoom}"));
+                perform(&c.e, Action::ZoomOut.spec().selector, 0);
+                perform(&c.e, Action::ZoomOut.spec().selector, 0);
+                let zoom = c.e.ivars().state.borrow().zoom();
+                check("zooming out shrinks", zoom < 1.0, &format!("{zoom}"));
+                perform(&c.e, Action::ZoomReset.spec().selector, 0);
+                let zoom = c.e.ivars().state.borrow().zoom();
+                check(
+                    "the actual size comes back",
+                    (zoom - 1.0).abs() < 1e-9,
+                    &format!("{zoom}"),
+                );
+            },
+        ),
         settle(|c| {
             select_in_source(&c.e, "drei.");
             remember(c);
@@ -646,7 +692,7 @@ fn toolbar_steps() -> Vec<Step> {
                     let control = item.view()?.downcast::<NSSegmentedControl>().ok()?;
                     let group = NSUserInterfaceItemIdentification::identifier(&*control)?.to_string();
                     let segment = (0..control.segmentCount()).find(|&s| {
-                        super::super::toolbar::segment_item(mtm, &group, s as usize, share, &c.e)
+                        super::super::toolbar::segment_item(mtm, &group, crate::util::to_usize(s), share, &c.e)
                             .is_some_and(|i| i.action() == Some(bold))
                     })?;
                     Some((control, segment))
@@ -682,13 +728,13 @@ fn large_change_steps() -> Vec<Step> {
             append(&c.e, &text);
         }),
         settle(|c| {
-            let pending = c.e.ivars().state.borrow().blocks.pending();
+            let pending = c.e.ivars().state.borrow().blocks().pending();
             check("a large change renders the part around the view first", pending, "");
             let end = storage(c.e.preview()).length();
             c.e.preview().scrollRangeToVisible(NSRange::new(end, 0));
         }),
         step(0.8, |c| {
-            let last = c.e.ivars().state.borrow().blocks.placeholders.last().copied();
+            let last = c.e.ivars().state.borrow().blocks().placeholders.last().copied();
             check(
                 "blocks scrolled into view are rendered",
                 last == Some(false),
@@ -696,6 +742,387 @@ fn large_change_steps() -> Vec<Step> {
             );
         }),
         undone("the large change is undone in one step".into()),
+    ]
+}
+
+/// A PNG of `side` × `side` pixels.
+fn png_of_side(side: u32) -> Vec<u8> {
+    let mut png = Vec::new();
+    let _ = image::RgbaImage::from_pixel(side, side, image::Rgba([30, 160, 60, 255]))
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png);
+    png
+}
+
+/// The width of the image in `file`, once the preview has it.
+fn shown_width(c: &Ctx, file: &str) -> Option<f64> {
+    let path = doc_dir(c).join(file);
+    c.e.ivars().images.borrow().shown_size(&path).map(|s| s.width)
+}
+
+fn image_file_steps() -> Vec<Step> {
+    vec![
+        step(0.1, |c| {
+            let _ = std::fs::write(doc_dir(c).join("bild.png"), png_of_side(7));
+        }),
+        when(
+            |c| shown_width(c, "bild.png") == Some(7.0),
+            |c| {
+                let width = shown_width(c, "bild.png");
+                check(
+                    "an image replaced on disk shows without reopening",
+                    width == Some(7.0),
+                    &format!("{width:?}"),
+                );
+                // Paper does not wait for a load under way.
+                let _ = std::fs::write(doc_dir(c).join("druck.png"), png_of_side(3));
+                let dir = doc_dir(c);
+                let mut images = c.e.ivars().images.borrow_mut();
+                let loading = images.file("druck.png", Some(&dir), false, Some(&c.e));
+                let printed = images.file("druck.png", Some(&dir), false, None);
+                check(
+                    "printing does not leave out an image that is still loading",
+                    loading.is_none() && printed.is_some(),
+                    &format!("preview {}, paper {}", loading.is_some(), printed.is_some()),
+                );
+            },
+        ),
+        step(0.1, |c| {
+            remember(c);
+            append(&c.e, "\n\n![spät](spaeter.png)\n");
+        }),
+        settle(|c| {
+            check(
+                "a missing image counts as failed",
+                c.e.ivars().images.borrow().shown(&doc_dir(c).join("spaeter.png")) == Some(false),
+                "",
+            );
+            let _ = std::fs::write(doc_dir(c).join("spaeter.png"), png_of_side(5));
+        }),
+        when(
+            |c| shown_width(c, "spaeter.png") == Some(5.0),
+            |c| {
+                let width = shown_width(c, "spaeter.png");
+                check(
+                    "an image that appears later shows",
+                    width == Some(5.0),
+                    &format!("{width:?}"),
+                );
+                let _ = std::fs::write(doc_dir(c).join("bild.png"), png_of_side(2));
+            },
+        ),
+        undone("the image line is undone in one step".into()),
+        when(|c| shown_width(c, "bild.png") == Some(2.0), |_| {}),
+    ]
+}
+
+fn memory_steps() -> Vec<Step> {
+    vec![step(0.1, |c| {
+        super::super::images::memory_pressure_changed(true);
+        check(
+            "while memory is short, images decode smaller",
+            super::super::images::allowed_side() == 640,
+            "",
+        );
+        let small = super::super::decoder::decode(&png_of_side(700), super::super::images::allowed_side());
+        check(
+            "the helpers start again after they were ended for memory",
+            matches!(small, Some(super::super::safe_image::Decoded::Rgba { width: 640, .. })),
+            "",
+        );
+        super::super::images::memory_pressure_changed(false);
+        check(
+            "once memory is back, images decode at full size again",
+            super::super::images::allowed_side() == super::super::safe_image::SHOWN_SIDE,
+            "",
+        );
+        check("the shown image survives", shown_width(c, "bild.png").is_some(), "");
+    })]
+}
+
+fn old_encoding_steps() -> Vec<Step> {
+    vec![
+        step(0.1, |c| {
+            let path = doc_dir(c).join("alt.md");
+            let mut utf16 = vec![0xFF, 0xFE];
+            utf16.extend("# Grüße\n".encode_utf16().flat_map(u16::to_le_bytes));
+            let _ = std::fs::write(&path, utf16);
+            let done = RcBlock::new(
+                |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
+            );
+            NSDocumentController::sharedDocumentController(c.e.mtm())
+                .openDocumentWithContentsOfURL_display_completionHandler(
+                    &NSURL::fileURLWithPath(&ns(path.to_str().unwrap_or_default())),
+                    true,
+                    &done,
+                );
+        }),
+        when(
+            |c| {
+                documents(c.e.mtm())
+                    .iter()
+                    .any(|d| d.displayName().to_string().starts_with("alt"))
+            },
+            |c| {
+                let other = documents(c.e.mtm())
+                    .into_iter()
+                    .find(|d| d.displayName().to_string().starts_with("alt"));
+                check(
+                    "a file in UTF-16 opens with its umlauts",
+                    other.as_ref().is_some_and(|d| d.text() == "# Grüße\n"),
+                    "",
+                );
+                if let Some(d) = other {
+                    d.close();
+                }
+                if let Some(window) = c.e.window() {
+                    window.makeKeyAndOrderFront(None);
+                }
+            },
+        ),
+    ]
+}
+
+fn copies_of(c: &Ctx) -> Vec<PathBuf> {
+    let folder = c.out.join("Unsaved").join(std::process::id().to_string());
+    std::fs::read_dir(folder)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "md"))
+        .collect()
+}
+
+fn unsaved_copy_steps() -> Vec<Step> {
+    vec![
+        step(0.1, |c| {
+            remember(c);
+            type_in_source(&c.e, "Q");
+            super::super::shadow::copy_unsaved();
+        }),
+        when(
+            |c| {
+                copies_of(c)
+                    .iter()
+                    .any(|f| std::fs::read_to_string(f).is_ok_and(|t| t == source(&c.e)))
+            },
+            |c| {
+                check(
+                    "unsaved text has a copy that outlives a crash",
+                    copies_of(c)
+                        .iter()
+                        .any(|f| std::fs::read_to_string(f).is_ok_and(|t| t == source(&c.e))),
+                    "",
+                );
+                // What a run that crashed leaves behind.
+                let ended = c.out.join("Unsaved/999999");
+                let _ = std::fs::create_dir_all(&ended);
+                let _ = std::fs::write(ended.join("Notiz.md"), "Text vor dem Absturz");
+                super::super::shadow::adopt_left_behind();
+                check(
+                    "the next start takes over the copies of a crashed run",
+                    std::fs::read_to_string(c.out.join("Recovery/999999-Notiz.md"))
+                        .is_ok_and(|t| t == "Text vor dem Absturz")
+                        && !ended.exists(),
+                    "",
+                );
+                check("a running app keeps its own copies", !copies_of(c).is_empty(), "");
+                undo(c);
+                if let Some(d) = c.e.document() {
+                    d.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeCleared);
+                }
+                super::super::shadow::copy_unsaved();
+            },
+        ),
+        when(
+            |c| copies_of(c).is_empty(),
+            |c| {
+                check(
+                    "a saved document needs no copy",
+                    copies_of(c).is_empty(),
+                    &format!("{:?}", copies_of(c)),
+                );
+                check("undoing leaves the text of before", source(&c.e) == before(), &sizes(c));
+                if let Some(d) = c.e.document() {
+                    d.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeDone);
+                }
+            },
+        ),
+    ]
+}
+
+/// The file changes while a formula's editor is open: its offsets mean nothing then, and nothing of it may reach the text.
+fn reload_under_an_open_editor_steps() -> Vec<Step> {
+    vec![
+        step(0.1, |c| {
+            remember(c);
+            append(&c.e, "\n\nFormel $a+b$ steht hier.\n");
+        }),
+        settle(|c| {
+            let at = source(&c.e).find("a+b").unwrap_or(0);
+            super::set_source_caret(&c.e, at);
+            c.e.edit_atom_at_selection();
+            check(
+                "the formula's editor opens for the reload check",
+                c.e.ivars().atoms.edit.borrow().is_some(),
+                "no editor",
+            );
+        }),
+        step(0.3, |c| {
+            let replaced = "# Von außen geändert\n\nGanz anderer Text.\n";
+            c.e.replace_all_text(replaced);
+            check(
+                "a reload closes the formula's editor",
+                c.e.ivars().atoms.edit.borrow().is_none(),
+                "still open",
+            );
+        }),
+        when(
+            |c| c.e.ivars().atoms.edit.borrow().is_none() && super::settled(&c.e),
+            |c| {
+                check(
+                    "nothing of a closed editor reaches the reloaded text",
+                    source(&c.e) == "# Von außen geändert\n\nGanz anderer Text.\n",
+                    &source(&c.e),
+                );
+                c.e.replace_all_text(&before());
+            },
+        ),
+        settle(|_| {}),
+    ]
+}
+
+/// What is saved is exactly what the source holds, and unsaved text outlives a change of its file by another program.
+fn saving_and_unsaved_text_steps() -> Vec<Step> {
+    let path = |c: &Ctx| c.e.document().and_then(|d| d.fileURL()?.path()).map(|p| p.to_string());
+    vec![
+        step(0.1, |c| {
+            if let Some(d) = c.e.document() {
+                unsafe { d.saveDocument(None) };
+            }
+        }),
+        when(
+            |c| c.e.document().is_some_and(|d| !d.isDocumentEdited()),
+            move |c| {
+                let saved = path(c).and_then(|p| std::fs::read(p).ok()).unwrap_or_default();
+                check(
+                    "a saved file holds exactly the text of the source",
+                    saved == c.e.exact_text().into_bytes(),
+                    &format!("{} bytes, {} in the source", saved.len(), c.e.exact_text().len()),
+                );
+                remember(c);
+                type_in_source(&c.e, "Ungespeichert");
+                if let Some(p) = path(c) {
+                    let _ = std::fs::write(p, "Fremder Text\n");
+                }
+            },
+        ),
+        // Files are looked at every two seconds.
+        step(3.0, |c| {
+            check(
+                "unsaved text outlives a change of its file by another program",
+                source(&c.e).contains("Ungespeichert") && !source(&c.e).contains("Fremder Text"),
+                &sizes(c),
+            );
+        }),
+        step(0.1, move |c| {
+            if let Some(p) = path(c) {
+                let _ = std::fs::write(p, before());
+            }
+        }),
+        step(3.0, |c| {
+            undo(c);
+            check(
+                "the unsaved text can be taken back",
+                source(&c.e) == before(),
+                &sizes(c),
+            );
+        }),
+    ]
+}
+
+/// Without a display an animated collapse only ends at the item's next toggle, and then undoes that toggle.
+fn show_outline(c: &Ctx, shown: bool) {
+    if let Some(item) = c.e.ivars().outline_item.get() {
+        item.setCollapsed(!shown);
+    }
+    c.e.refresh_outline();
+}
+
+/// Like `show_outline`, for the preview.
+fn show_preview(c: &Ctx, shown: bool) {
+    if let Some(item) = c.e.ivars().preview_item.get() {
+        item.setCollapsed(!shown);
+    }
+    c.e.update();
+}
+
+/// The outline stays in the window while the preview is hidden, and so must follow the text.
+fn outline_without_preview_steps() -> Vec<Step> {
+    let rows = |c: &Ctx| c.e.ivars().outline.get().map_or(0, |o| o.view.numberOfRows());
+    vec![
+        step(0.1, |c| {
+            remember(c);
+            show_preview(c, false);
+        }),
+        when(
+            |c| !c.e.preview_visible(),
+            |c| {
+                show_outline(c, true);
+            },
+        ),
+        when(
+            |c| c.e.outline_visible(),
+            move |c| {
+                ROWS.with(|r| r.set(rows(c)));
+                append(&c.e, "\n\n# Neu in der Gliederung\n");
+            },
+        ),
+        when(
+            move |c| rows(c) > ROWS.with(Cell::get),
+            move |c| {
+                check(
+                    "the outline follows the text while the preview is hidden",
+                    rows(c) == ROWS.with(Cell::get) + 1,
+                    &format!("{} rows, before {}", rows(c), ROWS.with(Cell::get)),
+                );
+                undo(c);
+                show_outline(c, false);
+            },
+        ),
+        when(|c| !c.e.outline_visible(), |c| show_preview(c, true)),
+        when(
+            |c| c.e.preview_visible() && super::settled(&c.e),
+            |c| check("the outline check leaves the text", source(&c.e) == before(), &sizes(c)),
+        ),
+    ]
+}
+
+fn huge_document_steps() -> Vec<Step> {
+    const NOTICE: &str = "Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten.";
+    vec![
+        step(0.1, |c| {
+            remember(c);
+            let huge = "Zeile\n".repeat(crate::markdown::incremental::PLAIN_FROM / 6 + 1);
+            append(&c.e, &huge);
+        }),
+        settle(|c| {
+            let preview = storage(c.e.preview()).string().to_string();
+            check(
+                "a huge document says why it has no preview",
+                preview == NOTICE,
+                &preview,
+            );
+        }),
+        undone("the huge text is undone in one step".into()),
+        settle(|c| {
+            let preview = storage(c.e.preview()).string().to_string();
+            check(
+                "the preview comes back with the smaller text",
+                preview.contains("Prüffußnote") && !preview.contains(NOTICE),
+                "",
+            );
+        }),
     ]
 }
 
@@ -796,6 +1223,8 @@ pub(super) fn steps() -> Vec<Step> {
     ] {
         steps.extend(command(name, needle, action, tag));
     }
+    steps.extend(outline_without_preview_steps());
+    steps.extend(saving_and_unsaved_text_steps());
     steps.extend(table_steps());
     steps.extend(view_steps());
     steps.extend(dialog_steps());
@@ -804,6 +1233,13 @@ pub(super) fn steps() -> Vec<Step> {
     steps.extend(export_steps());
     steps.extend(toolbar_steps());
     steps.extend(large_change_steps());
+    steps.extend(image_file_steps());
+    steps.extend(memory_steps());
+    steps.extend(old_encoding_steps());
+    steps.extend(unsaved_copy_steps());
+    steps.extend(huge_document_steps());
     steps.extend(app_steps());
+    // Last: on a locked screen, where popovers do not close, the open editor would keep the window from being key.
+    steps.extend(reload_under_an_open_editor_steps());
     steps
 }

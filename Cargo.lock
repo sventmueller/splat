@@ -985,6 +985,7 @@ dependencies = [
  "block2",
  "comrak",
  "dispatch2",
+ "entities",
  "image",
  "objc2",
  "objc2-app-kit",

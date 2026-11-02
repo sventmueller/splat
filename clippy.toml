@@ -1,0 +1,2 @@
+# A function longer than this is two functions, unless it is a table; those say so with an `expect`.
+too-many-lines-threshold = 100

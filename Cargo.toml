@@ -15,6 +15,11 @@ undocumented_unsafe_blocks = "warn"
 dbg_macro = "warn"
 todo = "warn"
 unimplemented = "warn"
+too_many_lines = "warn"
+allow_attributes_without_reason = "warn"
+cast_possible_truncation = "warn"
+cast_possible_wrap = "warn"
+cast_sign_loss = "warn"
 
 [package]
 name = "splat"
@@ -30,6 +35,7 @@ workspace = true
 [dependencies]
 block2 = "0.6.2"
 comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
+entities = "1"
 dispatch2 = "0.3"
 objc2 = { version = "0.6.5", features = ["catch-all"] }
 objc2-app-kit = { version = "0.3.2", features = ["objc2-uniform-type-identifiers"] }

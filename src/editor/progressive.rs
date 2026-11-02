@@ -17,6 +17,13 @@ use crate::util::{perform_later, storage};
 const RENDER_BEHIND: usize = 150;
 const RENDER_AHEAD: usize = 600;
 
+/// The blocks around those from `top` to `bottom`, of `count` in all. While TextKit lays out a large text, it can name a
+/// line for the bottom of the view that stands above the one it names for the top.
+fn window_around(top: usize, bottom: usize, count: usize) -> Range<usize> {
+    let end = (top.max(bottom) + 3).min(count);
+    top.min(bottom).saturating_sub(2).min(end)..end
+}
+
 impl EditorController {
     /// One of the views scrolled.
     pub(super) fn view_scrolled(&self, notification: &NSNotification) {
@@ -29,7 +36,7 @@ impl EditorController {
             self.render_visible_blocks();
         }
         self.sync_scroll(notification);
-        let pending = self.ivars().state.try_borrow().is_ok_and(|st| st.blocks.pending());
+        let pending = self.ivars().state.try_borrow().is_ok_and(|st| st.blocks().pending());
         if pending {
             self.schedule_pending_blocks();
         }
@@ -41,7 +48,7 @@ impl EditorController {
     }
 
     /// Renders the placeholder blocks in view right away, so scrolling never shows them unformatted.
-    fn render_visible_blocks(&self) {
+    pub(super) fn render_visible_blocks(&self) {
         // Rendered blocks change height and can pull further placeholders into view.
         for _ in 0..3 {
             if self.ivars().busy.get() || self.preview_editing() {
@@ -55,17 +62,17 @@ impl EditorController {
                 let Ok(st) = self.ivars().state.try_borrow() else {
                     return;
                 };
-                let placeholders = &st.blocks.placeholders;
-                if placeholders.len() != st.layout.blocks.len() {
+                let placeholders = &st.blocks().placeholders;
+                if placeholders.len() != st.layout().blocks.len() {
                     return;
                 }
                 let block_at = |offset: usize| {
-                    st.index
+                    st.index()
                         .block_starts
-                        .partition_point(|&s| s <= offset)
+                        .partition_point(|&s| s.0 <= offset)
                         .saturating_sub(1)
                 };
-                let window = block_at(top).saturating_sub(2)..(block_at(bottom) + 3).min(placeholders.len());
+                let window = window_around(block_at(top), block_at(bottom), placeholders.len());
                 if !placeholders[window.clone()].iter().any(|p| *p) {
                     return;
                 }
@@ -84,7 +91,7 @@ impl EditorController {
             return;
         }
         let near = self.visible_preview_block();
-        let count = self.ivars().state.borrow().blocks.placeholders.len();
+        let count = self.ivars().state.borrow().blocks().placeholders.len();
         let window = near.saturating_sub(RENDER_BEHIND)..(near + RENDER_AHEAD).min(count);
         if self.render_blocks(window, near, Some(Duration::from_millis(16))) {
             self.schedule_pending_blocks();
@@ -105,14 +112,15 @@ impl EditorController {
             let Ok(mut guard) = self.ivars().state.try_borrow_mut() else {
                 return true;
             };
-            let st = &mut *guard;
-            let count = st.blocks.placeholders.len();
-            if count != st.layout.blocks.len() || window.end > count {
+            let zoom = guard.zoom();
+            let (layout, index, placeholders) = guard.placeholders();
+            let count = placeholders.len();
+            if count != layout.blocks.len() || window.end > count || window.start > window.end {
                 return false;
             }
             let ctx = RenderCtx {
                 mtm: self.mtm(),
-                zoom: st.zoom,
+                zoom,
                 doc_dir: doc_dir.as_deref(),
                 images: &self.ivars().images,
                 max_image_width: max_width,
@@ -125,28 +133,28 @@ impl EditorController {
             // Consecutive blocks go in as one replacement: every single edit of a large text storage has a fixed cost.
             let mut chunks = Vec::new();
             while in_time() {
-                let Some(first) = order.by_ref().find(|&i| st.blocks.placeholders[i]) else {
+                let Some(first) = order.by_ref().find(|&i| placeholders[i]) else {
                     break;
                 };
-                let start = st.index.block_starts[first];
+                let start = index.block_starts[first];
                 let chunk = NSMutableAttributedString::new();
                 let (mut last, mut len) = (first, 0);
-                while last < window.end && st.blocks.placeholders[last] && in_time() {
-                    let block = &st.layout.blocks[last];
-                    if start + len + block.len_u16 > shown_len {
+                while last < window.end && placeholders[last] && in_time() {
+                    let block = &layout.blocks[last];
+                    if start.0 + len + block.len_u16 > shown_len {
                         break;
                     }
                     chunk.appendAttributedString(&ctx.render_block(block));
-                    st.blocks.placeholders[last] = false;
+                    placeholders[last] = false;
                     len += block.len_u16;
                     last += 1;
                 }
                 if last == first {
                     break;
                 }
-                chunks.push((NSRange::new(start, len), chunk));
+                chunks.push((NSRange::new(start.0, len), chunk));
             }
-            (chunks, st.blocks.placeholders[window].iter().any(|p| *p))
+            (chunks, placeholders[window].iter().any(|p| *p))
         };
         if !chunks.is_empty() {
             let _silent = self.silently();
@@ -157,7 +165,22 @@ impl EditorController {
             storage.endEditing();
         }
         // Replacing a block drops the highlight on it.
-        self.mark(self.preview(), self.ivars().marks.preview.get());
+        self.mark(self.preview(), self.ivars().marks.in_preview());
         remaining
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_window_stays_inside_the_blocks_whatever_textkit_answers() {
+        assert_eq!(window_around(10, 20, 100), 8..23);
+        assert_eq!(window_around(0, 0, 100), 0..3);
+        assert_eq!(window_around(98, 99, 100), 96..100);
+        assert_eq!(window_around(35_933, 35_926, 40_000), 35_924..35_936);
+        assert_eq!(window_around(500, 600, 100), 100..100);
+        assert_eq!(window_around(0, 0, 0), 0..0);
     }
 }

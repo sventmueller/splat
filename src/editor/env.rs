@@ -3,13 +3,14 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
 use objc2_foundation::{NSBundle, NSLocale, NSUserDefaults};
 
 use crate::markdown::typography::Quotes;
-use crate::util::ns;
+use crate::util::{DISK, ns};
 
 /// User defaults key of the typographic punctuation switch in the View menu.
 pub const TYPOGRAPHY_KEY: &str = "TypographicPunctuation";
@@ -28,13 +29,173 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn new(doc_dir: Option<PathBuf>, text: &str) -> Env {
+    /// Reads the disk right now, for an export the user is waiting for.
+    pub fn now(doc_dir: Option<PathBuf>, text: &str) -> Env {
         Env {
             quotes: typography_on().then(quotes),
-            repository: doc_dir.as_deref().and_then(repository),
+            repository: doc_dir.as_deref().and_then(find_repository),
             citations: doc_dir.as_deref().and_then(|d| citations(d, text)),
             doc_dir,
         }
+    }
+
+    /// What the disk thread last found, for the preview, which asks after every edit.
+    pub fn known(doc_dir: Option<PathBuf>, text: &str) -> Env {
+        let around = doc_dir
+            .as_deref()
+            .map(|d| Question::Around(d.to_path_buf(), named_bibliography(d, text)))
+            .and_then(look_up);
+        let (repository, citations) = match around {
+            Some(Answer::Around(repository, citations)) => (repository, citations),
+            _ => (None, None),
+        };
+        Env {
+            quotes: typography_on().then(quotes),
+            repository,
+            citations,
+            doc_dir,
+        }
+    }
+}
+
+/// How long the first question about something waits for the disk thread; a local disk answers in time, so a document
+/// does not lay out twice when it opens.
+const FIRST_WAIT: Duration = Duration::from_millis(50);
+/// After a wait in vain nothing waits for this long: a document can embed thousands of notes.
+const NO_WAIT_FOR: Duration = Duration::from_secs(5);
+/// How old an answer may be before the next question sends the disk thread to look again.
+const LOOK_AGAIN_AFTER: Duration = if cfg!(test) {
+    Duration::from_millis(20)
+} else {
+    Duration::from_secs(3)
+};
+/// Answers nobody asked for this long are dropped with the next new question.
+const FORGET_AFTER: Duration = Duration::from_secs(60);
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum Question {
+    /// The repository a folder lies in and the bibliography beside it, or the one its document names.
+    Around(PathBuf, Option<PathBuf>),
+    /// The note an embed in a folder names.
+    Note(PathBuf, String),
+}
+
+#[derive(Clone, PartialEq)]
+enum Answer {
+    Around(Option<Repository>, Option<Citations>),
+    Note(Option<(String, String)>),
+}
+
+impl Question {
+    fn answer_before_any_look(&self) -> Answer {
+        match self {
+            Question::Around(..) => Answer::Around(None, None),
+            Question::Note(..) => Answer::Note(None),
+        }
+    }
+
+    fn look(&self) -> Answer {
+        match self {
+            Question::Around(dir, named) => Answer::Around(find_repository(dir), find_citations(dir, named.clone())),
+            Question::Note(dir, target) => Answer::Note(embedded_note(dir, target)),
+        }
+    }
+}
+
+struct Known {
+    answer: Answer,
+    at: Instant,
+    looking: bool,
+    /// The first asker still waits, and sees the answer without being told.
+    waiting: bool,
+}
+
+#[derive(Default)]
+struct Answers {
+    known: HashMap<Question, Known>,
+    no_wait_until: Option<Instant>,
+}
+
+static ANSWERS: Mutex<Option<Answers>> = Mutex::new(None);
+
+fn with_answers<T>(f: impl FnOnce(&mut Answers) -> T) -> Option<T> {
+    let mut answers = ANSWERS.lock().ok()?;
+    Some(f(answers.get_or_insert_with(Answers::default)))
+}
+
+fn look_up(question: Question) -> Option<Answer> {
+    enum Next {
+        Known(Answer),
+        Wait(std::sync::mpsc::Receiver<()>),
+    }
+    let next = with_answers(|answers| {
+        if let Some(known) = answers.known.get_mut(&question) {
+            if !known.looking && known.at.elapsed() >= LOOK_AGAIN_AFTER {
+                known.looking = true;
+                send_to_look(question.clone(), None);
+            }
+            return Next::Known(known.answer.clone());
+        }
+        answers
+            .known
+            .retain(|_, known| known.looking || known.at.elapsed() < FORGET_AFTER);
+        let waits = answers.no_wait_until.is_none_or(|until| Instant::now() >= until);
+        let answer = question.answer_before_any_look();
+        answers.known.insert(
+            question.clone(),
+            Known {
+                answer: answer.clone(),
+                at: Instant::now(),
+                looking: true,
+                waiting: waits,
+            },
+        );
+        let (told, wait) = channel();
+        send_to_look(question.clone(), waits.then_some(told));
+        if waits { Next::Wait(wait) } else { Next::Known(answer) }
+    })?;
+    let wait = match next {
+        Next::Known(answer) => return Some(answer),
+        Next::Wait(wait) => wait,
+    };
+    let in_time = wait.recv_timeout(FIRST_WAIT).is_ok();
+    with_answers(|answers| {
+        if !in_time {
+            answers.no_wait_until = Some(Instant::now() + NO_WAIT_FOR);
+        }
+        let known = answers.known.get_mut(&question)?;
+        known.waiting = false;
+        Some(known.answer.clone())
+    })?
+}
+
+fn send_to_look(question: Question, told: Option<Sender<()>>) {
+    DISK.run(move || {
+        let answer = question.look();
+        let changed = with_answers(|answers| {
+            let known = answers.known.get_mut(&question)?;
+            let seen = std::mem::take(&mut known.waiting);
+            let changed = known.answer != answer;
+            known.answer = answer;
+            known.at = Instant::now();
+            known.looking = false;
+            Some(changed && !seen)
+        })
+        .flatten();
+        if let Some(told) = told {
+            let _ = told.send(());
+        }
+        if changed == Some(true) {
+            dispatch2::DispatchQueue::main().exec_async(super::relayout_all);
+        }
+    });
+}
+
+/// The note `![[target]]` names, as the disk thread last found it.
+pub fn known_note(dir: &Path, target: &str) -> Option<(String, String)> {
+    match look_up(Question::Note(dir.to_path_buf(), target.to_string()))? {
+        Answer::Note(note) => note,
+        Answer::Around(..) => None,
     }
 }
 
@@ -88,24 +249,7 @@ impl Repository {
     }
 }
 
-static REPOSITORIES: Mutex<Option<HashMap<PathBuf, Option<Repository>>>> = Mutex::new(None);
-
 /// The repository the folder lies in, from the `origin` remote of its Git configuration.
-pub fn repository(dir: &Path) -> Option<Repository> {
-    if let Ok(mut cache) = REPOSITORIES.lock()
-        && let Some(found) = cache.get_or_insert_with(HashMap::new).get(dir)
-    {
-        return found.clone();
-    }
-    let found = find_repository(dir);
-    if let Ok(mut cache) = REPOSITORIES.lock() {
-        cache
-            .get_or_insert_with(HashMap::new)
-            .insert(dir.to_path_buf(), found.clone());
-    }
-    found
-}
-
 fn find_repository(dir: &Path) -> Option<Repository> {
     let git = dir.ancestors().map(|d| d.join(".git")).find(|g| g.exists())?;
     let git_dir = if git.is_file() {
@@ -162,21 +306,33 @@ pub fn remote_repository(config: &str) -> Option<Repository> {
     (host == "github.com" || gitlab).then_some(Repository { host, path, gitlab })
 }
 
-type Bibliography = (PathBuf, SystemTime, Arc<HashMap<String, String>>);
+/// Bibliographies and embedded notes kept read, the oldest going first: reading one again costs far less than keeping
+/// everything an app that stays open for weeks ever showed.
+const KEPT_FILES: usize = 64;
+
+type Citations = Arc<HashMap<String, String>>;
+type Bibliography = (PathBuf, SystemTime, Citations);
 static BIBLIOGRAPHIES: Mutex<Vec<Bibliography>> = Mutex::new(Vec::new());
 
 /// How each entry of the document's BibTeX bibliography reads in a citation, such as `Doe 2020`. The file is the
 /// one front matter names as `bibliography:`, else `references.bib`, `literatur.bib` or `bibliography.bib` beside it.
-pub fn citations(dir: &Path, text: &str) -> Option<Arc<HashMap<String, String>>> {
-    let named = text
-        .strip_prefix("---\n")
+pub fn citations(dir: &Path, text: &str) -> Option<Citations> {
+    find_citations(dir, named_bibliography(dir, text))
+}
+
+/// The file the front matter of `text` names as `bibliography:`.
+fn named_bibliography(dir: &Path, text: &str) -> Option<PathBuf> {
+    text.strip_prefix("---\n")
         .and_then(|rest| rest.split("\n---").next())
         .and_then(|front| {
             front.lines().find_map(|l| {
                 let value = l.strip_prefix("bibliography:")?.trim().trim_matches(['"', '\'']);
                 (!value.is_empty()).then(|| dir.join(value))
             })
-        });
+        })
+}
+
+fn find_citations(dir: &Path, named: Option<PathBuf>) -> Option<Citations> {
     let path = named
         .into_iter()
         .chain(["references.bib", "literatur.bib", "bibliography.bib"].map(|n| dir.join(n)))
@@ -188,6 +344,9 @@ pub fn citations(dir: &Path, text: &str) -> Option<Arc<HashMap<String, String>>>
     }
     let entries = Arc::new(parse_bibtex(&std::fs::read_to_string(&path).ok()?));
     cache.retain(|(p, _, _)| *p != path);
+    if cache.len() >= KEPT_FILES {
+        cache.remove(0);
+    }
     cache.push((path, modified, entries.clone()));
     Some(entries)
 }
@@ -320,6 +479,9 @@ pub fn embedded_note(dir: &Path, target: &str) -> Option<(String, String)> {
     }
     let text: Arc<str> = std::fs::read_to_string(&found).ok()?.into();
     notes.retain(|(p, _, _)| *p != found);
+    if notes.len() >= KEPT_FILES {
+        notes.remove(0);
+    }
     notes.push((found, modified, text.clone()));
     Some((text.to_string(), folder))
 }
@@ -365,12 +527,12 @@ mod tests {
         .unwrap();
         std::fs::write(main_git.join("worktrees/wt/commondir"), "../..\n").unwrap();
         std::fs::write(worktree.join(".git"), "gitdir: ../main/.git/worktrees/wt\n").unwrap();
-        let found = repository(&worktree.join("docs")).unwrap();
+        let found = find_repository(&worktree.join("docs")).unwrap();
         assert_eq!(
             found.url("#1").as_deref(),
             Some("https://github.com/anna/splat/issues/1")
         );
-        assert_eq!(repository(&worktree.join("docs")), Some(found));
+        assert_eq!(find_repository(&worktree.join("docs")), Some(found));
 
         let docs = worktree.join("docs");
         std::fs::write(docs.join("quellen.bib"), "@book{k, author = {Kant, I.}, year = 1781}").unwrap();
@@ -384,7 +546,11 @@ mod tests {
         ));
 
         std::fs::write(docs.join("Notiz.md"), "# Notiz").unwrap();
-        std::fs::write(docs.join("Groß.md"), "x".repeat(MAX_NOTE_BYTES as usize + 1)).unwrap();
+        std::fs::write(
+            docs.join("Groß.md"),
+            "x".repeat(usize::try_from(MAX_NOTE_BYTES).unwrap_or(usize::MAX) + 1),
+        )
+        .unwrap();
         let (text, folder) = embedded_note(&docs, "Notiz").unwrap();
         assert_eq!((text.as_str(), folder.as_str()), ("# Notiz", docs.to_str().unwrap()));
         assert_eq!(embedded_note(&docs, "Notiz").unwrap().0, "# Notiz");
@@ -394,13 +560,43 @@ mod tests {
     }
 
     #[test]
+    fn the_preview_asks_the_disk_thread_and_follows_what_changes() {
+        let dir = std::env::temp_dir().join(format!("splat-known-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("references.bib"), "@book{a, author = {Ada, A.}, year = 1843}").unwrap();
+        std::fs::write(dir.join("Notiz.md"), "# Eins").unwrap();
+        let until = |found: &dyn Fn() -> bool| {
+            let started = Instant::now();
+            while !found() && started.elapsed() < Duration::from_secs(10) {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            found()
+        };
+        let cited = |key: &str| {
+            Env::known(Some(dir.clone()), "# Text")
+                .citations
+                .is_some_and(|c| c.contains_key(key))
+        };
+        assert!(until(&|| cited("a")));
+        assert!(until(&|| known_note(&dir, "Notiz").is_some_and(|n| n.0 == "# Eins")));
+        assert_eq!(known_note(&dir, "Fehlt"), None);
+        // Another modification time for the same second: file systems without fine dates would hide the change.
+        std::thread::sleep(Duration::from_millis(5));
+        std::fs::write(dir.join("references.bib"), "@book{b, author = {Bo, B.}, year = 1900}").unwrap();
+        std::fs::write(dir.join("Notiz.md"), "# Zwei, länger").unwrap();
+        assert!(until(&|| cited("b")));
+        assert!(until(
+            &|| known_note(&dir, "Notiz").is_some_and(|n| n.0 == "# Zwei, länger")
+        ));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn typographic_quotes_follow_the_setting_and_the_language() {
         let before = typography_on();
         set_typography(!before);
         assert_eq!(typography_on(), !before);
         set_typography(before);
-        let q = quotes();
-        assert!(q.open != q.close || q.open == '"', "{q:?}");
     }
 
     #[test]

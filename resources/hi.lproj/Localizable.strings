@@ -59,6 +59,7 @@
 "Diagramm: {}" = "डायग्राम : {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "यह फ़ाइल UTF-8 टेक्स्ट नहीं है और इसे Markdown के रूप में नहीं खोला जा सकता है।";
 "Dienste" = "सेवाएँ";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "यह दस्तावेज़ पूर्वावलोकन के लिए बहुत बड़ा है। आप टेक्स्ट का संपादन जारी रख सकते हैं।";
 "Dokument als PDF exportieren" = "दस्तावेज़ को PDF के रूप में एक्सपोर्ट करें";
 "Dokument drucken" = "दस्तावेज़ प्रिंट करें";
 "Dokument jetzt prüfen" = "दस्तावेज़ अभी जाँचें";

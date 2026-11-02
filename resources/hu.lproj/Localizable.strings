@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diagram: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "A fájl nem UTF-8 kódolású szöveg, ezért nem nyitható meg Markdownként.";
 "Dienste" = "Szolgáltatások";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Ez a dokumentum túl nagy az előnézethez. A szöveget továbbra is szerkesztheti.";
 "Dokument als PDF exportieren" = "A dokumentum exportálása PDF-ként";
 "Dokument drucken" = "A dokumentum nyomtatása";
 "Dokument jetzt prüfen" = "A dokumentum azonnali ellenőrzése";

@@ -5,15 +5,67 @@ use objc2::{DefinedClass, MainThreadOnly};
 use objc2_app_kit::{NSApplication, NSBeep, NSDocumentController, NSEventModifierFlags, NSTextView, NSWorkspace};
 use objc2_foundation::{NSArray, NSRange, NSString, NSURL};
 
-use super::EditorController;
 use super::editing::bridge;
 use super::links::{self, LinkTarget};
+use super::{EditorController, State};
 use crate::i18n::{t, tf};
 use crate::markdown::commands;
-use crate::preview::map::preview_offset;
-use crate::util::{ns, storage};
+use crate::preview::layout::{Link, Marker};
+use crate::preview::map::{Shown, preview_offset};
+use crate::util::{DISK, constant, contained, ns, storage};
+
+/// Goes where a local link leads, once that is known: a Markdown file (`true`) opens in Splat, anything else only shows
+/// in the Finder.
+fn open_place(mtm: objc2::MainThreadMarker, place: Option<(std::path::PathBuf, bool)>) {
+    let Some((path, markdown)) = place else {
+        NSBeep();
+        return;
+    };
+    let Some(url) = path.to_str().map(|p| NSURL::fileURLWithPath(&ns(p))) else {
+        return;
+    };
+    if markdown {
+        let done = block2::RcBlock::new(
+            |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
+        );
+        NSDocumentController::sharedDocumentController(mtm)
+            .openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
+    } else {
+        NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&NSArray::from_retained_slice(&[url]));
+    }
+}
+
+/// Looks at a file or folder, which can take as long as a network volume does, so only the answer comes back to the main
+/// thread.
+fn open_found_in_background(find: impl FnOnce() -> LinkTarget + Send + 'static) {
+    DISK.run(move || {
+        let opened = match find() {
+            LinkTarget::Document(path) if path.is_file() => Some((path, true)),
+            LinkTarget::Document(path) | LinkTarget::File(path) if path.exists() => Some((path, false)),
+            _ => None,
+        };
+        dispatch2::DispatchQueue::main().exec_async(move || {
+            if let Some(mtm) = objc2::MainThreadMarker::new() {
+                open_place(mtm, opened);
+            }
+        });
+    });
+}
 
 impl EditorController {
+    /// What `f` makes of the state, if that still belongs to the text: an edit made from an older one would land somewhere
+    /// else in it. The click meant what the preview showed then, so it goes unanswered, and the preview catches up.
+    fn on_current_state<T>(&self, f: impl FnOnce(&State) -> Option<T>) -> Option<T> {
+        let snap = self.snapshot();
+        let current = self.ivars().state.borrow().is_current(&snap);
+        if !current {
+            drop(snap);
+            self.update();
+            return None;
+        }
+        f(&self.ivars().state.borrow())
+    }
+
     pub(super) fn link_clicked(&self, view: &NSTextView, link: &AnyObject, index: usize) -> bool {
         let target = if let Some(s) = link.downcast_ref::<NSString>() {
             s.to_string()
@@ -22,49 +74,48 @@ impl EditorController {
         } else {
             return false;
         };
-        if target == "splat-task" {
-            let edit = {
-                let st = self.ivars().state.borrow();
-                bridge(&st.text, &st).toggle_task(index)
-            };
-            if let Some(edit) = edit {
-                self.apply_edit(edit, Some(t("Aufgabe umschalten")), false);
+        let shown = Shown(index);
+        let link = Link::from_attribute(&target);
+        match &link {
+            Link::Task => {
+                let edit = self.on_current_state(|st| contained(|| bridge(st.text(), st).toggle_task(shown)).flatten());
+                if let Some(edit) = edit {
+                    self.apply_edit(edit, Some(t("Aufgabe umschalten")), false);
+                }
+                return true;
             }
-            return true;
-        }
-        if target == "splat-fold" {
-            let edit = {
-                let st = self.ivars().state.borrow();
-                bridge(&st.text, &st).toggle_fold(index)
-            };
-            if let Some(edit) = edit {
-                self.apply_edit(edit, Some(t("Hinweisbox auf- oder zuklappen")), false);
+            Link::Fold => {
+                let edit = self.on_current_state(|st| contained(|| bridge(st.text(), st).toggle_fold(shown)).flatten());
+                if let Some(edit) = edit {
+                    self.apply_edit(edit, Some(t("Hinweisbox auf- oder zuklappen")), false);
+                }
+                return true;
             }
-            return true;
-        }
-        if let Some(name) = target.strip_prefix("splat-footnote:") {
-            let found = {
-                let st = self.ivars().state.borrow();
-                st.index
-                    .paras
-                    .iter()
-                    .enumerate()
-                    .find(|(i, _)| {
-                        matches!(&st.index.para(&st.layout, *i).style.marker, Some(crate::preview::layout::Marker::Footnote(n, _)) if **n == *name)
-                    })
-                    .map(|(_, pp)| NSRange::new(pp.start, pp.len))
-            };
-            if let Some(range) = found {
-                view.scrollRangeToVisible(range);
-                view.showFindIndicatorForRange(range);
+            Link::Footnote(name) => {
+                let found = {
+                    let st = self.ivars().state.borrow();
+                    st.index()
+                        .paras
+                        .iter()
+                        .enumerate()
+                        .find(|(i, _)| {
+                            matches!(&st.index().para(st.layout(), *i).style.marker, Some(Marker::Footnote(n, _)) if n == name)
+                        })
+                        .map(|(_, pp)| NSRange::new(pp.start.0, pp.len))
+                };
+                if let Some(range) = found {
+                    view.scrollRangeToVisible(range);
+                    view.showFindIndicatorForRange(range);
+                }
+                return true;
             }
-            return true;
+            Link::Address(_) | Link::WikiPage(_) | Link::Tag(_) | Link::Reference(_) => {}
         }
         let flags = NSApplication::sharedApplication(self.mtm())
             .currentEvent()
             .map(|e| e.modifierFlags());
         if flags.is_some_and(|f| f.contains(NSEventModifierFlags::Command)) {
-            self.open_link(&target);
+            self.open_link(&link);
         } else {
             view.setSelectedRange(NSRange::new(index, 0));
         }
@@ -73,65 +124,46 @@ impl EditorController {
 
     /// Opens a link from the document. Files are only shown in the Finder and other apps' URLs need a confirmation,
     /// so a link can never start a program or script.
-    fn open_link(&self, target: &str) {
-        let mtm = self.mtm();
-        if let Some(tag) = target.strip_prefix("splat-tag:") {
-            self.find_in_source(tag);
-            return;
-        }
-        if let Some(reference) = target.strip_prefix("splat-ref:") {
-            let url = self
-                .doc_dir()
-                .as_deref()
-                .and_then(super::env::repository)
-                .and_then(|r| r.url(reference))
-                .and_then(|u| NSURL::URLWithString(&ns(&u)));
-            match url {
-                Some(url) => {
-                    NSWorkspace::sharedWorkspace().openURL(&url);
-                }
-                None => NSBeep(),
-            }
-            return;
-        }
-        let file_url = |path: &std::path::Path| path.to_str().map(|p| NSURL::fileURLWithPath(&ns(p)));
-        match links::classify(target, self.doc_dir().as_deref()) {
-            LinkTarget::Anchor(anchor) => self.reveal_heading(&anchor),
-            LinkTarget::Web(link) => {
-                if let Some(url) = NSURL::URLWithString(&ns(&link)) {
-                    NSWorkspace::sharedWorkspace().openURL(&url);
+    fn open_link(&self, link: &Link) {
+        match link {
+            Link::Tag(tag) => self.find_in_source(tag),
+            Link::Reference(reference) => {
+                let url = super::env::Env::known(self.doc_dir(), "")
+                    .repository
+                    .and_then(|r| r.url(reference))
+                    .and_then(|u| NSURL::URLWithString(&ns(&u)));
+                match url {
+                    Some(url) => {
+                        NSWorkspace::sharedWorkspace().openURL(&url);
+                    }
+                    None => NSBeep(),
                 }
             }
-            LinkTarget::Document(path) if path.is_file() => {
-                if let Some(url) = file_url(&path) {
-                    let done = block2::RcBlock::new(
-                        |_: *mut objc2_app_kit::NSDocument,
-                         _: objc2::runtime::Bool,
-                         _: *mut objc2_foundation::NSError| {},
-                    );
-                    NSDocumentController::sharedDocumentController(mtm)
-                        .openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
-                }
+            Link::WikiPage(name) => {
+                let (name, doc_dir) = (name.clone(), self.doc_dir());
+                open_found_in_background(move || links::classify_wiki(&name, doc_dir.as_deref()));
             }
-            LinkTarget::Document(path) | LinkTarget::File(path) if path.exists() => {
-                if let Some(url) = file_url(&path) {
-                    NSWorkspace::sharedWorkspace()
-                        .activateFileViewerSelectingURLs(&NSArray::from_retained_slice(&[url]));
+            Link::Address(address) => match links::classify(address, self.doc_dir().as_deref()) {
+                LinkTarget::Anchor(anchor) => self.reveal_heading(&anchor),
+                LinkTarget::Web(address) => {
+                    if let Some(url) = NSURL::URLWithString(&ns(&address)) {
+                        NSWorkspace::sharedWorkspace().openURL(&url);
+                    }
                 }
-            }
-            LinkTarget::App => self.confirm_app_link(target),
-            _ => NSBeep(),
+                LinkTarget::App => self.confirm_app_link(address),
+                LinkTarget::Nothing => NSBeep(),
+                found => open_found_in_background(move || found),
+            },
+            Link::Footnote(_) | Link::Fold | Link::Task => {}
         }
     }
 
     /// Opens the find bar of the source on `text`, as a click on an Obsidian tag searches for it.
     fn find_in_source(&self, text: &str) {
         let mtm = self.mtm();
-        // SAFETY: Reading AppKit's constant for the shared find pasteboard.
-        let board = objc2_app_kit::NSPasteboard::pasteboardWithName(unsafe { objc2_app_kit::NSPasteboardNameFind });
+        let board = objc2_app_kit::NSPasteboard::pasteboardWithName(constant!(objc2_app_kit::NSPasteboardNameFind));
         board.clearContents();
-        // SAFETY: A string for the string type.
-        unsafe { board.setString_forType(&ns(text), objc2_app_kit::NSPasteboardTypeString) };
+        board.setString_forType(&ns(text), constant!(objc2_app_kit::NSPasteboardTypeString));
         let source = self.source();
         if let Some(window) = self.window() {
             window.makeFirstResponder(Some(source));
@@ -186,10 +218,13 @@ impl EditorController {
             .map_or_else(|| anchor.to_string(), |s| s.to_string());
         let start = {
             let st = self.ivars().state.borrow();
-            let Some((.., range)) = commands::heading_anchors(&st.doc).into_iter().find(|h| h.2 == anchor) else {
+            let Some(heading) = commands::heading_anchors(st.doc())
+                .into_iter()
+                .find(|h| h.anchor == anchor)
+            else {
                 return;
             };
-            range.start
+            heading.range.start
         };
         self.reveal_source(start);
     }
@@ -198,17 +233,17 @@ impl EditorController {
     pub(super) fn reveal_source(&self, start: usize) {
         let p = {
             let st = self.ivars().state.borrow();
-            preview_offset(&st.layout, &st.index, start)
+            preview_offset(st.layout(), st.index(), start)
         };
-        let at = NSRange::new(self.snapshot().u16_at(start), 0);
+        let at = NSRange::new(self.snapshot().u16_at(start).0, 0);
         self.set_source_selection(at);
         self.source().scrollRangeToVisible(at);
         if self.preview_visible() {
             let string = storage(self.preview()).string();
             let end = string.length();
-            let line = (p..end).take_while(|&i| string.characterAtIndex(i) != 10).count();
-            self.preview().scrollRangeToVisible(NSRange::new(p, 0));
-            self.preview().showFindIndicatorForRange(NSRange::new(p, line.max(1)));
+            let line = (p.0..end).take_while(|&i| string.characterAtIndex(i) != 10).count();
+            self.preview().scrollRangeToVisible(NSRange::new(p.0, 0));
+            self.preview().showFindIndicatorForRange(NSRange::new(p.0, line.max(1)));
         }
     }
 }

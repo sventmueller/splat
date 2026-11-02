@@ -4,41 +4,29 @@ use std::ptr::NonNull;
 
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::AnyObject;
 use objc2_app_kit::{
     NSAppearance, NSAppearanceNameAccessibilityHighContrastAqua, NSAppearanceNameAccessibilityHighContrastDarkAqua,
-    NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor, NSFont, NSFontAttributeName, NSFontManager,
-    NSFontTraitMask, NSFontWeightBold, NSFontWeightRegular, NSForegroundColorAttributeName, NSMutableParagraphStyle,
-    NSParagraphStyleAttributeName, NSStrikethroughStyleAttributeName, NSTextStorage, NSWritingDirection,
+    NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor, NSFont, NSFontManager, NSFontTraitMask, NSFontWeightBold,
+    NSFontWeightRegular, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextStorage, NSWritingDirection,
 };
-use objc2_foundation::{NSArray, NSAttributedStringKey, NSDictionary, NSNumber, NSRange};
+use objc2_foundation::{NSArray, NSRange};
 
+use super::attributes::{Attribute, Attributes, add_attribute, set_attributes};
 use crate::markdown::highlight::{Style, Token, changed_region, right_to_left_behind_markers};
 use crate::markdown::palette::{self, Appearance, Rgb};
-use crate::markdown::text::Utf16Cursor;
+use crate::markdown::text::{Utf16Cursor, line_start};
 use crate::util::constant;
 
 pub const SOURCE_SIZE: f64 = 13.0;
 pub const PREVIEW_SIZE: f64 = 15.0;
 
-pub fn attrs(
-    pairs: &[(&NSAttributedStringKey, &AnyObject)],
-) -> Retained<NSDictionary<NSAttributedStringKey, AnyObject>> {
-    let keys: Vec<&NSAttributedStringKey> = pairs.iter().map(|(k, _)| *k).collect();
-    let values: Vec<&AnyObject> = pairs.iter().map(|(_, v)| *v).collect();
-    NSDictionary::from_slices(&keys, &values)
-}
-
 pub fn appearance_of(appearance: &NSAppearance) -> Appearance {
-    // SAFETY: Reading AppKit's appearance name constants.
-    let names = unsafe {
-        NSArray::from_slice(&[
-            NSAppearanceNameAqua,
-            NSAppearanceNameDarkAqua,
-            NSAppearanceNameAccessibilityHighContrastAqua,
-            NSAppearanceNameAccessibilityHighContrastDarkAqua,
-        ])
-    };
+    let names = NSArray::from_slice(&[
+        constant!(NSAppearanceNameAqua),
+        constant!(NSAppearanceNameDarkAqua),
+        constant!(NSAppearanceNameAccessibilityHighContrastAqua),
+        constant!(NSAppearanceNameAccessibilityHighContrastDarkAqua),
+    ]);
     let best = appearance.bestMatchFromAppearancesWithNames(&names);
     let name = best.map(|n| n.to_string()).unwrap_or_default();
     if name == constant!(NSAppearanceNameAccessibilityHighContrastDarkAqua).to_string() {
@@ -118,15 +106,11 @@ impl SourceFonts {
     }
 }
 
-pub fn base_source_attributes(fonts: &SourceFonts) -> Retained<NSDictionary<NSAttributedStringKey, AnyObject>> {
-    let color = NSColor::textColor();
-    // SAFETY: Reading AppKit's attribute name constants, paired with values of the types they expect.
-    unsafe {
-        attrs(&[
-            (NSFontAttributeName, fonts.regular()),
-            (NSForegroundColorAttributeName, &color),
-        ])
-    }
+pub fn base_source_attributes(fonts: &SourceFonts) -> Attributes {
+    Attributes::new(&[
+        Attribute::font(fonts.regular()),
+        Attribute::foreground(&NSColor::textColor()),
+    ])
 }
 
 /// Re-applies syntax colors only where they can have changed: around the edit and wherever the new spans differ
@@ -150,9 +134,8 @@ pub fn apply_highlight_changes(
     let mut cursor = Utf16Cursor::new(text);
     storage.beginEditing();
     let base = base_source_attributes(fonts);
-    // SAFETY: A font and a color for their keys, within the text.
-    unsafe { storage.setAttributes_range(Some(&base), region) };
-    let strike = NSNumber::new_isize(1);
+    set_attributes(storage, &base, region);
+    let strike = Attribute::strikethrough();
     for (range, style) in spans.iter().filter(|(r, _)| r.end > start && r.start < end) {
         let a = cursor.at(range.start.max(start));
         let b = cursor.at(range.end.min(end));
@@ -160,17 +143,14 @@ pub fn apply_highlight_changes(
         if r.length == 0 {
             continue;
         }
-        // SAFETY: Each value has the type its key expects, within the text.
-        unsafe {
-            if style.bold || style.italic {
-                storage.addAttribute_value_range(NSFontAttributeName, fonts.pick(style.bold, style.italic), r);
-            }
-            if let Some(token) = style.token {
-                storage.addAttribute_value_range(NSForegroundColorAttributeName, &token_color(token), r);
-            }
-            if style.strike {
-                storage.addAttribute_value_range(NSStrikethroughStyleAttributeName, &strike, r);
-            }
+        if style.bold || style.italic {
+            add_attribute(storage, &Attribute::font(fonts.pick(style.bold, style.italic)), r);
+        }
+        if let Some(token) = style.token {
+            add_attribute(storage, &Attribute::foreground(&token_color(token)), r);
+        }
+        if style.strike {
+            add_attribute(storage, &strike, r);
         }
     }
     set_line_directions(storage, text, start..end.max(start));
@@ -182,19 +162,17 @@ pub fn apply_highlight_changes(
 fn set_line_directions(storage: &NSTextStorage, text: &str, region: std::ops::Range<usize>) {
     let rtl = NSMutableParagraphStyle::new();
     rtl.setBaseWritingDirection(NSWritingDirection::RightToLeft);
+    let rtl = Attribute::paragraph(&rtl);
     let mut cursor = Utf16Cursor::new(text);
-    let mut at = text[..region.start].rfind('\n').map_or(0, |i| i + 1);
+    let mut at = line_start(text, region.start);
     while at < text.len() && at <= region.end {
         let stop = text[at..].find('\n').map_or(text.len(), |i| at + i);
         let (a, b) = (cursor.at(at), cursor.at(stop));
         let line = NSRange::new(a, b - a);
-        // SAFETY: A paragraph style for its key, within the text.
-        unsafe {
-            if right_to_left_behind_markers(&text[at..stop]) {
-                storage.addAttribute_value_range(NSParagraphStyleAttributeName, &rtl, line);
-            } else if at < region.start {
-                storage.removeAttribute_range(NSParagraphStyleAttributeName, line);
-            }
+        if right_to_left_behind_markers(&text[at..stop]) {
+            add_attribute(storage, &rtl, line);
+        } else if at < region.start {
+            storage.removeAttribute_range(constant!(NSParagraphStyleAttributeName), line);
         }
         at = stop + 1;
     }

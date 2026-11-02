@@ -21,8 +21,10 @@ fn main() {
     let mtm = MainThreadMarker::new().expect("Splat must start on the main thread");
     let report = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        for path in editor::emergency_save() {
-            eprintln!("Splat: Text gesichert in {}", path.display());
+        if !editor::panic_is_contained() {
+            for path in editor::emergency_save() {
+                eprintln!("Splat: Text gesichert in {}", path.display());
+            }
         }
         report(info);
     }));

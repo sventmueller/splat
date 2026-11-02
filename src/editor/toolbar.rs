@@ -75,11 +75,11 @@ fn segmented_group(
 ) -> Retained<NSToolbarItem> {
     let items: Vec<Retained<NSToolbarItem>> = members.iter().filter_map(|m| make(mtm, m, share, target)).collect();
     let control = NSSegmentedControl::new(mtm);
-    control.setSegmentCount(items.len() as isize);
+    control.setSegmentCount(crate::util::to_isize(items.len()));
     control.setTrackingMode(NSSegmentSwitchTracking::Momentary);
     let overflow = NSMenu::new(mtm);
     for (n, item) in items.iter().enumerate() {
-        let n = n as isize;
+        let n = crate::util::to_isize(n);
         let menu = item.downcast_ref::<NSMenuToolbarItem>().map(|m| m.menu());
         let image = item
             .image()
@@ -205,6 +205,7 @@ fn menu(mtm: MainThreadMarker, items: Vec<Retained<objc2_app_kit::NSMenuItem>>) 
     m
 }
 
+#[expect(clippy::too_many_lines, reason = "one case per toolbar item")]
 pub fn make(
     mtm: MainThreadMarker,
     id: &str,
@@ -365,7 +366,7 @@ impl EditorController {
             segment_item(
                 self.mtm(),
                 &g.to_string(),
-                segment as usize,
+                crate::util::to_usize(segment),
                 ProtocolObject::from_ref(self),
                 self,
             )

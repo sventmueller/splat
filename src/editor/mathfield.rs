@@ -4,16 +4,17 @@ use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
 
 use objc2::rc::{Retained, Weak};
-use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
+use objc2::runtime::{NSObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
-use objc2_foundation::{NSBundle, NSDictionary, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{NSDictionary, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use objc2_web_kit::{
-    WKContentWorld, WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKScriptMessage,
+    WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKScriptMessage,
     WKScriptMessageHandler, WKUserContentController, WKWebView,
 };
 
 use super::EditorController;
-use crate::util::{ns, obj};
+use super::webkit::{self, ScriptValue};
+use crate::util::{contained, ns};
 
 define_class!(
     #[unsafe(super(NSObject))]
@@ -27,8 +28,7 @@ define_class!(
     unsafe impl WKScriptMessageHandler for Bridge {
         #[unsafe(method(userContentController:didReceiveScriptMessage:))]
         fn received(&self, _content: &WKUserContentController, message: &WKScriptMessage) {
-            // SAFETY: The message is valid for the duration of this callback.
-            let body = unsafe { message.body() };
+            let body = webkit::message_body(message);
             let Some(dict) = body.downcast_ref::<NSDictionary>() else {
                 return;
             };
@@ -64,27 +64,20 @@ define_class!(
             action: &WKNavigationAction,
             handler: &block2::DynBlock<dyn Fn(WKNavigationActionPolicy)>,
         ) {
-            handler.call((super::js::navigation_policy(action, "mathfield.html"),));
+            handler.call((webkit::navigation_policy(action, PAGE),));
         }
 
         #[unsafe(method(webViewWebContentProcessDidTerminate:))]
         fn terminated(&self, web: &WKWebView) {
             if let Some(field) = FIELD.with(|f| f.get().cloned()) {
                 field.loaded.set(false);
-                load_page(web);
+                webkit::load_bundled_page(web, PAGE);
             }
         }
     }
 );
 
-fn load_page(web: &WKWebView) {
-    if let Some(resources) = NSBundle::mainBundle().resourceURL()
-        && let Some(page) = resources.URLByAppendingPathComponent(&ns("mathfield.html"))
-    {
-        // SAFETY: Both URLs are file URLs inside the app bundle, the page within the readable folder.
-        unsafe { web.loadFileURL_allowingReadAccessToURL(&page, &resources) };
-    }
-}
+const PAGE: &str = "mathfield.html";
 
 pub struct MathField {
     pub web: Retained<WKWebView>,
@@ -97,6 +90,24 @@ thread_local! {
     static FIELD: OnceCell<Rc<MathField>> = const { OnceCell::new() };
 }
 
+pub(super) const DRAWS_BACKGROUND: &str = "drawsBackground";
+
+/// Sets a private boolean property to false and says whether that worked: a macOS without it costs the effect, not the
+/// editor.
+fn switch_off(object: &NSObject, key: &str) -> bool {
+    contained(|| {
+        // SAFETY: A boolean for a boolean property; the exception a missing key raises ends in `contained`.
+        unsafe {
+            objc2_foundation::NSObjectNSKeyValueCoding::setValue_forKey(
+                object,
+                Some(&NSNumber::new_bool(false)),
+                &ns(key),
+            )
+        }
+    })
+    .is_some()
+}
+
 /// The shared visual editor; its page loads once, the first time a formula popover opens.
 pub fn field(mtm: MainThreadMarker) -> Rc<MathField> {
     FIELD.with(|f| f.get_or_init(|| Rc::new(MathField::new(mtm))).clone())
@@ -107,27 +118,15 @@ impl MathField {
         let bridge: Retained<Bridge> =
             // SAFETY: NSObject's initializer, called once on the newly allocated object.
             unsafe { msg_send![super(Bridge::alloc(mtm).set_ivars(RefCell::new(None))), init] };
-        let config = super::js::configuration(mtm);
-        // SAFETY: The configuration's own content controller.
-        let content = unsafe { config.userContentController() };
-        // SAFETY: The content controller retains the handler for as long as the web view lives.
-        unsafe { content.addScriptMessageHandler_name(ProtocolObject::from_ref(&*bridge), &ns("splat")) };
+        let config = webkit::configuration(mtm);
+        webkit::add_message_handler(&config, ProtocolObject::from_ref(&*bridge), "splat");
         let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(480.0, 110.0));
-        // SAFETY: The configuration is complete and the frame finite.
-        let web = unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, &config) };
+        let web = webkit::new_view(mtm, frame, &config);
         // SAFETY: WebKit holds the delegate weakly; the content controller keeps the bridge alive.
         unsafe { web.setNavigationDelegate(Some(ProtocolObject::from_ref(&*bridge))) };
         // WKWebView has no public switch for a transparent background; this private key is the common workaround.
-        let object: &NSObject = &web;
-        // SAFETY: WKWebView has a boolean property under this key.
-        unsafe {
-            objc2_foundation::NSObjectNSKeyValueCoding::setValue_forKey(
-                object,
-                Some(&NSNumber::new_bool(false)),
-                &ns("drawsBackground"),
-            )
-        };
-        load_page(&web);
+        switch_off(&web, DRAWS_BACKGROUND);
+        webkit::load_bundled_page(&web, PAGE);
         MathField {
             web,
             bridge,
@@ -157,18 +156,16 @@ impl MathField {
     }
 
     pub fn run(&self, body: &str, latex: &str) {
-        let key = ns("latex");
-        let dict = NSDictionary::from_slices(&[&*key], &[&*obj(ns(latex)) as &AnyObject]);
-        // SAFETY: The arguments are property-list values, which WebKit hands to the script as plain values.
-        unsafe {
-            self.web
-                .callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-                    &ns(body),
-                    Some(&dict),
-                    None,
-                    &WKContentWorld::pageWorld(self.web.mtm()),
-                    None,
-                )
-        };
+        webkit::run_script(&self.web, body, &[("latex", ScriptValue::Text(latex))]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_private_key_that_is_gone_costs_only_its_effect() {
+        assert!(!switch_off(&NSObject::new(), "noSuchKey"));
     }
 }

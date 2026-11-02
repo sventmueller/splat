@@ -12,7 +12,7 @@ use objc2_uniform_type_identifiers::UTType;
 
 use super::images::{Sizing, native_only, resolve_path};
 use super::render::RenderCtx;
-use super::safe_image::{Decoded, MAX_FILE_BYTES};
+use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
 use super::{EditorController, decoder, js, links, remote};
 use crate::i18n::t;
@@ -20,22 +20,22 @@ use crate::markdown::doc::{Figure, parse};
 use crate::markdown::docx::{Picture, WordExport, to_docx};
 use crate::markdown::html::{Export, data_url, escape, to_html, web_image_type};
 use crate::preview::layout::layout;
-use crate::util::ns;
+use crate::util::{contained, ns};
 
 /// Paper shows the preview the way browsers print a page: a screen point, and so an image pixel, becomes 0.75 pt.
 const PRINT_SCALE: f64 = 0.75;
 
 #[derive(Clone, Copy)]
-pub(super) enum Format {
+pub(super) enum ExportKind {
     Html,
     Word,
 }
 
-impl Format {
+impl ExportKind {
     fn extension(self) -> &'static str {
         match self {
-            Format::Html => "html",
-            Format::Word => "docx",
+            ExportKind::Html => "html",
+            ExportKind::Word => "docx",
         }
     }
 }
@@ -44,9 +44,13 @@ impl EditorController {
     /// The document as printed: light appearance, smaller type, images no wider than `width`.
     pub(super) fn printable(&self, width: f64) -> Retained<NSMutableAttributedString> {
         let snap = self.snapshot();
-        let doc = parse(&snap.text);
-        let env = super::env::Env::new(self.doc_dir(), &snap.text);
-        let print_layout = layout(&snap.text, &doc, &Images { dark: false, env }, None);
+        let env = super::env::Env::now(self.doc_dir(), &snap.text);
+        let Some(print_layout) = contained(|| {
+            let doc = parse(&snap.text);
+            layout(&snap.text, &doc, &Images { dark: false, env }, None)
+        }) else {
+            return NSMutableAttributedString::from_nsstring(&ns(&snap.text));
+        };
         let doc_dir = self.doc_dir();
         let ctx = RenderCtx {
             mtm: self.mtm(),
@@ -65,7 +69,7 @@ impl EditorController {
         out
     }
 
-    pub(super) fn export(&self, format: Format) {
+    pub(super) fn export(&self, format: ExportKind) {
         let (Some(window), Some(doc)) = (self.window(), self.document()) else {
             return;
         };
@@ -95,13 +99,13 @@ impl EditorController {
     }
 
     /// Writes the document in `format` to `path`; the reason when that failed.
-    pub(super) fn write_export(&self, format: Format, title: &str, path: &Path) -> Result<(), String> {
-        match format {
-            Format::Html => std::fs::write(path, self.html(title, path)).map_err(|e| e.to_string()),
-            Format::Word => self
-                .word()
-                .and_then(|data| std::fs::write(path, data).map_err(|e| e.to_string())),
-        }
+    pub(super) fn write_export(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), String> {
+        let failed = || "The document could not be converted.".to_string();
+        let data = match format {
+            ExportKind::Html => contained(|| self.html(title, path)).ok_or_else(failed)?.into_bytes(),
+            ExportKind::Word => contained(|| self.word()).ok_or_else(failed)??,
+        };
+        std::fs::write(path, data).map_err(|e| e.to_string())
     }
 
     pub(super) fn html(&self, title: &str, target: &Path) -> String {
@@ -111,7 +115,7 @@ impl EditorController {
         let figure = |f: &Figure| figure_image(f);
         let embed = |url: &str| embedded(url, doc_dir.as_deref());
         let rebase = |link: &str| rebased(link, doc_dir.as_deref(), export_dir.as_deref());
-        let env = super::env::Env::new(doc_dir.clone(), &snap.text);
+        let env = super::env::Env::now(doc_dir.clone(), &snap.text);
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         to_html(
@@ -154,7 +158,7 @@ impl EditorController {
                 ..picture
             })
         };
-        let env = super::env::Env::new(doc_dir.clone(), &snap.text);
+        let env = super::env::Env::now(doc_dir.clone(), &snap.text);
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         Ok(to_docx(
@@ -190,7 +194,7 @@ fn figure_image(figure: &Figure) -> Option<String> {
         ),
         Sizing::Points { size, .. } => (size, format!(" width=\"{:.0}\"", size.width)),
     };
-    let png = png_of(&rendered.image, size, 2.0)?;
+    let png = png_of_image(&rendered.image, size, 2.0)?;
     let alt = match figure {
         Figure::Math { tex, .. } => tex.to_string(),
         Figure::Diagram { .. } => t("Diagramm").to_string(),
@@ -204,7 +208,7 @@ fn figure_image(figure: &Figure) -> Option<String> {
 
 fn picture_of(image: &NSImage, size: NSSize) -> Option<Picture> {
     Some(Picture {
-        data: png_of(image, size, 2.0)?,
+        data: png_of_image(image, size, 2.0)?,
         jpeg: false,
         width: size.width,
         height: size.height,
@@ -214,12 +218,11 @@ fn picture_of(image: &NSImage, size: NSSize) -> Option<Picture> {
 /// A local image for Word: PNG and JPEG as they are, other formats converted to PNG.
 fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
     let path = &super::images::locate(path, doc_dir);
-    if std::fs::metadata(path).ok()?.len() > MAX_FILE_BYTES as u64 {
-        return None;
-    }
-    let bytes = std::fs::read(path).ok()?;
-    match decoder::decode(&bytes) {
-        Some(Decoded::Rgba { width, height, pixels }) => {
+    let bytes = crate::util::read_regular_file(path, MAX_FILE_BYTES as u64)?;
+    match decoder::decode(&bytes, EXPORT_SIDE) {
+        Some(Decoded::Rgba {
+            width, height, pixels, ..
+        }) => {
             let (w, h) = (f64::from(width), f64::from(height));
             let data = match web_image_type(&bytes) {
                 Some(mime @ ("image/png" | "image/jpeg")) => {
@@ -251,7 +254,7 @@ fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
             picture_of(&image, image.size())
         }
         None if native_only(path, &bytes) => {
-            let image = NSImage::initWithData(NSImage::alloc(), &objc2_foundation::NSData::with_bytes(&bytes))?;
+            let image = decoder::system_image(&bytes)?;
             picture_of(&image, image.size())
         }
         None => None,
@@ -264,10 +267,7 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
         return None;
     }
     let path = super::images::locate(&resolve_path(url, doc_dir)?, doc_dir);
-    if std::fs::metadata(&path).ok()?.len() > MAX_FILE_BYTES as u64 {
-        return None;
-    }
-    let bytes = std::fs::read(&path).ok()?;
+    let bytes = crate::util::read_regular_file(&path, MAX_FILE_BYTES as u64)?;
     if let Some(mime) = web_image_type(&bytes) {
         return Some(data_url(mime, &bytes));
     }
@@ -275,8 +275,10 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
     if std::str::from_utf8(&bytes).is_ok_and(|t| t.contains("<svg")) {
         return Some(data_url("image/svg+xml", &bytes));
     }
-    let png = match decoder::decode(&bytes) {
-        Some(Decoded::Rgba { width, height, pixels }) => {
+    let png = match decoder::decode(&bytes, EXPORT_SIDE) {
+        Some(Decoded::Rgba {
+            width, height, pixels, ..
+        }) => {
             let image = image::RgbaImage::from_raw(width, height, pixels)?;
             let mut png = Vec::new();
             image
@@ -285,8 +287,8 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
             png
         }
         _ if native_only(&path, &bytes) => {
-            let image = NSImage::initWithData(NSImage::alloc(), &objc2_foundation::NSData::with_bytes(&bytes))?;
-            png_of(&image, image.size(), 1.0)?
+            let image = decoder::system_image(&bytes)?;
+            png_of_image(&image, image.size(), 1.0)?
         }
         _ => return None,
     };
@@ -309,7 +311,11 @@ fn rebased(link: &str, doc_dir: Option<&Path>, export_dir: Option<&Path>) -> Str
 }
 
 /// Draws an image into a bitmap of `size` points at `scale` and encodes it as PNG.
-fn png_of(image: &NSImage, size: NSSize, scale: f64) -> Option<Vec<u8>> {
+fn png_of_image(image: &NSImage, size: NSSize, scale: f64) -> Option<Vec<u8>> {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "pixels of a picture, and checked just below"
+    )]
     let (w, h) = (
         (size.width * scale).ceil() as isize,
         (size.height * scale).ceil() as isize,

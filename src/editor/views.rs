@@ -17,7 +17,7 @@ use crate::util::constant;
 pub struct ViewIvars {
     controller: RefCell<Option<Weak<EditorController>>>,
     /// Owns the text system; NSTextView itself does not retain it.
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "holding it keeps the owner alive")]
     owner: RefCell<Option<Retained<NSObject>>>,
 }
 
@@ -81,7 +81,8 @@ define_class!(
         fn set_frame_size(&self, size: NSSize) {
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), setFrameSize: size] };
-            // SAFETY: Reading the container does not switch the view to TextKit 1, unlike its layout manager.
+            // SAFETY: `owner` keeps the container alive; reading it does not switch the view to TextKit 1, unlike its
+            // layout manager.
             let Some(container) = (unsafe { self.textContainer() }) else {
                 return;
             };

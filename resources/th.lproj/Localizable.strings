@@ -59,6 +59,7 @@
 "Diagramm: {}" = "แผนภาพ: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "ไฟล์นี้ไม่ใช่ข้อความ UTF-8 จึงไม่สามารถเปิดเป็น Markdown ได้";
 "Dienste" = "บริการ";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "เอกสารนี้ใหญ่เกินกว่าจะแสดงตัวอย่างได้ คุณยังแก้ไขข้อความต่อได้";
 "Dokument als PDF exportieren" = "ส่งออกเอกสารเป็น PDF";
 "Dokument drucken" = "พิมพ์เอกสาร";
 "Dokument jetzt prüfen" = "ตรวจสอบเอกสารตอนนี้";

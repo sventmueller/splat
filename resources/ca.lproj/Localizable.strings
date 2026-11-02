@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diagrama: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "El fitxer no és text UTF-8 i no es pot obrir com a Markdown.";
 "Dienste" = "Serveis";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Aquest document és massa gran per a la previsualització. Pots continuar editant el text.";
 "Dokument als PDF exportieren" = "Exporta el document com a PDF";
 "Dokument drucken" = "Imprimeix el document";
 "Dokument jetzt prüfen" = "Revisa el document ara";

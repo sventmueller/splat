@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Διάγραμμα: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Το αρχείο δεν είναι κείμενο UTF-8 και δεν είναι δυνατό να ανοίξει ως Markdown.";
 "Dienste" = "Υπηρεσίες";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Αυτό το έγγραφο είναι πολύ μεγάλο για την προεπισκόπηση. Μπορείτε να συνεχίσετε να επεξεργάζεστε το κείμενο.";
 "Dokument als PDF exportieren" = "Εξαγωγή του εγγράφου ως PDF";
 "Dokument drucken" = "Εκτύπωση του εγγράφου";
 "Dokument jetzt prüfen" = "Έλεγχος εγγράφου τώρα";

@@ -25,28 +25,28 @@ impl EditorController {
     /// `None` while the state is in use: layout queries made then can resize a view and post a scroll.
     pub(super) fn scroll_spans(&self) -> Option<Rc<Vec<ScrollSpan>>> {
         let mut st = self.ivars().state.try_borrow_mut().ok()?;
-        if let Some(spans) = &st.scroll_spans {
-            return Some(spans.clone());
+        if let Some(spans) = st.scroll_spans() {
+            return Some(spans);
         }
-        let mut cursor = crate::markdown::text::Utf16Cursor::new(&st.text);
+        let mut cursor = crate::markdown::text::Utf16Cursor::new(st.text());
         // Footnote definitions comrak moved behind the text keep no place in the source order.
         let spans: Vec<ScrollSpan> = st
-            .layout
+            .layout()
             .blocks
             .iter()
-            .take(st.index.in_order)
-            .zip(&st.index.block_starts)
+            .take(st.index().in_order)
+            .zip(&st.index().block_starts)
             .map(|(b, &p)| {
                 let s0 = cursor.at(b.src.start);
                 let s1 = cursor.at(b.src.end.max(b.src.start));
                 ScrollSpan {
                     source: (s0, s1),
-                    preview: (p, p + b.len_u16),
+                    preview: (p.0, p.0 + b.len_u16),
                 }
             })
             .collect();
         let spans = Rc::new(spans);
-        st.scroll_spans = Some(spans.clone());
+        st.remember_scroll_spans(spans.clone());
         Some(spans)
     }
 
@@ -160,7 +160,8 @@ type TextLocation = (
 
 fn text_location(tlm: &NSTextLayoutManager, index: usize) -> Option<TextLocation> {
     let content = tlm.textContentManager()?;
-    let location = content.locationFromLocation_withOffset(&content.documentRange().location(), index as isize)?;
+    let location =
+        content.locationFromLocation_withOffset(&content.documentRange().location(), crate::util::to_isize(index))?;
     Some((content, location))
 }
 
@@ -184,7 +185,7 @@ pub(super) fn offset_at(view: &NSTextView, y: f64) -> Option<usize> {
         &content.documentRange().location(),
         &fragment.rangeInElement().location(),
     );
-    Some(offset.max(0) as usize)
+    Some(crate::util::to_usize(offset.max(0)))
 }
 
 /// Scrolls a TextKit 2 view until the character at `index` is laid out and returns its top in view coordinates.
@@ -201,10 +202,12 @@ fn reach(view: &NSTextView, index: usize) -> Option<f64> {
     for _ in 0..8 {
         viewport.layoutViewport();
         let range = viewport.viewportRange()?;
-        let from = content.offsetFromLocation_toLocation(&start, &range.location()).max(0) as usize;
-        let to = content
-            .offsetFromLocation_toLocation(&start, &range.endLocation())
-            .max(0) as usize;
+        let from = crate::util::to_usize(content.offsetFromLocation_toLocation(&start, &range.location()).max(0));
+        let to = crate::util::to_usize(
+            content
+                .offsetFromLocation_toLocation(&start, &range.endLocation())
+                .max(0),
+        );
         if (from..=to).contains(&index) {
             return Some(char_top(view, index));
         }
@@ -229,9 +232,11 @@ fn line_top(tlm: &NSTextLayoutManager, index: usize) -> Option<f64> {
     let range = fragment.rangeInElement();
     tlm.ensureLayoutForRange(&range);
     let top = fragment.layoutFragmentFrame().origin.y;
-    let offset = content
-        .offsetFromLocation_toLocation(&range.location(), &location)
-        .max(0) as usize;
+    let offset = crate::util::to_usize(
+        content
+            .offsetFromLocation_toLocation(&range.location(), &location)
+            .max(0),
+    );
     let lines = fragment.textLineFragments();
     let line = lines
         .iter()

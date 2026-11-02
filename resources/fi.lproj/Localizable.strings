@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Kaavio: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Tiedosto ei ole UTF-8-tekstiä, eikä sitä voi avata Markdownina.";
 "Dienste" = "Palvelut";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Tämä dokumentti on liian suuri esikatseluun. Voit yhä muokata tekstiä.";
 "Dokument als PDF exportieren" = "Vie dokumentti PDF:nä";
 "Dokument drucken" = "Tulosta dokumentti";
 "Dokument jetzt prüfen" = "Tarkista dokumentti nyt";

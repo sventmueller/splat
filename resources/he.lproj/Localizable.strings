@@ -59,6 +59,7 @@
 "Diagramm: {}" = "תרשים: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "הקובץ אינו מלל UTF-8 ולא ניתן לפתוח אותו כ-Markdown.";
 "Dienste" = "שירותים";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "המסמך גדול מדי לתצוגה המקדימה. אפשר להמשיך לערוך את הטקסט.";
 "Dokument als PDF exportieren" = "ייצוא המסמך כ-PDF";
 "Dokument drucken" = "הדפסת המסמך";
 "Dokument jetzt prüfen" = "בדיקת המסמך כעת";

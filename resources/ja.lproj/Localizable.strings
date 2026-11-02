@@ -59,6 +59,7 @@
 "Diagramm: {}" = "図：{}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "このファイルはUTF-8テキストではないため、Markdownとして開けません。";
 "Dienste" = "サービス";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "この書類はプレビューするには大きすぎます。テキストの編集は引き続き行えます。";
 "Dokument als PDF exportieren" = "書類をPDFとして書き出します";
 "Dokument drucken" = "書類をプリントします";
 "Dokument jetzt prüfen" = "書類を今すぐチェック";

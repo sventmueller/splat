@@ -2,13 +2,16 @@
 //! heading styles, lists real lists, tables tables. The system's own Word export drops images and tables.
 
 mod html;
+mod xml;
 
 use std::collections::HashMap;
 
-use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, diagram_kind, is_math_fence};
-use super::text::right_to_left;
-use super::typography::{Mark, Open, Quotes, marks, smarten};
+use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, Piece, code_figure};
+use super::text::{count32, right_to_left};
+use super::typography::{Mark, Open, Quotes, before_text, marks, smarten};
+use super::url::is_web_or_mail;
 use crate::i18n::t;
+use xml::{Line, ParaProps, Props, Runs, escape_xml};
 
 /// An image for the document, as PNG or JPEG data, with its size in points.
 pub struct Picture {
@@ -42,28 +45,38 @@ pub fn to_docx(doc: &Doc, export: &WordExport) -> Vec<u8> {
     let mut w = Writer {
         export,
         body: String::new(),
+        last: None,
+        paragraphs: 0,
         media: Vec::new(),
         links: Vec::new(),
         numbers: Vec::new(),
         footnotes: Vec::new(),
         footnote_ix: HashMap::new(),
-        last_paragraph: 0,
         gap: false,
         open: Open::default(),
     };
-    let ctx = Ctx::default();
+    let ctx = WordCtx::default();
     for block in &doc.blocks {
         w.block(block, &ctx);
     }
     w.write_footnotes();
+    w.flush_last();
     w.package()
 }
 
+/// Where a paragraph stands in a list.
+#[derive(Clone, Copy)]
+enum ListPlace {
+    /// It starts an item, with this numbering id and level.
+    Item(usize, usize),
+    /// It continues the item at this level, without a bullet of its own.
+    Continued(usize),
+}
+
 #[derive(Clone, Default)]
-struct Ctx {
+struct WordCtx {
     quote: u8,
-    /// Numbering id and level of the list item a paragraph belongs to.
-    list: Option<(usize, usize)>,
+    list: Option<ListPlace>,
     depth: usize,
     /// The first paragraph of a task item starts with its checkbox.
     task: Option<bool>,
@@ -73,31 +86,19 @@ struct Ctx {
     strong: bool,
 }
 
-#[derive(Clone, Copy, Default)]
-struct Props {
-    bold: bool,
-    italic: bool,
-    strike: bool,
-    underline: bool,
-    highlight: bool,
-    sup: bool,
-    sub: bool,
-    code: bool,
-    spoiler: bool,
-    tag: bool,
-}
-
 struct Writer<'a> {
     export: &'a WordExport<'a>,
     body: String,
+    /// The last paragraph, not yet in `body`, as the end of a framed block may still change its spacing.
+    last: Option<(ParaProps, Runs)>,
+    /// How many paragraphs there are so far, which tells whether `last` lies inside a block.
+    paragraphs: usize,
     media: Vec<(Vec<u8>, bool)>,
     links: Vec<String>,
     /// Ordered lists, each with its own numbering so it restarts, by start number.
     numbers: Vec<usize>,
     footnotes: Vec<(u32, &'a Block)>,
     footnote_ix: HashMap<String, u32>,
-    /// Where the last paragraph starts in `body`.
-    last_paragraph: usize,
     /// The next paragraph carries the space the block before it could not have after itself.
     gap: bool,
     /// Quotes the runs of the paragraph being written left open.
@@ -105,99 +106,38 @@ struct Writer<'a> {
 }
 
 impl<'a> Writer<'a> {
-    fn block(&mut self, block: &'a Block, ctx: &Ctx) {
+    fn block(&mut self, block: &'a Block, ctx: &WordCtx) {
         match &block.kind {
-            BlockKind::Paragraph => self.paragraph(None, ctx, &block.inlines),
+            BlockKind::Paragraph => self.paragraph(None, ctx, block.inlines()),
             BlockKind::Heading { level, .. } => {
-                self.paragraph(Some(&format!("Heading{}", level.clamp(&1, &6))), ctx, &block.inlines)
+                self.paragraph(Some(&format!("Heading{}", level.clamp(&1, &6))), ctx, block.inlines())
             }
             BlockKind::BlockQuote => {
-                let inner = Ctx {
+                let inner = WordCtx {
                     quote: ctx.quote + 1,
                     ..ctx.clone()
                 };
-                let start = self.body.len();
+                let start = self.paragraphs;
                 self.children(block, &inner);
                 if ctx.quote == 0 {
                     self.end_framed_block(start);
                 }
             }
             BlockKind::Alert { kind, title, .. } => {
-                let inner = Ctx {
-                    quote: ctx.quote + 1,
-                    ..ctx.clone()
-                };
-                let label = title.as_deref().unwrap_or(t(kind.label()));
-                let title = Inline {
-                    kind: InlineKind::Strong,
-                    range: 0..0,
-                    children: Box::new([Inline {
-                        kind: InlineKind::Text(label.into()),
-                        range: 0..0,
-                        children: Box::default(),
-                    }]),
-                };
-                let start = self.body.len();
-                self.paragraph(None, &inner, std::slice::from_ref(&title));
-                self.children(block, &inner);
-                if ctx.quote == 0 {
-                    self.end_framed_block(start);
-                }
+                self.alert(block, ctx, title.as_deref().unwrap_or(t(kind.label())));
             }
-            BlockKind::List { kind, .. } => {
-                let id = match kind {
-                    ListKind::Bullet(_) => 1,
-                    ListKind::Ordered { start, .. } => {
-                        self.numbers.push(*start);
-                        self.numbers.len() + 1
-                    }
-                };
-                for item in &block.children {
-                    let inner = Ctx {
-                        list: Some((id, ctx.depth)),
-                        depth: ctx.depth + 1,
-                        task: match &item.kind {
-                            BlockKind::Item { task: Some(task), .. } => Some(task.checked),
-                            _ => None,
-                        },
-                        ..ctx.clone()
-                    };
-                    self.item(item, &inner);
-                }
-            }
+            BlockKind::List { kind, .. } => self.list(block, kind, ctx),
             BlockKind::Item { .. } => self.item(block, ctx),
             BlockKind::CodeBlock { info, literal, .. } => {
-                let tex = literal.strip_suffix('\n').unwrap_or(literal);
-                let figure = match diagram_kind(info) {
-                    Some(kind) => Some((Figure::Diagram { source: literal, kind }, t("Diagramm"))),
-                    None if is_math_fence(info) => Some((Figure::Math { tex, display: true }, tex)),
-                    None => None,
-                };
-                match figure.and_then(|(f, alt)| Some(((self.export.figure)(&f)?, alt))) {
-                    Some((picture, alt)) => {
-                        let run = self.picture(picture, alt);
-                        self.raw_paragraph("<w:jc w:val=\"center\"/>", &run);
-                    }
-                    None => self.code(literal),
+                let figure = code_figure(info, literal);
+                let picture = figure.as_ref().and_then(|f| (self.export.figure)(f));
+                match (picture, figure) {
+                    (Some(picture), Some(Figure::Math { tex, .. })) => self.centered_picture(picture, tex),
+                    (Some(picture), _) => self.centered_picture(picture, t("Diagramm")),
+                    _ => self.code(literal),
                 }
             }
-            BlockKind::DefinitionList => {
-                for item in &block.children {
-                    for part in &item.children {
-                        let inner = match part.kind {
-                            BlockKind::DefinitionTerm => Ctx {
-                                strong: true,
-                                ..ctx.clone()
-                            },
-                            _ => Ctx {
-                                indent: ctx.indent + 1,
-                                ..ctx.clone()
-                            },
-                        };
-                        self.children(part, &inner);
-                    }
-                }
-            }
+            BlockKind::DefinitionList => self.definition_list(block, ctx),
             BlockKind::Comment => {}
             BlockKind::HtmlBlock { literal } => self.html(literal, ctx),
             BlockKind::MathBlock { literal } => {
@@ -206,17 +146,11 @@ impl<'a> Writer<'a> {
                     display: true,
                 };
                 match (self.export.figure)(&figure) {
-                    Some(picture) => {
-                        let run = self.picture(picture, literal);
-                        self.raw_paragraph("<w:jc w:val=\"center\"/>", &run);
-                    }
+                    Some(picture) => self.centered_picture(picture, literal),
                     None => self.code(&format!("$${literal}$$")),
                 }
             }
-            BlockKind::ThematicBreak => self.raw_paragraph(
-                "<w:pBdr><w:bottom w:val=\"single\" w:sz=\"6\" w:space=\"1\" w:color=\"D2D2D7\"/></w:pBdr>",
-                "",
-            ),
+            BlockKind::ThematicBreak => self.rule(Line::Bottom),
             BlockKind::Table { alignments } => self.table(block, alignments),
             BlockKind::FootnoteDefinition { name, .. } => {
                 let ix = self.footnote_number(name);
@@ -231,20 +165,82 @@ impl<'a> Writer<'a> {
         }
     }
 
-    fn children(&mut self, block: &'a Block, ctx: &Ctx) {
-        for child in &block.children {
+    fn alert(&mut self, block: &'a Block, ctx: &WordCtx, label: &str) {
+        let inner = WordCtx {
+            quote: ctx.quote + 1,
+            ..ctx.clone()
+        };
+        let title = Inline {
+            kind: InlineKind::Strong,
+            range: 0..0,
+            children: Box::new([Inline {
+                kind: InlineKind::Text(label.into()),
+                range: 0..0,
+                children: Box::default(),
+            }]),
+        };
+        let start = self.paragraphs;
+        self.paragraph(None, &inner, std::slice::from_ref(&title));
+        self.children(block, &inner);
+        if ctx.quote == 0 {
+            self.end_framed_block(start);
+        }
+    }
+
+    fn list(&mut self, block: &'a Block, kind: &ListKind, ctx: &WordCtx) {
+        let id = match kind {
+            ListKind::Bullet(_) => 1,
+            ListKind::Ordered { start, .. } => {
+                self.numbers.push(*start);
+                self.numbers.len() + 1
+            }
+        };
+        for item in block.children() {
+            let inner = WordCtx {
+                list: Some(ListPlace::Item(id, ctx.depth)),
+                depth: ctx.depth + 1,
+                task: match &item.kind {
+                    BlockKind::Item { task: Some(task), .. } => Some(task.checked),
+                    _ => None,
+                },
+                ..ctx.clone()
+            };
+            self.item(item, &inner);
+        }
+    }
+
+    fn definition_list(&mut self, block: &'a Block, ctx: &WordCtx) {
+        for part in block.children().iter().flat_map(|item| item.children()) {
+            let inner = match part.kind {
+                BlockKind::DefinitionTerm => WordCtx {
+                    strong: true,
+                    ..ctx.clone()
+                },
+                _ => WordCtx {
+                    indent: ctx.indent + 1,
+                    ..ctx.clone()
+                },
+            };
+            self.children(part, &inner);
+        }
+    }
+
+    fn children(&mut self, block: &'a Block, ctx: &WordCtx) {
+        for child in block.children() {
             self.block(child, ctx);
         }
     }
 
-    fn item(&mut self, item: &'a Block, ctx: &Ctx) {
-        for (n, child) in item.children.iter().enumerate() {
+    fn item(&mut self, item: &'a Block, ctx: &WordCtx) {
+        for (n, child) in item.children().iter().enumerate() {
             let inner = if n == 0 {
                 ctx.clone()
             } else {
                 // Further paragraphs of an item continue its indentation without a new bullet.
-                Ctx {
-                    list: ctx.list.map(|(_, level)| (0, level)),
+                WordCtx {
+                    list: ctx.list.map(|place| match place {
+                        ListPlace::Item(_, level) | ListPlace::Continued(level) => ListPlace::Continued(level),
+                    }),
                     task: None,
                     ..ctx.clone()
                 }
@@ -253,236 +249,177 @@ impl<'a> Writer<'a> {
         }
     }
 
-    fn paragraph(&mut self, style: Option<&str>, ctx: &Ctx, inlines: &[Inline]) {
-        let mut ppr = String::new();
-        let style = style.or((ctx.quote > 0).then_some("Quote"));
-        if let Some(style) = style {
-            ppr.push_str(&format!("<w:pStyle w:val=\"{style}\"/>"));
-        }
-        if let Some((id, level)) = ctx.list {
-            if id == 0 {
-                ppr.push_str(&format!("<w:ind w:left=\"{}\"/>", 720 * (level + 1)));
-            } else {
-                ppr.push_str(&format!(
-                    "<w:numPr><w:ilvl w:val=\"{level}\"/><w:numId w:val=\"{id}\"/></w:numPr>"
-                ));
-            }
-        } else if ctx.indent > 0 {
-            ppr.push_str(&format!("<w:ind w:left=\"{}\"/>", 567 * ctx.indent));
-        }
-        let mut runs = String::new();
-        if let Some(checked) = ctx.task {
-            runs.push_str(&text_run(if checked { "☑ " } else { "☐ " }, Props::default()));
-        }
-        let base = Props {
-            bold: ctx.strong,
-            ..Props::default()
+    fn paragraph(&mut self, style: Option<&str>, ctx: &WordCtx, inlines: &[Inline]) {
+        let mut para = ParaProps {
+            style: style.or((ctx.quote > 0).then_some("Quote")).map(str::to_string),
+            ..ParaProps::default()
         };
-        self.inlines(inlines, base, &mut runs);
-        self.raw_paragraph(&ppr, &runs);
+        match ctx.list {
+            Some(ListPlace::Item(id, level)) => para.list = Some((id, level)),
+            Some(ListPlace::Continued(level)) => para.indent = Some(720 * (level + 1)),
+            None if ctx.indent > 0 => para.indent = Some(567 * ctx.indent),
+            None => {}
+        }
+        let mut runs = Runs::default();
+        if let Some(checked) = ctx.task {
+            runs.push(if checked { "☑ " } else { "☐ " }, Props::default());
+        }
+        self.inlines(inlines, Props::default().bold(ctx.strong), &mut runs);
+        self.push_paragraph(para, runs);
     }
 
-    fn raw_paragraph(&mut self, ppr: &str, runs: &str) {
-        let mut ppr = if std::mem::take(&mut self.gap) {
-            with_spacing(ppr, "w:before", GAP)
-        } else {
-            ppr.to_string()
-        };
-        if !ppr.contains("w:val=\"Code\"") && right_to_left(&run_text(runs)) == Some(true) {
-            // Word expects the direction before spacing, indentation and alignment.
-            let at = ["<w:spacing", "<w:ind", "<w:jc"]
-                .iter()
-                .filter_map(|tag| ppr.find(tag))
-                .min()
-                .unwrap_or(ppr.len());
-            ppr.insert_str(at, "<w:bidi/>");
+    fn push_paragraph(&mut self, mut para: ParaProps, runs: Runs) {
+        self.flush_last();
+        if std::mem::take(&mut self.gap) {
+            para.before.get_or_insert(GAP);
         }
+        para.bidi |= !para.is_code() && right_to_left(runs.text()) == Some(true);
         self.open = Open::default();
-        self.last_paragraph = self.body.len();
+        self.paragraphs += 1;
+        self.last = Some((para, runs));
+    }
+
+    fn flush_last(&mut self) {
+        let Some((para, runs)) = self.last.take() else { return };
+        let props = para.to_xml();
         self.body.push_str("<w:p>");
-        if !ppr.is_empty() {
-            self.body.push_str(&format!("<w:pPr>{ppr}</w:pPr>"));
+        if !props.is_empty() {
+            self.body.push_str(&format!("<w:pPr>{props}</w:pPr>"));
         }
-        self.body.push_str(runs);
+        self.body.push_str(runs.xml());
         self.body.push_str("</w:p>");
     }
 
+    /// Markup around paragraphs, as of a table.
+    fn raw(&mut self, xml: &str) {
+        self.flush_last();
+        self.body.push_str(xml);
+    }
+
+    fn rule(&mut self, line: Line) {
+        let para = ParaProps {
+            line: Some(line),
+            ..ParaProps::default()
+        };
+        self.push_paragraph(para, Runs::default());
+    }
+
+    fn centered_picture(&mut self, picture: Picture, alt: &str) {
+        let mut runs = Runs::default();
+        let drawing = self.picture(picture, alt);
+        runs.picture(&drawing);
+        let para = ParaProps {
+            justify: Some(Align::Center),
+            ..ParaProps::default()
+        };
+        self.push_paragraph(para, runs);
+    }
+
+    /// A table has no space before, so an empty paragraph of that height stands in.
+    fn table_gap(&mut self) {
+        if std::mem::take(&mut self.gap) {
+            let para = ParaProps {
+                after: Some(0),
+                exact_line: Some(GAP),
+                ..ParaProps::default()
+            };
+            self.push_paragraph(para, Runs::default());
+        }
+    }
+
     fn code(&mut self, literal: &str) {
-        let start = self.body.len();
+        let start = self.paragraphs;
         for line in literal.strip_suffix('\n').unwrap_or(literal).split('\n') {
-            let run = text_run(line, Props::default());
-            self.raw_paragraph("<w:pStyle w:val=\"Code\"/>", &run);
+            let mut run = Runs::default();
+            run.push(line, Props::default());
+            self.push_paragraph(ParaProps::styled("Code"), run);
         }
         self.end_framed_block(start);
     }
 
     /// Word draws a quote's bar and a code block's shading through the space after their last paragraph, so that
-    /// space moves to the start of what follows. `start` is where the block begins in `body`.
+    /// space moves to the start of what follows. `start` is the number of paragraphs before the block.
     fn end_framed_block(&mut self, start: usize) {
-        if self.last_paragraph < start || self.last_paragraph >= self.body.len() {
+        if self.paragraphs == start {
             return;
         }
-        let last = self.body.split_off(self.last_paragraph);
-        let patched = match (last.strip_prefix("<w:p><w:pPr>"), last.find("</w:pPr>")) {
-            (Some(_), Some(end)) => format!(
-                "<w:p><w:pPr>{}{}",
-                with_spacing(&last["<w:p><w:pPr>".len()..end], "w:after", 0),
-                &last[end..]
-            ),
-            _ => last.replacen("<w:p>", "<w:p><w:pPr><w:spacing w:after=\"0\"/></w:pPr>", 1),
-        };
-        self.body.push_str(&patched);
-        self.gap = true;
+        if let Some((last, _)) = &mut self.last {
+            last.after.get_or_insert(0);
+            self.gap = true;
+        }
     }
 
     fn table(&mut self, table: &'a Block, alignments: &[Align]) {
-        if std::mem::take(&mut self.gap) {
-            // A table has no space before, so an empty paragraph of that height stands in.
-            self.raw_paragraph(
-                &format!("<w:spacing w:after=\"0\" w:line=\"{GAP}\" w:lineRule=\"exact\"/>"),
-                "",
-            );
-        }
+        self.table_gap();
         let mirrored = right_to_left(&self.export.source[table.range.clone()]) == Some(true);
-        self.body.push_str(&format!(
+        self.raw(&format!(
             "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/>{}<w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid>",
             if mirrored { "<w:bidiVisual/>" } else { "" }
         ));
-        for _ in alignments {
-            self.body.push_str("<w:gridCol/>");
-        }
-        self.body.push_str("</w:tblGrid>");
-        for row in &table.children {
+        self.raw(&"<w:gridCol/>".repeat(alignments.len()));
+        self.raw("</w:tblGrid>");
+        for row in table.children() {
             let header = matches!(row.kind, BlockKind::TableRow { header: true });
-            self.body.push_str("<w:tr>");
+            self.raw("<w:tr>");
             if header {
-                self.body.push_str("<w:trPr><w:tblHeader/></w:trPr>");
+                self.raw("<w:trPr><w:tblHeader/></w:trPr>");
             }
-            for (col, cell) in row.children.iter().enumerate() {
-                self.body.push_str("<w:tc><w:tcPr><w:tcW w:w=\"0\" w:type=\"auto\"/>");
-                if header {
-                    self.body
-                        .push_str("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"F2F2F4\"/>");
-                }
-                self.body.push_str("</w:tcPr>");
-                let jc = match alignments.get(col) {
-                    Some(Align::Center) => "<w:jc w:val=\"center\"/>",
-                    Some(Align::Right) => "<w:jc w:val=\"right\"/>",
-                    _ => "",
+            for (col, cell) in row.children().iter().enumerate() {
+                self.raw(&cell_start(1, header));
+                let justify = match alignments.get(col) {
+                    Some(Align::Center) => Some(Align::Center),
+                    Some(Align::Right) => Some(Align::Right),
+                    _ => None,
                 };
-                let mut runs = String::new();
-                let props = Props {
-                    bold: header,
-                    ..Props::default()
-                };
-                self.inlines(&cell.inlines, props, &mut runs);
-                self.raw_paragraph(&format!("<w:spacing w:after=\"0\"/>{jc}"), &runs);
-                self.body.push_str("</w:tc>");
+                let mut runs = Runs::default();
+                self.inlines(cell.inlines(), Props::default().bold(header), &mut runs);
+                self.push_paragraph(cell_paragraph(justify), runs);
+                self.raw("</w:tc>");
             }
-            self.body.push_str("</w:tr>");
+            self.raw("</w:tr>");
         }
-        self.body.push_str("</w:tbl>");
+        self.raw("</w:tbl>");
         // Word needs a paragraph between consecutive tables and before the end of the document.
-        self.raw_paragraph("", "");
+        self.push_paragraph(ParaProps::default(), Runs::default());
     }
 
-    fn inlines(&mut self, inlines: &[Inline], props: Props, out: &mut String) {
-        let mut props = props;
+    fn inlines(&mut self, inlines: &[Inline], props: Props, out: &mut Runs) {
         for inline in inlines {
-            match &inline.kind {
-                InlineKind::Text(text) => self.text(text, inline.range.start, props, out),
-                InlineKind::SoftBreak => out.push_str(&text_run(" ", props)),
-                InlineKind::LineBreak => out.push_str("<w:r><w:br/></w:r>"),
-                InlineKind::Code(code) => out.push_str(&text_run(code, Props { code: true, ..props })),
-                InlineKind::Html(raw) => match tag(raw) {
-                    Some((name, open)) => match name.as_str() {
-                        "u" | "ins" => props.underline = open,
-                        "mark" => props.highlight = open,
-                        "sup" => props.sup = open,
-                        "sub" => props.sub = open,
-                        "s" | "del" => props.strike = open,
-                        "b" | "strong" => props.bold = open,
-                        "i" | "em" => props.italic = open,
-                        "br" => out.push_str("<w:r><w:br/></w:r>"),
-                        _ => out.push_str(&text_run(raw, props)),
-                    },
-                    None => out.push_str(&text_run(raw, props)),
-                },
-                InlineKind::Emph => self.inlines(&inline.children, Props { italic: true, ..props }, out),
-                InlineKind::Strong => self.inlines(&inline.children, Props { bold: true, ..props }, out),
-                InlineKind::Strikethrough => self.inlines(&inline.children, Props { strike: true, ..props }, out),
-                InlineKind::Underline => self.inlines(
-                    &inline.children,
-                    Props {
-                        underline: true,
-                        ..props
-                    },
-                    out,
-                ),
-                InlineKind::Highlight => self.inlines(
-                    &inline.children,
-                    Props {
-                        highlight: true,
-                        ..props
-                    },
-                    out,
-                ),
-                InlineKind::Superscript => self.inlines(&inline.children, Props { sup: true, ..props }, out),
-                InlineKind::Subscript => self.inlines(&inline.children, Props { sub: true, ..props }, out),
-                InlineKind::Spoiler => self.inlines(&inline.children, Props { spoiler: true, ..props }, out),
-                InlineKind::Emoji(emoji) => out.push_str(&text_run(emoji, props)),
-                InlineKind::Kbd => self.inlines(&inline.children, Props { code: true, ..props }, out),
-                InlineKind::Span => self.inlines(&inline.children, props, out),
-                InlineKind::HtmlImage {
-                    url,
-                    alt,
-                    width,
-                    height,
-                } => match (self.export.image)(url) {
-                    Some(picture) => {
-                        let picture = asked_size(picture, *width, *height);
-                        out.push_str(&self.picture(picture, alt));
+            match inline.piece() {
+                Piece::Text(text) => self.text(text, inline.range.start, props, out),
+                Piece::SoftBreak => out.push(" ", props),
+                Piece::LineBreak => out.line_break(),
+                Piece::Code(code) => out.push(code, props.code()),
+                Piece::Html(raw) => out.push(raw, props),
+                Piece::Emoji(emoji) => out.push(emoji, props),
+                Piece::Styled => self.inlines(&inline.children, props.inside(&inline.kind), out),
+                Piece::Hidden => {}
+                Piece::WikiPage(_) => self.inlines(&inline.children, props, out),
+                Piece::Picture(picture) => match (self.export.image)(picture.url) {
+                    Some(found) => {
+                        let found = asked_size(found, picture.width, picture.height);
+                        out.picture(&self.picture(found, &picture.alt));
                     }
-                    None => out.push_str(&text_run(alt, props)),
+                    None => out.push(&picture.alt, props),
                 },
-                InlineKind::Comment => {}
-                InlineKind::WikiLink { target, embed } => {
-                    let picture = embed.then(|| (self.export.image)(target)).flatten();
-                    match picture {
-                        Some(picture) => out.push_str(&self.picture(picture, target)),
-                        None => self.inlines(&inline.children, props, out),
-                    }
-                }
-                InlineKind::Link { url, .. } => {
-                    let lower = url.to_ascii_lowercase();
-                    if ["http://", "https://", "mailto:"].iter().any(|s| lower.starts_with(s)) {
-                        let mut inner = String::new();
-                        self.inlines(&inline.children, props, &mut inner);
-                        let link = self.hyperlink(url, &inner);
-                        out.push_str(&link);
+                Piece::Link { url, .. } => {
+                    if is_web_or_mail(url) {
+                        let mut inner = Runs::default();
+                        self.inlines(&inline.children, props.linked(), &mut inner);
+                        out.hyperlink(self.link_id(url), inner);
                     } else {
                         self.inlines(&inline.children, props, out);
                     }
                 }
-                InlineKind::Image { url, .. } => match (self.export.image)(url) {
-                    Some(picture) => {
-                        let alt = plain(&inline.children);
-                        out.push_str(&self.picture(picture, &alt));
-                    }
-                    None => self.inlines(&inline.children, props, out),
-                },
-                InlineKind::FootnoteRef { name, .. } => {
+                Piece::FootnoteRef { name, .. } => {
                     let ix = self.footnote_number(name);
-                    out.push_str(&text_run(&ix.to_string(), Props { sup: true, ..props }));
+                    out.push(&ix.to_string(), props.superscript());
                 }
-                InlineKind::Math { display, literal } => {
-                    let figure = Figure::Math {
-                        tex: literal,
-                        display: *display,
-                    };
+                Piece::Math { literal, display } => {
+                    let figure = Figure::Math { tex: literal, display };
                     match (self.export.figure)(&figure) {
-                        Some(picture) => out.push_str(&self.picture(picture, literal)),
-                        None => out.push_str(&text_run(&format!("${literal}$"), Props { code: true, ..props })),
+                        Some(found) => out.picture(&self.picture(found, literal)),
+                        None => out.push(&format!("${literal}$"), props.code()),
                     }
                 }
             }
@@ -490,51 +427,54 @@ impl<'a> Writer<'a> {
     }
 
     /// Running text, with typographic punctuation, tags, references and citations as in the preview.
-    fn text(&mut self, literal: &str, at: usize, props: Props, out: &mut String) {
-        let source = self.export.source;
-        let before = source
-            .get(..source.floor_char_boundary(at))
-            .and_then(|s| s.chars().next_back());
+    fn text(&mut self, literal: &str, at: usize, props: Props, out: &mut Runs) {
+        if literal.is_empty() {
+            return;
+        }
+        let before = before_text(self.export.source, at);
         let shown = match self.export.quotes {
-            Some(q) if !props.code => smarten(literal, before, q, &mut self.open),
+            Some(q) if !props.text.code => smarten(literal, before, q, &mut self.open),
             _ => literal.to_string(),
         };
         let mut done = 0;
         for (range, mark) in marks(&shown, before, true) {
             let piece = &shown[range.clone()];
-            let replacement = match &mark {
-                Mark::Tag(_) => Some(text_run(piece, Props { tag: true, ..props })),
+            let mut marked = Runs::default();
+            match &mark {
+                Mark::Tag(_) => marked.push(piece, Props { tag: true, ..props }),
                 Mark::Reference(r) => {
-                    (self.export.reference)(r).map(|url| self.hyperlink(&url, &text_run(piece, props)))
+                    let Some(url) = (self.export.reference)(r) else {
+                        continue;
+                    };
+                    let mut linked = Runs::default();
+                    linked.push(piece, props.linked());
+                    marked.hyperlink(self.link_id(&url), linked);
                 }
                 Mark::Citation(keys) => {
                     let names: Option<Vec<String>> = keys.iter().map(|k| (self.export.citation)(k)).collect();
-                    names.map(|n| text_run(&format!("({})", n.join("; ")), props))
+                    let Some(names) = names else { continue };
+                    marked.push(&format!("({})", names.join("; ")), props);
                 }
-            };
-            let Some(replacement) = replacement else { continue };
-            if range.start > done {
-                out.push_str(&text_run(&shown[done..range.start], props));
             }
-            out.push_str(&replacement);
+            if range.start > done {
+                out.push(&shown[done..range.start], props);
+            }
+            out.append(marked);
             done = range.end;
         }
         if done < shown.len() || done == 0 {
-            out.push_str(&text_run(&shown[done..], props));
+            out.push(&shown[done..], props);
         }
     }
 
-    fn hyperlink(&mut self, url: &str, runs: &str) -> String {
+    /// The number of the relationship that points to `url`.
+    fn link_id(&mut self, url: &str) -> usize {
         self.links.push(url.to_string());
-        format!(
-            "<w:hyperlink r:id=\"rIdL{}\">{}</w:hyperlink>",
-            self.links.len(),
-            runs.replace("<w:rPr>", "<w:rPr><w:rStyle w:val=\"Hyperlink\"/>")
-        )
+        self.links.len()
     }
 
     fn footnote_number(&mut self, name: &str) -> u32 {
-        let next = self.footnote_ix.len() as u32 + 1;
+        let next = count32(self.footnote_ix.len()) + 1;
         *self.footnote_ix.entry(name.to_string()).or_insert(next)
     }
 
@@ -542,20 +482,29 @@ impl<'a> Writer<'a> {
         if self.footnotes.is_empty() {
             return;
         }
-        self.raw_paragraph(
-            "<w:pBdr><w:top w:val=\"single\" w:sz=\"4\" w:space=\"1\" w:color=\"D2D2D7\"/></w:pBdr>",
-            "",
-        );
+        self.rule(Line::Top);
         let mut notes = std::mem::take(&mut self.footnotes);
         notes.sort_by_key(|(ix, _)| *ix);
         for (ix, block) in notes {
-            for (n, child) in block.children.iter().enumerate() {
-                let mut runs = String::new();
-                if n == 0 {
-                    runs.push_str(&text_run(&format!("{ix}. "), Props::default()));
+            let mut number = Some(format!("{ix}. "));
+            for child in block.children() {
+                let mut runs = Runs::default();
+                let paragraph = matches!(child.kind, BlockKind::Paragraph);
+                if let Some(number) =
+                    number.take_if(|_| paragraph || !child.children().is_empty() || !child.inlines().is_empty())
+                {
+                    runs.push(&number, Props::default());
                 }
-                self.inlines(&child.inlines, Props::default(), &mut runs);
-                self.raw_paragraph("<w:pStyle w:val=\"FootnoteText\"/>", &runs);
+                if paragraph {
+                    self.inlines(child.inlines(), Props::default(), &mut runs);
+                }
+                // A list or code block can't follow a number on its line, so the number stands above it.
+                if !runs.is_empty() {
+                    self.push_paragraph(ParaProps::styled("FootnoteText"), runs);
+                }
+                if !paragraph {
+                    self.block(child, &WordCtx::default());
+                }
             }
         }
     }
@@ -563,8 +512,15 @@ impl<'a> Writer<'a> {
     /// An inline picture, no wider than the text.
     fn picture(&mut self, picture: Picture, alt: &str) -> String {
         let scale = (TEXT_WIDTH / picture.width.max(1.0)).min(1.0);
-        let cx = (picture.width * scale * EMU_PER_POINT).round() as u64;
-        let cy = (picture.height * scale * EMU_PER_POINT).round() as u64;
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "scaled to fit the page"
+        )]
+        let (cx, cy) = (
+            (picture.width * scale * EMU_PER_POINT).round() as u64,
+            (picture.height * scale * EMU_PER_POINT).round() as u64,
+        );
         self.media.push((picture.data, picture.jpeg));
         let n = self.media.len();
         let ext = if picture.jpeg { "jpeg" } else { "png" };
@@ -575,7 +531,7 @@ impl<'a> Writer<'a> {
              <pic:blipFill><a:blip r:embed=\"rIdI{n}\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>\
              <pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>\
              </pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>",
-            alt = xml(alt)
+            alt = escape_xml(alt)
         )
     }
 
@@ -604,7 +560,7 @@ impl<'a> Writer<'a> {
             rels.push_str(&format!(
                 "<Relationship Id=\"rIdL{}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"{}\" TargetMode=\"External\"/>",
                 n + 1,
-                xml(url)
+                escape_xml(url)
             ));
         }
         rels.push_str("</Relationships>");
@@ -646,106 +602,25 @@ fn asked_size(picture: Picture, width: Option<u32>, height: Option<u32>) -> Pict
     }
 }
 
-/// The text of the runs as the reader sees it, without the escapes that `xml` adds.
-fn run_text(runs: &str) -> String {
-    runs.split("<w:t xml:space=\"preserve\">")
-        .skip(1)
-        .filter_map(|part| part.split("</w:t>").next())
-        .collect::<String>()
-        .replace("&quot;", "\"")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-}
-
-/// Paragraph properties with `attribute` set on their spacing, unless it is set already; Word requires the spacing
-/// after list numbering and before indentation and alignment.
-fn with_spacing(ppr: &str, attribute: &str, value: u32) -> String {
-    if ppr.contains(&format!("{attribute}=")) {
-        return ppr.to_string();
+/// A table cell's opening up to its paragraphs, with its width in columns.
+fn cell_start(span: u32, header: bool) -> String {
+    let mut out = String::from("<w:tc><w:tcPr><w:tcW w:w=\"0\" w:type=\"auto\"/>");
+    if span > 1 {
+        out.push_str(&format!("<w:gridSpan w:val=\"{span}\"/>"));
     }
-    if ppr.contains("<w:spacing ") {
-        return ppr.replacen("<w:spacing ", &format!("<w:spacing {attribute}=\"{value}\" "), 1);
+    if header {
+        out.push_str("<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"F2F2F4\"/>");
     }
-    let at = ["<w:ind", "<w:jc"]
-        .iter()
-        .filter_map(|tag| ppr.find(tag))
-        .min()
-        .unwrap_or(ppr.len());
-    format!("{}<w:spacing {attribute}=\"{value}\"/>{}", &ppr[..at], &ppr[at..])
-}
-
-/// The name of a single HTML tag and whether it opens, for the inline tags Splat writes.
-fn tag(raw: &str) -> Option<(String, bool)> {
-    let inner = raw
-        .trim()
-        .strip_prefix('<')?
-        .strip_suffix('>')?
-        .trim_end_matches('/')
-        .trim();
-    let (name, open) = match inner.strip_prefix('/') {
-        Some(name) => (name.trim(), false),
-        None => (inner, true),
-    };
-    name.chars()
-        .all(|c| c.is_ascii_alphanumeric())
-        .then(|| (name.to_ascii_lowercase(), open))
-}
-
-fn plain(inlines: &[Inline]) -> String {
-    let mut out = String::new();
-    for i in inlines {
-        match &i.kind {
-            InlineKind::Text(t) | InlineKind::Code(t) => out.push_str(t),
-            _ => out.push_str(&plain(&i.children)),
-        }
-    }
+    out.push_str("</w:tcPr>");
     out
 }
 
-fn text_run(text: &str, p: Props) -> String {
-    let mut rpr = String::new();
-    if p.code {
-        rpr.push_str("<w:rStyle w:val=\"CodeChar\"/>");
+fn cell_paragraph(justify: Option<Align>) -> ParaProps {
+    ParaProps {
+        after: Some(0),
+        justify,
+        ..ParaProps::default()
     }
-    // In the order Word's schema requires.
-    for (on, tag) in [
-        (p.bold, "<w:b/>"),
-        (p.italic, "<w:i/>"),
-        (p.strike, "<w:strike/>"),
-        (p.spoiler, "<w:color w:val=\"1D1D1F\"/>"),
-        (p.tag && !p.spoiler, "<w:color w:val=\"0066CC\"/>"),
-        (p.highlight, "<w:highlight w:val=\"yellow\"/>"),
-        (p.underline, "<w:u w:val=\"single\"/>"),
-        (p.spoiler, "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"1D1D1F\"/>"),
-        (p.sup, "<w:vertAlign w:val=\"superscript\"/>"),
-        (p.sub, "<w:vertAlign w:val=\"subscript\"/>"),
-    ] {
-        if on {
-            rpr.push_str(tag);
-        }
-    }
-    format!(
-        "<w:r><w:rPr>{rpr}</w:rPr><w:t xml:space=\"preserve\">{}</w:t></w:r>",
-        xml(text)
-    )
-}
-
-/// Escapes text for XML and drops the control characters XML 1.0 does not allow.
-fn xml(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\t' | '\n' | '\r' => out.push(c),
-            c if (c as u32) < 0x20 || c == '\u{FFFE}' || c == '\u{FFFF}' => {}
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 fn numbering(ordered: &[usize]) -> String {
@@ -849,6 +724,11 @@ struct Zip {
     count: u16,
 }
 
+// Without the 64-bit extension of the format: a document stays far below its 4 GB.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "a document stays far below the 4 GB of a ZIP without extensions"
+)]
 impl Zip {
     fn add(&mut self, name: &str, content: &[u8]) {
         let crc = crc32(content);
@@ -904,8 +784,8 @@ fn crc32(bytes: &[u8]) -> u32 {
     static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
     let table = TABLE.get_or_init(|| {
         let mut t = [0u32; 256];
-        for (i, entry) in t.iter_mut().enumerate() {
-            let mut c = i as u32;
+        for (i, entry) in (0u32..).zip(t.iter_mut()) {
+            let mut c = i;
             for _ in 0..8 {
                 c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
             }
@@ -921,7 +801,7 @@ fn crc32(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::doc::parse;
+    use crate::markdown::doc::{AlertKind, parse};
 
     fn export(text: &str) -> Vec<u8> {
         to_docx(
@@ -1191,18 +1071,331 @@ mod tests {
     }
 
     #[test]
-    fn spacing_goes_after_numbering_and_before_indentation() {
-        assert_eq!(
-            with_spacing("<w:pStyle w:val=\"Quote\"/><w:ind w:left=\"720\"/>", "w:after", 0),
-            "<w:pStyle w:val=\"Quote\"/><w:spacing w:after=\"0\"/><w:ind w:left=\"720\"/>"
+    fn footnotes_keep_their_lists_and_code() {
+        let files = entries(&export(
+            "x[^1]\n\n[^1]: note\n\n    - item-a\n    - item-b\n\n    ```\n    code-c\n    ```\n",
+        ));
+        let document =
+            String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
+        for wanted in ["note", "item-a", "item-b", "code-c"] {
+            assert!(document.contains(wanted), "{wanted} missing: {document}");
+        }
+        assert!(document.find("note").unwrap() < document.find("item-a").unwrap());
+    }
+
+    #[test]
+    fn a_footnote_starting_with_a_list_shows_its_number_above_it() {
+        let files = entries(&export("x[^1]\n\n[^1]:\n    - item\n"));
+        let document =
+            String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
+        assert!(
+            document.find(">1. <").unwrap() < document.find("item").unwrap(),
+            "{document}"
         );
-        assert_eq!(
-            with_spacing("<w:spacing w:before=\"160\"/>", "w:after", 0),
-            "<w:spacing w:after=\"0\" w:before=\"160\"/>"
+    }
+
+    #[test]
+    fn a_link_around_code_is_valid_word() {
+        let files = entries(&export("[`code`](https://x.example) [plain](https://y.example)\n"));
+        let document =
+            String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
+        for run in document.split("<w:r>").skip(1) {
+            assert!(run.matches("w:rStyle").count() <= 1, "{run}");
+        }
+        assert!(document.contains("<w:rStyle w:val=\"Hyperlink\"/>"));
+    }
+
+    fn export_with(text: &str, figure: &dyn Fn(&Figure) -> Option<Picture>) -> Vec<u8> {
+        to_docx(
+            &parse(text),
+            &WordExport {
+                source: text,
+                quotes: Some(Quotes {
+                    open: '„',
+                    close: '“',
+                    open_single: '‚',
+                    close_single: '‘',
+                }),
+                reference: &|r| (r == "#12").then(|| "https://example.com/issues/12".to_string()),
+                citation: &|_| None,
+                figure,
+                image: &|_| None,
+            },
+        )
+    }
+
+    fn document(text: &str) -> String {
+        let files = entries(&export(text));
+        String::from_utf8(files.into_iter().find(|(n, _)| n == "word/document.xml").unwrap().1).unwrap()
+    }
+
+    #[test]
+    fn a_figure_with_a_picture_is_centered_and_says_what_it_shows() {
+        let picture = |_: &Figure| {
+            Some(Picture {
+                data: b"\x89PNG".to_vec(),
+                jpeg: false,
+                width: 10.0,
+                height: 10.0,
+            })
+        };
+        let word = |text: &str| {
+            let files = entries(&export_with(text, &picture));
+            String::from_utf8(files.into_iter().find(|(n, _)| n == "word/document.xml").unwrap().1).unwrap()
+        };
+        let diagram = word("```mermaid\nabcd\n```\n");
+        assert!(diagram.contains(&format!("descr=\"{}\"", t("Diagramm"))), "{diagram}");
+        assert!(diagram.contains("<w:jc w:val=\"center\"/>"), "{diagram}");
+        assert!(!diagram.contains("abcd"));
+        let formula = word("```math\nx^2\n```\n");
+        assert!(formula.contains("descr=\"x^2\""), "{formula}");
+    }
+
+    #[test]
+    fn an_alert_is_a_bold_title_over_its_text_in_a_quote() {
+        let word = document("> [!NOTE]\n> Inhalt\n\nDanach\n");
+        let label = format!(
+            "<w:b/></w:rPr><w:t xml:space=\"preserve\">{}",
+            t(AlertKind::Note.label())
         );
-        assert_eq!(
-            with_spacing("<w:spacing w:after=\"0\"/>", "w:after", 0),
-            "<w:spacing w:after=\"0\"/>"
+        assert!(word.contains(&label), "{word}");
+        assert_eq!(word.matches("<w:pStyle w:val=\"Quote\"/>").count(), 2, "{word}");
+        assert!(
+            word.contains(
+                "<w:spacing w:before=\"160\"/></w:pPr><w:r><w:rPr></w:rPr><w:t xml:space=\"preserve\">Danach"
+            ),
+            "{word}"
         );
+    }
+
+    #[test]
+    fn only_a_quote_makes_a_paragraph_a_quote() {
+        assert!(!document("a\n").contains("Quote"));
+    }
+
+    #[test]
+    fn lists_keep_their_depth_tasks_and_further_paragraphs() {
+        let word = document("- a\n  - b\n\n    c\n");
+        assert!(
+            word.contains("<w:ilvl w:val=\"0\"/>") && word.contains("<w:ilvl w:val=\"1\"/>"),
+            "{word}"
+        );
+        assert!(word.contains("<w:ind w:left=\"1440\"/>"), "{word}");
+        let word = document("- [x] a\n\n  b\n\n- [ ] c\n");
+        assert!(word.contains("☑ ") && word.contains("☐ "), "{word}");
+        assert_eq!(
+            word.matches("☑ ").count(),
+            1,
+            "a further paragraph has no box of its own"
+        );
+        assert_eq!(word.matches("<w:ilvl").count(), 2, "and no bullet: {word}");
+    }
+
+    #[test]
+    fn a_definition_inside_a_definition_goes_further_in() {
+        let word = document("A\n\n: B\n\n  C\n\n  : D\n");
+        assert!(word.contains("<w:ind w:left=\"1134\"/>"), "{word}");
+    }
+
+    #[test]
+    fn a_centered_table_column_is_centered() {
+        assert!(document("| a |\n|:-:|\n| 1 |\n").contains("<w:jc w:val=\"center\"/>"));
+    }
+
+    #[test]
+    fn a_keyboard_key_keeps_its_straight_quotes() {
+        let word = document("<kbd>\"a\"</kbd>\n");
+        assert!(!word.contains("„a“"), "{word}");
+    }
+
+    #[test]
+    fn code_keeps_its_straight_quotes() {
+        let word = document("a `\"b\"` \"c\"\n");
+        assert!(word.contains("\"b\"") || word.contains("&quot;b&quot;"), "{word}");
+        assert!(word.contains("„c“"), "{word}");
+    }
+
+    #[test]
+    fn text_around_a_mark_stays_in_its_order_without_empty_runs() {
+        let word = document("#12 und mehr\n");
+        assert!(word.contains(">#12<"), "{word}");
+        assert!(word.contains("> und mehr<"), "{word}");
+        assert!(!word.contains("preserve\"></w:t>"), "{word}");
+        let word = document("nur #12\n");
+        assert!(word.contains(">nur <") && !word.contains("preserve\"></w:t>"), "{word}");
+    }
+
+    #[test]
+    fn footnotes_count_up_and_a_second_reference_keeps_the_number() {
+        let word = document("a[^x] b[^y] c[^x]\n\n[^x]: X\n\n[^y]: Y\n");
+        assert!(word.contains("1. ") && word.contains("2. "), "{word}");
+        assert!(!word.contains("3. "), "{word}");
+    }
+
+    #[test]
+    fn a_footnote_of_a_heading_shows_its_number() {
+        let word = document("a[^x]\n\n[^x]: # Kopf\n");
+        assert!(word.contains("1. "), "{word}");
+    }
+
+    #[test]
+    fn a_wide_picture_shrinks_in_both_directions() {
+        let word = document("![a](a.png)\n");
+        assert!(word.contains("cy=\"1909233\""), "{word}");
+    }
+
+    #[test]
+    fn a_picture_takes_the_size_asked_for_and_keeps_its_shape() {
+        let size = |width, height| {
+            let p = asked_size(
+                Picture {
+                    data: Vec::new(),
+                    jpeg: false,
+                    width: 900.0,
+                    height: 300.0,
+                },
+                width,
+                height,
+            );
+            (p.width, p.height)
+        };
+        assert_eq!(size(Some(200), None), (150.0, 50.0));
+        assert_eq!(size(None, Some(100)), (225.0, 75.0));
+        assert_eq!(size(Some(200), Some(100)), (150.0, 75.0));
+        assert_eq!(size(None, None), (900.0, 300.0));
+        for (width, height) in [(0.0, 300.0), (900.0, 0.0)] {
+            let p = asked_size(
+                Picture {
+                    data: Vec::new(),
+                    jpeg: false,
+                    width,
+                    height,
+                },
+                Some(10),
+                Some(10),
+            );
+            assert_eq!((p.width, p.height), (width, height), "no size to keep the shape of");
+        }
+    }
+
+    #[test]
+    fn a_cell_spans_columns_only_when_asked_and_has_no_space_after() {
+        assert!(!cell_start(1, false).contains("gridSpan"));
+        assert!(cell_start(2, false).contains("<w:gridSpan w:val=\"2\"/>"));
+        assert_eq!(cell_paragraph(None).after, Some(0));
+    }
+
+    #[test]
+    fn bullets_change_with_the_depth_and_start_over() {
+        let levels = numbering(&[]);
+        for (level, bullet) in [(0, "•"), (1, "◦"), (2, "▪"), (3, "•"), (4, "◦")] {
+            let wanted = format!(
+                "<w:lvl w:ilvl=\"{level}\"><w:start w:val=\"1\"/><w:numFmt w:val=\"bullet\"/><w:lvlText w:val=\"{bullet}\"/>"
+            );
+            assert!(levels.contains(&wanted), "{wanted} in {levels}");
+        }
+    }
+
+    #[test]
+    fn the_end_of_the_zip_counts_its_entries() {
+        let zip = export("a\n");
+        let end = zip.len() - 22;
+        assert_eq!(&zip[end..end + 4], &0x0605_4b50u32.to_le_bytes());
+        let count = u16::from_le_bytes([zip[end + 10], zip[end + 11]]);
+        assert_eq!(usize::from(count), entries(&zip).len());
+    }
+
+    #[test]
+    fn embedded_html_in_a_quote_stays_a_quote() {
+        assert!(document("> <div>a</div>\n").contains("<w:pStyle w:val=\"Quote\"/>"));
+        assert!(!document("<div>a</div>\n").contains("Quote"));
+    }
+
+    #[test]
+    fn embedded_html_collapses_spaces_like_a_browser() {
+        let word = document("<p> a</p>\n");
+        assert!(word.contains(">a<"), "nothing before the first word: {word}");
+        let word = document("<p>a <b>b</b></p>\n");
+        assert!(word.contains(">a <"), "a space before the next element: {word}");
+        let word = document("<p><b>a</b> <i>b</i></p>\n");
+        assert!(word.contains("> <"), "one space between two elements: {word}");
+        assert!(!word.contains(">  <"), "{word}");
+        assert!(
+            !document("<div>\n</div>\n").contains("preserve"),
+            "a tag on its own line adds nothing"
+        );
+    }
+
+    #[test]
+    fn embedded_breaks_links_and_code_keep_their_meaning() {
+        assert!(document("<p>a<br>b</p>\n").contains("<w:br/>"));
+        let link = document("<p><a href=\"https://x.de\">l</a></p>\n");
+        assert!(link.contains("<w:hyperlink") && link.contains("Hyperlink"), "{link}");
+        let script = document("<p><a href=\"javascript:x\">l</a></p>\n");
+        assert!(!script.contains("<w:hyperlink") && script.contains(">l<"), "{script}");
+        assert!(document("<pre>a\n b</pre>\n").contains("<w:pStyle w:val=\"Code\"/>"));
+        assert!(document("<ol><li>a</li></ol>\n").contains("<w:numId w:val=\"2\"/>"));
+    }
+
+    #[test]
+    fn embedded_alignment_reaches_headings_and_blocks() {
+        assert!(document("<h1 align=\"center\">T</h1>\n").contains("<w:jc w:val=\"center\"/>"));
+        assert!(document("<center>a</center>\n").contains("<w:jc w:val=\"center\"/>"));
+        assert!(!document("<div>a</div>\n").contains("<w:jc"));
+    }
+
+    #[test]
+    fn embedded_summaries_and_terms_are_bold_and_other_blocks_are_not() {
+        let bold = "<w:b/></w:rPr><w:t xml:space=\"preserve\">a";
+        assert!(document("<details><summary>a</summary></details>\n").contains(bold));
+        assert!(document("<dl><dt>a</dt></dl>\n").contains(bold));
+        assert!(document("<b><div>a</div></b>\n").contains(bold), "it stays bold inside");
+        assert!(!document("<div>a</div>\n").contains(bold));
+    }
+
+    #[test]
+    fn only_head_cells_of_an_embedded_table_are_shaded() {
+        let shaded = |html: &str| document(html).matches("w:fill=\"F2F2F4\"").count();
+        assert_eq!(shaded("<table><tr><th>a</th><td>b</td><td>c</td></tr></table>\n"), 1);
+        assert_eq!(
+            shaded("<table><thead><tr><td>a</td><td>b</td></tr></thead></table>\n"),
+            2
+        );
+    }
+
+    #[test]
+    fn a_missing_picture_leaves_its_text_wherever_it_is_written() {
+        assert!(document("![Bild](fehlt.png)\n").contains("Bild"));
+        assert!(document("Text <img src=\"fehlt.png\" alt=\"Bild\"> Text\n").contains("Bild"));
+        assert!(document("<div><img src=\"fehlt.png\" alt=\"Bild\"></div>\n").contains("Bild"));
+    }
+
+    #[test]
+    fn text_has_one_place_on_its_line() {
+        let word = document("<sup><sub>x</sub></sup>\n");
+        assert_eq!(word.matches("<w:vertAlign").count(), 1, "{word}");
+    }
+
+    #[test]
+    fn a_list_stays_within_what_word_knows() {
+        let deep: String = (0..12).map(|i| format!("{}- x\n", "  ".repeat(i))).collect();
+        assert!(!document(&deep).contains("<w:ilvl w:val=\"9\"/>"));
+        let files = entries(&export("<ol start=\"99999999999\"><li>x</li></ol>\n"));
+        let numbering =
+            String::from_utf8(files.into_iter().find(|(n, _)| n == "word/numbering.xml").unwrap().1).unwrap();
+        assert!(!numbering.contains("99999999999"), "{numbering}");
+    }
+
+    #[test]
+    fn a_paragraph_in_an_aligned_cell_takes_its_alignment() {
+        let word = document("<table><tr><td align=\"right\"><p>a</p></td></tr></table>\n");
+        let at = word.find(">a<").unwrap();
+        assert!(word[..at].contains("<w:jc w:val=\"right\"/>"), "{word}");
+    }
+
+    #[test]
+    fn a_footnote_reference_stands_raised_and_a_line_break_stays() {
+        assert!(document("a[^x]\n\n[^x]: X\n").contains("<w:vertAlign w:val=\"superscript\"/>"));
+        assert!(document("a  \nb\n").contains("<w:br/>"));
     }
 }

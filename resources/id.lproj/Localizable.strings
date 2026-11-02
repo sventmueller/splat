@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Diagram: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "File ini bukan teks UTF-8 dan tidak dapat dibuka sebagai Markdown.";
 "Dienste" = "Layanan";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Dokumen ini terlalu besar untuk pratinjau. Anda tetap dapat mengedit teksnya.";
 "Dokument als PDF exportieren" = "Ekspor dokumen sebagai PDF";
 "Dokument drucken" = "Cetak dokumen";
 "Dokument jetzt prüfen" = "Periksa Dokumen Sekarang";

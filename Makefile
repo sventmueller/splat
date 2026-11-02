@@ -1,6 +1,6 @@
 # Entry points only; the build logic lives in xtask/src/main.rs.
 .DEFAULT_GOAL := help
-.PHONY: help build lint check test test-gui test-long coverage coverage-library bench release
+.PHONY: help build lint check test test-gui test-long mutants coverage coverage-library bench release
 
 ROUNDS ?= 20000
 
@@ -16,7 +16,7 @@ lint: ## Formatting and clippy, also with the selftest feature; warnings fail
 	cargo clippy --release --all-targets --features selftest -- -D warnings
 
 check: lint ## lint, all cargo tests, vendored scripts; what CI runs, needs no keychain and no window
-	cargo test --release --workspace
+	CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true cargo test --release --workspace
 	cargo xtask vendor check
 
 test: check ## check, then the selftest without a window
@@ -27,8 +27,12 @@ test-gui: ## Click-through and resize selftests; occupy the Mac for about four m
 	cargo xtask selftest resize
 
 test-long: ## Longer random search (ROUNDS=20000, SPLAT_FUZZ_SEED=<n>) and the 10 MB partial-update check
-	SPLAT_FUZZ_ROUNDS=$(ROUNDS) cargo test --release
+	CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true SPLAT_FUZZ_ROUNDS=$(ROUNDS) cargo test --release
 	cargo test --release -- --ignored partial_updates
+
+mutants: ## Faults built into the model and the preview one by one, which the tests must notice; takes hours (FILE=<file> narrows it)
+	cargo mutants $(if $(FILE),--file "$(FILE)",--file "src/markdown/**/*.rs" --file "src/preview/**/*.rs") --jobs 4 --output target/mutants; code=$$?; case $$code in 0|2|3) ;; *) exit $$code ;; esac
+	@echo "survivors: target/mutants/mutants.out/missed.txt"
 
 coverage: ## Line coverage of all tests and selftests; fails below 80 % in a module or 85 % overall. About five minutes
 	cargo xtask coverage

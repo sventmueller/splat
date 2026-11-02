@@ -21,12 +21,13 @@ use crate::i18n::{t, tf};
 use crate::markdown::commands::{self, Active, Edit, InlineStyle, ListStyle, Pending, Toggle};
 use crate::markdown::doc::{AlertKind, Align, Doc};
 use crate::markdown::table::{self, TableOp};
-use crate::markdown::text::utf16_len;
+use crate::markdown::text::{Shown, U16, units, utf16_len};
 use crate::preview::bridge::Bridge;
 use crate::preview::layout::Layout;
-use crate::util::{constant, from_nsrange, ns, storage, to_nsrange};
+use crate::util::{constant, contained, insert_text, ns, perform_later, shown_from_ns, storage, to_nsrange};
 
 impl EditorController {
+    #[expect(clippy::too_many_lines, reason = "one case per command")]
     pub(super) fn perform(&self, action: Action, sender: Option<&AnyObject>) {
         use Action::*;
         let tag = tag_of(sender);
@@ -40,7 +41,7 @@ impl EditorController {
             Superscript => self.inline(InlineStyle::Superscript, t("Hochgestellt")),
             Subscript => self.inline(InlineStyle::Subscript, t("Tiefgestellt")),
             Heading => {
-                let level = tag.clamp(0, 6) as u8;
+                let level = u8::try_from(tag.clamp(0, 6)).unwrap_or(0);
                 let name = if level == 0 {
                     t("Fließtext").to_string()
                 } else {
@@ -65,7 +66,7 @@ impl EditorController {
                 });
             }
             Alert => {
-                let kind = AlertKind::ALL[tag.clamp(0, AlertKind::ALL.len() as isize - 1) as usize];
+                let kind = AlertKind::ALL[crate::util::to_usize(tag).min(AlertKind::ALL.len() - 1)];
                 self.command(t("Hinweisbox"), |t, d, sel| {
                     Some(commands::insert_alert(t, d, sel, kind))
                 });
@@ -110,20 +111,20 @@ impl EditorController {
                 super::relayout_all();
             }
             ZoomIn => {
-                let z = self.ivars().state.borrow().zoom;
+                let z = self.ivars().state.borrow().zoom();
                 self.set_zoom((z * 1.1).min(3.0));
             }
             ZoomOut => {
-                let z = self.ivars().state.borrow().zoom;
+                let z = self.ivars().state.borrow().zoom();
                 self.set_zoom((z / 1.1).max(0.5));
             }
             ZoomReset => self.set_zoom(1.0),
             NewTab => self.new_tab(),
             LoadRemoteImages => self.allow_remote_images(),
-            ExportHtml => self.export(super::export::Format::Html),
-            ExportWord => self.export(super::export::Format::Word),
+            ExportHtml => self.export(super::export::ExportKind::Html),
+            ExportWord => self.export(super::export::ExportKind::Word),
             EditAtomAt => {
-                if let Some(range) = self.atom_starting_at(tag.max(0) as usize) {
+                if let Some(range) = self.atom_starting_at(crate::util::to_usize(tag.max(0))) {
                     self.open_atom_editor(range, None);
                 }
             }
@@ -140,7 +141,9 @@ impl EditorController {
 
     /// Applies a source edit as one undo step. Typing edits coalesce like keystrokes in the source view.
     pub(super) fn apply_edit(&self, edit: Edit, undo_name: Option<&str>, typing: bool) {
-        self.ivars().state.borrow_mut().pending = None;
+        // An open editor's text stands in the source without an undo step; committed, the offsets of `edit` stay right.
+        self.finish_atom_edit();
+        self.ivars().state.borrow_mut().clear_pending();
         let source = self.source();
         let range = {
             let snap = self.snapshot();
@@ -158,8 +161,7 @@ impl EditorController {
         let replacement = ns(&edit.replacement);
         let silent = self.silently();
         if typing {
-            // SAFETY: The inserted object is an NSString, one of the two types this method accepts.
-            unsafe { source.insertText_replacementRange(&replacement, range) };
+            insert_text(source, &replacement, range);
         } else {
             // Without this, NSTextView merges the command into the preceding typing undo step.
             source.breakUndoCoalescing();
@@ -188,18 +190,20 @@ impl EditorController {
         let edit = {
             let st = self.ivars().state.borrow();
             let sel = self.current_selection(&snap, &st);
-            f(&snap.text, &st.doc, sel)
+            contained(|| f(&snap.text, st.doc(), sel))
         };
         drop(snap);
-        if let Some(edit) = edit {
-            self.apply_edit(edit, Some(name), false);
+        match edit {
+            Some(Some(edit)) => self.apply_edit(edit, Some(name), false),
+            Some(None) => {}
+            None => NSBeep(),
         }
     }
 
     pub(super) fn current_selection(&self, snap: &Snapshot, st: &State) -> Range<usize> {
         if self.preview_focused() {
-            let r = from_nsrange(self.preview().selectedRange());
-            bridge(&snap.text, st).source_selection(r)
+            let r = shown_from_ns(self.preview().selectedRange());
+            contained(|| bridge(&snap.text, st).source_selection(r)).unwrap_or_else(|| self.source_selection(snap))
         } else {
             self.source_selection(snap)
         }
@@ -212,11 +216,15 @@ impl EditorController {
             let st = self.ivars().state.borrow();
             let sel = self.current_selection(&snap, &st);
             let pending = st
-                .pending
+                .pending()
                 .as_ref()
                 .filter(|(_, base)| *base == snap.text)
                 .map(|(p, _)| p);
-            commands::toggle(&snap.text, &st.doc, sel, style, pending)
+            contained(|| commands::toggle(&snap.text, st.doc(), sel, style, pending))
+        };
+        let Some(toggled) = toggled else {
+            NSBeep();
+            return;
         };
         match toggled {
             Toggle::Edit(edit) => {
@@ -224,7 +232,10 @@ impl EditorController {
                 self.apply_edit(edit, Some(name), false);
             }
             Toggle::Pending(pending) => {
-                self.ivars().state.borrow_mut().pending = pending.map(|p| (p, snap.text.clone()));
+                self.ivars()
+                    .state
+                    .borrow_mut()
+                    .set_pending(pending.map(|p| (p, snap.text.clone())));
             }
         }
     }
@@ -232,7 +243,7 @@ impl EditorController {
     /// Forgets pending styles once the caret leaves their position. While the text differs from the stored one the
     /// user is typing, which `source_typed_with_pending` and `preview_changed` handle.
     pub(super) fn drop_pending_unless_at(&self, sel: Option<Range<usize>>) {
-        let Some(at) = self.ivars().state.borrow().pending.as_ref().map(|(p, _)| p.at) else {
+        let Some(at) = self.ivars().state.borrow().pending().map(|(p, _)| p.at) else {
             return;
         };
         let snap = self.snapshot();
@@ -240,27 +251,26 @@ impl EditorController {
             .ivars()
             .state
             .borrow()
-            .pending
-            .as_ref()
+            .pending()
             .is_some_and(|(_, base)| *base != snap.text);
         if typing {
             return;
         }
         let sel = sel.unwrap_or_else(|| self.source_selection(&snap));
         if !sel.is_empty() || sel.start != at {
-            self.ivars().state.borrow_mut().pending = None;
+            self.ivars().state.borrow_mut().clear_pending();
         }
     }
 
     /// Text just typed into the source at a caret with pending styles is moved into its markers.
     pub(super) fn source_typed_with_pending(&self) -> bool {
-        let Some((pending, base)) = self.ivars().state.borrow().pending.clone() else {
+        let Some((pending, base)) = self.ivars().state.borrow().pending().cloned() else {
             return false;
         };
         if self.source().hasMarkedText() {
             return false;
         }
-        self.ivars().state.borrow_mut().pending = None;
+        self.ivars().state.borrow_mut().clear_pending();
         let (edit, unchanged, keep_pending) = {
             let snap = self.snapshot();
             let Some((edit, keep_pending)) = commands::typed_at_pending(&base, &snap.text, &pending) else {
@@ -275,7 +285,10 @@ impl EditorController {
         }
         if keep_pending {
             let styles = pending.styles;
-            self.ivars().state.borrow_mut().pending = Some((Pending { at: caret, styles }, self.source_text()));
+            self.ivars()
+                .state
+                .borrow_mut()
+                .set_pending(Some((Pending { at: caret, styles }, self.source_text())));
         }
         !unchanged
     }
@@ -294,11 +307,11 @@ impl EditorController {
         let key = {
             let st = self.ivars().state.borrow();
             ActiveKey {
-                version: self.ivars().copy.version.get(),
+                version: self.ivars().copy.version(),
                 selection: (view_sel.location, view_sel.length),
                 preview,
-                state_version: st.version,
-                pending: st.pending.as_ref().map(|(p, _)| (p.at, p.styles.clone())),
+                state_version: st.version(),
+                pending: st.pending().map(|(p, _)| (p.at, p.styles.clone())),
             }
         };
         if let Some((k, a)) = self.ivars().active_cache.borrow().as_ref()
@@ -313,8 +326,8 @@ impl EditorController {
                 Active::default()
             } else {
                 let sel = self.current_selection(&snap, &st);
-                let active = commands::active_at(&st.doc, sel.start);
-                match &st.pending {
+                let active = commands::active_at(st.doc(), sel.start);
+                match st.pending() {
                     Some((p, base)) if *base == snap.text && sel.is_empty() && sel.start == p.at => {
                         active.with_pending(p)
                     }
@@ -405,11 +418,21 @@ impl EditorController {
             .and_then(|v| v.get_range());
         let text = single(strings).and_then(|s| s.downcast::<NSString>().ok());
         let announced = match (range, text) {
-            (Some(r), Some(text)) => Announced::Edit(from_nsrange(r), text.to_string()),
+            (Some(r), Some(text)) => Announced::Edit(shown_from_ns(r), text.to_string()),
             _ => Announced::Unknown,
         };
         let mut slot = self.ivars().preview_edit.borrow_mut();
         *slot = Some(if slot.is_some() { Announced::Unknown } else { announced });
+        drop(slot);
+        // A composition that is cancelled announces a change and never makes it.
+        perform_later(self, sel!(previewEditSettled), 0.0, true);
+    }
+
+    /// The turn of the run loop that announced an edit is over, and with it the edit, unless a composition goes on.
+    pub(super) fn preview_edit_settled(&self) {
+        if !self.preview().hasMarkedText() && self.ivars().preview_edit.borrow_mut().take().is_some() {
+            self.update();
+        }
     }
 
     /// The user typed, deleted or pasted in the preview: translate the change into the source.
@@ -428,35 +451,44 @@ impl EditorController {
         let new_len = storage(preview).length();
         let (edit, dirty, next) = {
             let st = self.ivars().state.borrow();
-            let shown_len: usize = st.blocks.lens.iter().sum();
+            let shown_len: usize = st.blocks().lens.iter().sum();
             let (old_range, inserted) = preview_change(
                 announced,
                 shown_len,
                 new_len,
-                &st.layout,
+                st.layout(),
                 || preview.string().to_string(),
                 preview.selectedRange().location,
             );
-            let delta = utf16_len(&inserted) as isize - old_range.len() as isize;
+            let delta = crate::util::to_isize(utf16_len(&inserted)) - crate::util::to_isize(units(&old_range));
             let bridge = bridge(&snap.text, &st);
-            let typed_pending = st
-                .pending
-                .as_ref()
-                .filter(|(_, base)| *base == st.text && old_range.is_empty())
-                .and_then(|(pending, _)| bridge.type_with_pending(pending, old_range.start, &inserted));
-            let (edit, next) = match typed_pending {
-                Some((edit, next)) => (Some(edit), next),
-                None => (bridge.replace(old_range.clone(), &inserted), None),
-            };
+            // Without an edit the preview falls back to what the source says, which it shows next.
+            let (edit, next) = contained(|| {
+                let typed_pending = st
+                    .pending()
+                    .as_ref()
+                    .filter(|(_, base)| *base == st.text() && old_range.is_empty())
+                    .and_then(|(pending, _)| bridge.type_with_pending(pending, old_range.start, &inserted));
+                match typed_pending {
+                    Some((edit, next)) => (Some(edit), next),
+                    None => bridge
+                        .replace_keeping_styles(old_range.clone(), &inserted)
+                        .map_or((None, None), |(edit, next)| (Some(edit), next)),
+                }
+            })
+            .unwrap_or((None, None));
             (edit, (old_range, delta), next)
         };
         drop(snap);
-        self.ivars().state.borrow_mut().dirty_preview = Some(dirty);
+        self.ivars().state.borrow_mut().note_preview_edit(dirty);
         match edit {
             Some(edit) => {
                 self.apply_edit(edit, None, true);
                 if let Some(next) = next {
-                    self.ivars().state.borrow_mut().pending = Some((next, self.source_text()));
+                    self.ivars()
+                        .state
+                        .borrow_mut()
+                        .set_pending(Some((next, self.source_text())));
                 }
             }
             None => self.update(),
@@ -470,12 +502,16 @@ impl EditorController {
             if !st.is_current(&snap) {
                 return;
             }
-            bridge(&snap.text, &st).source_selection(from_nsrange(self.preview().selectedRange()))
+            let shown = shown_from_ns(self.preview().selectedRange());
+            let Some(sel) = contained(|| bridge(&snap.text, &st).source_selection(shown)) else {
+                return;
+            };
+            sel
         };
         self.drop_pending_unless_at(Some(sel.clone()));
         self.set_source_selection(to_nsrange(snap.u16_range(&sel)));
         drop(snap);
-        let caret_moved = self.ivars().state.borrow().caret != Some(sel.start);
+        let caret_moved = self.ivars().state.borrow().caret() != Some(sel.start);
         if caret_moved {
             self.update();
         }
@@ -484,34 +520,38 @@ impl EditorController {
 
     pub(super) fn preview_command(&self, command: Sel) -> bool {
         self.update();
-        let sel = from_nsrange(self.preview().selectedRange());
+        let sel = shown_from_ns(self.preview().selectedRange());
         let p = sel.start;
         let edit = {
             let st = self.ivars().state.borrow();
-            let bridge = bridge(&st.text, &st);
+            let bridge = bridge(st.text(), &st);
             match command {
-                c if c == sel!(insertNewline:) && sel.len() == 1 && self.atom_at_preview(&st, p).is_some() => {
+                c if c == sel!(insertNewline:) && units(&sel) == 1 && self.atom_at_preview(&st, p).is_some() => {
                     drop(st);
                     self.edit_atom_at_preview(p, None);
                     return true;
                 }
-                c if c == sel!(insertNewline:) && sel.is_empty() => bridge.newline(p).map(|e| (e, t("Absatz"))),
+                c if c == sel!(insertNewline:) && sel.is_empty() => {
+                    contained(|| bridge.newline(p)).flatten().map(|e| (e, t("Absatz")))
+                }
                 c if (c == sel!(insertLineBreak:) || c == sel!(insertNewlineIgnoringFieldEditor:))
                     && sel.is_empty() =>
                 {
-                    bridge.line_break(p).map(|e| (e, t("Zeilenumbruch")))
+                    contained(|| bridge.line_break(p))
+                        .flatten()
+                        .map(|e| (e, t("Zeilenumbruch")))
                 }
-                c if c == sel!(insertTab:) => match bridge.tab(p, false) {
+                c if c == sel!(insertTab:) => match contained(|| bridge.tab(p, false)).flatten() {
                     Some(e) => Some((e, t("Einrücken"))),
                     None => return !preview_in_code(&st, p),
                 },
-                c if c == sel!(insertBacktab:) => match bridge.tab(p, true) {
+                c if c == sel!(insertBacktab:) => match contained(|| bridge.tab(p, true)).flatten() {
                     Some(e) => Some((e, t("Ausrücken"))),
                     None => return true,
                 },
-                c if c == sel!(deleteBackward:) && sel.is_empty() => {
-                    bridge.delete_at_block_start(p).map(|e| (e, t("Löschen")))
-                }
+                c if c == sel!(deleteBackward:) && sel.is_empty() => contained(|| bridge.delete_at_block_start(p))
+                    .flatten()
+                    .map(|e| (e, t("Löschen"))),
                 _ => None,
             }
         };
@@ -533,7 +573,7 @@ impl EditorController {
         let edit = {
             let sel = self.source_selection(&snap);
             let st = self.ivars().state.borrow();
-            table::navigate(&snap.text, &st.doc, sel.start, command == sel!(insertBacktab:))
+            contained(|| table::navigate(&snap.text, st.doc(), sel.start, command == sel!(insertBacktab:))).flatten()
         };
         drop(snap);
         match edit {
@@ -571,7 +611,7 @@ impl EditorController {
             .position(|i| i.action() == Some(sel!(paste:)))
             .map_or(0, |p| p + 1);
         let mut insert = |item: Retained<NSMenuItem>| {
-            menu.insertItem_atIndex(&item, position as isize);
+            menu.insertItem_atIndex(&item, crate::util::to_isize(position));
             position += 1;
         };
         insert(NSMenuItem::separatorItem(mtm));
@@ -598,7 +638,7 @@ impl EditorController {
                 Action::EditAtomAt,
                 title,
                 "",
-                range.start as isize,
+                crate::util::to_isize(range.start),
             ));
         }
         if self.active().table {
@@ -671,7 +711,7 @@ impl EditorController {
             .or_else(|| {
                 pasteboard
                     .dataForType(constant!(NSPasteboardTypeTIFF))
-                    .and_then(|tiff| png_of(&tiff))
+                    .and_then(|tiff| png_of_tiff(&tiff))
             });
         let Some(png) = png else {
             return false;
@@ -747,7 +787,7 @@ impl EditorController {
         if dropped.is_empty() {
             return false;
         }
-        let at = self.snapshot().byte_at(index);
+        let at = self.snapshot().byte_at(U16(index));
         let insert = dropped_markdown(&dropped, self.doc_dir().as_deref());
         let end = at + insert.len();
         let edit = Edit {
@@ -763,23 +803,23 @@ impl EditorController {
 pub(super) fn bridge<'a>(text: &'a str, st: &'a State) -> Bridge<'a> {
     Bridge {
         text,
-        doc: &st.doc,
-        layout: &st.layout,
-        index: &st.index,
+        doc: st.doc(),
+        layout: st.layout(),
+        index: st.index(),
     }
 }
 
-fn preview_in_code(st: &State, p: usize) -> bool {
-    st.index.para_at(p).is_some_and(|i| {
+fn preview_in_code(st: &State, p: Shown) -> bool {
+    st.index().para_at(p).is_some_and(|i| {
         matches!(
-            st.index.para(&st.layout, i).style.kind,
+            st.index().para(st.layout(), i).style.kind,
             crate::preview::layout::ParaKind::Code { .. }
         )
     })
 }
 
 /// Screenshots arrive as TIFF from some apps; Markdown viewers show PNG everywhere.
-fn png_of(tiff: &objc2_foundation::NSData) -> Option<Vec<u8>> {
+fn png_of_tiff(tiff: &objc2_foundation::NSData) -> Option<Vec<u8>> {
     let rep = objc2_app_kit::NSBitmapImageRep::imageRepWithData(tiff)?;
     // SAFETY: an empty property dictionary, which every file type accepts.
     let png = unsafe {
@@ -800,10 +840,10 @@ fn preview_change(
     layout: &Layout,
     new_text: impl FnOnce() -> String,
     caret: usize,
-) -> (Range<usize>, String) {
+) -> (Range<Shown>, String) {
     match announced {
         Some(Announced::Edit(range, text))
-            if range.end <= shown_len && new_len + range.len() == shown_len + utf16_len(&text) =>
+            if range.end.0 <= shown_len && new_len + units(&range) == shown_len + utf16_len(&text) =>
         {
             (range, text)
         }
@@ -811,7 +851,10 @@ fn preview_change(
             let new: Vec<u16> = new_text().encode_utf16().collect();
             let old: Vec<u16> = preview_string(layout).encode_utf16().collect();
             let (old_range, new_range) = utf16_diff(&old, &new, caret);
-            (old_range, String::from_utf16_lossy(&new[new_range]))
+            (
+                Shown(old_range.start)..Shown(old_range.end),
+                String::from_utf16_lossy(&new[new_range]),
+            )
         }
     }
 }
@@ -886,6 +929,20 @@ pub(super) fn relative_path(dir: Option<&Path>, target: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paths_with_only_the_root_in_common_stay_absolute() {
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/c/d.png")),
+            "/c/d.png"
+        );
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/a/d.png")),
+            "../d.png"
+        );
+        assert_eq!(relative_path(Some(Path::new("/a")), Path::new("/a/b/d.png")), "b/d.png");
+        assert_eq!(relative_path(None, Path::new("/a/d.png")), "/a/d.png");
+    }
     use crate::markdown::doc::parse;
     use crate::preview::layout::{NoImages, layout};
 
@@ -907,19 +964,19 @@ mod tests {
         let text = "Ein Wort\n";
         let l = layout(text, &parse(text), &NoImages, None);
         let shown = utf16_len(&preview_string(&l));
-        let fits = Some(Announced::Edit(3..3, "x".into()));
+        let fits = Some(Announced::Edit(Shown(3)..Shown(3), "x".into()));
         assert_eq!(
             preview_change(fits, shown, shown + 1, &l, || unreachable!(), 4),
-            (3..3, "x".into())
+            (Shown(3)..Shown(3), "x".into())
         );
-        let misfit = Some(Announced::Edit(0..0, "yy".into()));
+        let misfit = Some(Announced::Edit(Shown(0)..Shown(0), "yy".into()));
         assert_eq!(
             preview_change(misfit, shown, shown + 1, &l, || "Einx Wort\n".into(), 4),
-            (3..3, "x".into())
+            (Shown(3)..Shown(3), "x".into())
         );
         assert_eq!(
             preview_change(Some(Announced::Unknown), shown, shown - 4, &l, || "Ein \n".into(), 4),
-            (4..8, String::new())
+            (Shown(4)..Shown(8), String::new())
         );
     }
 

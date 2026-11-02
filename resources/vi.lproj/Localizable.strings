@@ -59,6 +59,7 @@
 "Diagramm: {}" = "Sơ đồ: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "Tệp không phải là văn bản UTF-8 và không thể mở dưới dạng Markdown.";
 "Dienste" = "Dịch vụ";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "Tài liệu này quá lớn để xem trước. Bạn vẫn có thể tiếp tục chỉnh sửa văn bản.";
 "Dokument als PDF exportieren" = "Xuất tài liệu dưới dạng PDF";
 "Dokument drucken" = "In tài liệu";
 "Dokument jetzt prüfen" = "Kiểm tra tài liệu bây giờ";

@@ -107,6 +107,26 @@ fn is_cjk(c: char) -> bool {
     matches!(c, '\u{2E80}'..='\u{9FFF}' | '\u{F900}'..='\u{FAFF}' | '\u{FF00}'..='\u{FFEF}' | '\u{20000}'..='\u{3FFFF}')
 }
 
+/// The character in front of running text at `at`, past the formatting around it: a quote behind `**` or `<b>` opens or
+/// closes by what stands before those.
+pub fn before_text(text: &str, at: usize) -> Option<char> {
+    const MOST_TAGS: usize = 200;
+    let mut rest = &text[..text.floor_char_boundary(at)];
+    loop {
+        rest = rest.trim_end_matches(['*', '_', '~', '=', '^', '`']);
+        let window = rest.floor_char_boundary(rest.len().saturating_sub(MOST_TAGS));
+        let tag = rest
+            .ends_with('>')
+            .then(|| rest[window..].rfind('<'))
+            .flatten()
+            .map(|at| window + at);
+        match tag.filter(|&at| super::markup::read_tag(rest, at).is_some_and(|(_, end)| end == rest.len())) {
+            Some(at) => rest = &rest[..at],
+            None => return rest.chars().next_back(),
+        }
+    }
+}
+
 /// How many source bytes at the start of `source` the typographic character `shown` stands for.
 pub fn typographic_source(shown: char, source: &str) -> Option<usize> {
     let ascii = match shown {
@@ -147,9 +167,12 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
     while i < text.len() {
         let c = text[i..].chars().next().unwrap_or(' ');
         let at_word_start = prev.is_none_or(|p| p.is_whitespace() || "([{,;（［｛【「『，；、،؛".contains(p));
+        // A citation holds no other bracket, so the search for its end stops at the next one of either kind; searching
+        // on would read the rest of a long text once per `[@`.
         if c == '['
             && text[i + 1..].starts_with('@')
-            && let Some(len) = text[i..].find(']')
+            && let Some(len) = text[i + 1..].find(['[', ']']).map(|at| at + 1)
+            && text[i + len..].starts_with(']')
         {
             let inside = &text[i + 1..i + len];
             let keys: Vec<String> = inside
@@ -202,12 +225,35 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_quote_behind_a_slash_opens() {
+        let mut open = Default::default();
+        assert_eq!(smarten("a/\"b\"", None, GERMAN, &mut open), "a/„b“");
+    }
+
     const GERMAN: Quotes = Quotes {
         open: '„',
         close: '“',
         open_single: '‚',
         close_single: '‘',
     };
+
+    #[test]
+    fn formatting_does_not_count_as_the_character_before_a_quote() {
+        let text = "x **\"Hallo\"** y";
+        assert_eq!(before_text(text, 4), Some(' '));
+        assert_eq!(before_text("<b>x", 3), None);
+        assert_eq!(before_text("a <b title=\"t\">x", 15), Some(' '));
+        assert_eq!(before_text("a>x", 2), Some('>'));
+        assert_eq!(before_text("ä", 1), None);
+    }
+
+    #[test]
+    fn citations_without_a_closing_bracket_are_no_marks() {
+        assert!(marks("[@doe und [@roe", None, false).is_empty());
+        assert_eq!(marks("[@doe und [@roe]", None, false).len(), 1);
+        assert_eq!(marks("[@a [@b [@c; @d] e", None, false).len(), 1);
+    }
 
     #[test]
     fn quotes_dashes_and_ellipses_follow_the_language() {
@@ -298,5 +344,19 @@ mod tests {
             .map(|(r, _)| &chinese[r])
             .collect();
         assert_eq!(found, ["#灵感", "#12", "@anna"]);
+    }
+
+    #[test]
+    fn three_dots_are_the_source_of_an_ellipsis() {
+        assert_eq!(typographic_source('…', "...x"), Some(3));
+        assert_eq!(typographic_source('…', "..x"), None);
+    }
+
+    #[test]
+    fn a_citation_holds_nothing_but_valid_keys() {
+        for text in ["[@]", "[@a!]", "[@a; b]", "[@a; @b!]"] {
+            assert!(marks(text, None, false).is_empty(), "{text}");
+        }
+        assert_eq!(marks("[@a; @b]", None, false).len(), 1);
     }
 }

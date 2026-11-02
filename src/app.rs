@@ -42,6 +42,8 @@ define_class!(
             // WebKit needs about a second to start; doing it now keeps the first formula from waiting on it.
             crate::util::perform_later(self, objc2::sel!(warmRenderer), 1.0, false);
             crate::document::watch_files(self.mtm());
+            crate::editor::watch_memory(self.mtm());
+            crate::editor::keep_copies(self.mtm());
             // The alert would stop a self-test run; the self-test shows it itself.
             #[cfg(not(feature = "selftest"))]
             crate::editor::offer_recovered(self.mtm());
@@ -52,6 +54,11 @@ define_class!(
         #[unsafe(method(applicationDidBecomeActive:))]
         fn did_become_active(&self, _notification: &NSNotification) {
             crate::document::reload_changed_documents(self.mtm());
+        }
+
+        #[unsafe(method(applicationWillTerminate:))]
+        fn will_terminate(&self, _notification: &NSNotification) {
+            crate::editor::discard_copies();
         }
 
         #[unsafe(method(applicationShouldTerminateAfterLastWindowClosed:))]

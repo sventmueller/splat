@@ -183,11 +183,14 @@ Splat is a regular macOS document app:
 - **Open Markdown files in Splat.** **Splat › Set as Default App for Markdown** makes a double-click on a `.md` or
   `.markdown` file open Splat; macOS asks once to confirm. The item shows a checkmark while Splat is the default.
 
-Files must be UTF-8 text. Splat refuses other encodings rather than guessing and corrupting the text. A byte order
-mark stays, and in a file whose lines all end in CRLF, the lines you add get CRLF as well.
+Files must be UTF-8 text, or UTF-16 with a byte order mark. Splat refuses other encodings rather than guessing and
+corrupting the text. A byte order mark stays, UTF-16 stays UTF-16, and in a file whose lines all end in CRLF, the lines
+you add get CRLF as well.
 
-**After a crash**, Splat writes the text of every open document to `~/Library/Application Support/Splat/Recovery`
-before it quits, and on the next start it says so once, with a button that opens the folder.
+**After a crash**, at most the last few seconds of typing are lost: every five seconds, Splat copies unsaved text to
+`~/Library/Application Support/Splat/Unsaved`, and removes the copies once a document is saved or Splat quits normally.
+The next start moves what a crash left there to `~/Library/Application Support/Splat/Recovery` and says so once, with a
+button that opens the folder. A crash Splat can still react to also writes the text of every open document there.
 
 ### Quick reference
 
@@ -478,6 +481,11 @@ PlantUML's engine (7 MB) loads only with the first PlantUML diagram. A PlantUML 
   their servers that and when you open the document. **Load Images** allows them for this document; Splat remembers
   the choice per file.
 - **Size.** `<img width="200">` sizes an image; otherwise images fit the width of the preview.
+- **Changes on disk.** An image you replace, or one that appears after the document named it, shows without opening
+  the document again. Images from the web that failed because of the network are tried again while a document shows
+  them.
+- **Memory.** Images show at up to 2560 pixels on their longest side, which also fills an A4 page. They decode smaller
+  once they fill an eighth of the Mac's memory, and while macOS reports memory pressure.
 - **Dark mode.** Images with a white background are slightly dimmed in the dark preview.
 - **Pasting and dropping.** See [In the source](#in-the-source).
 
@@ -583,6 +591,9 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
   and below, and a missing picture is looked for only there. An image path elsewhere, absolute or starting with `~`,
   still loads, and HTML and Word exports embed it: look at the export of a document you did not write before you pass
   it on.
+- **Copies of unsaved text** stay on this Mac, in your Library folder, for the recovery after a crash. They leave
+  with the save or the normal end of Splat; the copies a crash left behind stay in the recovery folder until you delete
+  them.
 - **Links** never start a program by a click. Web and mail links open as usual; links to other apps ask first.
 - **HTML in documents** is read by Splat's own parser. Scripts, styles, frames and forms never run.
 - **Exports** carry no scripts. HTML pages keep only a fixed list of harmless tags and attributes, as GitHub does, plus
@@ -595,11 +606,14 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
 Splat stays responsive with documents of several megabytes:
 
 - The source uses TextKit 2, which lays out only the visible part.
-- After a keystroke, only the affected paragraphs are parsed, coloured and laid out again. In a 10 MB document, a
-  keystroke takes about 25 ms.
+- While you type in the preview, and in the source of documents up to 2 MB, only the affected paragraphs are parsed,
+  coloured and laid out again: about 25 ms in a 10 MB document, and about 50 ms for a keystroke in its preview, with
+  the view's own work.
 - Large previews render the visible part first and the rest while the app is idle. Blocks scrolled into view are
   rendered before they are drawn.
-- Parsing for the preview runs in the background while you type in the source.
+- In the source of larger documents, parsing for the preview runs in the background while you type.
+- From 64 MB, a document stays plain text: the source has no colours and the preview says why it stays empty. Exports
+  still work.
 - From about 200 KB, a document opens its window before it is parsed; at 5 MB, the colours and the preview follow
   about a quarter of a second later.
 
@@ -612,6 +626,7 @@ with the file, to roughly 115–160 MB for 1 MB of Markdown and 340–510 MB for
 - **Single tildes mean subscript.** `~text~` is subscript as in Pandoc; strikethrough needs `~~two~~`. GitHub also
   strikes through with one tilde.
 - **Read-only in the preview:** embedded HTML, embedded notes and front matter are edited in the source.
+- **Very deep nesting:** HTML nested deeper than 64 levels, and inline HTML deeper than 16, gives way to its content.
 - **Merged table cells** exist only in HTML tables, and only across columns (`colspan`, no `rowspan`). MultiMarkdown's
   table syntax for merged cells is not supported.
 - **Bibliographies** are read from BibTeX only, not from CSL JSON or YAML.
@@ -645,8 +660,8 @@ public hosts load.
 **Pasting a screenshot asks me to save first.** Pasted images are stored as files next to the document, which needs a
 place on disk. Save it, then paste again.
 
-**"The file is not UTF-8 text."** Convert the file first, for example with
-`iconv -f ISO-8859-1 -t UTF-8 old.md > new.md`.
+**"The file is not UTF-8 text."** The file is in another encoding and has no byte order mark that would name it.
+Convert it first, for example with `iconv -f ISO-8859-1 -t UTF-8 old.md > new.md`.
 
 **A formula or diagram shows an error.** Click it: the editor shows the message of MathJax, Mermaid, Graphviz or
 PlantUML below the code.
@@ -748,32 +763,36 @@ permissions for the two.
 | `cargo test --release` | unit, randomised and translation tests |
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | a longer randomised search; `SPLAT_FUZZ_SEED` varies the inputs |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | one language, while others are incomplete |
-| `cargo clippy --release --all-targets [--features selftest]` | lints, including the justification of every `unsafe` block |
+| `cargo clippy --release --all-targets [--features selftest]` | lints, including the justification of every `unsafe` block, the length of functions and, in the library, number conversions |
 | `cargo xtask vendor check` | the JavaScript libraries match `vendor.lock` byte for byte |
-| `cargo xtask selftest probe` | without a window: formulas, diagrams, web images, blocked addresses, the defences of the web views |
-| `cargo xtask selftest gui [--only "<check>"] [--scenarios]` | the running app, click by click. Opens a window and types into it; the Mac is busy for about four minutes. `--scenarios` runs only the second part, in about a minute and a half |
+| `cargo xtask selftest probe` | without a window, each with its expected result: formulas, diagrams, web images against a server inside the process, blocked addresses, the defences of the web views |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | the running app, click by click. Opens a window and types into it; the Mac is busy for about four minutes. `--scenarios` runs only the second part, in about a minute and a half |
 | `cargo xtask selftest resize` | widens the window after moving the divider: the source re-wraps while the window is resized. Takes about ten seconds |
 | `cargo xtask selftest bench <file.md>` | timings for opening, typing and scrolling a large file |
-| `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, result and time |
+| `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, result and time limit |
+| `cargo test --release --test hostile` | documents built to overflow the stack or take quadratic time, through parsing, layout, both exports, keystrokes and commands |
+| `make mutants` | faults built into `src/markdown/` and `src/preview/` one by one, through [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); says which ones no test notices. Takes hours; `FILE=src/preview/bridge.rs` narrows it |
 | `cargo test --release --test decoder` | the decoder process decodes images and reaches neither files nor the network |
 | `make coverage` | line coverage of `cargo test` and all self-tests, through [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fails below the floors. Occupies the Mac for about five minutes |
 | `make coverage-library` | the floors for `src/markdown/`, `src/preview/` and `i18n.rs`, measured by `cargo test` alone |
 
 Unit tests sit next to the code they test. `tests/` holds what reaches the library from outside: the randomised tests
-in `robustness.rs`, which share the generator in `src/fuzz.rs` with those of `sync.rs`, and the decoder test, which
-starts the built program. Decisions in `src/editor/` that need no window live in free functions with tests of their
-own, such as `preview_work` and `eager_blocks` in `update.rs` or `preview_change` in `editing.rs`. The window
+in `robustness.rs`, which share the generator in `src/fuzz.rs` with those of `sync.rs`, the documents built to hurt in
+`hostile.rs`, and the decoder test, which starts the built program. Decisions in `src/editor/` that need no window live in free functions with tests of their
+own: everything the controller knows and how that changes in `state.rs`, the rules of rendering in `render_queue.rs`, the text copy in `sync.rs`. A step of the window self-test that waits in vain fails the run. The window
 self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios.rs`: every formatting and
-table command, the dialogs, link clicks, pasting, dropping, exports, a large change and the recovery after a crash.
+table command, the dialogs, link clicks, pasting, dropping, exports, a large change, images changing on disk, memory
+pressure, a huge document and the recovery after a crash.
 
 Coverage has two floors: every module at least 80 % of its lines, all modules together at least 85 %. `make coverage`
 measures `cargo test` together with the self-tests and fails below either; the floors and the few exceptions, such
-as the panic hook in `main.rs` that runs only in a crash, are in [xtask](xtask/src/main.rs) next to their reasons.
+as the panic hook in `main.rs` that runs only in a crash, are in [xtask](xtask/src/coverage.rs) next to their reasons.
 Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. The
 decoder helper opens its measurement file before it locks itself in, so it is measured as well.
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make check` and `make coverage-library` on Apple
-Silicon for every push to `main` and every pull request. The self-tests and the disk image stay on the developer's Mac: they need a screen and the
+Silicon for every push to `main` and every pull request. Every night,
+[.github/workflows/nightly.yml](.github/workflows/nightly.yml) runs `make test-long` with new random inputs. The self-tests and the disk image stay on the developer's Mac: they need a screen and the
 signing certificates in the keychain.
 
 Self-test output goes to `target/selftest/`. The self-test builds a separate app (`target/release/Splat Selftest.app`,
@@ -787,8 +806,9 @@ untouched.
 
 - `src/markdown/`: the parser binding (comrak), syntax colours, and all commands as pure text edits (`Edit`). Also
   re-parsing after an edit (`incremental.rs`), the reader for embedded HTML (`markup.rs`), typography, tags,
-  references and citations in running text (`typography.rs`), and the HTML and Word export (`html.rs`, `docx.rs`
-  with `docx/html.rs`). No AppKit.
+  references and citations in running text (`typography.rs`), how text looks and which Markdown and HTML make it so
+  (`style.rs`), what an address may be (`url.rs`), and the HTML and Word export (`html.rs`, `docx.rs` with `docx/html.rs`
+  and `docx/xml.rs`). The preview and both exports all read the same tree, `Doc`. No AppKit.
 - `src/preview/`: the preview layout, embedded HTML in it (`layout/html.rs`), and the mapping between preview and
   source (`Bridge`, `Index`). No AppKit.
 - `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views; its work is split
@@ -796,7 +816,8 @@ untouched.
 
 | Module | Responsibility |
 |---|---|
-| `mod.rs` | class, state, delegate methods, `invalidate` |
+| `mod.rs` | class, delegate methods, `invalidate` |
+| `state.rs` | what the controller knows about the document and every way that changes; its fields are private, and it touches no view |
 | `actions.rs` | command registry: selector, title, shortcut, symbol, when the command applies |
 | `editing.rs` | running and validating commands, typing in the preview |
 | `update.rs` | parsing, colouring, updating the preview; after an edit only the affected paragraphs |
@@ -807,9 +828,12 @@ untouched.
 | `navigation.rs`, `links.rs` | links, wiki links, tags, task checkboxes, folding, footnotes |
 | `env.rs` | what the preview reads from outside the text: typographic punctuation, the repository for `@name` and `#12`, the BibTeX file, embedded notes |
 | `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | preview text, local and remote images |
+| `attributes.rs` | text attributes; each key only gets a value of the type it expects |
+| `shadow.rs` | copies of unsaved text for the recovery after a crash |
 | `decoder.rs` | sandboxed helper processes that decode images and graphics |
 | `export.rs`, `outline.rs` | HTML and Word export; the outline sidebar |
-| `js.rs`, `mathfield.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor |
+| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor; the rules of what renders when, apart from WebKit |
+| `webkit.rs` | calls into WebKit; only the navigation delegate's lifetime stays with `js.rs` and `mathfield.rs` |
 | `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | window, toolbar, text views, dialogs, colours |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
@@ -818,7 +842,7 @@ untouched.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
   returns after big edits.
 - `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](vendor.lock).
-- `xtask/`: bundling, signing, the disk image, the icon, vendoring and the self-test runner.
+- `xtask/`: bundling, signing, the disk image, the icon, vendoring, the self-test runner and the coverage floors.
 
 ### Data flow
 
@@ -828,24 +852,34 @@ The source text in the left text view is the single source of truth.
 2. An update parses the copy, recolours the source only where colours changed, lays out the preview and replaces only
    the blocks whose content changed.
 3. After an edit, only the affected paragraphs are parsed, coloured and laid out again, as long as their neighbours
-   stay the same. Documents with footnotes (including `^[…]`) or `%%` comment blocks, changes to the front matter and
-   changes near link reference definitions are processed in full.
+   stay the same; `reparse_part_and_color` says when they do not. Documents with footnotes (including `^[…]`) or `%%`
+   comment blocks, changes to the front matter and changes near link reference definitions are processed in full.
 4. HTML blocks that open `<details>` or `<div align>` and close it later affect the Markdown blocks in between; a
    reused block must have the same surroundings.
-5. While you type in the source, parsing and layout run in the background. While you type in the preview, they run
+5. While you type in the source of a document up to 2 MB, the partial update runs immediately; when it does not apply,
+   or in a larger document, parsing and layout run in the background. While you type in the preview, they run
    immediately, because the preview's cursor depends on the result.
 6. Input in the preview is translated by `Bridge` into an edit of the source and takes the same path from there.
+   Markdown has too many ways of turning text into syntax for rules alone, so `preview/verify.rs` parses the changed part
+   again and compares what it shows with what was typed; an edit that does not hold is escaped further or refused.
+7. comrak's inline positions go wrong in a few places, for example behind a link reference definition. `markdown/positions.rs`
+   checks them against the source when reading a block and reads them again from the source where they do not fit.
 
 ### Rules in the controller
 
 1. The controller's own changes to the views run inside `silently()`; the delegate callbacks ignore them.
-2. `state` is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view.
-3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `images_changed`, never in the
+2. `state` is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view. It
+   changes through its own methods only, whose tests need no window.
+3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `renders_arrived` and `image_arrived`, never in the
    middle of an update.
 4. Redrawing without a text change goes through `invalidate(reason)` only.
 5. An `Rc<Snapshot>` is not held across a change of the source, or that change copies the whole text.
 6. A new command needs an entry in `actions.rs`, a method in `mod.rs` and a branch in `editing::perform`.
-7. Every `unsafe` block carries its justification as a `// SAFETY:` comment.
+7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
+   the app through `decoder::system_image` only.
+8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
+   looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user
+   waits for, like an export or saving, may touch the disk directly.
 
 ### Adding a command
 
@@ -885,6 +919,7 @@ text and that every quick reference has the outline of the German one.
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formulas and SVG images as vector PDF | MIT or Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | decoding PNG, JPEG, GIF, WebP and BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | aligning table columns | MIT or Apache-2.0 |
+| [entities](https://github.com/p-jackson/entities) | 1 | the names of HTML character references | MIT |
 | [MathJax](https://www.mathjax.org) | 3.2.2 | rendering formulas | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | visual formula editor, with KaTeX fonts | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid diagrams | MIT |

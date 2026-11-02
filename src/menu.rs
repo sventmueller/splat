@@ -6,6 +6,7 @@ use crate::i18n::t;
 use crate::updates;
 use crate::util::{item, ns, separator, submenu, tagged};
 
+#[expect(clippy::too_many_lines, reason = "one flat list of every menu")]
 pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
     let main = NSMenu::initWithTitle(NSMenu::alloc(mtm), &ns(""));
 

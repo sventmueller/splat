@@ -13,8 +13,34 @@ use super::{EditorController, State, mathfield};
 use crate::i18n::t;
 use crate::markdown::commands::{self, Edit};
 use crate::markdown::doc::{BlockKind, Doc, block_path, figure_at};
+use crate::markdown::text::{Shown, U16};
 use crate::preview::layout::{Atom, ParaKind, RunMap};
-use crate::util::{ns, perform_later, storage, to_nsrange};
+use crate::util::{contained, ns, perform_later, storage, to_nsrange};
+
+/// What closing a formula or diagram editor does to the document.
+#[derive(Debug, PartialEq, Eq)]
+enum AtomOutcome {
+    /// The source stays as it was before the editor opened.
+    Nothing,
+    /// The text inserted for a new formula goes again.
+    RemoveInserted(usize, usize),
+    /// What the editor holds replaces what it started with, as one undo step.
+    Commit,
+}
+
+/// Only Escape discards a new formula: a click into the source closes the editor too, to type the formula there.
+fn outcome_of_closing(
+    cancelled: bool,
+    original: &str,
+    inserted: Option<(usize, usize)>,
+    final_text: &str,
+) -> AtomOutcome {
+    match inserted {
+        Some((a, b)) if cancelled && original.trim().is_empty() => AtomOutcome::RemoveInserted(a, b),
+        _ if !cancelled && final_text != original => AtomOutcome::Commit,
+        _ => AtomOutcome::Nothing,
+    }
+}
 
 impl EditorController {
     /// Inserts a formula and opens its editor right away: an empty `$$` block is no formula yet for the parser, so
@@ -24,7 +50,11 @@ impl EditorController {
         let edit = {
             let snap = self.snapshot();
             let st = self.ivars().state.borrow();
-            commands::insert_formula(&snap.text, self.current_selection(&snap, &st))
+            let sel = self.current_selection(&snap, &st);
+            let Some(edit) = contained(|| commands::insert_formula(&snap.text, sel)) else {
+                return;
+            };
+            edit
         };
         let start = edit.range.start;
         let inserted = (start, start + edit.replacement.len());
@@ -70,14 +100,14 @@ impl EditorController {
         if !st.is_current(&snap) {
             return None;
         }
-        self.atom_at_preview(&st, r.location)
+        self.atom_at_preview(&st, Shown(r.location))
     }
 
     /// Source range of the formula or diagram rendered at preview offset `p`.
-    pub(super) fn atom_at_preview(&self, st: &State, p: usize) -> Option<Range<usize>> {
-        let pi = st.index.para_at(p)?;
-        let pp = st.index.paras[pi];
-        let para = st.index.para(&st.layout, pi);
+    pub(super) fn atom_at_preview(&self, st: &State, p: Shown) -> Option<Range<usize>> {
+        let pi = st.index().para_at(p)?;
+        let pp = st.index().paras[pi];
+        let para = st.index().para(st.layout(), pi);
         if matches!(para.style.kind, ParaKind::MathBlock | ParaKind::Diagram) {
             return Some(para.src.clone());
         }
@@ -105,17 +135,17 @@ impl EditorController {
             return None;
         }
         if self.preview_focused() {
-            return self.atom_near_preview(&st, self.preview().selectedRange().location);
+            return self.atom_near_preview(&st, Shown(self.preview().selectedRange().location));
         }
         let at = self.source_selection(&snap).start;
-        atom_at_source(&st.doc, at)
+        atom_at_source(st.doc(), at)
     }
 
     /// Formula or diagram at a preview offset, also when the caret sits right behind it in the same paragraph.
-    fn atom_near_preview(&self, st: &State, p: usize) -> Option<Range<usize>> {
+    fn atom_near_preview(&self, st: &State, p: Shown) -> Option<Range<usize>> {
         self.atom_at_preview(st, p).or_else(|| {
-            let before = p.checked_sub(1)?;
-            (st.index.para_at(before) == st.index.para_at(p))
+            let before = Shown(p.0.checked_sub(1)?);
+            (st.index().para_at(before) == st.index().para_at(p))
                 .then(|| self.atom_at_preview(st, before))
                 .flatten()
         })
@@ -129,21 +159,21 @@ impl EditorController {
             return None;
         }
         if self.is_preview(Some(view)) {
-            self.atom_near_preview(&st, index)
+            self.atom_near_preview(&st, Shown(index))
         } else {
-            atom_at_source(&st.doc, snap.byte_at(index))
+            atom_at_source(st.doc(), snap.byte_at(U16(index)))
         }
     }
 
     pub(super) fn atom_starting_at(&self, start: usize) -> Option<Range<usize>> {
         let st = self.ivars().state.borrow();
-        atom_at_source(&st.doc, start).filter(|r| r.start == start)
+        atom_at_source(st.doc(), start).filter(|r| r.start == start)
     }
 
     /// The editable part of a formula or diagram, the TeX or Mermaid code without delimiters, and what it is.
     pub(super) fn atom_content(&self, text: &str, range: &Range<usize>) -> (Range<usize>, AtomKind) {
         let st = self.ivars().state.borrow();
-        let path = block_path(&st.doc.blocks, range.start);
+        let path = block_path(&st.doc().blocks, range.start);
         if let Some(BlockKind::CodeBlock { content, info, .. }) = path.last().map(|b| &b.kind)
             && path.last().is_some_and(|b| b.range == *range)
         {
@@ -179,7 +209,7 @@ impl EditorController {
         self.open_atom_editor(range, None);
     }
 
-    pub(super) fn edit_atom_at_preview(&self, p: usize, frame: Option<NSRect>) {
+    pub(super) fn edit_atom_at_preview(&self, p: Shown, frame: Option<NSRect>) {
         let range = {
             let snap = self.snapshot();
             let st = self.ivars().state.borrow();
@@ -210,7 +240,7 @@ impl EditorController {
             }
             to_nsrange(snap.u16_range(&range))
         };
-        self.ivars().state.borrow_mut().pending = None;
+        self.ivars().state.borrow_mut().clear_pending();
         let undo = self.undo_manager();
         if let Some(u) = &undo {
             u.disableUndoRegistration();
@@ -255,6 +285,30 @@ impl EditorController {
         false
     }
 
+    /// The whole text is about to change under an open editor, whose offsets then mean nothing: it closes, and nothing
+    /// of it reaches the new text.
+    pub(super) fn abandon_atom_edit(&self) {
+        let Some(edit) = self.ivars().atoms.edit.borrow_mut().take() else {
+            return;
+        };
+        if edit.visual.get() {
+            mathfield::field(self.mtm()).detach();
+        }
+        edit.popover.close();
+    }
+
+    /// Commits an open editor and closes it, for what is about to change the source.
+    pub(super) fn finish_atom_edit(&self) {
+        let popover = match self.ivars().atoms.edit.try_borrow() {
+            Ok(edit) => edit.as_ref().map(|e| e.popover.clone()),
+            Err(_) => None,
+        };
+        if let Some(popover) = popover {
+            self.atom_edit_closed();
+            popover.close();
+        }
+    }
+
     /// Closing the popover commits the edit as one undo step; Escape discards it.
     pub(super) fn atom_edit_closed(&self) {
         let Some(edit) = self.ivars().atoms.edit.borrow_mut().take() else {
@@ -272,13 +326,8 @@ impl EditorController {
         let current = edit.start..edit.start + edit.len.get();
         let final_text = edit.view.string().to_string();
         self.replace_silently(current, &edit.original);
-        // Only Escape discards a new formula: a click into the source closes the editor too, to type the formula
-        // there.
-        if let Some((a, b)) = edit
-            .inserted
-            .get()
-            .filter(|_| edit.cancelled.get() && edit.original.trim().is_empty())
-        {
+        let outcome = outcome_of_closing(edit.cancelled.get(), &edit.original, edit.inserted.get(), &final_text);
+        if let AtomOutcome::RemoveInserted(a, b) = outcome {
             self.apply_edit(
                 Edit {
                     range: a..b,
@@ -288,7 +337,7 @@ impl EditorController {
                 Some(t("Formel")),
                 false,
             );
-        } else if !edit.cancelled.get() && final_text != edit.original {
+        } else if outcome == AtomOutcome::Commit {
             let range = edit.start..edit.start + edit.original.len();
             // The caret goes behind the closing delimiter: inside, the next formula would land in this one.
             let closing = {
@@ -332,4 +381,27 @@ impl EditorController {
 
 fn atom_at_source(doc: &Doc, at: usize) -> Option<Range<usize>> {
     figure_at(doc, at).map(|(range, _)| range)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn closing_an_editor_commits_only_what_changed_and_was_not_cancelled() {
+        assert_eq!(outcome_of_closing(false, "x", None, "y"), AtomOutcome::Commit);
+        assert_eq!(outcome_of_closing(false, "x", None, "x"), AtomOutcome::Nothing);
+        assert_eq!(outcome_of_closing(true, "x", None, "y"), AtomOutcome::Nothing);
+        assert_eq!(
+            outcome_of_closing(true, "", Some((3, 8)), "y"),
+            AtomOutcome::RemoveInserted(3, 8),
+            "Escape takes a new formula back"
+        );
+        assert_eq!(
+            outcome_of_closing(false, "", Some((3, 8)), "y"),
+            AtomOutcome::Commit,
+            "a click elsewhere keeps it"
+        );
+        assert_eq!(outcome_of_closing(true, "x", Some((3, 8)), "y"), AtomOutcome::Nothing);
+    }
 }

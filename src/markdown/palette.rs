@@ -44,6 +44,11 @@ pub fn color(token: Token, appearance: Appearance) -> Rgb {
 }
 
 fn mix(a: Rgb, b: Rgb, t: f64) -> Rgb {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "between two values of a byte"
+    )]
     let m = |x: u8, y: u8| (x as f64 + (y as f64 - x as f64) * t).round() as u8;
     Rgb(m(a.0, b.0), m(a.1, b.1), m(a.2, b.2))
 }

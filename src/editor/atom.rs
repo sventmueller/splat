@@ -1,7 +1,7 @@
 //! The popover that edits a formula or diagram: building blocks, syntax colors, an error line and, for formulas,
 //! the visual editor.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::ops::Range;
 
 use objc2::rc::Retained;
@@ -9,24 +9,24 @@ use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
     NSAccessibility, NSAutoresizingMaskOptions, NSBezelStyle, NSButton, NSColor, NSControlSize, NSFont,
-    NSFontAttributeName, NSFontWeightRegular, NSForegroundColorAttributeName, NSLineBreakMode, NSPopUpButton,
-    NSPopover, NSPopoverBehavior, NSScrollView, NSSegmentSwitchTracking, NSSegmentedControl, NSTextField,
-    NSTextInputClient, NSTextView, NSView, NSViewController,
+    NSFontWeightRegular, NSLineBreakMode, NSPopUpButton, NSPopover, NSPopoverBehavior, NSScrollView,
+    NSSegmentSwitchTracking, NSSegmentedControl, NSTextField, NSTextInputClient, NSTextView, NSView, NSViewController,
 };
-use objc2_foundation::{NSArray, NSPoint, NSRange, NSRect, NSRectEdge, NSSize, NSUserDefaults};
+use objc2_foundation::{NSArray, NSPoint, NSRange, NSRect, NSRectEdge, NSSize, NSUndoManager, NSUserDefaults};
 
+use super::attributes::{Attribute, add_attribute};
 use super::scroll::char_rect;
 use super::style::token_color;
 use super::update::render_key;
-use super::{AtomEdit, EditorController, js, mathfield};
+use super::{EditorController, js, mathfield};
 use crate::i18n::t;
 use crate::markdown::code;
 use crate::markdown::doc::figure_at;
-use crate::markdown::snippets::{self, DIRECTIONS, DiagramAction, DiagramKind, Shape};
-use crate::markdown::text::Utf16Map;
+use crate::markdown::snippets::{self, DIRECTIONS, DiagramAction, MermaidKind, Shape};
+use crate::markdown::text::{U16, Utf16Map};
 use crate::preview::map::preview_offset;
 use crate::util::constant;
-use crate::util::{byte_range_to_ns, from_nsrange, ns, storage};
+use crate::util::{byte_range_to_ns, from_nsrange, insert_text, ns, storage};
 
 const GREEK_TAG: isize = 100;
 const RELATION_TAG: isize = 200;
@@ -59,13 +59,44 @@ const DIAGRAM_ACTIONS: [DiagramAction; 21] = [
 const VISUAL_DEFAULT: &str = "FormulaEditorCode";
 
 pub(super) fn diagram_tag(action: DiagramAction) -> isize {
-    DIAGRAM_TAG + DIAGRAM_ACTIONS.iter().position(|a| *a == action).unwrap_or(0) as isize
+    DIAGRAM_TAG + crate::util::to_isize(DIAGRAM_ACTIONS.iter().position(|a| *a == action).unwrap_or(0))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AtomKind {
     Formula { display: bool },
     Diagram(crate::markdown::doc::DiagramKind),
+}
+
+/// An open popover editing the source of a formula or diagram in place.
+pub(super) struct AtomEdit {
+    pub(super) popover: Retained<NSPopover>,
+    pub(super) view: Retained<NSTextView>,
+    pub(super) start: usize,
+    pub(super) len: Cell<usize>,
+    pub(super) original: String,
+    pub(super) cancelled: Cell<bool>,
+    pub(super) range_start: usize,
+    pub(super) kind: AtomKind,
+    pub(super) diagram: crate::markdown::snippets::MermaidKind,
+    pub(super) status: Retained<objc2_app_kit::NSTextField>,
+    pub(super) scroll: Retained<NSScrollView>,
+    pub(super) editor_frame: NSRect,
+    pub(super) visual: Cell<bool>,
+    /// Text just inserted for a new formula, removed again if the editor closes without one.
+    pub(super) inserted: Cell<Option<(usize, usize)>>,
+    /// The document counts as edited while the editor holds changes, so quitting saves them.
+    pub(super) marked_edited: Cell<bool>,
+    /// Steps within the editor, which end with it. In the document's undo history they would point at a text that the
+    /// editor mirrors into the source without a step of its own.
+    pub(super) undo: Retained<NSUndoManager>,
+}
+
+#[derive(Default)]
+pub(super) struct Atoms {
+    pub(super) edit: RefCell<Option<AtomEdit>>,
+    /// Start of the formula or diagram whose editor just closed; the caret resting on it does not reopen it.
+    pub(super) closed: Cell<Option<usize>>,
 }
 
 impl AtomKind {
@@ -130,6 +161,111 @@ impl Row<'_> {
     }
 }
 
+/// The buttons above the code: what a formula is made of, or for Mermaid the parts of its kind of diagram.
+fn building_blocks(row: &mut Row, kind: AtomKind, diagram_kind: MermaidKind) {
+    match kind {
+        AtomKind::Formula { .. } => {
+            for (n, s) in snippets::FORMULA_BUTTONS.iter().enumerate() {
+                row.button(t(s.label), t(s.tip), crate::util::to_isize(n));
+            }
+            let greek: Vec<(&str, isize)> = snippets::GREEK
+                .iter()
+                .enumerate()
+                .map(|(n, (l, _))| (*l, GREEK_TAG + crate::util::to_isize(n)))
+                .collect();
+            row.pull_down("α β", t("Griechische Buchstaben"), &greek);
+            let relations: Vec<(&str, isize)> = snippets::RELATIONS
+                .iter()
+                .enumerate()
+                .map(|(n, (l, _))| (*l, RELATION_TAG + crate::util::to_isize(n)))
+                .collect();
+            row.pull_down("≤ →", t("Relationen, Operatoren und Pfeile"), &relations);
+        }
+        AtomKind::Diagram(_) => match diagram_kind {
+            MermaidKind::Flowchart => {
+                let shapes: Vec<(&str, isize)> = Shape::ALL
+                    .iter()
+                    .map(|(s, l)| (t(l), diagram_tag(DiagramAction::Node(*s))))
+                    .collect();
+                row.pull_down(t("Knoten"), t("Knoten einfügen"), &shapes);
+                row.button(
+                    t("Verbindung"),
+                    t("Neuen Knoten an den letzten anschließen"),
+                    diagram_tag(DiagramAction::Edge),
+                );
+                row.button(
+                    t("Mit Beschriftung"),
+                    t("Beschriftete Verbindung zu einem neuen Knoten"),
+                    diagram_tag(DiagramAction::LabeledEdge),
+                );
+                row.button(
+                    t("Gruppe"),
+                    t("Knoten in einem Rahmen gruppieren"),
+                    diagram_tag(DiagramAction::Group),
+                );
+                let directions: Vec<(&str, isize)> = DIRECTIONS
+                    .iter()
+                    .map(|(d, l)| (t(l), diagram_tag(DiagramAction::Direction(d))))
+                    .collect();
+                row.pull_down(t("Richtung"), t("Richtung des Diagramms"), &directions);
+            }
+            MermaidKind::Sequence => {
+                for (label, tip, action) in [
+                    (t("Teilnehmer"), t("Teilnehmer hinzufügen"), DiagramAction::Participant),
+                    (
+                        t("Nachricht"),
+                        t("Nachricht zwischen zwei Teilnehmern"),
+                        DiagramAction::Message,
+                    ),
+                    (t("Antwort"), t("Antwort zurück"), DiagramAction::Reply),
+                    (t("Notiz"), t("Notiz neben einem Teilnehmer"), DiagramAction::Note),
+                    (t("Schleife"), t("Wiederholte Nachrichten"), DiagramAction::Loop),
+                    (t("Alternative"), t("Fallunterscheidung"), DiagramAction::Alternative),
+                ] {
+                    row.button(label, tip, diagram_tag(action));
+                }
+            }
+            MermaidKind::Gantt => {
+                for (label, tip, action) in [
+                    (t("Abschnitt"), t("Neuer Abschnitt"), DiagramAction::Section),
+                    (t("Aufgabe"), t("Aufgabe nach der letzten"), DiagramAction::Task),
+                    (
+                        t("Meilenstein"),
+                        t("Meilenstein nach der letzten Aufgabe"),
+                        DiagramAction::Milestone,
+                    ),
+                ] {
+                    row.button(label, tip, diagram_tag(action));
+                }
+            }
+            MermaidKind::Other => {}
+        },
+    }
+}
+
+/// The switch between the visual editor and LaTeX, at the right end of the status line.
+fn mode_switch(target: &AnyObject, visual: bool, width: f64, mtm: MainThreadMarker) -> Retained<NSSegmentedControl> {
+    let labels = NSArray::from_retained_slice(&[ns(t("Visuell")), ns("LaTeX")]);
+    // SAFETY: The target is the window's controller, which outlives the popover holding the control.
+    let mode = unsafe {
+        NSSegmentedControl::segmentedControlWithLabels_trackingMode_target_action(
+            &labels,
+            NSSegmentSwitchTracking::SelectOne,
+            Some(target),
+            Some(sel!(mdAtomMode:)),
+            mtm,
+        )
+    };
+    mode.setControlSize(NSControlSize::Small);
+    mode.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
+    mode.setSelectedSegment(if visual { 0 } else { 1 });
+    mode.setToolTip(Some(&ns(t("Formel grafisch oder als LaTeX-Code bearbeiten"))));
+    mode.sizeToFit();
+    mode.setFrameOrigin(NSPoint::new(width - mode.frame().size.width - 8.0, 2.0));
+    mode.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
+    mode
+}
+
 impl EditorController {
     pub(super) fn open_atom_editor(&self, range: Range<usize>, frame: Option<NSRect>) {
         if self.ivars().atoms.edit.borrow().is_some() {
@@ -168,92 +304,113 @@ impl EditorController {
         // Building blocks exist for Mermaid only.
         let diagram_kind = match kind {
             AtomKind::Diagram(crate::markdown::doc::DiagramKind::Mermaid) => snippets::diagram_kind(&original),
-            _ => DiagramKind::Other,
+            _ => MermaidKind::Other,
         };
-        match kind {
-            AtomKind::Formula { .. } => {
-                for (n, s) in snippets::FORMULA_BUTTONS.iter().enumerate() {
-                    row.button(t(s.label), t(s.tip), n as isize);
-                }
-                let greek: Vec<(&str, isize)> = snippets::GREEK
-                    .iter()
-                    .enumerate()
-                    .map(|(n, (l, _))| (*l, GREEK_TAG + n as isize))
-                    .collect();
-                row.pull_down("α β", t("Griechische Buchstaben"), &greek);
-                let relations: Vec<(&str, isize)> = snippets::RELATIONS
-                    .iter()
-                    .enumerate()
-                    .map(|(n, (l, _))| (*l, RELATION_TAG + n as isize))
-                    .collect();
-                row.pull_down("≤ →", t("Relationen, Operatoren und Pfeile"), &relations);
-            }
-            AtomKind::Diagram(_) => match diagram_kind {
-                DiagramKind::Flowchart => {
-                    let shapes: Vec<(&str, isize)> = Shape::ALL
-                        .iter()
-                        .map(|(s, l)| (t(l), diagram_tag(DiagramAction::Node(*s))))
-                        .collect();
-                    row.pull_down(t("Knoten"), t("Knoten einfügen"), &shapes);
-                    row.button(
-                        t("Verbindung"),
-                        t("Neuen Knoten an den letzten anschließen"),
-                        diagram_tag(DiagramAction::Edge),
-                    );
-                    row.button(
-                        t("Mit Beschriftung"),
-                        t("Beschriftete Verbindung zu einem neuen Knoten"),
-                        diagram_tag(DiagramAction::LabeledEdge),
-                    );
-                    row.button(
-                        t("Gruppe"),
-                        t("Knoten in einem Rahmen gruppieren"),
-                        diagram_tag(DiagramAction::Group),
-                    );
-                    let directions: Vec<(&str, isize)> = DIRECTIONS
-                        .iter()
-                        .map(|(d, l)| (t(l), diagram_tag(DiagramAction::Direction(d))))
-                        .collect();
-                    row.pull_down(t("Richtung"), t("Richtung des Diagramms"), &directions);
-                }
-                DiagramKind::Sequence => {
-                    for (label, tip, action) in [
-                        (t("Teilnehmer"), t("Teilnehmer hinzufügen"), DiagramAction::Participant),
-                        (
-                            t("Nachricht"),
-                            t("Nachricht zwischen zwei Teilnehmern"),
-                            DiagramAction::Message,
-                        ),
-                        (t("Antwort"), t("Antwort zurück"), DiagramAction::Reply),
-                        (t("Notiz"), t("Notiz neben einem Teilnehmer"), DiagramAction::Note),
-                        (t("Schleife"), t("Wiederholte Nachrichten"), DiagramAction::Loop),
-                        (t("Alternative"), t("Fallunterscheidung"), DiagramAction::Alternative),
-                    ] {
-                        row.button(label, tip, diagram_tag(action));
-                    }
-                }
-                DiagramKind::Gantt => {
-                    for (label, tip, action) in [
-                        (t("Abschnitt"), t("Neuer Abschnitt"), DiagramAction::Section),
-                        (t("Aufgabe"), t("Aufgabe nach der letzten"), DiagramAction::Task),
-                        (
-                            t("Meilenstein"),
-                            t("Meilenstein nach der letzten Aufgabe"),
-                            DiagramAction::Milestone,
-                        ),
-                    ] {
-                        row.button(label, tip, diagram_tag(action));
-                    }
-                }
-                DiagramKind::Other => {}
-            },
-        }
+        building_blocks(&mut row, kind, diagram_kind);
         row.view.setAutoresizingMask(
             NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewMinYMargin,
         );
         root.addSubview(&row.view);
 
         let editor_frame = NSRect::new(NSPoint::new(0.0, 26.0), NSSize::new(width, editor_height));
+        let (scroll, view) = self.atom_code_view(editor_frame, &original, kind);
+        root.addSubview(&scroll);
+
+        let status = NSTextField::labelWithString(&ns(""), mtm);
+        status.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
+        status.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
+        status.setFrame(NSRect::new(NSPoint::new(10.0, 5.0), NSSize::new(width - 20.0, 16.0)));
+        status.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        root.addSubview(&status);
+
+        let visual = matches!(kind, AtomKind::Formula { .. })
+            && !NSUserDefaults::standardUserDefaults().boolForKey(&ns(VISUAL_DEFAULT));
+        if matches!(kind, AtomKind::Formula { .. }) {
+            let mode = mode_switch(target, visual, width, mtm);
+            status.setFrameSize(NSSize::new(mode.frame().origin.x - 20.0, 16.0));
+            root.addSubview(&mode);
+        }
+
+        let popover = self.atom_popover(&root, size);
+
+        let (anchor_view, rect) = self.atom_anchor(range.start, source_at, frame);
+        *self.ivars().atoms.edit.borrow_mut() = Some(AtomEdit {
+            popover: popover.clone(),
+            view: view.clone(),
+            start: content.start,
+            len: Cell::new(content.len()),
+            original,
+            cancelled: Cell::new(false),
+            range_start: range.start,
+            kind,
+            diagram: diagram_kind,
+            status,
+            scroll,
+            editor_frame,
+            visual: Cell::new(false),
+            inserted: Cell::new(None),
+            marked_edited: Cell::new(false),
+            undo: NSUndoManager::new(mtm),
+        });
+        self.color_atom_code();
+        self.refresh_atom_status();
+        popover.showRelativeToRect_ofView_preferredEdge(rect, anchor_view, NSRectEdge::MaxY);
+        #[cfg(feature = "selftest")]
+        let kept_for_checks = super::selftest::keeps_unshown_editor();
+        #[cfg(not(feature = "selftest"))]
+        let kept_for_checks = false;
+        if !popover.isShown() && !kept_for_checks {
+            self.ivars().atoms.edit.borrow_mut().take();
+            return;
+        }
+        if let Some(w) = view.window() {
+            w.makeFirstResponder(Some(&view));
+        }
+        // SAFETY: Select All accepts a missing sender.
+        unsafe { view.selectAll(None) };
+        if visual {
+            self.set_atom_visual(true);
+        }
+    }
+
+    fn atom_popover(&self, root: &NSView, size: NSSize) -> Retained<NSPopover> {
+        let mtm = self.mtm();
+        let controller = NSViewController::new(mtm);
+        controller.setView(root);
+        let popover = NSPopover::new(mtm);
+        popover.setBehavior(NSPopoverBehavior::Transient);
+        popover.setContentViewController(Some(&controller));
+        popover.setContentSize(size);
+        popover.setDelegate(Some(ProtocolObject::from_ref(self)));
+        popover
+    }
+
+    /// Where the popover points: at a given frame, or at the formula in whichever view shows it.
+    fn atom_anchor(&self, start: usize, source_at: U16, frame: Option<NSRect>) -> (&NSTextView, NSRect) {
+        if let Some(frame) = frame {
+            return (self.preview(), frame);
+        }
+        if self.preview_visible() {
+            let st = self.ivars().state.borrow();
+            let p = preview_offset(st.layout(), st.index(), start);
+            drop(st);
+            // NSPopover refuses to appear at a spot that is scrolled out of view.
+            self.preview().scrollRangeToVisible(NSRange::new(p.0, 1));
+            (self.preview(), char_rect(self.preview(), p.0))
+        } else {
+            self.source().scrollRangeToVisible(NSRange::new(source_at.0, 1));
+            (self.source(), char_rect(self.source(), source_at.0))
+        }
+    }
+
+    /// The text view for a formula's or diagram's code, in its scroll view.
+    fn atom_code_view(
+        &self,
+        editor_frame: NSRect,
+        original: &str,
+        kind: AtomKind,
+    ) -> (Retained<NSScrollView>, Retained<NSTextView>) {
+        let mtm = self.mtm();
         let scroll = NSScrollView::initWithFrame(NSScrollView::alloc(mtm), editor_frame);
         scroll.setHasVerticalScroller(true);
         scroll.setDrawsBackground(false);
@@ -275,7 +432,7 @@ impl EditorController {
         view.setContinuousSpellCheckingEnabled(false);
         view.setDrawsBackground(false);
         view.setFont(Some(&code_font()));
-        view.setString(&ns(&original));
+        view.setString(&ns(original));
         view.setAccessibilityLabel(Some(&ns(if matches!(kind, AtomKind::Diagram(_)) {
             t("Mermaid-Code")
         } else {
@@ -283,94 +440,7 @@ impl EditorController {
         })));
         view.setDelegate(Some(ProtocolObject::from_ref(self)));
         scroll.setDocumentView(Some(&view));
-        root.addSubview(&scroll);
-
-        let status = NSTextField::labelWithString(&ns(""), mtm);
-        status.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
-        status.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
-        status.setFrame(NSRect::new(NSPoint::new(10.0, 5.0), NSSize::new(width - 20.0, 16.0)));
-        status.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
-        root.addSubview(&status);
-
-        let visual = matches!(kind, AtomKind::Formula { .. })
-            && !NSUserDefaults::standardUserDefaults().boolForKey(&ns(VISUAL_DEFAULT));
-        if matches!(kind, AtomKind::Formula { .. }) {
-            let labels = NSArray::from_retained_slice(&[ns(t("Visuell")), ns("LaTeX")]);
-            // SAFETY: The target is the window's controller, which outlives the popover holding the control.
-            let mode = unsafe {
-                NSSegmentedControl::segmentedControlWithLabels_trackingMode_target_action(
-                    &labels,
-                    NSSegmentSwitchTracking::SelectOne,
-                    Some(target),
-                    Some(sel!(mdAtomMode:)),
-                    mtm,
-                )
-            };
-            mode.setControlSize(NSControlSize::Small);
-            mode.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
-            mode.setSelectedSegment(if visual { 0 } else { 1 });
-            mode.setToolTip(Some(&ns(t("Formel grafisch oder als LaTeX-Code bearbeiten"))));
-            mode.sizeToFit();
-            let w = mode.frame().size.width;
-            mode.setFrameOrigin(NSPoint::new(width - w - 8.0, 2.0));
-            mode.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
-            root.addSubview(&mode);
-            status.setFrameSize(NSSize::new(width - w - 28.0, 16.0));
-        }
-
-        let controller = NSViewController::new(mtm);
-        controller.setView(&root);
-        let popover = NSPopover::new(mtm);
-        popover.setBehavior(NSPopoverBehavior::Transient);
-        popover.setContentViewController(Some(&controller));
-        popover.setContentSize(size);
-        popover.setDelegate(Some(ProtocolObject::from_ref(self)));
-
-        let (anchor_view, rect): (&NSTextView, NSRect) = if let Some(frame) = frame {
-            (self.preview(), frame)
-        } else if self.preview_visible() {
-            let st = self.ivars().state.borrow();
-            let p = preview_offset(&st.layout, &st.index, range.start);
-            drop(st);
-            // NSPopover refuses to appear at a spot that is scrolled out of view.
-            self.preview().scrollRangeToVisible(NSRange::new(p, 1));
-            (self.preview(), char_rect(self.preview(), p))
-        } else {
-            self.source().scrollRangeToVisible(NSRange::new(source_at, 1));
-            (self.source(), char_rect(self.source(), source_at))
-        };
-        *self.ivars().atoms.edit.borrow_mut() = Some(AtomEdit {
-            popover: popover.clone(),
-            view: view.clone(),
-            start: content.start,
-            len: Cell::new(content.len()),
-            original,
-            cancelled: Cell::new(false),
-            range_start: range.start,
-            kind,
-            diagram: diagram_kind,
-            status,
-            scroll,
-            editor_frame,
-            visual: Cell::new(false),
-            inserted: Cell::new(None),
-            marked_edited: Cell::new(false),
-        });
-        self.color_atom_code();
-        self.refresh_atom_status();
-        popover.showRelativeToRect_ofView_preferredEdge(rect, anchor_view, NSRectEdge::MaxY);
-        if !popover.isShown() {
-            self.ivars().atoms.edit.borrow_mut().take();
-            return;
-        }
-        if let Some(w) = view.window() {
-            w.makeFirstResponder(Some(&view));
-        }
-        // SAFETY: Select All accepts a missing sender.
-        unsafe { view.selectAll(None) };
-        if visual {
-            self.set_atom_visual(true);
-        }
+        (scroll, view)
     }
 
     /// Switches a formula popover between the visual editor and the LaTeX code.
@@ -456,23 +526,27 @@ impl EditorController {
             (e.kind, e.visual.get(), e.view.clone())
         };
         if tag >= DIAGRAM_TAG {
-            let Some(action) = DIAGRAM_ACTIONS.get((tag - DIAGRAM_TAG) as usize) else {
+            let Some(action) = DIAGRAM_ACTIONS.get(crate::util::to_usize(tag - DIAGRAM_TAG)) else {
                 return;
             };
             let code = view.string().to_string();
             let map = Utf16Map::new(&code);
-            let caret = map.to_byte(view.selectedRange().location);
+            let caret = map.to_byte(U16(view.selectedRange().location));
             let edit = snippets::diagram_snippet(&code, caret, *action, &today());
             let select = edit.range.start + edit.select.start..edit.range.start + edit.select.end;
             replace_in_view(&view, &edit.range, &edit.text, Some(select));
             return;
         }
         let template = if tag >= RELATION_TAG {
-            snippets::RELATIONS.get((tag - RELATION_TAG) as usize).map(|r| r.1)
+            snippets::RELATIONS
+                .get(crate::util::to_usize(tag - RELATION_TAG))
+                .map(|r| r.1)
         } else if tag >= GREEK_TAG {
-            snippets::GREEK.get((tag - GREEK_TAG) as usize).map(|g| g.1)
+            snippets::GREEK.get(crate::util::to_usize(tag - GREEK_TAG)).map(|g| g.1)
         } else {
-            snippets::FORMULA_BUTTONS.get(tag as usize).map(|s| s.text)
+            snippets::FORMULA_BUTTONS
+                .get(crate::util::to_usize(tag))
+                .map(|s| s.text)
         };
         let Some(template) = template else { return };
         if !matches!(kind, AtomKind::Formula { .. }) {
@@ -536,17 +610,14 @@ impl EditorController {
         }
         let all = NSRange::new(0, store.length());
         store.beginEditing();
-        // SAFETY: Fonts and colors are the values these attribute keys expect.
-        unsafe {
-            store.addAttribute_value_range(NSFontAttributeName, &code_font(), all);
-            store.addAttribute_value_range(NSForegroundColorAttributeName, &NSColor::textColor(), all);
-            for (range, token) in code::tokens(lang, &text) {
-                store.addAttribute_value_range(
-                    NSForegroundColorAttributeName,
-                    &token_color(token.into()),
-                    byte_range_to_ns(&map, &range),
-                );
-            }
+        add_attribute(&store, &Attribute::font(&code_font()), all);
+        add_attribute(&store, &Attribute::foreground(&NSColor::textColor()), all);
+        for (range, token) in code::tokens(lang, &text) {
+            add_attribute(
+                &store,
+                &Attribute::foreground(&token_color(token.into())),
+                byte_range_to_ns(&map, &range),
+            );
         }
         store.endEditing();
     }
@@ -568,7 +639,7 @@ impl EditorController {
             Some(Err(e)) => (format!("⚠︎ {}", e.lines().next().unwrap_or("")), true),
             _ => {
                 let hint = match (kind, diagram) {
-                    (AtomKind::Diagram(crate::markdown::doc::DiagramKind::Mermaid), DiagramKind::Other) => {
+                    (AtomKind::Diagram(crate::markdown::doc::DiagramKind::Mermaid), MermaidKind::Other) => {
                         t("Bausteine gibt es für Fluss-, Sequenz- und Gantt-Diagramme")
                     }
                     (AtomKind::Formula { .. }, _) if !visual => t("Tab springt zum nächsten □"),
@@ -592,7 +663,7 @@ impl EditorController {
         let start = self.ivars().atoms.edit.borrow().as_ref()?.start;
         let dark = self.is_dark();
         let st = self.ivars().state.borrow();
-        figure_at(&st.doc, start).map(|(_, figure)| render_key(&figure, dark))
+        figure_at(st.doc(), start).map(|(_, figure)| render_key(&figure, dark))
     }
 }
 
@@ -607,8 +678,7 @@ fn replace_in_view(view: &NSTextView, range: &Range<usize>, text: &str, select: 
     if let Some(w) = view.window() {
         w.makeFirstResponder(Some(view));
     }
-    // SAFETY: The inserted object is an NSString, one of the two types this method accepts.
-    unsafe { view.insertText_replacementRange(&ns(text), byte_range_to_ns(&map, range)) };
+    insert_text(view, &ns(text), byte_range_to_ns(&map, range));
     if let Some(select) = select {
         let new = view.string().to_string();
         let new_map = Utf16Map::new(&new);

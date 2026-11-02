@@ -2,9 +2,13 @@
 //! edit by edit, and the blocks the preview view shows. Free of AppKit, so it is tested here against plain
 //! reference implementations.
 
+use std::cell::{Cell, RefCell};
 use std::ops::Range;
+use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::markdown::text::{byte_at_u16, byte_at_u16_exact, utf16_len};
+use crate::markdown::text::{Shown, U16, byte_at_u16, byte_at_u16_exact, units, utf16_len};
 
 /// The source text as the source view holds it.
 #[derive(Clone)]
@@ -12,8 +16,8 @@ pub struct Snapshot {
     pub text: String,
     pub version: u64,
     pub len_u16: usize,
-    /// A UTF-16 offset and the byte offset it maps to; typing goes on near the last edit.
-    mark: (usize, usize),
+    /// A position and the byte offset it maps to; typing goes on near the last edit.
+    mark: (U16, usize),
 }
 
 impl Snapshot {
@@ -22,56 +26,139 @@ impl Snapshot {
             text,
             version,
             len_u16,
-            mark: (0, 0),
+            mark: (U16(0), 0),
         }
     }
 
     /// Applies an edit as a text storage reports it: `range` holds `inserted` in the new text and the length changed
     /// by `delta`. `None` when the edit does not fit this copy, e.g. because it splits a surrogate pair.
-    pub fn patched(mut self, range: Range<usize>, delta: isize, inserted: &str, version: u64) -> Option<Snapshot> {
-        let old_len = usize::try_from(range.len() as isize - delta).ok()?;
-        let (mark_u16, mark_byte) = if self.mark.0 <= range.start { self.mark } else { (0, 0) };
+    pub fn patched(mut self, range: Range<U16>, delta: isize, inserted: &str, version: u64) -> Option<Snapshot> {
+        let new_len = units(&range);
+        let old_len = usize::try_from(crate::util::to_isize(new_len) - delta).ok()?;
+        let (mark_u16, mark_byte) = if self.mark.0 <= range.start {
+            self.mark
+        } else {
+            (U16(0), 0)
+        };
         let start = byte_at_u16_exact(&self.text, mark_byte, range.start - mark_u16)?;
         let end = byte_at_u16_exact(&self.text, start, old_len)?;
         self.text.replace_range(start..end, inserted);
         self.version = version;
-        self.len_u16 = (self.len_u16 + range.len()).checked_sub(old_len)?;
+        self.len_u16 = (self.len_u16 + new_len).checked_sub(old_len)?;
         // Text before the edit is unchanged.
         self.mark = (range.start, start);
         Some(self)
     }
 
-    /// UTF-16 offset of a byte offset; counting starts at the last edit when the offset lies behind it.
-    pub fn u16_at(&self, byte: usize) -> usize {
+    /// The position of a byte offset; counting starts at the last edit when the offset lies behind it.
+    pub fn u16_at(&self, byte: usize) -> U16 {
         let byte = self.text.floor_char_boundary(byte.min(self.text.len()));
         if byte >= self.mark.1 {
             self.mark.0 + utf16_len(&self.text[self.mark.1..byte])
         } else {
-            utf16_len(&self.text[..byte])
+            U16(utf16_len(&self.text[..byte]))
         }
     }
 
-    /// Byte offset of the char boundary at or after a UTF-16 offset.
-    pub fn byte_at(&self, units: usize) -> usize {
-        if units >= self.mark.0 {
-            byte_at_u16(&self.text, self.mark.1, units - self.mark.0)
+    /// Byte offset of the char boundary at or after a position.
+    pub fn byte_at(&self, position: U16) -> usize {
+        if position >= self.mark.0 {
+            byte_at_u16(&self.text, self.mark.1, position - self.mark.0)
         } else {
-            byte_at_u16(&self.text, 0, units)
+            byte_at_u16(&self.text, 0, position.0)
         }
     }
 
-    /// A byte range as UTF-16 range.
-    pub fn u16_range(&self, bytes: &Range<usize>) -> Range<usize> {
+    /// A byte range as a range of positions.
+    pub fn u16_range(&self, bytes: &Range<usize>) -> Range<U16> {
         let start = self.u16_at(bytes.start);
         let from = self.text.floor_char_boundary(bytes.start.min(self.text.len()));
         let to = self.text.floor_char_boundary(bytes.end.min(self.text.len())).max(from);
         start..start + utf16_len(&self.text[from..to])
     }
 
-    /// A UTF-16 range as byte range.
-    pub fn byte_range(&self, units: &Range<usize>) -> Range<usize> {
-        let start = self.byte_at(units.start);
-        start..byte_at_u16(&self.text, start, units.end.saturating_sub(units.start))
+    /// A range of positions as byte range.
+    pub fn byte_range(&self, range: &Range<U16>) -> Range<usize> {
+        let start = self.byte_at(range.start);
+        start..byte_at_u16(&self.text, start, range.end.0.saturating_sub(range.start.0))
+    }
+}
+
+/// The source text as last read from the view, kept in step with every edit, and which update is the newest.
+#[derive(Default)]
+pub struct SourceCopy {
+    snapshot: RefCell<Option<Rc<Snapshot>>>,
+    /// Counts the character edits of the source storage.
+    version: Cell<u64>,
+    generation: Cell<u64>,
+    /// The generation again, for a background job to look at; it stops when a newer update has started.
+    latest: Arc<AtomicU64>,
+    update_scheduled: Cell<bool>,
+}
+
+impl SourceCopy {
+    pub fn version(&self) -> u64 {
+        self.version.get()
+    }
+
+    /// An edit of the source as a text storage reports it, whose length is then `length`. A copy that went out of step
+    /// would end up in every command and the preview, so it is dropped then and read anew.
+    pub fn edited(&self, range: Range<U16>, delta: isize, inserted: &str, length: usize) {
+        let version = self.version.get() + 1;
+        self.version.set(version);
+        let Ok(mut slot) = self.snapshot.try_borrow_mut() else {
+            return;
+        };
+        *slot = slot.take().and_then(|snap| {
+            let snap = Rc::try_unwrap(snap).unwrap_or_else(|shared| (*shared).clone());
+            snap.patched(range, delta, inserted, version)
+                .filter(|s| s.len_u16 == length)
+                .map(Rc::new)
+        });
+    }
+
+    /// The current text; `read` gets it from the view when edits could not patch it in place. Holding on to it across an
+    /// edit of the source makes that edit copy the whole text.
+    pub fn current(&self, read: impl FnOnce() -> (String, usize)) -> Rc<Snapshot> {
+        let version = self.version.get();
+        if let Some(s) = self.snapshot.borrow().as_ref().filter(|s| s.version == version) {
+            return s.clone();
+        }
+        let (text, len_u16) = read();
+        let s = Rc::new(Snapshot::new(text, len_u16, version));
+        *self.snapshot.borrow_mut() = Some(s.clone());
+        s
+    }
+
+    /// An update starts: every result of an older one is outdated from now on.
+    pub fn next_generation(&self) -> u64 {
+        let generation = self.generation.get() + 1;
+        self.generation.set(generation);
+        self.latest.store(generation, Ordering::SeqCst);
+        generation
+    }
+
+    pub fn is_latest(&self, generation: u64) -> bool {
+        self.generation.get() == generation
+    }
+
+    /// The generation as a background job can read it.
+    pub fn latest_generation(&self) -> Arc<AtomicU64> {
+        self.latest.clone()
+    }
+
+    /// Whether this call is the one that has to schedule the update.
+    pub fn schedule_update(&self) -> bool {
+        !self.update_scheduled.replace(true)
+    }
+
+    #[cfg(any(test, feature = "selftest"))]
+    pub fn update_is_scheduled(&self) -> bool {
+        self.update_scheduled.get()
+    }
+
+    pub fn update_ran(&self) {
+        self.update_scheduled.set(false);
     }
 }
 
@@ -90,8 +177,8 @@ pub struct BlockDiff {
     /// Number of unchanged blocks at the start and at the end.
     pub prefix: usize,
     pub suffix: usize,
-    /// UTF-16 range of the preview text that the changed blocks replace.
-    pub replace: Range<usize>,
+    /// The part of the preview text that the changed blocks replace.
+    pub replace: Range<Shown>,
 }
 
 impl Blocks {
@@ -113,7 +200,7 @@ impl Blocks {
 
     /// `edited` is the range of the shown text (before the edit) that the user changed directly, with the change in
     /// length; every block it touches is replaced. `shown_len` is the current length of the preview text.
-    pub fn diff(&self, new_keys: &[u64], edited: Option<(Range<usize>, isize)>, shown_len: usize) -> BlockDiff {
+    pub fn diff(&self, new_keys: &[u64], edited: Option<(Range<Shown>, isize)>, shown_len: usize) -> BlockDiff {
         let old_count = self.keys.len();
         let mut prefix = self.keys.iter().zip(new_keys).take_while(|(a, b)| a == b).count();
         let max_suffix = old_count.min(new_keys.len()) - prefix;
@@ -129,7 +216,7 @@ impl Blocks {
             return BlockDiff {
                 prefix: 0,
                 suffix: 0,
-                replace: 0..shown_len,
+                replace: Shown(0)..Shown(shown_len),
             };
         }
         let mut delta = 0isize;
@@ -138,7 +225,7 @@ impl Blocks {
             let mut pos = 0;
             for (i, len) in self.lens.iter().enumerate() {
                 let end = pos + len;
-                if dirty.start <= end && dirty.end >= pos {
+                if dirty.start.0 <= end && dirty.end.0 >= pos {
                     prefix = prefix.min(i);
                     suffix = suffix.min(old_count - 1 - i);
                 }
@@ -147,12 +234,12 @@ impl Blocks {
         }
         let start: usize = self.lens[..prefix].iter().sum();
         let end: usize = self.lens[..old_count - suffix].iter().sum();
-        let end = (end as isize + delta).max(start as isize) as usize;
+        let end = crate::util::to_usize(crate::util::to_isize(end) + delta).max(start);
         let start = start.min(shown_len);
         BlockDiff {
             prefix,
             suffix,
-            replace: start..end.clamp(start, shown_len),
+            replace: Shown(start)..Shown(end.clamp(start, shown_len)),
         }
     }
 
@@ -229,45 +316,88 @@ mod tests {
                 let inserted = random_text(&mut rng, 4);
                 let new: Vec<u16> = inserted.encode_utf16().collect();
                 reference.splice(a..b, new.iter().copied());
-                let delta = new.len() as isize - (b - a) as isize;
+                let delta = crate::util::to_isize(new.len()) - crate::util::to_isize(b - a);
                 snap = snap
-                    .patched(a..a + new.len(), delta, &inserted, version)
+                    .patched(U16(a)..U16(a + new.len()), delta, &inserted, version)
                     .expect("edit fits");
                 assert_eq!(snap.text, String::from_utf16(&reference).unwrap());
                 assert_eq!(snap.len_u16, reference.len());
                 for &u in &boundaries(&reference) {
-                    let byte = snap.byte_at(u);
-                    assert_eq!(snap.u16_at(byte), u, "{:?} at {u}", snap.text);
+                    let byte = snap.byte_at(U16(u));
+                    assert_eq!(snap.u16_at(byte), U16(u), "{:?} at {u}", snap.text);
                 }
             }
         }
     }
 
     #[test]
+    fn the_copy_follows_edits_and_is_read_anew_when_it_cannot() {
+        let copy = SourceCopy::default();
+        let read = |text: &str| {
+            let text = text.to_string();
+            move || {
+                let len = text.encode_utf16().count();
+                (text, len)
+            }
+        };
+        assert_eq!(copy.current(read("ab")).text, "ab");
+        copy.edited(U16(1)..U16(2), 1, "x", 3);
+        assert_eq!(copy.current(|| panic!("no need to read")).text, "axb");
+        // A length the copy does not reach means it went out of step.
+        copy.edited(U16(0)..U16(1), 1, "y", 99);
+        assert_eq!(copy.current(read("neu")).text, "neu");
+    }
+
+    #[test]
+    fn only_the_newest_update_counts_and_background_jobs_can_tell() {
+        let copy = SourceCopy::default();
+        let first = copy.next_generation();
+        let latest = copy.latest_generation();
+        assert!(copy.is_latest(first));
+        assert_eq!(latest.load(Ordering::SeqCst), first);
+        let second = copy.next_generation();
+        assert!(!copy.is_latest(first) && copy.is_latest(second));
+        assert_eq!(
+            latest.load(Ordering::SeqCst),
+            second,
+            "every update stops the job of the one before"
+        );
+    }
+
+    #[test]
+    fn an_update_is_scheduled_once_until_it_ran() {
+        let copy = SourceCopy::default();
+        assert!(copy.schedule_update());
+        assert!(!copy.schedule_update() && copy.update_is_scheduled());
+        copy.update_ran();
+        assert!(copy.schedule_update());
+    }
+
+    #[test]
     fn edits_splitting_a_surrogate_pair_are_refused() {
         let snap = Snapshot::new("a😀b".into(), 4, 0);
-        assert!(snap.clone().patched(2..3, 0, "x", 1).is_none());
-        assert!(snap.clone().patched(2..2, -1, "", 1).is_none());
-        assert_eq!(snap.patched(1..2, -1, "x", 1).unwrap().text, "axb");
+        assert!(snap.clone().patched(U16(2)..U16(3), 0, "x", 1).is_none());
+        assert!(snap.clone().patched(U16(2)..U16(2), -1, "", 1).is_none());
+        assert_eq!(snap.patched(U16(1)..U16(2), -1, "x", 1).unwrap().text, "axb");
     }
 
     #[test]
     fn ranges_convert_both_ways() {
         let mut snap = Snapshot::new("ä😀 b".into(), 5, 0);
-        snap = snap.patched(1..2, 1, "x", 1).unwrap();
+        snap = snap.patched(U16(1)..U16(2), 1, "x", 1).unwrap();
         assert_eq!(snap.text, "äx😀 b");
-        assert_eq!(snap.u16_range(&(2..3)), 1..2);
-        assert_eq!(snap.u16_range(&(3..7)), 2..4);
-        assert_eq!(snap.byte_range(&(2..4)), 3..7);
-        assert_eq!(snap.u16_range(&(0..100)), 0..6);
+        assert_eq!(snap.u16_range(&(2..3)), U16(1)..U16(2));
+        assert_eq!(snap.u16_range(&(3..7)), U16(2)..U16(4));
+        assert_eq!(snap.byte_range(&(U16(2)..U16(4))), 3..7);
+        assert_eq!(snap.u16_range(&(0..100)), U16(0)..U16(6));
         // A byte offset inside a character counts up to the character's start.
-        assert_eq!(snap.u16_at(1), 0);
+        assert_eq!(snap.u16_at(1), U16(0));
     }
 
     fn content(key: u64) -> String {
         let pieces = ["x", "ä", "😀", "\n"];
         (0..=(key % 5) as usize)
-            .map(|i| pieces[(key as usize + i) % 4])
+            .map(|i| pieces[(usize::try_from(key).unwrap_or(usize::MAX) + i) % 4])
             .collect()
     }
 
@@ -314,11 +444,18 @@ mod tests {
                 let (a, b) = (cuts[rng.below(cuts.len())], cuts[rng.below(cuts.len())]);
                 let (a, b) = (a.min(b), a.max(b));
                 let typed: Vec<u16> = random_text(&mut rng, 2).encode_utf16().collect();
-                edited = Some((a..b, typed.len() as isize - (b - a) as isize));
+                edited = Some((a..b, crate::util::to_isize(typed.len()) - crate::util::to_isize(b - a)));
                 text.splice(a..b, typed);
             }
-            let diff = state.diff(&new, edited.clone(), text.len());
-            text.splice(diff.replace.clone(), shown(&new[diff.prefix..new.len() - diff.suffix]));
+            let diff = state.diff(
+                &new,
+                edited.clone().map(|(r, d)| (Shown(r.start)..Shown(r.end), d)),
+                text.len(),
+            );
+            text.splice(
+                diff.replace.start.0..diff.replace.end.0,
+                shown(&new[diff.prefix..new.len() - diff.suffix]),
+            );
             assert_eq!(text, shown(&new), "{old:?} -> {new:?}, edited {edited:?}: {diff:?}");
         }
     }
@@ -340,7 +477,7 @@ mod tests {
             BlockDiff {
                 prefix: 0,
                 suffix: 0,
-                replace: 0..7
+                replace: Shown(0)..Shown(7)
             }
         );
     }

@@ -196,7 +196,7 @@ mod tests {
                     BlockKind::CodeBlock { info, .. } => format!("code {info}"),
                     other => format!("{:?}", std::mem::discriminant(other)),
                 });
-                shape(&b.children, out);
+                shape(b.children(), out);
             }
         }
         let resources = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources");

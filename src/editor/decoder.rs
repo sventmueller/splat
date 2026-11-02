@@ -1,6 +1,8 @@
 //! Images, SVGs and rendered formulas are decoded in helper processes that may neither read files nor use the
 //! network: a flaw in a decoder that a crafted document triggers then stays inside a process that can only hand
-//! back pixels. The helpers are this executable started with `ARG`.
+//! back pixels or a PDF of its own making. The helpers are this executable started with `ARG`. What is left for the
+//! system's decoders in the app itself, such as those PDFs and formats only the system reads, goes through
+//! `system_image`, so this file names all of it.
 
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -9,11 +11,11 @@ use std::time::Duration;
 
 use objc2::AnyThread;
 use objc2::rc::Retained;
-use objc2_app_kit::{NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
+use objc2_app_kit::{NSBitmapFormat, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
 use objc2_foundation::{NSData, NSSize};
 use svg2pdf::usvg::fontdb;
 
-use super::safe_image::{self, Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
+use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 
 /// Command line argument that turns the process into a decoding helper.
 pub const ARG: &str = "--splat-decoder";
@@ -21,6 +23,8 @@ pub const ARG: &str = "--splat-decoder";
 /// A decode that takes longer ends its helper, which then counts as failed.
 const TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_PDF: usize = 128 << 20;
+/// Beyond the `MAX_SIDE` of `safe_image`; the helper is trusted for no more than a sane number.
+const NATURAL_SIDE: u32 = 1 << 20;
 
 const IMAGE: u8 = 1;
 const FORMULA_SVG: u8 = 2;
@@ -35,8 +39,8 @@ const PROFILE: &str = "(version 1)\n(deny default)\n";
 
 unsafe extern "C" {
     fn sandbox_init(profile: *const std::ffi::c_char, flags: u64, errorbuf: *mut *mut std::ffi::c_char) -> i32;
-    fn kill(pid: i32, signal: i32) -> i32;
     fn close(fd: i32) -> i32;
+    fn fcntl(fd: i32, command: i32, ...) -> i32;
 }
 
 /// Runs the helper: loads the system fonts, closes itself off and then answers requests until its input ends.
@@ -60,7 +64,9 @@ pub fn serve() -> ! {
             std::process::exit(0);
         };
         let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match kind {
-            IMAGE => safe_image::decode(&payload, fonts.clone()),
+            IMAGE => payload.split_first_chunk::<4>().and_then(|(side, image)| {
+                safe_image::decode(image, fonts.clone(), u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))
+            }),
             FORMULA_SVG => std::str::from_utf8(&payload)
                 .ok()
                 .and_then(|svg| safe_image::svg_to_pdf(svg, empty.clone()))
@@ -153,21 +159,24 @@ fn mapped_system_fonts() -> Arc<fontdb::Database> {
     Arc::new(db)
 }
 
-/// Whether the helper can read the file at `path` or open a connection, which the sandbox must prevent. Only a
-/// refusal by the sandbox counts: a closed port also fails, but with another error.
+/// Whether the helper can read the file at `path`, open a connection or still holds a file the app left open, which
+/// must all be impossible. Only a refusal by the sandbox counts: a closed port also fails, but with another error.
 fn escapes(path: &[u8]) -> bool {
+    const F_GETFD: i32 = 1;
     let path = String::from_utf8_lossy(path);
     let file = std::fs::read(path.as_ref()).is_ok();
     let network = std::net::TcpStream::connect(("127.0.0.1", 9))
         .map_or_else(|e| e.kind() != std::io::ErrorKind::PermissionDenied, |_| true);
-    file || network
+    // SAFETY: asking for the flags of a descriptor number has no effect, whether it is open or not.
+    let inherited = !cfg!(coverage) && (3..256).any(|fd| unsafe { fcntl(fd, F_GETFD) } != -1);
+    file || network || inherited
 }
 
 fn read_request(input: &mut impl Read) -> std::io::Result<(u8, Vec<u8>)> {
     let mut head = [0u8; 9];
     input.read_exact(&mut head)?;
-    let len = u64::from_le_bytes(head[1..].try_into().expect("8 bytes")) as usize;
-    if len > MAX_FILE_BYTES {
+    let len = usize::try_from(u64::from_le_bytes(head[1..].try_into().expect("8 bytes"))).unwrap_or(usize::MAX);
+    if len > MAX_FILE_BYTES + 4 {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     let mut payload = vec![0; len];
@@ -183,10 +192,16 @@ fn write_answer(output: &mut impl Write, answer: Option<Decoded>) -> std::io::Re
             output.write_all(&(pdf.len() as u64).to_le_bytes())?;
             output.write_all(&pdf)
         }
-        Some(Decoded::Rgba { width, height, pixels }) => {
+        Some(Decoded::Rgba {
+            width,
+            height,
+            pixels,
+            natural,
+        }) => {
             output.write_all(&[RGBA])?;
-            output.write_all(&width.to_le_bytes())?;
-            output.write_all(&height.to_le_bytes())?;
+            for side in [width, height, natural.0, natural.1] {
+                output.write_all(&side.to_le_bytes())?;
+            }
             output.write_all(&pixels)
         }
     }
@@ -214,50 +229,63 @@ impl Helper {
         })
     }
 
-    fn exchange(&mut self, kind: u8, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
+    fn exchange(&mut self, kind: u8, side: Option<u32>, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
+        let prefix = side.map(u32::to_le_bytes);
+        let prefix = prefix.as_ref().map_or(&[][..], |p| &p[..]);
         self.input.write_all(&[kind])?;
-        self.input.write_all(&(payload.len() as u64).to_le_bytes())?;
+        self.input
+            .write_all(&((prefix.len() + payload.len()) as u64).to_le_bytes())?;
+        self.input.write_all(prefix)?;
         self.input.write_all(payload)?;
         self.input.flush()?;
-        let mut tag = [0u8; 1];
-        self.output.read_exact(&mut tag)?;
-        let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidData);
-        // The helper may have been taken over, so nothing it sends is trusted beyond these bounds.
-        match tag[0] {
-            NOTHING => Ok(None),
-            PDF => {
-                let len = self.read_u64()? as usize;
-                if len > MAX_PDF {
-                    return Err(invalid());
-                }
-                let mut pdf = vec![0; len];
-                self.output.read_exact(&mut pdf)?;
-                Ok(pdf.starts_with(b"%PDF").then_some(Decoded::Pdf(pdf)))
-            }
-            RGBA => {
-                let width = self.read_u32()?;
-                let height = self.read_u32()?;
-                if !(1..=SHOWN_SIDE).contains(&width) || !(1..=SHOWN_SIDE).contains(&height) {
-                    return Err(invalid());
-                }
-                let mut pixels = vec![0; width as usize * height as usize * 4];
-                self.output.read_exact(&mut pixels)?;
-                Ok(Some(Decoded::Rgba { width, height, pixels }))
-            }
-            _ => Err(invalid()),
-        }
+        read_answer(&mut self.output, side)
     }
+}
 
-    fn read_u32(&mut self) -> std::io::Result<u32> {
+/// The answer of a helper, which may have been taken over: nothing it sends is trusted beyond these bounds.
+fn read_answer(input: &mut impl Read, side: Option<u32>) -> std::io::Result<Option<Decoded>> {
+    let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidData);
+    let u32_from = |input: &mut dyn Read| -> std::io::Result<u32> {
         let mut b = [0u8; 4];
-        self.output.read_exact(&mut b)?;
+        input.read_exact(&mut b)?;
         Ok(u32::from_le_bytes(b))
-    }
-
-    fn read_u64(&mut self) -> std::io::Result<u64> {
-        let mut b = [0u8; 8];
-        self.output.read_exact(&mut b)?;
-        Ok(u64::from_le_bytes(b))
+    };
+    let mut tag = [0u8; 1];
+    input.read_exact(&mut tag)?;
+    match tag[0] {
+        NOTHING => Ok(None),
+        PDF => {
+            let mut len = [0u8; 8];
+            input.read_exact(&mut len)?;
+            let len = usize::try_from(u64::from_le_bytes(len)).map_err(|_| invalid())?;
+            if len > MAX_PDF {
+                return Err(invalid());
+            }
+            let mut pdf = vec![0; len];
+            input.read_exact(&mut pdf)?;
+            Ok(pdf.starts_with(b"%PDF").then_some(Decoded::Pdf(pdf)))
+        }
+        RGBA => {
+            let width = u32_from(input)?;
+            let height = u32_from(input)?;
+            let natural = (u32_from(input)?, u32_from(input)?);
+            if !(1..=NATURAL_SIDE).contains(&natural.0) || !(1..=NATURAL_SIDE).contains(&natural.1) {
+                return Err(invalid());
+            }
+            let allowed = 1..=side.unwrap_or(EXPORT_SIDE);
+            if !allowed.contains(&width) || !allowed.contains(&height) {
+                return Err(invalid());
+            }
+            let mut pixels = vec![0; width as usize * height as usize * 4];
+            input.read_exact(&mut pixels)?;
+            Ok(Some(Decoded::Rgba {
+                width,
+                height,
+                pixels,
+                natural,
+            }))
+        }
+        _ => Err(invalid()),
     }
 }
 
@@ -273,43 +301,73 @@ pub const HELPER_COUNT: usize = 3;
 static HELPERS: [Mutex<Option<Helper>>; HELPER_COUNT] = [const { Mutex::new(None) }; HELPER_COUNT];
 static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-fn request(kind: u8, payload: &[u8]) -> Option<Decoded> {
-    if payload.len() > MAX_FILE_BYTES {
-        return None;
-    }
-    let slot = &HELPERS[NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % HELPERS.len()];
-    let mut guard = slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if guard.is_none() {
-        *guard = Helper::start();
-    }
-    let helper = guard.as_mut()?;
-    let pid = helper.child.id() as i32;
-    let (done, finished) = std::sync::mpsc::channel::<()>();
-    std::thread::spawn(move || {
-        if finished.recv_timeout(TIMEOUT) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
-            // SAFETY: plain signal delivery; the helper is a child of this process and not waited for yet.
-            unsafe { kill(pid, 9) };
+/// A free helper if there is one, so that an image that takes long holds up nothing but itself.
+fn free_helper() -> std::sync::MutexGuard<'static, Option<Helper>> {
+    let first = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    for n in 0..HELPERS.len() {
+        if let Ok(free) = HELPERS[(first + n) % HELPERS.len()].try_lock() {
+            return free;
         }
-    });
-    let answer = helper.exchange(kind, payload);
-    let _ = done.send(());
-    match answer {
-        Ok(decoded) => decoded,
-        Err(_) => {
-            *guard = None;
-            None
+    }
+    HELPERS[first % HELPERS.len()]
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Ends the helpers that are not decoding; the next request starts them again.
+pub fn release_idle() {
+    for slot in &HELPERS {
+        if let Ok(mut idle) = slot.try_lock() {
+            *idle = None;
         }
     }
 }
 
-/// An image file or download: PNG, JPEG, GIF, WebP and BMP become pixels, SVG a PDF.
-pub fn decode(bytes: &[u8]) -> Option<Decoded> {
-    request(IMAGE, bytes)
+fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
+    if payload.len() > MAX_FILE_BYTES {
+        return None;
+    }
+    let mut guard = free_helper();
+    // A helper can die of what the image before did to it, so a failure gets one more try with a new one; a file that
+    // ends every helper or takes too long then fails on its own.
+    for _ in 0..2 {
+        if guard.is_none() {
+            *guard = Helper::start();
+        }
+        let helper = guard.as_mut()?;
+        let pid = i32::try_from(helper.child.id()).ok()?;
+        let timed_out = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (done, finished) = std::sync::mpsc::channel::<()>();
+        let noted = timed_out.clone();
+        std::thread::spawn(move || {
+            if finished.recv_timeout(TIMEOUT) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+                noted.store(true, std::sync::atomic::Ordering::SeqCst);
+                crate::util::end_process(pid);
+            }
+        });
+        let answer = helper.exchange(kind, side, payload);
+        let _ = done.send(());
+        match answer {
+            Ok(decoded) => return decoded,
+            Err(_) => {
+                *guard = None;
+                if timed_out.load(std::sync::atomic::Ordering::SeqCst) {
+                    return None;
+                }
+            }
+        }
+    }
+    None
+}
+
+/// An image file or download: PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`, SVG a PDF.
+pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
+    request(IMAGE, Some(side), bytes)
 }
 
 /// A formula or diagram as rendered by WebKit, converted without fonts: MathJax draws glyphs as paths.
 pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
-    match request(FORMULA_SVG, svg.as_bytes())? {
+    match request(FORMULA_SVG, None, svg.as_bytes())? {
         Decoded::Pdf(pdf) => Some(pdf),
         Decoded::Rgba { .. } => None,
     }
@@ -328,15 +386,30 @@ pub fn self_check(path: &str) -> Option<bool> {
     (answer[0] == SELF_CHECK).then_some(answer[1] != 0)
 }
 
+/// Bytes read by the system's decoders in the app itself, outside the sandbox of the helpers. Nothing else may hand
+/// bytes to `NSImage`: formats the helpers cannot read arrive here checked by `images::native_only`, vector PDFs from the
+/// helper or from WebKit by their own origin.
+pub fn system_image(bytes: &[u8]) -> Option<Retained<NSImage>> {
+    NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))
+}
+
 /// An image from decoded pixels or from a PDF the helper wrote.
 pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
     match decoded {
-        Decoded::Pdf(pdf) => NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(&pdf)),
-        Decoded::Rgba { width, height, pixels } => {
-            let (w, h) = (width as isize, height as isize);
+        Decoded::Pdf(pdf) => system_image(&pdf),
+        Decoded::Rgba {
+            width,
+            height,
+            pixels,
+            natural,
+        } => {
+            let (w, h) = (
+                crate::util::to_isize(width as usize),
+                crate::util::to_isize(height as usize),
+            );
             // SAFETY: without plane pointers the image rep allocates its own buffer of the given size.
             let rep = unsafe {
-                NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bitmapFormat_bytesPerRow_bitsPerPixel(
                     NSBitmapImageRep::alloc(),
                     std::ptr::null_mut(),
                     w,
@@ -346,17 +419,21 @@ pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
                     true,
                     false,
                     NSDeviceRGBColorSpace,
+                    NSBitmapFormat::AlphaNonpremultiplied,
                     w * 4,
                     32,
                 )
             }?;
             let target = rep.bitmapData();
-            if target.is_null() || pixels.len() != (w * h * 4) as usize {
+            if target.is_null() || pixels.len() != crate::util::to_usize(w * h * 4) {
                 return None;
             }
             // SAFETY: the buffer holds width × height × 4 bytes, the length of `pixels` checked above.
             unsafe { std::ptr::copy_nonoverlapping(pixels.as_ptr(), target, pixels.len()) };
-            let image = NSImage::initWithSize(NSImage::alloc(), NSSize::new(width as f64, height as f64));
+            let image = NSImage::initWithSize(
+                NSImage::alloc(),
+                NSSize::new(f64::from(natural.0), f64::from(natural.1)),
+            );
             image.addRepresentation(&rep);
             Some(image)
         }
@@ -366,6 +443,66 @@ pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rgba(width: u32, height: u32, natural: (u32, u32), pixels: usize) -> Vec<u8> {
+        let mut answer = vec![RGBA];
+        for value in [width, height, natural.0, natural.1] {
+            answer.extend_from_slice(&value.to_le_bytes());
+        }
+        answer.extend(std::iter::repeat_n(0, pixels));
+        answer
+    }
+
+    fn read(answer: &[u8], side: Option<u32>) -> std::io::Result<Option<Decoded>> {
+        read_answer(&mut std::io::Cursor::new(answer), side)
+    }
+
+    #[test]
+    fn an_honest_answer_comes_through() {
+        assert!(read(&[NOTHING], None).unwrap().is_none());
+        let Decoded::Rgba { width, height, .. } = read(&rgba(2, 1, (2, 1), 8), Some(10)).unwrap().unwrap() else {
+            panic!()
+        };
+        assert_eq!((width, height), (2, 1));
+        let mut pdf = vec![PDF];
+        pdf.extend_from_slice(&5u64.to_le_bytes());
+        pdf.extend_from_slice(b"%PDF-");
+        assert!(matches!(read(&pdf, None).unwrap(), Some(Decoded::Pdf(_))));
+    }
+
+    /// A helper taken over by a crafted file must get nothing out of the app, least of all gigabytes of memory.
+    #[test]
+    fn a_helper_taken_over_is_believed_nothing_beyond_the_limits() {
+        for (name, answer) in [
+            ("wider than asked", rgba(11, 1, (11, 1), 44)),
+            ("higher than asked", rgba(1, 11, (1, 11), 44)),
+            ("without width", rgba(0, 1, (1, 1), 0)),
+            ("without height", rgba(1, 0, (1, 1), 0)),
+            ("natural size without width", rgba(1, 1, (0, 1), 4)),
+            ("natural size without height", rgba(1, 1, (1, 0), 4)),
+            ("natural size beyond all", rgba(1, 1, (NATURAL_SIDE + 1, 1), 4)),
+            ("fewer pixels than named", rgba(2, 2, (2, 2), 4)),
+            ("an unknown kind", vec![9]),
+            ("nothing at all", vec![]),
+        ] {
+            assert!(read(&answer, Some(10)).is_err(), "{name}");
+        }
+        let mut huge_pdf = vec![PDF];
+        huge_pdf.extend_from_slice(&(MAX_PDF as u64 + 1).to_le_bytes());
+        assert!(read(&huge_pdf, None).is_err(), "a PDF over the limit is not even read");
+        let mut no_pdf = vec![PDF];
+        no_pdf.extend_from_slice(&3u64.to_le_bytes());
+        no_pdf.extend_from_slice(b"abc");
+        assert!(
+            read(&no_pdf, None).unwrap().is_none(),
+            "what is no PDF stays out of the system's decoders"
+        );
+    }
+
+    #[test]
+    fn without_a_limit_of_its_own_an_answer_stays_within_the_export_size() {
+        assert!(read(&rgba(EXPORT_SIDE + 1, 1, (1, 1), 0), None).is_err());
+    }
 
     #[test]
     fn requests_and_answers_cross_the_pipe_intact() {
@@ -385,6 +522,7 @@ mod tests {
                 width: 1,
                 height: 1,
                 pixels: vec![1, 2, 3, 4],
+                natural: (9, 9),
             }),
         )
         .unwrap();
@@ -392,8 +530,9 @@ mod tests {
         expected.extend_from_slice(&4u64.to_le_bytes());
         expected.extend_from_slice(b"%PDF");
         expected.push(RGBA);
-        expected.extend_from_slice(&1u32.to_le_bytes());
-        expected.extend_from_slice(&1u32.to_le_bytes());
+        for side in [1u32, 1, 9, 9] {
+            expected.extend_from_slice(&side.to_le_bytes());
+        }
         expected.extend_from_slice(&[1, 2, 3, 4]);
         assert_eq!(out, expected);
     }

@@ -1,5 +1,6 @@
 //! The selection lives in the focused view; the other view shows it as a highlight in the selection colour.
 
+use std::cell::Cell;
 use std::ops::Range;
 
 use objc2::DefinedClass;
@@ -7,10 +8,38 @@ use objc2_app_kit::NSTextView;
 use objc2_foundation::NSRange;
 
 use super::EditorController;
+use super::attributes::{Attribute, add_attribute, add_temporary_attribute};
 use super::sync::Snapshot;
-use crate::preview::map::preview_offset;
+use crate::preview::map::{Shown, preview_offset};
 use crate::util::constant;
-use crate::util::{from_nsrange, layout_manager, storage, to_nsrange};
+use crate::util::{from_nsrange, layout_manager, shown_to_ns, storage};
+
+/// The selection of the focused view, shown as highlight in the other one.
+#[derive(Default)]
+pub(super) struct Marks {
+    /// The source selection while the preview has the focus. The source then shows it as a highlight: a text view
+    /// without focus draws its own selection grey, whatever colour is set for it.
+    source_mirror: Cell<Option<NSRange>>,
+    /// Ranges currently highlighted as the other view's selection.
+    source: Cell<Option<NSRange>>,
+    preview: Cell<Option<NSRange>>,
+}
+
+impl Marks {
+    /// The preview has the focus, and the source shows its selection as a highlight.
+    pub(super) fn mirrors_source(&self) -> bool {
+        self.source_mirror.get().is_some()
+    }
+
+    pub(super) fn in_preview(&self) -> Option<NSRange> {
+        self.preview.get()
+    }
+
+    #[cfg(feature = "selftest")]
+    pub(super) fn in_source(&self) -> Option<NSRange> {
+        self.source.get()
+    }
+}
 
 impl EditorController {
     /// The source selection as byte range of `snap`: the real selection, or its highlight while the preview has the
@@ -72,9 +101,9 @@ impl EditorController {
             if !st.is_current(&snap) {
                 return;
             }
-            let start = preview_offset(&st.layout, &st.index, sel.start);
-            let end = preview_offset(&st.layout, &st.index, sel.end).max(start);
-            NSRange::new(start, end - start)
+            let start = preview_offset(st.layout(), st.index(), sel.start);
+            let end = preview_offset(st.layout(), st.index(), sel.end).max(start);
+            shown_to_ns(start..end)
         };
         {
             let _silent = self.silently();
@@ -128,13 +157,12 @@ impl EditorController {
         } else {
             objc2_app_kit::NSColor::unemphasizedSelectedTextBackgroundColor()
         };
+        let highlight = Attribute::background(&color);
         if in_storage {
             let _silent = self.silently();
-            // SAFETY: A color for the background color key, within the text.
-            unsafe { storage(view).addAttribute_value_range(key, &color, range) };
+            add_attribute(&storage(view), &highlight, range);
         } else if let Some(lm) = layout_manager(view) {
-            // SAFETY: A color for the background color key, within the text.
-            unsafe { lm.addTemporaryAttribute_value_forCharacterRange(key, &color, range) };
+            add_temporary_attribute(&lm, &highlight, range);
         }
         slot.set(Some(range));
     }
@@ -144,16 +172,16 @@ impl EditorController {
         let sel = self.source_selection(&snap);
         let (start, end) = {
             let st = self.ivars().state.borrow();
-            let start = preview_offset(&st.layout, &st.index, sel.start);
+            let start = preview_offset(st.layout(), st.index(), sel.start);
             let end = if sel.is_empty() {
                 start
             } else {
-                preview_offset(&st.layout, &st.index, sel.end).max(start)
+                preview_offset(st.layout(), st.index(), sel.end).max(start)
             };
             (start, end)
         };
         let len = storage(self.preview()).length();
-        let range = to_nsrange(start.min(len)..end.min(len));
+        let range = shown_to_ns(start.min(Shown(len))..end.min(Shown(len)));
         let _silent = self.silently();
         self.preview().setSelectedRange(range);
         self.preview().scrollRangeToVisible(range);
@@ -167,8 +195,8 @@ impl EditorController {
         let sel = self.source_selection(&snap);
         let p = {
             let st = self.ivars().state.borrow();
-            preview_offset(&st.layout, &st.index, sel.start)
+            preview_offset(st.layout(), st.index(), sel.start)
         };
-        self.preview().scrollRangeToVisible(NSRange::new(p, 0));
+        self.preview().scrollRangeToVisible(NSRange::new(p.0, 0));
     }
 }

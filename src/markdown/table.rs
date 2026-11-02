@@ -1,8 +1,9 @@
+use crate::markdown::text::{line_end, line_start};
 use std::ops::Range;
 
 use unicode_width::UnicodeWidthStr;
 
-use super::commands::Edit;
+use super::commands::{Edit, continuation_of};
 use super::doc::{Align, Block, BlockKind, Doc, block_path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,11 +46,9 @@ pub fn table_at(text: &str, doc: &Doc, offset: usize) -> Option<(Table, Cell)> {
     let BlockKind::Table { alignments } = &block.kind else {
         return None;
     };
-    let line_start = text[..block.range.start].rfind('\n').map_or(0, |i| i + 1);
-    let prefix = text[line_start..block.range.start].to_string();
-    let end = text[block.range.end..]
-        .find('\n')
-        .map_or(text.len(), |i| block.range.end + i);
+    let line_begin = line_start(text, block.range.start);
+    let prefix = text[line_begin..block.range.start].to_string();
+    let end = line_end(text, block.range.end);
     let end = if text[block.range.clone()].ends_with('\n') {
         block.range.end - 1
     } else {
@@ -58,18 +57,33 @@ pub fn table_at(text: &str, doc: &Doc, offset: usize) -> Option<(Table, Cell)> {
     let cols = alignments.len();
     let mut rows = Vec::new();
     let mut cell = Cell { row: 0, col: 0 };
-    for (r, row) in block.children.iter().enumerate() {
+    for (r, row) in block.children().iter().enumerate() {
+        // comrak drops cells beyond the header's number, and rewriting the table would lose what they say.
+        let behind = row.children().last().map_or(row.range.start, |c| c.range.end);
+        if !text[behind.min(row.range.end)..row.range.end]
+            .trim_matches([' ', '\t', '|', '\r', '\n'])
+            .is_empty()
+        {
+            return None;
+        }
+        // A cell missing in the source gets an empty one from comrak, whose range holds the row's closing pipe.
         let mut cells: Vec<String> = row
-            .children
+            .children()
             .iter()
-            .map(|c| text[c.range.clone()].trim().to_string())
+            .map(|c| {
+                if c.inlines().is_empty() {
+                    String::new()
+                } else {
+                    text[c.range.clone()].trim().to_string()
+                }
+            })
             .collect();
         cells.resize(cols, String::new());
         rows.push(cells);
         if row.range.start <= offset && offset <= row.range.end {
             cell.row = r;
             cell.col = row
-                .children
+                .children()
                 .iter()
                 .position(|c| offset <= c.range.end)
                 .unwrap_or(cols - 1);
@@ -82,7 +96,7 @@ pub fn table_at(text: &str, doc: &Doc, offset: usize) -> Option<(Table, Cell)> {
         Table {
             rows,
             aligns: alignments.to_vec(),
-            range: line_start..end,
+            range: line_begin..end,
             prefix,
         },
         cell,
@@ -99,7 +113,7 @@ impl Table {
     /// Renders the table with aligned pipes; returns the text and the content offset of every cell.
     pub fn render(&self) -> (String, Vec<Vec<usize>>) {
         let widths = self.widths();
-        let following = continuation(&self.prefix);
+        let following = continuation_of(&self.prefix);
         let mut out = String::new();
         let mut offsets = Vec::new();
         for (r, row) in self.rows.iter().enumerate() {
@@ -282,30 +296,22 @@ pub fn new_table(rows: usize, cols: usize) -> String {
     table.render().0
 }
 
-/// The prefix of the lines after the first: quote markers repeat, a list marker becomes indentation, or every row
-/// would start a list item of its own.
-fn continuation(prefix: &str) -> String {
-    let mut out = String::new();
-    let mut rest = prefix;
-    loop {
-        let indent = rest.len() - rest.trim_start_matches([' ', '\t']).len();
-        out.push_str(&rest[..indent]);
-        rest = &rest[indent..];
-        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
-        let marker = if rest.starts_with('>') {
-            out.push('>');
-            1
-        } else if rest.starts_with(['-', '*', '+']) {
-            out.push(' ');
-            1
-        } else if digits > 0 && rest[digits..].starts_with(['.', ')']) {
-            out.push_str(&" ".repeat(digits + 1));
-            digits + 1
-        } else {
-            out.push_str(rest);
-            return out;
-        };
-        rest = &rest[marker..];
+#[cfg(test)]
+mod hidden_cells_tests {
+    use super::*;
+    use crate::markdown::doc::parse;
+
+    #[test]
+    fn a_table_with_more_cells_than_its_header_is_not_rewritten() {
+        let t = "| a |\n|---|\n| 1 | 2 | 3 |\n";
+        assert_eq!(navigate(t, &parse(t), t.find('1').unwrap(), false), None);
+    }
+
+    #[test]
+    fn a_cell_the_source_does_not_have_stays_empty() {
+        let t = "| a | b |\n|---|---|\n| 1 |\n";
+        let edit = navigate(t, &parse(t), t.find('a').unwrap(), false).unwrap();
+        assert_eq!(edit.replacement, "| a   | b   |\n|-----|-----|\n| 1   |     |");
     }
 }
 
@@ -360,8 +366,8 @@ mod tests {
         let d = parse(t);
         let e = table_edit(t, &d, t.find('1').unwrap(), TableOp::Format).unwrap();
         assert_eq!(apply(t, &e), "- | a   | b   |\n  |-----|-----|\n  | 1   | 2   |\n");
-        assert_eq!(continuation("> 12. "), ">     ");
-        assert_eq!(continuation("> > "), "> > ");
+        assert_eq!(continuation_of("> 12. "), ">     ");
+        assert_eq!(continuation_of("> > "), "> > ");
     }
 
     #[test]
@@ -371,5 +377,87 @@ mod tests {
         let e = table_edit(t, &d, t.find('1').unwrap(), TableOp::Format).unwrap();
         let out = apply(t, &e);
         assert_eq!(out, "> | a   | b   |\n> |-----|-----|\n> | 1   | 2   |\n");
+    }
+
+    #[test]
+    fn behind_the_last_cell_of_a_row_is_still_that_cell() {
+        let t = "| a | b |\n|---|---|\n| 1 | 2 |  \n";
+        let d = parse(t);
+        let (_, cell) = table_at(t, &d, t.find("2 |").unwrap() + 3).unwrap();
+        assert_eq!((cell.row, cell.col), (1, 1));
+    }
+
+    #[test]
+    fn shift_tab_goes_back_one_cell() {
+        let t = "| a | b |\n|---|---|\n| 1 | 2 |\n";
+        let d = parse(t);
+        let e = navigate(t, &d, t.find('2').unwrap(), true).unwrap();
+        let out = apply(t, &e);
+        assert_eq!(&out[e.selection.clone()], "1");
+    }
+
+    #[test]
+    fn spaces_behind_the_table_belong_to_it() {
+        let t = "| a |\n|---|\n| 1 |  \n\nx\n";
+        let d = parse(t);
+        let e = table_edit(t, &d, t.find('1').unwrap(), TableOp::Format).unwrap();
+        assert_eq!(apply(t, &e), "| a   |\n|-----|\n| 1   |\n\nx\n");
+    }
+
+    #[test]
+    fn right_and_centered_columns_pad_on_their_side() {
+        let format = |t: &str| {
+            let d = parse(t);
+            apply(t, &table_edit(t, &d, 2, TableOp::Format).unwrap())
+        };
+        assert_eq!(
+            format("| aaaaa |\n|----:|\n| b |\n"),
+            "| aaaaa |\n|------:|\n|     b |\n"
+        );
+        assert_eq!(
+            format("| aaaaa |\n|:---:|\n| b |\n"),
+            "| aaaaa |\n|:-----:|\n|   b   |\n"
+        );
+    }
+
+    #[test]
+    fn tab_and_shift_tab_go_cell_by_cell_through_three_rows() {
+        let t = "| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n";
+        let d = parse(t);
+        let go = |from: char, backwards: bool| {
+            let e = navigate(t, &d, t.find(from).unwrap(), backwards).unwrap();
+            let out = apply(t, &e);
+            assert_eq!(out.lines().count(), 4, "no new row from {from}");
+            out[e.selection.clone()].to_string()
+        };
+        assert_eq!(go('1', false), "2");
+        assert_eq!(go('3', false), "4");
+        assert_eq!(go('b', false), "1");
+        assert_eq!(go('2', true), "1");
+        assert_eq!(go('1', true), "b");
+        assert_eq!(go('a', true), "a", "the first cell has nothing before it");
+    }
+
+    #[test]
+    fn return_goes_down_one_row_in_the_same_column() {
+        let t = "| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n";
+        let d = parse(t);
+        let down = |from: char| {
+            let e = move_down(t, &d, t.find(from).unwrap()).unwrap();
+            let mut s = t.to_string();
+            s.replace_range(e.range.clone(), &e.replacement);
+            s[e.selection.start..].chars().next().unwrap()
+        };
+        assert_eq!(down('b'), '2');
+        assert_eq!(down('2'), '4');
+    }
+
+    #[test]
+    fn only_quote_marks_repeat_and_list_marks_become_indentation() {
+        assert_eq!(continuation_of("> "), "> ");
+        assert_eq!(continuation_of("- "), "  ");
+        assert_eq!(continuation_of("1. "), "   ");
+        assert_eq!(continuation_of(". "), ". ", "no number");
+        assert_eq!(continuation_of("1 "), "1 ", "no mark");
     }
 }

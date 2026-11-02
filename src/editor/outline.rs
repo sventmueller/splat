@@ -71,12 +71,16 @@ define_class!(
     unsafe impl NSOutlineViewDataSource for OutlineSource {
         #[unsafe(method(outlineView:numberOfChildrenOfItem:))]
         fn children_count(&self, _view: &NSOutlineView, item: Option<&AnyObject>) -> isize {
-            self.children_of(item).len() as isize
+            crate::util::to_isize(self.children_of(item).len())
         }
 
         #[unsafe(method_id(outlineView:child:ofItem:))]
         fn child(&self, _view: &NSOutlineView, index: isize, item: Option<&AnyObject>) -> Retained<AnyObject> {
-            let i = self.children_of(item).get(index as usize).copied().unwrap_or(0);
+            let i = self
+                .children_of(item)
+                .get(crate::util::to_usize(index))
+                .copied()
+                .unwrap_or(0);
             crate::util::obj(NSNumber::new_usize(i))
         }
 

@@ -44,30 +44,56 @@ fn bmp() -> Vec<u8> {
     b
 }
 
+/// An image request: the longest side wanted, then the image.
+fn image(side: u32, bytes: &[u8]) -> Vec<u8> {
+    let mut payload = side.to_le_bytes().to_vec();
+    payload.extend_from_slice(bytes);
+    payload
+}
+
 #[test]
 fn images_decode_to_pixels_and_svgs_to_pdf() {
     let mut child = helper();
-    send(&mut child, 1, &bmp());
-    let head = read(&mut child, 9);
-    assert_eq!(head, [2, 2, 0, 0, 0, 1, 0, 0, 0]);
+    send(&mut child, 1, &image(2560, &bmp()));
+    let head = read(&mut child, 17);
+    assert_eq!(head, [2, 2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0]);
     assert_eq!(read(&mut child, 8), [255, 0, 0, 255, 0, 0, 255, 255]);
     let svg =
         br#"<svg xmlns="http://www.w3.org/2000/svg" width="80" height="20"><text x="2" y="15">Splat</text></svg>"#;
-    send(&mut child, 1, svg);
+    send(&mut child, 1, &image(2560, svg));
     assert_eq!(read(&mut child, 1), [1]);
-    let len = u64::from_le_bytes(read(&mut child, 8).try_into().unwrap()) as usize;
+    let len = usize::try_from(u64::from_le_bytes(read(&mut child, 8).try_into().unwrap())).unwrap();
     assert!(read(&mut child, len).starts_with(b"%PDF"));
-    send(&mut child, 1, b"not an image");
+    send(&mut child, 1, &image(1, &bmp()));
+    assert_eq!(
+        read(&mut child, 17),
+        [2, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0],
+        "scaled down to one pixel, and still naming its size"
+    );
+    read(&mut child, 4);
+    send(&mut child, 1, &image(2560, b"not an image"));
     assert_eq!(read(&mut child, 1), [0]);
+    send(&mut child, 1, b"no");
+    assert_eq!(read(&mut child, 1), [0], "too short to name a side");
     drop(child.stdin.take());
     assert!(child.wait().unwrap().success(), "the helper ends with its input");
 }
 
+unsafe extern "C" {
+    fn fcntl(fd: i32, command: i32, ...) -> i32;
+}
+
 #[test]
 fn the_helper_can_neither_read_files_nor_connect() {
+    const F_SETFD: i32 = 2;
     let path = std::env::temp_dir().join(format!("splat-secret-{}", std::process::id()));
     std::fs::write(&path, "secret").unwrap();
+    // A file the app left open without close-on-exec, as a library might.
+    let open = std::fs::File::open(&path).unwrap();
+    // SAFETY: Clearing the flags of a descriptor this test owns for as long as the file lives.
+    assert_eq!(unsafe { fcntl(std::os::fd::AsRawFd::as_raw_fd(&open), F_SETFD, 0) }, 0);
     let mut child = helper();
+    drop(open);
     send(&mut child, 3, path.to_str().unwrap().as_bytes());
     assert_eq!(
         read(&mut child, 2),

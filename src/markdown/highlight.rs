@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::code::{self, CodeToken};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, walk_blocks};
-use super::text::{LineStarts, common_prefix, common_suffix, right_to_left};
+use super::text::{LineStarts, right_to_left, shifted};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -40,25 +40,15 @@ pub struct Style {
     pub strike: bool,
 }
 
-#[derive(Clone, Copy)]
-struct Paint {
-    token: Option<Token>,
-    bold: bool,
-    italic: bool,
-    strike: bool,
-}
-
-impl Paint {
+impl Style {
     fn color(token: Token) -> Self {
-        Paint {
+        Style {
             token: Some(token),
-            bold: false,
-            italic: false,
-            strike: false,
+            ..Style::default()
         }
     }
     fn flags(bold: bool, italic: bool, strike: bool) -> Self {
-        Paint {
+        Style {
             token: None,
             bold,
             italic,
@@ -73,7 +63,7 @@ pub fn highlight(text: &str, doc: &Doc) -> Vec<(Range<usize>, Style)> {
 }
 
 fn highlight_blocks(text: &str, blocks: &[Block]) -> Vec<(Range<usize>, Style)> {
-    let mut spans: Vec<(Range<usize>, Paint)> = Vec::new();
+    let mut spans: Vec<(Range<usize>, Style)> = Vec::new();
     let lines = LineStarts::new(text);
     walk_blocks(blocks, &mut |b| block_spans(text, &lines, b, &mut spans));
     flatten(spans)
@@ -88,30 +78,38 @@ pub fn rehighlight(
     splice: &super::incremental::Splice,
 ) -> Vec<(Range<usize>, Style)> {
     let window = &splice.window;
-    let old_end = (window.end as isize - splice.delta) as usize;
+    let old_end = shifted(window.end, -splice.delta);
     let head = old.partition_point(|(r, _)| r.start < window.start);
     let tail = old.partition_point(|(r, _)| r.start < old_end);
     let fresh = highlight_blocks(text, &doc.blocks[splice.new.clone()]);
+    // comrak's blocks can overlap, as an HTML block behind a tab does; a color across the edge of the window then belongs
+    // to both sides, and only the whole text tells which one wins.
+    let crosses = old[..head].last().is_some_and(|(r, _)| r.end > window.start)
+        || old[..tail].last().is_some_and(|(r, _)| r.end > old_end)
+        || fresh.iter().any(|(r, _)| r.start < window.start || r.end > window.end);
+    if crosses {
+        return highlight(text, doc);
+    }
     let mut out = Vec::with_capacity(head + fresh.len() + old.len() - tail);
     out.extend_from_slice(&old[..head]);
     out.extend(fresh);
-    let at = |o: usize| (o as isize + splice.delta) as usize;
+    let at = |o: usize| shifted(o, splice.delta);
     out.extend(old[tail..].iter().map(|(r, s)| (at(r.start)..at(r.end), *s)));
     out
 }
 
-fn push(spans: &mut Vec<(Range<usize>, Paint)>, range: Range<usize>, paint: Paint) {
+fn push(spans: &mut Vec<(Range<usize>, Style)>, range: Range<usize>, paint: Style) {
     if range.start < range.end {
         spans.push((range, paint));
     }
 }
 
-fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Paint)>) {
+fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
     match &b.kind {
         BlockKind::Heading { attrs, .. } => {
             spans.push((
                 b.range.clone(),
-                Paint {
+                Style {
                     token: Some(Token::Heading),
                     bold: true,
                     italic: false,
@@ -119,23 +117,23 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
                 },
             ));
             if let Some(attrs) = attrs {
-                push(spans, attrs.clone(), Paint::color(Token::Comment));
+                push(spans, attrs.clone(), Style::color(Token::Comment));
             }
         }
-        BlockKind::Comment => push(spans, b.range.clone(), Paint::color(Token::Comment)),
+        BlockKind::Comment => push(spans, b.range.clone(), Style::color(Token::Comment)),
         BlockKind::DefinitionDetails => {
             if text[b.range.clone()].starts_with(':') {
-                push(spans, b.range.start..b.range.start + 1, Paint::color(Token::ListMarker));
+                push(spans, b.range.start..b.range.start + 1, Style::color(Token::ListMarker));
             }
         }
         BlockKind::Item { task, marker } => {
-            push(spans, marker.clone(), Paint::color(Token::ListMarker));
+            push(spans, marker.clone(), Style::color(Token::ListMarker));
             if let Some(t) = task {
                 let start = text[..t.symbol].rfind('[').unwrap_or(t.symbol);
                 push(
                     spans,
                     start..(t.symbol + 2).min(text.len()),
-                    Paint::color(Token::ListMarker),
+                    Style::color(Token::ListMarker),
                 );
             }
         }
@@ -144,7 +142,7 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
             quote_markers(text, lines, b, spans);
             spans.push((
                 marker.clone(),
-                Paint {
+                Style {
                     token: Some(Token::Quote),
                     bold: true,
                     italic: false,
@@ -156,40 +154,40 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
             content, fenced, info, ..
         } => {
             if *fenced {
-                push(spans, b.range.start..content.start, Paint::color(Token::Punctuation));
-                push(spans, content.end..b.range.end, Paint::color(Token::Punctuation));
+                push(spans, b.range.start..content.start, Style::color(Token::Punctuation));
+                push(spans, content.end..b.range.end, Style::color(Token::Punctuation));
             }
             if super::doc::is_math_fence(info) {
-                push(spans, content.clone(), Paint::color(Token::Math));
+                push(spans, content.clone(), Style::color(Token::Math));
             } else if code::known(info) {
                 for (r, t) in code::tokens(info, &text[content.clone()]) {
                     push(
                         spans,
                         content.start + r.start..content.start + r.end,
-                        Paint::color(t.into()),
+                        Style::color(t.into()),
                     );
                 }
             } else {
-                push(spans, content.clone(), Paint::color(Token::Code));
+                push(spans, content.clone(), Style::color(Token::Code));
             }
         }
-        BlockKind::HtmlBlock { .. } => push(spans, b.range.clone(), Paint::color(Token::Html)),
-        BlockKind::FrontMatter { .. } => push(spans, b.range.clone(), Paint::color(Token::Comment)),
-        BlockKind::ThematicBreak => push(spans, b.range.clone(), Paint::color(Token::Punctuation)),
-        BlockKind::MathBlock { .. } => push(spans, b.range.clone(), Paint::color(Token::Math)),
+        BlockKind::HtmlBlock { .. } => push(spans, b.range.clone(), Style::color(Token::Html)),
+        BlockKind::FrontMatter { .. } => push(spans, b.range.clone(), Style::color(Token::Comment)),
+        BlockKind::ThematicBreak => push(spans, b.range.clone(), Style::color(Token::Punctuation)),
+        BlockKind::MathBlock { .. } => push(spans, b.range.clone(), Style::color(Token::Math)),
         BlockKind::Table { .. } => table_spans(text, lines, b, spans),
         BlockKind::TableRow { header: true } => {
-            spans.push((b.range.clone(), Paint::flags(true, false, false)));
+            spans.push((b.range.clone(), Style::flags(true, false, false)));
         }
-        BlockKind::FootnoteDefinition { label, .. } => push(spans, label.clone(), Paint::color(Token::LinkText)),
+        BlockKind::FootnoteDefinition { label, .. } => push(spans, label.clone(), Style::color(Token::LinkText)),
         _ => {}
     }
-    for i in &b.inlines {
+    for i in b.inlines() {
         inline_spans(text, i, spans);
     }
 }
 
-fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Paint)>) {
+fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
     for line in lines.line_of(b.range.start)..=lines.line_of(b.range.end.saturating_sub(1)) {
         let lr = lines.line_range(text, line);
         let s = &text[lr.clone()];
@@ -201,24 +199,24 @@ fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Ran
                 _ => break,
             }
         }
-        push(spans, lr.start..lr.start + end, Paint::color(Token::Quote));
+        push(spans, lr.start..lr.start + end, Style::color(Token::Quote));
     }
 }
 
-fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Paint)>) {
+fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
     let first = lines.line_of(b.range.start);
     let last = lines.line_of(b.range.end.saturating_sub(1));
     for line in first..=last {
         let lr = lines.line_range(text, line);
         if line == first + 1 {
-            push(spans, lr, Paint::color(Token::Punctuation));
+            push(spans, lr, Style::color(Token::Punctuation));
             continue;
         }
         for pipe in unescaped_pipes(&text[lr.clone()]) {
             push(
                 spans,
                 lr.start + pipe..lr.start + pipe + 1,
-                Paint::color(Token::Punctuation),
+                Style::color(Token::Punctuation),
             );
         }
     }
@@ -277,24 +275,24 @@ pub fn unescaped_pipes(line: &str) -> Vec<usize> {
     out
 }
 
-fn delimiters(i: &Inline, spans: &mut Vec<(Range<usize>, Paint)>, token: Token) {
+fn delimiters(i: &Inline, spans: &mut Vec<(Range<usize>, Style)>, token: Token) {
     let content = i.content_range();
-    push(spans, i.range.start..content.start, Paint::color(token));
-    push(spans, content.end..i.range.end, Paint::color(token));
+    push(spans, i.range.start..content.start, Style::color(token));
+    push(spans, content.end..i.range.end, Style::color(token));
 }
 
-fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Paint)>) {
+fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) {
     match &i.kind {
         InlineKind::Strong => {
-            spans.push((i.range.clone(), Paint::flags(true, false, false)));
+            spans.push((i.range.clone(), Style::flags(true, false, false)));
             delimiters(i, spans, Token::Punctuation);
         }
         InlineKind::Emph => {
-            spans.push((i.range.clone(), Paint::flags(false, true, false)));
+            spans.push((i.range.clone(), Style::flags(false, true, false)));
             delimiters(i, spans, Token::Punctuation);
         }
         InlineKind::Strikethrough => {
-            spans.push((i.range.clone(), Paint::flags(false, false, true)));
+            spans.push((i.range.clone(), Style::flags(false, false, true)));
             delimiters(i, spans, Token::Punctuation);
         }
         InlineKind::Underline | InlineKind::Highlight | InlineKind::Superscript | InlineKind::Subscript => {
@@ -304,48 +302,48 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Paint)>) 
         InlineKind::Spoiler => delimiters(i, spans, Token::Punctuation),
         InlineKind::WikiLink { .. } => {
             delimiters(i, spans, Token::Punctuation);
-            push(spans, i.content_range(), Paint::color(Token::LinkText));
+            push(spans, i.content_range(), Style::color(Token::LinkText));
         }
-        InlineKind::Emoji(_) => push(spans, i.range.clone(), Paint::color(Token::Punctuation)),
+        InlineKind::Emoji(_) => push(spans, i.range.clone(), Style::color(Token::Punctuation)),
         InlineKind::Kbd | InlineKind::Span => delimiters(i, spans, Token::Html),
-        InlineKind::HtmlImage { .. } => push(spans, i.range.clone(), Paint::color(Token::Html)),
+        InlineKind::HtmlImage { .. } => push(spans, i.range.clone(), Style::color(Token::Html)),
         InlineKind::Link { .. } if text[i.range.clone()].starts_with('<') => {
             delimiters(i, spans, Token::Html);
-            push(spans, i.content_range(), Paint::color(Token::LinkText));
+            push(spans, i.content_range(), Style::color(Token::LinkText));
         }
-        InlineKind::Comment => push(spans, i.range.clone(), Paint::color(Token::Comment)),
-        InlineKind::Code(_) => push(spans, i.range.clone(), Paint::color(Token::Code)),
-        InlineKind::Html(_) => push(spans, i.range.clone(), Paint::color(Token::Html)),
-        InlineKind::Math { .. } => push(spans, i.range.clone(), Paint::color(Token::Math)),
-        InlineKind::FootnoteRef { .. } => push(spans, i.range.clone(), Paint::color(Token::LinkText)),
+        InlineKind::Comment => push(spans, i.range.clone(), Style::color(Token::Comment)),
+        InlineKind::Code(_) => push(spans, i.range.clone(), Style::color(Token::Code)),
+        InlineKind::Html(_) => push(spans, i.range.clone(), Style::color(Token::Html)),
+        InlineKind::Math { .. } => push(spans, i.range.clone(), Style::color(Token::Math)),
+        InlineKind::FootnoteRef { .. } => push(spans, i.range.clone(), Style::color(Token::LinkText)),
         InlineKind::Link { .. } | InlineKind::Image { .. } => {
             let src = &text[i.range.clone()];
             if !src.starts_with('[') && !src.starts_with("![") {
-                push(spans, i.range.clone(), Paint::color(Token::Url));
+                push(spans, i.range.clone(), Style::color(Token::Url));
             } else {
                 let content = i.content_range();
-                push(spans, i.range.start..content.start, Paint::color(Token::Punctuation));
-                push(spans, content.clone(), Paint::color(Token::LinkText));
+                push(spans, i.range.start..content.start, Style::color(Token::Punctuation));
+                push(spans, content.clone(), Style::color(Token::LinkText));
                 let tail = &text[content.end..i.range.end];
                 match (tail.find('('), tail.rfind(')')) {
                     (Some(open), Some(close)) if open < close => {
                         push(
                             spans,
                             content.end..content.end + open + 1,
-                            Paint::color(Token::Punctuation),
+                            Style::color(Token::Punctuation),
                         );
                         push(
                             spans,
                             content.end + open + 1..content.end + close,
-                            Paint::color(Token::Url),
+                            Style::color(Token::Url),
                         );
                         push(
                             spans,
                             content.end + close..i.range.end,
-                            Paint::color(Token::Punctuation),
+                            Style::color(Token::Punctuation),
                         );
                     }
-                    _ => push(spans, content.end..i.range.end, Paint::color(Token::Punctuation)),
+                    _ => push(spans, content.end..i.range.end, Style::color(Token::Punctuation)),
                 }
             }
         }
@@ -358,7 +356,7 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Paint)>) 
                         push(
                             spans,
                             i.range.start + pos..i.range.start + pos + 1,
-                            Paint::color(Token::Punctuation),
+                            Style::color(Token::Punctuation),
                         );
                         prev_backslash = true;
                     } else {
@@ -374,7 +372,7 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Paint)>) 
     }
 }
 
-fn flatten(spans: Vec<(Range<usize>, Paint)>) -> Vec<(Range<usize>, Style)> {
+fn flatten(spans: Vec<(Range<usize>, Style)>) -> Vec<(Range<usize>, Style)> {
     let mut events: Vec<(usize, bool, usize)> = Vec::with_capacity(spans.len() * 2);
     for (idx, (r, _)) in spans.iter().enumerate() {
         events.push((r.start, true, idx));
@@ -420,17 +418,8 @@ pub fn changed_region(
     text: &str,
     spans: &[(Range<usize>, Style)],
 ) -> Range<usize> {
-    let mut prefix = common_prefix(old_text.as_bytes(), text.as_bytes());
-    while !(old_text.is_char_boundary(prefix) && text.is_char_boundary(prefix)) {
-        prefix -= 1;
-    }
-    let max_suffix = old_text.len().min(text.len()) - prefix;
-    let mut suffix = common_suffix(old_text.as_bytes(), text.as_bytes(), max_suffix);
-    while !(old_text.is_char_boundary(old_text.len() - suffix) && text.is_char_boundary(text.len() - suffix)) {
-        suffix -= 1;
-    }
-    let old_edit_end = old_text.len() - suffix;
-    let edit_end = text.len() - suffix;
+    let (old_edit, edit) = super::incremental::changed(old_text, text);
+    let (prefix, old_edit_end, edit_end) = (old_edit.start, old_edit.end, edit.end);
     let shift = |o: usize| {
         if o <= prefix {
             o
@@ -561,5 +550,138 @@ mod tests {
             s.iter()
                 .any(|(t, st)| t.contains('[') && st.token == Some(Token::ListMarker))
         );
+    }
+
+    fn token_of(t: &str, piece: &str) -> Option<Token> {
+        let spans = styled(t);
+        let found = spans.iter().find(|(text, _)| *text == piece);
+        found.unwrap_or_else(|| panic!("no {piece:?} in {spans:?}")).1.token
+    }
+
+    #[test]
+    fn every_kind_of_block_has_its_color() {
+        let t = "# T {#a}\n";
+        assert_eq!(token_of(t, "# T "), Some(Token::Heading));
+        assert!(styled(t)[0].1.bold);
+        assert_eq!(token_of(t, "{#a}"), Some(Token::Comment));
+        assert_eq!(token_of("%%\na\n%%\n", "%%\na\n%%"), Some(Token::Comment));
+        assert_eq!(token_of("x\n\nT\n: d\n", ":"), Some(Token::ListMarker));
+        assert_eq!(token_of("<div>\nx\n</div>\n", "<div>\nx\n</div>"), Some(Token::Html));
+        assert_eq!(token_of("---\na: b\n---\n", "---\na: b\n---"), Some(Token::Comment));
+        assert_eq!(token_of("x\n\n---\n", "---"), Some(Token::Punctuation));
+        assert_eq!(token_of("$$\na\n$$\n", "$$\na\n$$"), Some(Token::Math));
+        assert_eq!(token_of("x[^a]\n\n[^a]: b\n", "[^a]:"), Some(Token::LinkText));
+    }
+
+    #[test]
+    fn a_table_head_is_bold_and_the_rest_is_not() {
+        let spans = styled("a|b\n-|-\n1|2\n");
+        assert!(spans.iter().find(|(t, _)| *t == "a").unwrap().1.bold);
+        assert!(!spans.iter().any(|(t, s)| *t == "1" && s.bold));
+    }
+
+    #[test]
+    fn an_alert_shows_its_marker_and_all_quote_marks_of_a_line() {
+        let s = styled("> [!NOTE] a\n> b\n");
+        assert!(
+            s.iter()
+                .any(|(t, st)| *t == "[!NOTE] a" && st.token == Some(Token::Quote) && st.bold)
+        );
+        assert_eq!(token_of("> > a\n", "> >"), Some(Token::Quote));
+    }
+
+    #[test]
+    fn right_to_left_needs_a_real_marker_in_front_of_it() {
+        assert!(
+            !right_to_left_behind_markers(". [x] משימה"),
+            "a dot without a number is no list"
+        );
+        assert!(right_to_left_behind_markers("> [!NOTE]- - [x] הערה"));
+    }
+
+    #[test]
+    fn an_escaped_pipe_splits_no_cell() {
+        assert_eq!(unescaped_pipes("a\\|b|c"), [4]);
+        assert_eq!(unescaped_pipes("|\\\\|"), [0, 3]);
+    }
+
+    #[test]
+    fn every_kind_of_inline_has_its_color_and_style() {
+        for (t, delimiter, token) in [
+            ("a <u>b</u>\n", "<u>", Token::Html),
+            ("a ==b==\n", "==", Token::Punctuation),
+            ("a ^b^\n", "^", Token::Punctuation),
+            ("a ~b~\n", "~", Token::Punctuation),
+            ("a ||b||\n", "||", Token::Punctuation),
+            ("a <kbd>b</kbd>\n", "<kbd>", Token::Html),
+            ("a <span>b</span>\n", "<span>", Token::Html),
+            ("a [[b]]\n", "[[", Token::Punctuation),
+            ("a <a href=\"u\">b</a>\n", "<a href=\"u\">", Token::Html),
+        ] {
+            assert_eq!(token_of(t, delimiter), Some(token), "{t}");
+        }
+        assert_eq!(token_of("a [[b]]\n", "b"), Some(Token::LinkText));
+        assert_eq!(token_of("a <a href=\"u\">b</a>\n", "b"), Some(Token::LinkText));
+        assert_eq!(token_of("a :smile: b\n", ":smile:"), Some(Token::Punctuation));
+        assert_eq!(
+            token_of("a <img src=\"x.png\"> b\n", "<img src=\"x.png\">"),
+            Some(Token::Html)
+        );
+        assert_eq!(token_of("a %%c%% b\n", "%%c%%"), Some(Token::Comment));
+        assert_eq!(token_of("a <foo> b\n", "<foo>"), Some(Token::Html));
+        assert_eq!(token_of("a $b$ c\n", "$b$"), Some(Token::Math));
+        assert_eq!(token_of("x[^a]\n\n[^a]: b\n", "[^a]"), Some(Token::LinkText));
+        assert_eq!(token_of("a http://x.de b\n", "http://x.de"), Some(Token::Url));
+        assert_eq!(token_of("![a](u)\n", "u"), Some(Token::Url));
+        assert_eq!(token_of("![a](u)\n", "a"), Some(Token::LinkText));
+        assert_eq!(token_of("![a](u)\n", "!["), Some(Token::Punctuation));
+    }
+
+    #[test]
+    fn overlapping_styles_add_up() {
+        let inner = |t: &'static str| styled(t).into_iter().find(|(x, _)| *x == "a").unwrap().1;
+        let italic = inner("x *a* y\n");
+        assert!(italic.italic && !italic.bold && !italic.strike);
+        let strike = inner("x ~~a~~ y\n");
+        assert!(strike.strike && !strike.bold && !strike.italic);
+        let both = inner("x ***a*** y\n");
+        assert!(both.bold && both.italic);
+        let all = inner("x ~~***a***~~ y\n");
+        assert!(all.bold && all.italic && all.strike);
+    }
+
+    #[test]
+    fn neighbouring_spans_of_one_style_become_one() {
+        let bold = Style::flags(true, false, false);
+        assert_eq!(flatten(vec![(0..2, bold), (2..4, bold)]), [(0..4, bold)]);
+    }
+
+    #[test]
+    fn only_the_backslash_of_an_escape_is_marked() {
+        let marks = |t: &'static str| {
+            styled(t)
+                .into_iter()
+                .filter(|(_, s)| s.token == Some(Token::Punctuation))
+                .map(|(x, _)| x)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(marks("a \\* b\n"), ["\\"]);
+        assert_eq!(marks("a \\\\ b\n"), ["\\"], "a backslash that is the text itself");
+        assert!(marks("a\\b\n").is_empty(), "no escape");
+    }
+
+    #[test]
+    fn a_changed_region_starts_and_ends_at_whole_letters() {
+        let region = |a: &str, b: &str| changed_region(a, &[], b, &[]);
+        assert_eq!(region("x é y", "x è y"), 2..4, "the letters begin alike");
+        assert_eq!(region("x éy", "x ĩy"), 2..4, "the letters end alike");
+    }
+
+    #[test]
+    fn spans_behind_the_edit_only_move() {
+        let a = "*a* *b* *c* X *d* *e* *f* *g*\n";
+        let b = "*a* *b* *c* Y *d* *e* *f* *g*\n";
+        let r = changed_region(a, &highlight(a, &parse(a)), b, &highlight(b, &parse(b)));
+        assert_eq!(r, 12..13);
     }
 }

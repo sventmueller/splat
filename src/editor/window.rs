@@ -91,14 +91,12 @@ impl EditorController {
             preview_item: OnceCell::new(),
             outline: OnceCell::new(),
             outline_item: OnceCell::new(),
-            state: RefCell::new(State {
-                zoom: 1.0,
-                ..Default::default()
-            }),
+            state: RefCell::new(State::new()),
             copy: Default::default(),
             marks: Default::default(),
             atoms: Default::default(),
             images: Default::default(),
+            arrivals: Default::default(),
             remote_allowed: Cell::new(false),
             remote_banner: OnceCell::new(),
             busy: Cell::new(false),
@@ -321,7 +319,7 @@ impl EditorController {
             // SAFETY: an array of strings is a property list value, as user defaults require.
             unsafe { NSUserDefaults::standardUserDefaults().setObject_forKey(Some(&list), &ns(ALLOWED_KEY)) };
         }
-        self.invalidate(super::Invalidate::Arrivals);
+        self.invalidate(super::Invalidate::RemoteAllowed);
     }
 
     /// Remembers where the window stands and how large it is, for the next window and the next start.
@@ -430,9 +428,9 @@ impl EditorController {
         let Some(outline) = self.ivars().outline.get() else {
             return;
         };
-        let headings: Vec<_> = crate::markdown::commands::heading_anchors(&self.ivars().state.borrow().doc)
+        let headings: Vec<_> = crate::markdown::commands::heading_anchors(self.ivars().state.borrow().doc())
             .into_iter()
-            .map(|(level, title, _, range)| (level, title, range))
+            .map(|h| (h.level, h.title, h.range))
             .collect();
         outline.update(&headings);
     }
@@ -498,11 +496,10 @@ impl EditorController {
     pub(super) fn share_file(&self, refresh: bool) -> Option<Retained<NSURL>> {
         self.ivars().source.get()?;
         let doc = self.document()?;
-        let name = match doc.fileURL().and_then(|u| u.lastPathComponent()) {
+        let name = crate::util::file_name_of(&match doc.fileURL().and_then(|u| u.lastPathComponent()) {
             Some(name) => name.to_string(),
             None => format!("{}.md", doc.displayName()),
-        }
-        .replace(['/', ':'], "-");
+        });
         let previous = self.ivars().share_path.borrow().clone();
         let path = match previous.filter(|p| p.file_name().is_some_and(|n| *n == *name)) {
             Some(path) => path,

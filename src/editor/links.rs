@@ -23,15 +23,10 @@ const MARKDOWN: [&str; 6] = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn"];
 
 pub fn classify(target: &str, doc_dir: Option<&Path>) -> LinkTarget {
     let target = target.trim();
-    if let Some(name) = target.strip_prefix(WIKI) {
-        return doc_dir
-            .and_then(|dir| find_note(dir, name))
-            .map_or(LinkTarget::Nothing, local);
-    }
     if let Some(anchor) = target.strip_prefix('#') {
         return LinkTarget::Anchor(anchor.to_string());
     }
-    match scheme(target).map(str::to_ascii_lowercase).as_deref() {
+    match crate::markdown::url::scheme(target).as_deref() {
         Some("http" | "https" | "mailto") => LinkTarget::Web(target.to_string()),
         Some("file") => {
             let rest = &target["file:".len()..];
@@ -65,8 +60,12 @@ pub fn classify(target: &str, doc_dir: Option<&Path>) -> LinkTarget {
     }
 }
 
-/// Link scheme of `[[wiki links]]`, which name a note instead of giving its path.
-pub const WIKI: &str = "splat-wiki:";
+/// A `[[wiki link]]`, which names a note instead of giving its path. Searching folders, it must stay off the main thread.
+pub fn classify_wiki(name: &str, doc_dir: Option<&Path>) -> LinkTarget {
+    doc_dir
+        .and_then(|dir| find_note(dir, name.trim()))
+        .map_or(LinkTarget::Nothing, local)
+}
 
 /// Folders and entries searched below the document's folder for a note named in a wiki link.
 const SEARCH_ENTRIES: usize = 20_000;
@@ -131,18 +130,8 @@ fn local(path: PathBuf) -> LinkTarget {
     }
 }
 
-/// The URL scheme, if the text starts with one: a letter, then letters, digits, `+`, `-` or `.`, then `:`.
-fn scheme(target: &str) -> Option<&str> {
-    let end = target.find(':')?;
-    let scheme = &target[..end];
-    let mut chars = scheme.chars();
-    let valid = chars.next().is_some_and(|c| c.is_ascii_alphabetic())
-        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
-    valid.then_some(scheme)
-}
-
 /// The path part of a link, without `?query` and `#fragment`.
-fn strip_suffixes(target: &str) -> &str {
+pub(super) fn strip_suffixes(target: &str) -> &str {
     let end = target.find(['?', '#']).unwrap_or(target.len());
     &target[..end]
 }
@@ -150,7 +139,7 @@ fn strip_suffixes(target: &str) -> &str {
 /// Decodes `%XX` escapes; invalid escapes and bytes stay as they are.
 pub fn percent_decode(s: &str) -> String {
     fn hex(b: u8) -> Option<u8> {
-        (b as char).to_digit(16).map(|d| d as u8)
+        (b as char).to_digit(16).and_then(|d| u8::try_from(d).ok())
     }
     let bytes = s.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

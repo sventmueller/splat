@@ -59,6 +59,7 @@
 "Diagramm: {}" = "다이어그램: {}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "이 파일은 UTF-8 텍스트가 아니므로 Markdown으로 열 수 없습니다.";
 "Dienste" = "서비스";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "이 문서는 미리 보기에 표시하기에 너무 큽니다. 텍스트는 계속 편집할 수 있습니다.";
 "Dokument als PDF exportieren" = "문서를 PDF로 내보내기";
 "Dokument drucken" = "문서 프린트";
 "Dokument jetzt prüfen" = "지금 문서 검사";

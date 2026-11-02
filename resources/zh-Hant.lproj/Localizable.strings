@@ -59,6 +59,7 @@
 "Diagramm: {}" = "圖表：{}";
 "Die Datei ist kein UTF-8-Text und kann nicht als Markdown geöffnet werden." = "此檔案不是 UTF-8 文字，無法以 Markdown 格式打開。";
 "Dienste" = "服務";
+"Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten." = "此文件太大，無法預覽。你仍可繼續編輯文字。";
 "Dokument als PDF exportieren" = "將文件輸出為 PDF";
 "Dokument drucken" = "列印文件";
 "Dokument jetzt prüfen" = "立即檢查文件";
