@@ -35,7 +35,12 @@ impl EditorController {
         if from_preview {
             self.render_visible_blocks();
         }
-        self.sync_scroll(notification);
+        // Not from here: the scroll may be AppKit's own, from a block it runs when layout is done, and laying out the view
+        // again inside it frees that block while it runs.
+        if !self.ivars().scrolling.get() {
+            self.ivars().scrolled_preview.set(from_preview);
+            perform_later(self, sel!(syncScroll), 0.0, true);
+        }
         let pending = self.ivars().state.try_borrow().is_ok_and(|st| st.blocks().pending());
         if pending {
             self.schedule_pending_blocks();

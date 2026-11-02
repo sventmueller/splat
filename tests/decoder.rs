@@ -139,3 +139,91 @@ fn the_helper_can_neither_read_files_nor_connect() {
     );
     let _ = std::fs::remove_file(&path);
 }
+
+fn native_helper() -> Child {
+    Command::new(env!("CARGO_BIN_EXE_splat"))
+        .arg("--splat-native-decoder")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("helper starts")
+}
+
+/// Width, height, the size a picture says it has, and its pixels.
+type Picture = (u32, u32, (u32, u32), Vec<u8>);
+
+/// The answer to an image request of the native helper.
+fn pixels_of(child: &mut Child, bytes: &[u8], side: u32) -> Option<Picture> {
+    const NATIVE_IMAGE: u8 = 4;
+    send(child, NATIVE_IMAGE, &image(side, bytes));
+    if read(child, 1) != [2] {
+        return None;
+    }
+    let number = |b: &[u8]| u32::from_le_bytes(b.try_into().unwrap());
+    let head = read(child, 16);
+    let (w, h) = (number(&head[..4]), number(&head[4..8]));
+    let natural = (number(&head[8..12]), number(&head[12..16]));
+    Some((w, h, natural, read(child, w as usize * h as usize * 4)))
+}
+
+/// What only the system reads, in every kind it comes in here: each must show something, in a process that started
+/// without any of it having been read yet.
+#[test]
+fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
+    let mut child = native_helper();
+    for (name, bytes) in [
+        ("TIFF", include_bytes!("../src/editor/warmup/sample.tiff").as_slice()),
+        ("HEIC", include_bytes!("../src/editor/warmup/sample.heic")),
+        ("AVIF", include_bytes!("../src/editor/warmup/sample.avif")),
+        ("PDF", include_bytes!("../src/editor/warmup/sample.pdf")),
+    ] {
+        let (w, h, natural, pixels) = pixels_of(&mut child, bytes, 2560).unwrap_or_else(|| panic!("{name}"));
+        assert!(w > 0 && h > 0 && natural.0 > 0 && natural.1 > 0, "{name}");
+        assert!(pixels.iter().any(|p| *p != 0), "{name} shows nothing");
+    }
+    assert_eq!(pixels_of(&mut child, b"not an image", 2560), None);
+    drop(child.stdin.take());
+    assert!(child.wait().unwrap().success(), "the helper ends with its input");
+}
+
+/// A PDF has no pixels of its own, so it is drawn sharp, within what was asked for and as large as it says it is.
+#[test]
+fn a_vector_picture_is_drawn_at_four_pixels_per_point_within_the_limit() {
+    let mut child = native_helper();
+    let pdf = include_bytes!("../src/editor/warmup/sample.pdf");
+    let (w, h, natural, _) = pixels_of(&mut child, pdf, 2560).unwrap();
+    assert_eq!((w, h, natural), (800, 160, (200, 40)));
+    let (w, h, natural, _) = pixels_of(&mut child, pdf, 100).unwrap();
+    assert_eq!(
+        (w, h, natural),
+        (100, 20, (200, 40)),
+        "scaled to fit, and still naming its size"
+    );
+}
+
+/// Half transparent colours arrive with straight alpha, as all pixels from a helper do.
+#[test]
+fn colours_come_apart_from_their_alpha() {
+    let mut child = native_helper();
+    let tiff = include_bytes!("../src/editor/warmup/sample.tiff");
+    let (.., pixels) = pixels_of(&mut child, tiff, 2560).unwrap();
+    let px = &pixels[..4];
+    assert!(px[0] > 240 && px[1] < 10 && px[2] < 10, "{px:?}");
+    assert!((120..=135).contains(&px[3]), "{px:?}");
+}
+
+/// The sandbox of this helper is wider than the other's by what the system's decoders need, and by nothing else.
+#[test]
+fn the_helper_for_the_system_decoders_reads_no_files_and_opens_no_connections() {
+    const SELF_CHECK: u8 = 3;
+    let secret = std::env::temp_dir().join(format!("splat-native-secret-{}", std::process::id()));
+    std::fs::write(&secret, "secret").unwrap();
+    let mut child = native_helper();
+    send(&mut child, SELF_CHECK, secret.to_str().unwrap().as_bytes());
+    assert_eq!(
+        read(&mut child, 2),
+        [SELF_CHECK, 0],
+        "it reached the file or the network"
+    );
+    std::fs::remove_file(&secret).unwrap();
+}

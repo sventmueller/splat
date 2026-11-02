@@ -1,5 +1,5 @@
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -14,7 +14,7 @@ use objc2_foundation::{NSRect, NSSize};
 
 use super::safe_image::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
 use super::{EditorController, OPEN_EDITORS};
-use crate::util::{DISK, Lane, Stamp, stamp};
+use crate::util::{BusyVolumes, Lane, Stamp, answer_from, lane_of_volume, stamp, volume_of};
 
 #[derive(Clone, Copy)]
 pub enum Sizing {
@@ -63,16 +63,9 @@ impl Drop for ImageStore {
     }
 }
 
-/// An image file read and decoded off the main thread.
-pub enum Loaded {
-    Decoded(Decoded),
-    /// HEIC, TIFF, AVIF or PDF, which only the system can decode; the content was checked to be that format.
-    Native(Vec<u8>),
-}
-
 /// What became of reading an image file.
 pub struct ImageFile {
-    loaded: Option<Loaded>,
+    loaded: Option<Decoded>,
     file: PathBuf,
     seen: Stamp,
     side: u32,
@@ -172,7 +165,8 @@ pub fn resolve_path(url: &str, doc_dir: Option<&Path>) -> Option<PathBuf> {
         .map_or(url, |r| r.strip_prefix("localhost").unwrap_or(r));
     let without_suffix = super::links::strip_suffixes(raw);
     let found = local_path(raw, doc_dir);
-    if without_suffix.len() == raw.len() || found.as_ref().is_some_and(|p| p.exists()) {
+    // The main thread asks this during layout, and only the start-up disk is sure to answer.
+    if without_suffix.len() == raw.len() || found.as_ref().is_some_and(|p| volume_of(p) == "/" && p.exists()) {
         return found;
     }
     // `![](a.png?raw=true)` as GitHub reads it, unless a file is really called that.
@@ -237,7 +231,8 @@ impl ImageStore {
             _ => {}
         }
         let Some(requester) = requester else {
-            let file = load(&path, doc_dir, SHOWN_SIDE);
+            let (file, dir) = (path.clone(), doc_dir.map(Path::to_path_buf));
+            let file = answer_from(&path, PAPER_WAIT, move || load(&file, dir.as_deref(), SHOWN_SIDE))?;
             self.finish(path.clone(), file);
             return match self.files.get(&path) {
                 Some(Slot::Done(done)) => done.found.clone(),
@@ -302,7 +297,7 @@ impl ImageStore {
 
     pub fn finish(&mut self, path: PathBuf, file: ImageFile) {
         let bytes = match &file.loaded {
-            Some(Loaded::Decoded(Decoded::Rgba { pixels, .. })) => pixels.len(),
+            Some(Decoded::Rgba { pixels, .. }) => pixels.len(),
             _ => 0,
         };
         count_decoded(crate::util::to_isize(bytes));
@@ -324,7 +319,8 @@ impl ImageStore {
 fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorController) {
     let me = dispatch2::MainThreadBound::new(Weak::from(requester), requester.mtm());
     let doc_dir = doc_dir.map(Path::to_path_buf);
-    load_in_background(move || {
+    let volume = volume_of(&path);
+    let job = move || {
         let file = load(&path, doc_dir.as_deref(), allowed_side());
         dispatch2::DispatchQueue::main().exec_async(move || {
             let Some(mtm) = MainThreadMarker::new() else {
@@ -334,12 +330,18 @@ fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorControlle
                 c.image_loaded(path, file);
             }
         });
-    });
+    };
+    // An image on a volume that may stop answering must not take up a place that other images wait for.
+    if volume == "/" {
+        load_in_background(job);
+    } else {
+        lane_of_volume(&volume).run(job);
+    }
 }
 
 /// Every this many looks at the images, one that is missing is searched for again.
 const LOOKS_PER_TRY: u32 = 15;
-static LOOKING: AtomicBool = AtomicBool::new(false);
+static LOOKING: BusyVolumes = BusyVolumes::new();
 
 thread_local! {
     static LOOKS: Cell<u32> = const { Cell::new(0) };
@@ -349,61 +351,70 @@ thread_local! {
 /// the document named it, shows without opening the document again.
 pub fn look_at_images(mtm: MainThreadMarker) {
     super::remote::try_failed_again();
-    if LOOKING.swap(true, Ordering::SeqCst) {
-        return;
-    }
     let look = LOOKS.with(|n| n.replace(n.get().wrapping_add(1)));
     let editors: Vec<Retained<EditorController>> =
         OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
-    let requests: Vec<_> = editors
-        .iter()
-        .filter(|e| e.preview_visible())
-        .filter_map(|e| {
-            let mut store = e.ivars().images.try_borrow_mut().ok()?;
-            let retry = if look % LOOKS_PER_TRY == LOOKS_PER_TRY - 1 {
-                store.missing_in_turn()
-            } else {
-                None
-            };
-            Some((
-                dispatch2::MainThreadBound::new(Weak::from(&**e), mtm),
-                store.watched(),
-                retry,
-            ))
-        })
-        .filter(|(_, watched, _)| !watched.is_empty())
-        .collect();
-    let ended = crate::util::Lowers(&LOOKING);
-    if requests.is_empty() {
-        return;
+    let mut by_volume: BTreeMap<String, Vec<LookAtEditor>> = BTreeMap::new();
+    for e in editors.iter().filter(|e| e.preview_visible()) {
+        let Ok(mut store) = e.ivars().images.try_borrow_mut() else {
+            continue;
+        };
+        let retry = if look % LOOKS_PER_TRY == LOOKS_PER_TRY - 1 {
+            store.missing_in_turn()
+        } else {
+            None
+        };
+        let mut watched_on: BTreeMap<String, Vec<(PathBuf, PathBuf, Stamp)>> = BTreeMap::new();
+        for watched in store.watched() {
+            watched_on.entry(volume_of(&watched.1)).or_default().push(watched);
+        }
+        for (volume, watched) in watched_on {
+            by_volume.entry(volume).or_default().push(LookAtEditor {
+                editor: dispatch2::MainThreadBound::new(Weak::from(&**e), mtm),
+                watched,
+                retry: retry.clone(),
+            });
+        }
     }
-    DISK.run(move || {
-        let changed: Vec<_> = requests
-            .into_iter()
-            .map(|(editor, watched, retry)| {
-                let watched: Vec<(PathBuf, PathBuf, Stamp)> = watched;
-                let changed: Vec<(PathBuf, Stamp)> = watched
-                    .into_iter()
-                    .filter_map(|(path, file, seen)| {
-                        let now = stamp(&file);
-                        (now != seen || Some(&path) == retry.as_ref()).then_some((path, now))
-                    })
-                    .collect();
-                (editor, changed)
-            })
-            .collect();
-        dispatch2::DispatchQueue::main().exec_async(move || {
-            drop(ended);
-            let Some(mtm) = MainThreadMarker::new() else {
-                return;
-            };
-            for (editor, changed) in changed {
-                if let Some(editor) = editor.get(mtm).load() {
-                    editor.read_images_again(changed);
+    for (volume, requests) in by_volume {
+        let Some(on_volume) = LOOKING.enter(&volume) else {
+            continue;
+        };
+        lane_of_volume(&volume).run(move || {
+            let changed: Vec<_> = requests
+                .into_iter()
+                .map(|request| {
+                    let changed: Vec<(PathBuf, Stamp)> = request
+                        .watched
+                        .into_iter()
+                        .filter_map(|(path, file, seen)| {
+                            let now = stamp(&file);
+                            (now != seen || Some(&path) == request.retry.as_ref()).then_some((path, now))
+                        })
+                        .collect();
+                    (request.editor, changed)
+                })
+                .collect();
+            dispatch2::DispatchQueue::main().exec_async(move || {
+                drop(on_volume);
+                let Some(mtm) = MainThreadMarker::new() else {
+                    return;
+                };
+                for (editor, changed) in changed {
+                    if let Some(editor) = editor.get(mtm).load() {
+                        editor.read_images_again(changed);
+                    }
                 }
-            }
+            });
         });
-    });
+    }
+}
+
+/// The images of one editor on one volume.
+struct LookAtEditor {
+    editor: dispatch2::MainThreadBound<Weak<EditorController>>,
+    watched: Vec<(PathBuf, PathBuf, Stamp)>,
+    retry: Option<PathBuf>,
 }
 
 impl EditorController {
@@ -426,17 +437,17 @@ pub(super) fn load_in_background(job: impl FnOnce() + Send + 'static) {
     LOADERS.run(job);
 }
 
-fn rendered(loaded: Loaded) -> Option<Rendered> {
-    let image = match loaded {
-        Loaded::Decoded(decoded) => super::decoder::image(decoded)?,
-        Loaded::Native(bytes) => super::decoder::system_image(&bytes)?,
-    };
+fn rendered(loaded: Decoded) -> Option<Rendered> {
+    let image = super::decoder::image(loaded)?;
     let size = image.size();
     Some(Rendered {
         image,
         sizing: Sizing::Points { size, descent: 0.0 },
     })
 }
+
+/// How long the main thread waits for a picture to print; printing goes on without one from a volume that hangs.
+const PAPER_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The file an image link names; a picture Obsidian embeds as `![[name.png]]` may sit in any folder below the
 /// document's. Only there is it searched for, so a document cannot fish for a file name across the disk.
@@ -459,10 +470,11 @@ fn load(path: &Path, doc_dir: Option<&Path>, side: u32) -> ImageFile {
     let seen = stamp(&file);
     let loaded = seen.and_then(|_| {
         let bytes = crate::util::read_regular_file(&file, MAX_FILE_BYTES as u64)?;
-        if let Some(decoded) = super::decoder::decode(&bytes, side) {
-            return Some(Loaded::Decoded(decoded));
-        }
-        native_only(&file, &bytes).then_some(Loaded::Native(bytes))
+        super::decoder::decode(&bytes, side).or_else(|| {
+            native_only(&file, &bytes)
+                .then(|| super::decoder::decode_native(&bytes, side))
+                .flatten()
+        })
     });
     ImageFile {
         loaded,

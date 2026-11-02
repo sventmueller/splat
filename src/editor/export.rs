@@ -1,9 +1,9 @@
 //! Exporting the document as HTML page or Word document, with its images embedded.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use objc2::rc::Retained;
-use objc2::{AnyThread, DefinedClass, MainThreadOnly, Message};
+use objc2::rc::{Retained, Weak};
+use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message};
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSSavePanel,
 };
@@ -20,7 +20,7 @@ use crate::markdown::doc::{Figure, parse};
 use crate::markdown::docx::{Picture, WordExport, to_docx};
 use crate::markdown::html::{Export, data_url, escape, to_html, web_image_type};
 use crate::preview::layout::layout;
-use crate::util::{contained, ns};
+use crate::util::{contained, ns, on_main};
 
 /// Paper shows the preview the way browsers print a page: a screen point, and so an image pixel, becomes 0.75 pt.
 const PRINT_SCALE: f64 = 0.75;
@@ -44,7 +44,8 @@ impl EditorController {
     /// The document as printed: light appearance, smaller type, images no wider than `width`.
     pub(super) fn printable(&self, width: f64) -> Retained<NSMutableAttributedString> {
         let snap = self.snapshot();
-        let env = super::env::Env::now(self.doc_dir(), &snap.text);
+        // Printing runs on the main thread, and what the disk thread knows does not wait for a volume.
+        let env = super::env::Env::known(self.doc_dir(), &snap.text);
         let Some(print_layout) = contained(|| {
             let doc = parse(&snap.text);
             layout(&snap.text, &doc, &Images { dark: false, env }, None)
@@ -90,36 +91,71 @@ impl EditorController {
                 return;
             };
             let path = std::path::PathBuf::from(path.to_string());
-            if let Err(reason) = this.write_export(format, &stem, &path) {
-                chosen.orderOut(None);
-                this.report_export_failure(&reason);
-            }
+            chosen.orderOut(None);
+            let (source, title) = (this.export_source(), stem.clone());
+            let me = dispatch2::MainThreadBound::new(Weak::from(&*this), this.mtm());
+            // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
+            std::thread::spawn(move || {
+                let Err(reason) = source.write(format, &title, &path) else {
+                    return;
+                };
+                dispatch2::DispatchQueue::main().exec_async(move || {
+                    let Some(mtm) = MainThreadMarker::new() else { return };
+                    if let Some(c) = me.get(mtm).load() {
+                        c.report_export_failure(&reason);
+                    }
+                });
+            });
         });
         panel.beginSheetModalForWindow_completionHandler(&window, &handler);
     }
 
+    pub(super) fn export_source(&self) -> ExportSource {
+        ExportSource {
+            text: self.source_text(),
+            doc_dir: self.doc_dir(),
+            remote: self.ivars().remote_allowed.get(),
+        }
+    }
+
+    pub(super) fn report_export_failure(&self, reason: &str) {
+        let Some(window) = self.window() else { return };
+        let alert = objc2_app_kit::NSAlert::new(self.mtm());
+        alert.setMessageText(&ns(t("Export fehlgeschlagen")));
+        alert.setInformativeText(&ns(reason));
+        alert.beginSheetModalForWindow_completionHandler(&window, None);
+    }
+}
+
+/// What an export takes from the window, so that the rest can wait for the volumes on another thread.
+pub(super) struct ExportSource {
+    text: String,
+    doc_dir: Option<PathBuf>,
+    remote: bool,
+}
+
+impl ExportSource {
     /// Writes the document in `format` to `path`; the reason when that failed.
-    pub(super) fn write_export(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), String> {
+    pub(super) fn write(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), String> {
         let failed = || "The document could not be converted.".to_string();
         let data = match format {
             ExportKind::Html => contained(|| self.html(title, path)).ok_or_else(failed)?.into_bytes(),
-            ExportKind::Word => contained(|| self.word()).ok_or_else(failed)??,
+            ExportKind::Word => contained(|| self.word()).ok_or_else(failed)?,
         };
         std::fs::write(path, data).map_err(|e| e.to_string())
     }
 
     pub(super) fn html(&self, title: &str, target: &Path) -> String {
-        let snap = self.snapshot();
-        let doc_dir = self.doc_dir();
+        let doc_dir = self.doc_dir.as_deref();
         let export_dir = target.parent().map(Path::to_path_buf);
-        let figure = |f: &Figure| figure_image(f);
-        let embed = |url: &str| embedded(url, doc_dir.as_deref());
-        let rebase = |link: &str| rebased(link, doc_dir.as_deref(), export_dir.as_deref());
-        let env = super::env::Env::now(doc_dir.clone(), &snap.text);
+        let figure = |f: &Figure| on_main(|| figure_image(f)).flatten();
+        let embed = |url: &str| embedded(url, doc_dir);
+        let rebase = |link: &str| rebased(link, doc_dir, export_dir.as_deref());
+        let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         to_html(
-            &snap.text,
+            &self.text,
             &Export {
                 title,
                 figure: &figure,
@@ -132,25 +168,29 @@ impl EditorController {
         )
     }
 
-    pub(super) fn word(&self) -> Result<Vec<u8>, String> {
-        let snap = self.snapshot();
-        let doc_dir = self.doc_dir();
-        let remote = self.ivars().remote_allowed.get();
+    pub(super) fn word(&self) -> Vec<u8> {
+        let doc_dir = self.doc_dir.as_deref();
         let figure = |f: &Figure| {
-            let rendered = js::cached(&render_key(f, false))?;
-            // One ex is about half the 11 pt body text.
-            let size = match rendered.sizing {
-                Sizing::Ex { width, height, .. } => NSSize::new(width * 5.5, height * 5.5),
-                Sizing::Points { size, .. } => size,
-            };
-            picture_of(&rendered.image, size)
+            on_main(|| {
+                let rendered = js::cached(&render_key(f, false))?;
+                // One ex is about half the 11 pt body text.
+                let size = match rendered.sizing {
+                    Sizing::Ex { width, height, .. } => NSSize::new(width * 5.5, height * 5.5),
+                    Sizing::Points { size, .. } => size,
+                };
+                picture_of(&rendered.image, size)
+            })
+            .flatten()
         };
         let image = |url: &str| {
             let picture = if remote::is_remote(url) {
-                let rendered = remote.then(|| remote::get(url, None)).flatten().flatten()?;
-                picture_of(&rendered.image, rendered.image.size())?
+                on_main(|| {
+                    let rendered = self.remote.then(|| remote::get(url, None)).flatten().flatten()?;
+                    picture_of(&rendered.image, rendered.image.size())
+                })
+                .flatten()?
             } else {
-                local_picture(&resolve_path(url, doc_dir.as_deref())?, doc_dir.as_deref())?
+                local_picture(&resolve_path(url, doc_dir)?, doc_dir)?
             };
             Some(Picture {
                 width: picture.width * PRINT_SCALE,
@@ -158,28 +198,20 @@ impl EditorController {
                 ..picture
             })
         };
-        let env = super::env::Env::now(doc_dir.clone(), &snap.text);
+        let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
-        Ok(to_docx(
-            &parse(&snap.text),
+        to_docx(
+            &parse(&self.text),
             &WordExport {
-                source: &snap.text,
+                source: &self.text,
                 figure: &figure,
                 image: &image,
                 quotes: env.quotes,
                 reference: &reference,
                 citation: &citation,
             },
-        ))
-    }
-
-    pub(super) fn report_export_failure(&self, reason: &str) {
-        let Some(window) = self.window() else { return };
-        let alert = objc2_app_kit::NSAlert::new(self.mtm());
-        alert.setMessageText(&ns(t("Export fehlgeschlagen")));
-        alert.setInformativeText(&ns(reason));
-        alert.beginSheetModalForWindow_completionHandler(&window, None);
+        )
     }
 }
 
@@ -215,50 +247,54 @@ fn picture_of(image: &NSImage, size: NSSize) -> Option<Picture> {
     })
 }
 
+/// Pixels from a helper, or from the other one for what only the system reads.
+fn decoded_file(path: &Path, bytes: &[u8]) -> Option<Decoded> {
+    decoder::decode(bytes, EXPORT_SIDE).or_else(|| {
+        native_only(path, bytes)
+            .then(|| decoder::decode_native(bytes, EXPORT_SIDE))
+            .flatten()
+    })
+}
+
+fn png_of_pixels(width: u32, height: u32, pixels: Vec<u8>) -> Option<Vec<u8>> {
+    let image = image::RgbaImage::from_raw(width, height, pixels)?;
+    let mut png = Vec::new();
+    image
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .ok()?;
+    Some(png)
+}
+
 /// A local image for Word: PNG and JPEG as they are, other formats converted to PNG.
 fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
     let path = &super::images::locate(path, doc_dir);
     let bytes = crate::util::read_regular_file(path, MAX_FILE_BYTES as u64)?;
-    match decoder::decode(&bytes, EXPORT_SIDE) {
-        Some(Decoded::Rgba {
-            width, height, pixels, ..
-        }) => {
-            let (w, h) = (f64::from(width), f64::from(height));
-            let data = match web_image_type(&bytes) {
-                Some(mime @ ("image/png" | "image/jpeg")) => {
-                    return Some(Picture {
-                        data: bytes,
-                        jpeg: mime == "image/jpeg",
-                        width: w,
-                        height: h,
-                    });
-                }
-                _ => {
-                    let image = image::RgbaImage::from_raw(width, height, pixels)?;
-                    let mut png = Vec::new();
-                    image
-                        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
-                        .ok()?;
-                    png
-                }
-            };
-            Some(Picture {
-                data,
-                jpeg: false,
-                width: w,
-                height: h,
-            })
-        }
-        Some(pdf @ Decoded::Pdf(_)) => {
-            let image = decoder::image(pdf)?;
-            picture_of(&image, image.size())
-        }
-        None if native_only(path, &bytes) => {
-            let image = decoder::system_image(&bytes)?;
-            picture_of(&image, image.size())
-        }
-        None => None,
+    let Decoded::Rgba {
+        width,
+        height,
+        pixels,
+        natural,
+    } = decoded_file(path, &bytes)?
+    else {
+        return None;
+    };
+    if let Some(mime @ ("image/png" | "image/jpeg")) = web_image_type(&bytes) {
+        return Some(Picture {
+            data: bytes,
+            jpeg: mime == "image/jpeg",
+            width: f64::from(width),
+            height: f64::from(height),
+        });
     }
+    // A vector picture has more pixels than points, and it is the points that say how large it is.
+    let vector = natural.0 < width && natural.1 < height;
+    let (w, h) = if vector { natural } else { (width, height) };
+    Some(Picture {
+        data: png_of_pixels(width, height, pixels)?,
+        jpeg: false,
+        width: f64::from(w),
+        height: f64::from(h),
+    })
 }
 
 /// A local image as `data:` URL: web formats as they are, others converted to PNG. Images from the web stay links.
@@ -275,24 +311,13 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
     if std::str::from_utf8(&bytes).is_ok_and(|t| t.contains("<svg")) {
         return Some(data_url("image/svg+xml", &bytes));
     }
-    let png = match decoder::decode(&bytes, EXPORT_SIDE) {
-        Some(Decoded::Rgba {
-            width, height, pixels, ..
-        }) => {
-            let image = image::RgbaImage::from_raw(width, height, pixels)?;
-            let mut png = Vec::new();
-            image
-                .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
-                .ok()?;
-            png
-        }
-        _ if native_only(&path, &bytes) => {
-            let image = decoder::system_image(&bytes)?;
-            png_of_image(&image, image.size(), 1.0)?
-        }
-        _ => return None,
+    let Decoded::Rgba {
+        width, height, pixels, ..
+    } = decoded_file(&path, &bytes)?
+    else {
+        return None;
     };
-    Some(data_url("image/png", &png))
+    Some(data_url("image/png", &png_of_pixels(width, height, pixels)?))
 }
 
 /// A relative link of the document as seen from the folder the page goes to.

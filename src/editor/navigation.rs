@@ -1,5 +1,7 @@
 //! Clicks on links, task checkboxes and footnote markers in the preview.
 
+use std::path::Path;
+
 use objc2::runtime::AnyObject;
 use objc2::{DefinedClass, MainThreadOnly};
 use objc2_app_kit::{NSApplication, NSBeep, NSDocumentController, NSEventModifierFlags, NSTextView, NSWorkspace};
@@ -12,7 +14,7 @@ use crate::i18n::{t, tf};
 use crate::markdown::commands;
 use crate::preview::layout::{Link, Marker};
 use crate::preview::map::{Shown, preview_offset};
-use crate::util::{DISK, constant, contained, ns, storage};
+use crate::util::{DISK, constant, contained, lane_of, ns, storage};
 
 /// Goes where a local link leads, once that is known: a Markdown file (`true`) opens in Splat, anything else only shows
 /// in the Finder.
@@ -37,8 +39,8 @@ fn open_place(mtm: objc2::MainThreadMarker, place: Option<(std::path::PathBuf, b
 
 /// Looks at a file or folder, which can take as long as a network volume does, so only the answer comes back to the main
 /// thread.
-fn open_found_in_background(find: impl FnOnce() -> LinkTarget + Send + 'static) {
-    DISK.run(move || {
+fn open_found_in_background(place: Option<&Path>, find: impl FnOnce() -> LinkTarget + Send + 'static) {
+    place.map_or(&DISK, lane_of).run(move || {
         let opened = match find() {
             LinkTarget::Document(path) if path.is_file() => Some((path, true)),
             LinkTarget::Document(path) | LinkTarget::File(path) if path.exists() => Some((path, false)),
@@ -141,7 +143,10 @@ impl EditorController {
             }
             Link::WikiPage(name) => {
                 let (name, doc_dir) = (name.clone(), self.doc_dir());
-                open_found_in_background(move || links::classify_wiki(&name, doc_dir.as_deref()));
+                let place = doc_dir.clone();
+                open_found_in_background(place.as_deref(), move || {
+                    links::classify_wiki(&name, doc_dir.as_deref())
+                });
             }
             Link::Address(address) => match links::classify(address, self.doc_dir().as_deref()) {
                 LinkTarget::Anchor(anchor) => self.reveal_heading(&anchor),
@@ -152,7 +157,13 @@ impl EditorController {
                 }
                 LinkTarget::App => self.confirm_app_link(address),
                 LinkTarget::Nothing => NSBeep(),
-                found => open_found_in_background(move || found),
+                found => {
+                    let place = match &found {
+                        LinkTarget::Document(path) | LinkTarget::File(path) => Some(path.clone()),
+                        _ => None,
+                    };
+                    open_found_in_background(place.as_deref(), move || found);
+                }
             },
             Link::Footnote(_) | Link::Fold | Link::Task => {}
         }

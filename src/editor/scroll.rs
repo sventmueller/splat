@@ -5,12 +5,12 @@ use std::rc::Rc;
 
 use objc2::DefinedClass;
 use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::runtime::ProtocolObject;
 use objc2_app_kit::{
     NSTextContentManager, NSTextElementProvider, NSTextLayoutManager, NSTextLayoutManagerSegmentOptions,
     NSTextLayoutManagerSegmentType, NSTextLocation, NSTextRange, NSTextView,
 };
-use objc2_foundation::{NSNotification, NSPoint, NSRange, NSRect, NSSize};
+use objc2_foundation::{NSPoint, NSRange, NSRect, NSSize};
 
 use super::{EditorController, Raised};
 use crate::util::{layout_manager, storage};
@@ -50,13 +50,11 @@ impl EditorController {
         Some(spans)
     }
 
-    pub(super) fn sync_scroll(&self, notification: &NSNotification) {
+    pub(super) fn sync_scroll(&self) {
         if self.ivars().scrolling.get() || self.ivars().busy.get() || !self.preview_visible() {
             return;
         }
-        let Some(object) = notification.object() else { return };
-        let source_clip = self.source().enclosingScrollView().map(|s| s.contentView());
-        let from_source = source_clip.is_some_and(|c| std::ptr::eq(&*c as &AnyObject, &*object));
+        let from_source = !self.ivars().scrolled_preview.get();
         let (from, to): (&NSTextView, &NSTextView) = if from_source {
             (self.source(), self.preview())
         } else {

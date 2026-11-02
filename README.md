@@ -617,9 +617,11 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
   at most 10 MB each, and in a private session without cookies.
 - **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in helper processes that close
   every file they inherited and lock themselves into a sandbox before reading the first byte: no file access, no
-  network. They hand back only pixels or a PDF, and are stopped after 10 seconds. Apple's own image decoders only see
-  HEIC, TIFF, AVIF and PDF, and only when the data really is that format; they run in Splat itself, outside the
-  sandbox.
+  network. They hand back only pixels, whose size is checked, and are stopped after 10 seconds. Apple's own image
+  decoders only see HEIC, TIFF, AVIF and PDF, and only when the data really is that format; they run in a helper of
+  their own, which may in addition read the system's font folders and use the system's video decoder. SVGs, formulas
+  and diagrams pass that helper as well, so they are pictures with a fixed resolution in Splat: four pixels per point,
+  up to 2560 on the longer side.
 - **Local files** reach a document only by the path it names. Embeds show Markdown notes from the document's folder
   and below, and a missing picture is looked for only there. An image path elsewhere, absolute or starting with `~`,
   still loads, and HTML and Word exports embed it: look at the export of a document you did not write before you pass
@@ -946,6 +948,9 @@ lookup. Each `resources/<language>.lproj/` holds:
 the system menus and the save dialog follow the same language. The i18n test checks that every language has every
 text and that every quick reference has the outline of the German one.
 
+`assets/readme/<language>/` holds this README in that language, its screenshot and the demo document the screenshot
+shows. A change to this README belongs in those copies as well.
+
 ### Third-party components
 
 | Component | Version | Used for | License |
@@ -953,9 +958,6 @@ text and that every quick reference has the outline of the German one.
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown parser | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C runtime, Foundation, blocks | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit, WebKit and Grand Central Dispatch bindings | Zlib, Apache-2.0 or MIT |
-`assets/readme/<language>/` holds this README in that language, its screenshot and the demo document the screenshot
-shows. A change to this README belongs in those copies as well.
-
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formulas and SVG images as vector PDF | MIT or Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | decoding PNG, JPEG, GIF, WebP and BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | aligning table columns | MIT or Apache-2.0 |

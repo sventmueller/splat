@@ -1045,6 +1045,11 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
     ]
 }
 
+thread_local! {
+    /// Whether the preview and the outline showed before they were toggled.
+    static PANES_BEFORE: std::cell::Cell<(bool, bool)> = const { std::cell::Cell::new((false, false)) };
+}
+
 pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
     vec![
         when(
@@ -1133,5 +1138,31 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 );
             },
         ),
+        step(0.1, |c| {
+            let e = &c.e;
+            PANES_BEFORE.set((e.preview_visible(), e.outline_visible()));
+            e.toggle_preview();
+            e.toggle_preview();
+            e.toggle_outline();
+            e.toggle_outline();
+        }),
+        step(1.0, |c| {
+            let now = (c.e.preview_visible(), c.e.outline_visible());
+            check(
+                "panes toggled twice in a moment end as they were",
+                now == PANES_BEFORE.get(),
+                &format!("{:?} -> {now:?}", PANES_BEFORE.get()),
+            );
+            c.e.toggle_preview();
+        }),
+        step(0.05, |c| c.e.toggle_preview()),
+        step(1.0, |c| {
+            let now = c.e.preview_visible();
+            check(
+                "a pane toggled twice during its animation ends as it was",
+                now == PANES_BEFORE.get().0,
+                "",
+            );
+        }),
     ]
 }

@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
+use std::sync::OnceLock;
 
 use block2::RcBlock;
 use objc2::rc::{Retained, Weak};
@@ -42,6 +43,28 @@ fn own_folder() -> Option<PathBuf> {
     Some(copies_root()?.join(std::process::id().to_string()))
 }
 
+/// A file in the folder of a run that the run keeps locked for as long as it lives; the system lets go of it however the
+/// process ends, and a number of another process that came round again holds no lock.
+const RUN_LOCK: &str = ".running";
+
+/// Takes the lock of this run on its folder, once.
+fn keep_run_lock(folder: &Path) {
+    static LOCK: OnceLock<Option<std::fs::File>> = OnceLock::new();
+    LOCK.get_or_init(|| {
+        let file = std::fs::File::create(folder.join(RUN_LOCK)).ok()?;
+        file.try_lock().ok()?;
+        Some(file)
+    });
+}
+
+/// Whether the run of a folder still lives: by its lock, or for a folder without one by its process number.
+fn run_is_alive(folder: &Path, pid: u32) -> bool {
+    match std::fs::File::open(folder.join(RUN_LOCK)) {
+        Ok(file) => matches!(file.try_lock(), Err(std::fs::TryLockError::WouldBlock)),
+        Err(_) => process_exists(pid),
+    }
+}
+
 /// A path in `folder` nothing stands at: process numbers come round again, and an older copy must not be overwritten.
 fn free_name(folder: &Path, name: &str) -> PathBuf {
     let plain = folder.join(name);
@@ -72,18 +95,21 @@ fn clear_old_recovered(recovery: &Path, now: std::time::SystemTime) {
 }
 
 /// Moves what ended runs left in `root` to `recovery`, and returns what it moved.
-fn adopt(root: &Path, recovery: &Path, alive: impl Fn(u32) -> bool) -> Vec<PathBuf> {
+fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Vec<PathBuf> {
     let mut adopted = Vec::new();
     for run in std::fs::read_dir(root).into_iter().flatten().flatten() {
         let name = run.file_name();
         let Some(pid) = name.to_str().and_then(|n| n.parse::<u32>().ok()) else {
             continue;
         };
-        if alive(pid) {
+        if alive(&run.path(), pid) {
             continue;
         }
         let mut left_behind = false;
         for file in std::fs::read_dir(run.path()).into_iter().flatten().flatten() {
+            if file.file_name() == RUN_LOCK {
+                continue;
+            }
             let name = format!("{pid}-{}", file.file_name().to_string_lossy());
             let target = free_name(recovery, &name);
             if std::fs::create_dir_all(recovery).is_ok() && std::fs::rename(file.path(), &target).is_ok() {
@@ -103,7 +129,7 @@ fn adopt(root: &Path, recovery: &Path, alive: impl Fn(u32) -> bool) -> Vec<PathB
 /// Moves what ended runs left behind to the recovery folder, where `offer_recovered` points to it.
 pub(super) fn adopt_left_behind() {
     if let (Some(root), Some(recovery)) = (copies_root(), recovery_dir()) {
-        adopt(&root, &recovery, process_exists);
+        adopt(&root, &recovery, run_is_alive);
         clear_old_recovered(&recovery, std::time::SystemTime::now());
     }
 }
@@ -179,6 +205,7 @@ pub(super) fn copy_unsaved() {
             let _ = std::fs::remove_file(file);
         }
         if std::fs::create_dir_all(&folder).is_ok() {
+            keep_run_lock(&folder);
             for (file, text) in writes {
                 // Through a second file, so a crash while writing leaves the last copy whole.
                 let partial = file.with_extension("partial");
@@ -218,7 +245,7 @@ mod tests {
             std::fs::create_dir_all(unsaved.join(run)).unwrap();
             std::fs::write(unsaved.join(run).join(file), "Text").unwrap();
         }
-        let adopted = adopt(&unsaved, &recovery, |pid| pid == 222);
+        let adopted = adopt(&unsaved, &recovery, |_, pid| pid == 222);
         assert_eq!(adopted, [recovery.join("111-1-Notiz.md")]);
         assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "Text");
         assert!(!unsaved.join("111").exists(), "the ended run's folder goes");
@@ -227,7 +254,7 @@ mod tests {
             "a running app keeps its copies"
         );
         assert!(unsaved.join("kein-prozess/x.md").exists());
-        assert!(adopt(&root.join("Fehlt"), &recovery, |_| false).is_empty());
+        assert!(adopt(&root.join("Fehlt"), &recovery, |_, _| false).is_empty());
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -240,10 +267,13 @@ mod tests {
         // A file where the recovery folder should be keeps it from being made.
         let recovery = root.join("Recovery");
         std::fs::write(&recovery, "").unwrap();
-        assert!(adopt(&unsaved, &recovery, |_| false).is_empty());
+        assert!(adopt(&unsaved, &recovery, |_, _| false).is_empty());
         assert_eq!(std::fs::read_to_string(unsaved.join("111/1-Notiz.md")).unwrap(), "Text");
         std::fs::remove_file(&recovery).unwrap();
-        assert_eq!(adopt(&unsaved, &recovery, |_| false), [recovery.join("111-1-Notiz.md")]);
+        assert_eq!(
+            adopt(&unsaved, &recovery, |_, _| false),
+            [recovery.join("111-1-Notiz.md")]
+        );
         assert!(!unsaved.join("111").exists());
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -256,7 +286,7 @@ mod tests {
         std::fs::write(recovery.join("111-1-Notiz.md"), "älter").unwrap();
         std::fs::create_dir_all(unsaved.join("111")).unwrap();
         std::fs::write(unsaved.join("111/1-Notiz.md"), "neuer").unwrap();
-        let adopted = adopt(&unsaved, &recovery, |_| false);
+        let adopted = adopt(&unsaved, &recovery, |_, _| false);
         assert_eq!(adopted, [recovery.join("2-111-1-Notiz.md")]);
         assert_eq!(
             std::fs::read_to_string(recovery.join("111-1-Notiz.md")).unwrap(),
@@ -276,6 +306,40 @@ mod tests {
         assert!(file.exists());
         clear_old_recovered(&root, std::time::SystemTime::now() + KEPT_FOR + KEPT_FOR);
         assert!(!file.exists());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_number_that_came_round_again_does_not_keep_a_run_alive() {
+        let root = std::env::temp_dir().join(format!("splat-shadow-lock-{}", std::process::id()));
+        let (unsaved, recovery) = (root.join("Unsaved"), root.join("Recovery"));
+        let run = unsaved.join(std::process::id().to_string());
+        std::fs::create_dir_all(&run).unwrap();
+        std::fs::write(run.join("1-Notiz.md"), "Text").unwrap();
+        let lock = std::fs::File::create(run.join(RUN_LOCK)).unwrap();
+        lock.try_lock().unwrap();
+        assert!(run_is_alive(&run, std::process::id()), "it holds its lock");
+        assert!(adopt(&unsaved, &recovery, run_is_alive).is_empty());
+        drop(lock);
+        assert!(
+            !run_is_alive(&run, std::process::id()),
+            "this process lives, but the run of that folder has ended"
+        );
+        assert_eq!(
+            adopt(&unsaved, &recovery, run_is_alive).len(),
+            1,
+            "and its copy is taken over"
+        );
+        assert!(!run.exists(), "the lock goes with the folder");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn without_a_lock_the_process_number_decides() {
+        let root = std::env::temp_dir().join(format!("splat-shadow-nolock-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(run_is_alive(&root, std::process::id()));
+        assert!(!run_is_alive(&root, u32::MAX));
         std::fs::remove_dir_all(&root).unwrap();
     }
 

@@ -10,7 +10,7 @@ use std::time::{Duration, Instant, SystemTime};
 use objc2_foundation::{NSBundle, NSLocale, NSUserDefaults};
 
 use crate::markdown::typography::Quotes;
-use crate::util::{DISK, ns};
+use crate::util::ns;
 
 /// User defaults key of the typographic punctuation switch in the View menu.
 pub const TYPOGRAPHY_KEY: &str = "TypographicPunctuation";
@@ -94,6 +94,12 @@ impl Question {
         }
     }
 
+    fn folder(&self) -> &Path {
+        match self {
+            Question::Around(dir, _) | Question::Note(dir, _) => dir,
+        }
+    }
+
     fn look(&self) -> Answer {
         match self {
             Question::Around(dir, named) => Answer::Around(find_repository(dir), find_citations(dir, named.clone())),
@@ -170,7 +176,7 @@ fn look_up(question: Question) -> Option<Answer> {
 }
 
 fn send_to_look(question: Question, told: Option<Sender<()>>) {
-    DISK.run(move || {
+    crate::util::lane_of(question.folder()).run(move || {
         let answer = question.look();
         let changed = with_answers(|answers| {
             let known = answers.known.get_mut(&question)?;

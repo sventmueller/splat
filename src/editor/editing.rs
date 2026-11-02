@@ -24,7 +24,12 @@ use crate::markdown::table::{self, TableOp};
 use crate::markdown::text::{Shown, U16, units, utf16_len};
 use crate::preview::bridge::Bridge;
 use crate::preview::layout::Layout;
-use crate::util::{constant, contained, insert_text, ns, perform_later, shown_from_ns, storage, to_nsrange};
+use crate::util::{
+    answer_from, constant, contained, insert_text, ns, perform_later, shown_from_ns, storage, to_nsrange,
+};
+
+/// How long a paste waits for the picture to reach the document's folder, which may lie on a volume that hangs.
+const PASTE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
 
 impl EditorController {
     #[expect(clippy::too_many_lines, reason = "one case per command")]
@@ -721,17 +726,21 @@ impl EditorController {
             return true;
         };
         let stem = format!("{} {}", t("Bild"), crate::util::now("yyyy-MM-dd HH.mm.ss"));
-        let mut path = dir.join(format!("{stem}.png"));
-        for n in 2.. {
-            if !path.exists() {
-                break;
+        let folder = dir.clone();
+        let written = answer_from(&dir, PASTE_WAIT, move || {
+            let mut path = folder.join(format!("{stem}.png"));
+            for n in 2.. {
+                if !path.exists() {
+                    break;
+                }
+                path = folder.join(format!("{stem} {n}.png"));
             }
-            path = dir.join(format!("{stem} {n}.png"));
-        }
-        if std::fs::write(&path, &png).is_err() {
+            std::fs::write(&path, &png).ok().map(|()| path)
+        });
+        let Some(path) = written.flatten() else {
             NSBeep();
             return true;
-        }
+        };
         let (sel, _) = self.selected_source();
         let alt = path
             .file_stem()

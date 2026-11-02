@@ -85,7 +85,8 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
             println!("output in {}", work.display());
             let report = report.join().map_err(|_| "reading the selftest's output failed")?;
-            return verdict(mode, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
+            let stops_early = args.iter().any(|a| a == "--stop-after");
+            return verdict(mode, stops_early, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
         }
         if started.elapsed() > std::time::Duration::from_secs(600) {
             let _ = child.kill();
@@ -117,15 +118,16 @@ impl Report {
 
 /// The checks a whole run makes at least, far below their number: an exit code alone would also pass a run that a stray
 /// environment variable ended before it began.
-pub(crate) fn fewest_checks(mode: &str) -> Option<usize> {
+pub(crate) fn fewest_checks(mode: &str, stops_early: bool) -> Option<usize> {
     match mode {
-        "gui" if std::env::var_os("SPLAT_SELFTEST_STOP_AFTER").is_none() => Some(150),
+        "gui" if stops_early => Some(1),
+        "gui" => Some(150),
         "probe" => Some(20),
         _ => None,
     }
 }
 
-pub(crate) fn verdict(mode: &str, exited_well: bool, report: &Report) -> Result<(), String> {
+pub(crate) fn verdict(mode: &str, stops_early: bool, exited_well: bool, report: &Report) -> Result<(), String> {
     if !report.failed.is_empty() {
         return Err(format!(
             "{} checks failed:\n  {}",
@@ -136,7 +138,7 @@ pub(crate) fn verdict(mode: &str, exited_well: bool, report: &Report) -> Result<
     if !exited_well {
         return Err("the app ended with an error".into());
     }
-    if let Some(fewest) = fewest_checks(mode) {
+    if let Some(fewest) = fewest_checks(mode, stops_early) {
         if !report.done {
             return Err("the app ended before reporting that it was done".into());
         }
@@ -181,26 +183,57 @@ mod tests {
             r
         };
         let many = "SELFTEST PASS x\n".repeat(20);
-        assert!(verdict("probe", true, &report(&format!("{many}SELFTEST DONE failures=0"))).is_ok());
         assert!(
-            verdict("probe", true, &report(&many))
+            verdict(
+                "probe",
+                false,
+                true,
+                &report(&format!("{many}SELFTEST DONE failures=0"))
+            )
+            .is_ok()
+        );
+        assert!(
+            verdict("probe", false, true, &report(&many))
                 .unwrap_err()
                 .contains("before reporting")
         );
-        assert!(verdict("probe", true, &report("MENU a | b")).is_err());
+        assert!(verdict("probe", false, true, &report("MENU a | b")).is_err());
         assert!(
-            verdict("probe", true, &report("SELFTEST PASS x\nSELFTEST DONE failures=0"))
-                .unwrap_err()
-                .contains("only 1 checks")
+            verdict(
+                "probe",
+                false,
+                true,
+                &report("SELFTEST PASS x\nSELFTEST DONE failures=0")
+            )
+            .unwrap_err()
+            .contains("only 1 checks")
         );
         let failed = verdict(
             "probe",
+            false,
             false,
             &report("SELFTEST FAIL one: why\nSELFTEST FAIL two: how"),
         )
         .unwrap_err();
         assert!(failed.contains("one: why") && failed.contains("two: how"), "{failed}");
-        assert!(verdict("probe", false, &report(&format!("{many}SELFTEST DONE failures=0"))).is_err());
-        assert!(verdict("resize", true, &report("")).is_ok());
+        assert!(
+            verdict(
+                "probe",
+                false,
+                false,
+                &report(&format!("{many}SELFTEST DONE failures=0"))
+            )
+            .is_err()
+        );
+        assert!(verdict("resize", false, true, &report("")).is_ok());
+        let two = "SELFTEST PASS a\nSELFTEST PASS b\nSELFTEST DONE failures=0";
+        assert!(
+            verdict("gui", false, true, &report(two)).is_err(),
+            "all of them were to run"
+        );
+        assert!(
+            verdict("gui", true, true, &report(two)).is_ok(),
+            "a run told to stop early"
+        );
     }
 }

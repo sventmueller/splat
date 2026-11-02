@@ -1,17 +1,16 @@
 use std::cell::{Cell, RefCell};
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use block2::RcBlock;
 use objc2::rc::{Allocated, Retained, Weak};
 use objc2::runtime::{AnyObject, Sel};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
-use objc2_app_kit::{NSDocument, NSDocumentController, NSPrintOperation};
+use objc2_app_kit::{NSDocument, NSDocumentChangeType, NSDocumentController, NSPrintOperation};
 use objc2_foundation::{NSData, NSDate, NSDictionary, NSError, NSFileManager, NSObjectProtocol, NSString, NSTimer};
 
 use crate::editor::EditorController;
 use crate::util::constant;
-use crate::util::{DISK, Stamp, ns, stamp};
+use crate::util::{BusyVolumes, Stamp, lane_of_volume, ns, stamp, volume_of};
 
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 enum Encoding {
@@ -115,6 +114,8 @@ pub struct Ivars {
     editor: RefCell<Option<Weak<EditorController>>>,
     /// How the file looked when its content was last compared with the text.
     seen: Cell<Stamp>,
+    /// What the save under way writes; the only state `dataOfType` reads, since AppKit calls that on another thread.
+    to_write: std::sync::Mutex<Option<Vec<u8>>>,
 }
 
 define_class!(
@@ -147,27 +148,44 @@ define_class!(
             self.addWindowController(&controller);
         }
 
+        // AppKit then reads on another thread, so that a volume that hangs does not stop the app. Nothing else knows the
+        // document before it comes back, which is what makes its state safe to touch in `readFromData`.
+        #[unsafe(method(canConcurrentlyReadDocumentsOfType:))]
+        fn can_concurrently_read(_type_name: &NSString) -> bool {
+            true
+        }
+
         #[unsafe(method(readFromData:ofType:error:))]
         fn read_from_data(&self, data: &NSData, _type_name: &NSString, error: *mut *mut NSError) -> bool {
-            match Encoding::read(data.to_vec()) {
-                Some((encoding, text)) => {
-                    let (format, text) = FileFormat::of(&text);
-                    self.ivars().format.set(FileFormat { encoding, ..format });
-                    *self.ivars().initial_text.borrow_mut() = text.to_string();
-                    if let Some(editor) = self.editor() {
-                        editor.replace_all_text(text);
-                    }
-                    true
-                }
-                None => {
-                    if !error.is_null() {
-                        let e = read_error();
-                        // SAFETY: AppKit passes a valid pointer for the error, checked for null above.
-                        unsafe { *error = Retained::autorelease_ptr(e) };
-                    }
-                    false
-                }
+            let read = self.take_bytes(data.to_vec());
+            if !read && !error.is_null() {
+                let e = read_error();
+                // SAFETY: AppKit passes a valid pointer for the error, checked for null above.
+                unsafe { *error = Retained::autorelease_ptr(e) };
             }
+            read
+        }
+
+        // Taken with the token that marks the document as saved, on the main thread: its text views are out of reach of
+        // `dataOfType`, and file and token then stand for the same text, however long this save waits behind another.
+        #[unsafe(method_id(changeCountTokenForSaveOperation:))]
+        fn change_count_token(&self, operation: objc2_app_kit::NSSaveOperationType) -> Retained<AnyObject> {
+            if let Ok(mut to_write) = self.ivars().to_write.lock() {
+                *to_write = Some(self.encoded_text());
+            }
+            // SAFETY: NSDocument's implementation, with this method's signature.
+            unsafe { msg_send![super(self), changeCountTokenForSaveOperation: operation] }
+        }
+
+        // AppKit then writes on another thread, keeping the main thread waiting only until `dataOfType` has returned.
+        #[unsafe(method(canAsynchronouslyWriteToURL:ofType:forSaveOperation:))]
+        fn can_asynchronously_write(
+            &self,
+            _url: &objc2_foundation::NSURL,
+            _type_name: &NSString,
+            _operation: objc2_app_kit::NSSaveOperationType,
+        ) -> bool {
+            true
         }
 
         // AppKit reports a change by another program here, on a background queue, but keeps showing the old text. So off
@@ -189,12 +207,13 @@ define_class!(
         }
 
         #[unsafe(method_id(dataOfType:error:))]
-        fn data_of_type(&self, _type_name: &NSString, _error: *mut *mut NSError) -> Option<Retained<NSData>> {
-            let text = match self.editor() {
-                Some(editor) => editor.exact_text(),
-                None => self.text(),
-            };
-            Some(NSData::with_bytes(&self.ivars().format.get().encode(&text)))
+        fn data_of_type(&self, _type_name: &NSString, error: *mut *mut NSError) -> Option<Retained<NSData>> {
+            let bytes = self.bytes_to_write();
+            if bytes.is_none() && !error.is_null() {
+                // SAFETY: AppKit passes a valid pointer for the error, checked for null above.
+                unsafe { *error = Retained::autorelease_ptr(write_error()) };
+            }
+            bytes.map(|bytes| NSData::with_bytes(&bytes))
         }
 
         #[unsafe(method_id(printOperationWithSettings:error:))]
@@ -257,8 +276,8 @@ pub fn watch_files(mtm: MainThreadMarker) {
     timer.setTolerance(1.0);
 }
 
-/// A look at the files is under way; one on a volume that stopped answering must not pile up behind it.
-static LOOKING: AtomicBool = AtomicBool::new(false);
+/// A look at the files of a volume is under way; one on a volume that stopped answering must not pile up behind it.
+static LOOKING: BusyVolumes = BusyVolumes::new();
 
 /// What a document does about a file that may have changed.
 #[derive(Debug, PartialEq)]
@@ -296,37 +315,42 @@ struct Look {
 /// Documents with unsaved changes keep them, so their files wait until those are saved; AppKit asks before saving over
 /// another version.
 fn look_at_files(mtm: MainThreadMarker) {
-    if LOOKING.swap(true, Ordering::SeqCst) {
-        return;
+    let mut by_volume: std::collections::BTreeMap<String, Vec<(String, Stamp)>> = Default::default();
+    for document in documents(mtm).iter().filter(|d| !d.isDocumentEdited()) {
+        if let Some(path) = document.fileURL().and_then(|u| u.path()).map(|p| p.to_string()) {
+            by_volume
+                .entry(volume_of(std::path::Path::new(&path)))
+                .or_default()
+                .push((path, document.ivars().seen.get()));
+        }
     }
-    let requests: Vec<(String, Stamp)> = documents(mtm)
-        .iter()
-        .filter(|d| !d.isDocumentEdited())
-        .filter_map(|d| Some((d.fileURL()?.path()?.to_string(), d.ivars().seen.get())))
-        .collect();
-    let ended = crate::util::Lowers(&LOOKING);
-    DISK.run(move || {
-        let looks: Vec<Look> = requests.into_iter().map(|(path, seen)| look(path, seen)).collect();
-        dispatch2::DispatchQueue::main().exec_async(move || {
-            drop(ended);
-            let Some(mtm) = MainThreadMarker::new() else { return };
-            let open = documents(mtm);
-            for look in looks {
-                let path = Some(look.path.as_str());
-                let same = |d: &&Retained<MdDocument>| {
-                    d.fileURL()
-                        .and_then(|u| u.path())
-                        .as_deref()
-                        .map(|p| p.to_string())
-                        .as_deref()
-                        == path
-                };
-                if let Some(document) = open.iter().find(same) {
-                    document.take_look(look.now, look.changed);
+    for (volume, requests) in by_volume {
+        let Some(on_volume) = LOOKING.enter(&volume) else {
+            continue;
+        };
+        lane_of_volume(&volume).run(move || {
+            let looks: Vec<Look> = requests.into_iter().map(|(path, seen)| look(path, seen)).collect();
+            dispatch2::DispatchQueue::main().exec_async(move || {
+                drop(on_volume);
+                let Some(mtm) = MainThreadMarker::new() else { return };
+                let open = documents(mtm);
+                for look in looks {
+                    let path = Some(look.path.as_str());
+                    let same = |d: &&Retained<MdDocument>| {
+                        d.fileURL()
+                            .and_then(|u| u.path())
+                            .as_deref()
+                            .map(|p| p.to_string())
+                            .as_deref()
+                            == path
+                    };
+                    if let Some(document) = open.iter().find(same) {
+                        document.take_look(look.now, look.changed);
+                    }
                 }
-            }
+            });
         });
-    });
+    }
 }
 
 fn look(path: String, seen: Stamp) -> Look {
@@ -353,6 +377,13 @@ fn documents(mtm: MainThreadMarker) -> Vec<Retained<MdDocument>> {
         .collect()
 }
 
+/// AppKit words the message for a failed save itself.
+fn write_error() -> Retained<NSError> {
+    let info = NSDictionary::<objc2_foundation::NSErrorUserInfoKey, AnyObject>::new();
+    // SAFETY: An empty user info, as the Cocoa error domain accepts.
+    unsafe { NSError::errorWithDomain_code_userInfo(objc2_foundation::NSCocoaErrorDomain, 512, Some(&info)) }
+}
+
 fn read_error() -> Retained<NSError> {
     let info = NSDictionary::from_slices(
         &[constant!(objc2_foundation::NSLocalizedDescriptionKey)],
@@ -374,6 +405,36 @@ impl MdDocument {
             Some(editor) => editor.source_text(),
             None => self.ivars().initial_text.borrow().clone(),
         }
+    }
+
+    /// The content of a file now becomes the document's; `false` if it is no text Splat can read.
+    fn take_bytes(&self, bytes: Vec<u8>) -> bool {
+        let Some((encoding, text)) = Encoding::read(bytes) else {
+            return false;
+        };
+        let (format, text) = FileFormat::of(&text);
+        self.ivars().format.set(FileFormat { encoding, ..format });
+        *self.ivars().initial_text.borrow_mut() = text.to_string();
+        if let Some(editor) = self.editor() {
+            editor.replace_all_text(text);
+        }
+        true
+    }
+
+    /// What saving writes now, from whichever thread AppKit saves on.
+    fn bytes_to_write(&self) -> Option<Vec<u8>> {
+        if MainThreadMarker::new().is_some() {
+            return Some(self.encoded_text());
+        }
+        self.ivars().to_write.lock().ok()?.clone()
+    }
+
+    fn encoded_text(&self) -> Vec<u8> {
+        let text = match self.editor() {
+            Some(editor) => editor.exact_text(),
+            None => self.text(),
+        };
+        self.ivars().format.get().encode(&text)
     }
 
     /// Whether `bytes` are what saving the document now would write.
@@ -401,24 +462,19 @@ impl MdDocument {
                     self.setFileModificationDate(Some(&date));
                 }
             }
-            Reaction::Reread => {
-                let (Some(url), Some(kind)) = (self.fileURL(), self.fileType()) else {
-                    return;
-                };
-                match self.revertToContentsOfURL_ofType_error(&url, &kind) {
-                    Ok(()) => {
-                        // Undo steps point into the old text.
-                        if let Some(undo) = self.undoManager() {
-                            undo.removeAllActions();
-                        }
-                    }
-                    Err(reason) => {
-                        // The next look tries again, as a file that is being written may read wrong for a moment.
-                        self.ivars().seen.set(before);
-                        eprintln!("rereading a changed file failed: {}", reason.localizedDescription());
-                    }
+            // The bytes are at hand: asking AppKit to revert would read the file again on the main thread.
+            Reaction::Reread if self.take_bytes(bytes) => {
+                self.updateChangeCount(NSDocumentChangeType::ChangeCleared);
+                if let Some(date) = date.map(NSDate::dateWithTimeIntervalSinceReferenceDate) {
+                    self.setFileModificationDate(Some(&date));
+                }
+                // Undo steps point into the old text.
+                if let Some(undo) = self.undoManager() {
+                    undo.removeAllActions();
                 }
             }
+            // The next look tries again, as a file that is being written may read wrong for a moment.
+            Reaction::Reread => self.ivars().seen.set(before),
         }
     }
 

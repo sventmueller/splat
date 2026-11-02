@@ -212,7 +212,7 @@ fn export_steps() -> Vec<Step> {
                 "",
             );
             let page = doc_dir(c).join("Export.html");
-            let written = c.e.write_export(ExportKind::Html, "Export", &page);
+            let written = c.e.export_source().write(ExportKind::Html, "Export", &page);
             let page = std::fs::read_to_string(page).unwrap_or_default();
             check(
                 "HTML export embeds PNG, JPEG, SVG, PDF and TIFF images",
@@ -231,7 +231,7 @@ fn export_steps() -> Vec<Step> {
                 "",
             );
             let path = doc_dir(c).join("Export.docx");
-            let written = c.e.write_export(ExportKind::Word, "Export", &path);
+            let written = c.e.export_source().write(ExportKind::Word, "Export", &path);
             let docx = std::fs::read(path).unwrap_or_default();
             check(
                 "Word export carries the images",
@@ -239,7 +239,8 @@ fn export_steps() -> Vec<Step> {
                 &format!("{written:?}, {} bytes", docx.len()),
             );
             let failed =
-                c.e.write_export(ExportKind::Html, "Export", Path::new("/System/Export.html"));
+                c.e.export_source()
+                    .write(ExportKind::Html, "Export", Path::new("/System/Export.html"));
             if let Err(reason) = &failed {
                 c.e.report_export_failure(reason);
             }

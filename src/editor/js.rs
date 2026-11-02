@@ -15,6 +15,7 @@ use objc2_web_kit::{WKNavigation, WKNavigationAction, WKNavigationActionPolicy, 
 use super::EditorController;
 use super::images::{Rendered, Sizing};
 use super::render_queue::RenderQueue;
+use super::safe_image::Decoded;
 use super::webkit::{self, ScriptValue};
 use crate::markdown::doc::DiagramKind;
 use crate::util::ns;
@@ -386,18 +387,22 @@ impl Renderer {
             let label = label.clone();
             background(move || {
                 // The answer must arrive whatever happens, or the renderer never counts as idle again.
-                let pdf = std::panic::catch_unwind(|| svg_to_pdf(&svg)).ok().flatten();
+                let pixels = std::panic::catch_unwind(|| super::decoder::svg_to_pixels(&svg))
+                    .ok()
+                    .flatten();
                 DispatchQueue::main().exec_async(move || {
                     let Some(r) = renderer_if_started() else { return };
                     r.queue.borrow_mut().conversion_ended();
-                    let rendered = pdf.and_then(|pdf| pdf_image(&pdf, &label)).map(|image| Rendered {
-                        image,
-                        sizing: Sizing::Ex {
-                            width: w,
-                            height: h,
-                            valign: va,
-                        },
-                    });
+                    let rendered = pixels
+                        .and_then(|pixels| labeled_image(pixels, &crate::i18n::tf("Formel: {}", &[&label])))
+                        .map(|image| Rendered {
+                            image,
+                            sizing: Sizing::Ex {
+                                width: w,
+                                height: h,
+                                valign: va,
+                            },
+                        });
                     r.store(key, rendered);
                     r.notify_if_idle();
                 });
@@ -438,20 +443,30 @@ impl Renderer {
                 let key = key.clone();
                 let label = label.clone();
                 webkit::transparent_pdf(&web, NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)), move |data| {
-                    let rendered = data.and_then(|d| {
-                        let image = super::decoder::system_image(&d.to_vec())?;
-                        image.setAccessibilityDescription(Some(&ns(&crate::i18n::tf("Diagramm: {}", &[&label]))));
-                        Some(Rendered {
-                            image,
-                            sizing: Sizing::Points {
-                                size: NSSize::new(w, h),
-                                descent: 0.0,
-                            },
-                        })
+                    let pdf = data.map(|d| d.to_vec());
+                    let key = key.clone();
+                    let label = label.clone();
+                    background(move || {
+                        // The answer must arrive whatever happens, or the renderer never counts as idle again.
+                        let pixels =
+                            std::panic::catch_unwind(|| pdf.and_then(|pdf| super::decoder::pdf_to_pixels(&pdf)))
+                                .ok()
+                                .flatten();
+                        DispatchQueue::main().exec_async(move || {
+                            let rendered = pixels
+                                .and_then(|pixels| labeled_image(pixels, &crate::i18n::tf("Diagramm: {}", &[&label])))
+                                .map(|image| Rendered {
+                                    image,
+                                    sizing: Sizing::Points {
+                                        size: NSSize::new(w, h),
+                                        descent: 0.0,
+                                    },
+                                });
+                            if let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) {
+                                r.finish(key.clone(), rendered);
+                            }
+                        });
                     });
-                    if let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) {
-                        r.finish(key.clone(), rendered);
-                    }
                 });
             },
         );
@@ -475,15 +490,10 @@ fn number(d: &NSDictionary, key: &str) -> Option<f64> {
     v.downcast_ref::<NSNumber>().map(|n| n.doubleValue())
 }
 
-/// MathJax output is plain SVG, so it converts to a vector PDF without WebKit; the SVG still derives from the document,
-/// so the conversion runs in a decoder helper.
-fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
-    super::decoder::svg_to_pdf(svg)
-}
-
-fn pdf_image(pdf: &[u8], label: &str) -> Option<Retained<NSImage>> {
-    let image = super::decoder::system_image(pdf)?;
-    image.setAccessibilityDescription(Some(&ns(&crate::i18n::tf("Formel: {}", &[label]))));
+/// The image of pixels from a helper, named for those who cannot see it.
+fn labeled_image(pixels: Decoded, description: &str) -> Option<Retained<NSImage>> {
+    let image = super::decoder::image(pixels)?;
+    image.setAccessibilityDescription(Some(&ns(description)));
     Some(image)
 }
 

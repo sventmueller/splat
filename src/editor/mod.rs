@@ -105,6 +105,11 @@ pub struct Ivars {
     scroll_after_undo: Cell<bool>,
     /// Set from the moment the preview announces a user edit until it reports it done.
     preview_edit: RefCell<Option<Announced>>,
+    /// Whether the preview and the outline were last asked to show, while their animation runs.
+    preview_asked: Cell<Option<bool>>,
+    outline_asked: Cell<Option<bool>>,
+    /// Which view the last scroll was in, for the other one to follow.
+    scrolled_preview: Cell<bool>,
     share_path: RefCell<Option<PathBuf>>,
     /// Toolbar and menu validation asks for the formatting at the caret once per item and event.
     active_cache: RefCell<Option<(ActiveKey, Active)>>,
@@ -363,6 +368,16 @@ define_class!(
         #[unsafe(method(showArrivedImages))]
         fn show_arrived_images_now(&self) {
             self.show_arrived_images();
+        }
+
+        #[unsafe(method(syncScroll))]
+        fn sync_scroll_now(&self) {
+            self.sync_scroll();
+        }
+
+        #[unsafe(method(settlePanes))]
+        fn settle_panes_now(&self) {
+            self.settle_panes();
         }
 
         #[unsafe(method(previewEditSettled))]

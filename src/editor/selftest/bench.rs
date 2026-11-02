@@ -81,13 +81,8 @@ pub(super) fn bench(mtm: MainThreadMarker) {
             },
         );
         e.ivars().scrolling.set(false);
-        let note = unsafe {
-            objc2_foundation::NSNotification::notificationWithName_object(
-                objc2_app_kit::NSViewBoundsDidChangeNotification,
-                Some(&clip),
-            )
-        };
-        timed("  sync of the preview to it", || e.sync_scroll(&note));
+        e.ivars().scrolled_preview.set(false);
+        timed("  sync of the preview to it", || e.sync_scroll());
     }
     let pending = e
         .ivars()

@@ -141,12 +141,20 @@ fn two_pixel_bmp() -> Vec<u8> {
 fn sandbox_of_the_helper() {
     let secret = std::env::temp_dir().join(format!("splat-probe-secret-{}", std::process::id()));
     let _ = std::fs::write(&secret, "secret");
-    let escaped = super::super::decoder::self_check(secret.to_str().unwrap_or_default());
-    check(
-        "the decoder helper reads no files and reaches no network",
-        escaped == Some(false),
-        &format!("{escaped:?}"),
-    );
+    for (name, arg) in [
+        ("the decoder helper", super::super::decoder::ARG),
+        (
+            "the helper for the system's decoders",
+            super::super::decoder::NATIVE_ARG,
+        ),
+    ] {
+        let escaped = super::super::decoder::self_check(arg, secret.to_str().unwrap_or_default());
+        check(
+            &format!("{name} reads no files and reaches no network"),
+            escaped == Some(false),
+            &format!("{escaped:?}"),
+        );
+    }
     let _ = std::fs::remove_file(&secret);
 }
 
@@ -351,14 +359,16 @@ fn remote_answers() {
 }
 
 fn exports(e: &EditorController) {
-    let page = e.html("Probe", &std::env::temp_dir().join("probe.html"));
+    let page = e
+        .export_source()
+        .html("Probe", &std::env::temp_dir().join("probe.html"));
     check(
         "the HTML export embeds the local image and the formula",
         page.matches("src=\"data:image/png;base64,").count() >= 2 && page.contains("class=\"math\""),
         "",
     );
     check("the HTML export holds no script", !page.contains("<script"), "");
-    let word = e.word().unwrap_or_default();
+    let word = e.export_source().word();
     let listing = String::from_utf8_lossy(&word);
     check(
         "the Word export holds its document and pictures",

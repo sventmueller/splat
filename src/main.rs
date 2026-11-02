@@ -15,8 +15,10 @@ use splat::{i18n, markdown, preview};
 static ALLOC: large_alloc::LargeAlloc = large_alloc::LargeAlloc;
 
 fn main() {
-    if std::env::args().nth(1).as_deref() == Some(editor::decoder::ARG) {
-        editor::decoder::serve();
+    match std::env::args().nth(1).as_deref() {
+        Some(editor::decoder::ARG) => editor::decoder::serve(),
+        Some(editor::decoder::NATIVE_ARG) => editor::decoder::serve_native(),
+        _ => {}
     }
     let mtm = MainThreadMarker::new().expect("Splat must start on the main thread");
     let report = std::panic::take_hook();

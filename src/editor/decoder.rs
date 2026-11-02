@@ -1,8 +1,7 @@
-//! Images, SVGs and rendered formulas are decoded in helper processes that may neither read files nor use the
-//! network: a flaw in a decoder that a crafted document triggers then stays inside a process that can only hand
-//! back pixels or a PDF of its own making. The helpers are this executable started with `ARG`. What is left for the
-//! system's decoders in the app itself, such as those PDFs and formats only the system reads, goes through
-//! `system_image`, so this file names all of it.
+//! Images, SVGs and rendered formulas are decoded in helper processes that may neither read the user's files nor use
+//! the network: a flaw in a decoder that a crafted document triggers then stays inside a process that can only hand
+//! back pixels. The helpers are this executable, started with `ARG` for what Rust decodes and with `NATIVE_ARG` for what
+//! only the system's decoders read: TIFF, HEIC, AVIF and PDF. The app itself turns no untrusted bytes into a picture.
 
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -10,15 +9,18 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use objc2::AnyThread;
-use objc2::rc::Retained;
-use objc2_app_kit::{NSBitmapFormat, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
-use objc2_foundation::{NSData, NSSize};
+use objc2::rc::{Retained, autoreleasepool};
+use objc2_app_kit::{NSBitmapFormat, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage};
+use objc2_foundation::{NSData, NSPoint, NSRect, NSSize};
 use svg2pdf::usvg::fontdb;
 
-use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
+use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES, MAX_SIDE, SHOWN_SIDE};
 
 /// Command line argument that turns the process into a decoding helper.
 pub const ARG: &str = "--splat-decoder";
+
+/// Command line argument that turns the process into the helper for what only the system's decoders read.
+pub const NATIVE_ARG: &str = "--splat-native-decoder";
 
 /// A decode that takes longer ends its helper, which then counts as failed.
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -29,6 +31,7 @@ const NATURAL_SIDE: u32 = 1 << 20;
 const IMAGE: u8 = 1;
 const FORMULA_SVG: u8 = 2;
 const SELF_CHECK: u8 = 3;
+const NATIVE_IMAGE: u8 = 4;
 
 const NOTHING: u8 = 0;
 const PDF: u8 = 1;
@@ -36,6 +39,23 @@ const RGBA: u8 = 2;
 
 /// Everything the helper may do once it runs untrusted data: compute, and use the pipes it was started with.
 const PROFILE: &str = "(version 1)\n(deny default)\n";
+
+/// For the system's decoders as well: font files for the text of a PDF, and the service that decodes HEIC and AVIF.
+const NATIVE_PROFILE: &str = "(version 1)\n(deny default)\n\
+    (allow mach-lookup (global-name \"com.apple.coremedia.videodecoder\"))\n\
+    (allow file-read* (subpath \"/System/Library/Fonts\") (subpath \"/Library/Fonts\"))\n";
+
+/// One small file of each kind. The system's decoders load their parts on first use, which the sandbox refuses and which
+/// some of them do not survive, so they have seen each kind before it closes.
+const WARM_UP: [&[u8]; 4] = [
+    include_bytes!("warmup/sample.tiff"),
+    include_bytes!("warmup/sample.heic"),
+    include_bytes!("warmup/sample.avif"),
+    include_bytes!("warmup/sample.pdf"),
+];
+
+/// A vector picture becomes this many pixels per point, enough for a Retina display at twice the size and for print.
+const VECTOR_SCALE: f64 = 4.0;
 
 unsafe extern "C" {
     fn sandbox_init(profile: *const std::ffi::c_char, flags: u64, errorbuf: *mut *mut std::ffi::c_char) -> i32;
@@ -46,39 +66,166 @@ unsafe extern "C" {
 /// Runs the helper: loads the system fonts, closes itself off and then answers requests until its input ends.
 pub fn serve() -> ! {
     close_inherited_descriptors();
+    let holds_nothing = holds_no_descriptor();
     #[cfg(coverage)]
     open_measurement_file();
     let fonts = mapped_system_fonts();
-    let profile = std::ffi::CString::new(PROFILE).expect("profile without NUL");
+    lock(PROFILE);
+    answer_requests(holds_nothing, |kind, payload| match kind {
+        IMAGE => payload.split_first_chunk::<4>().and_then(|(side, image)| {
+            safe_image::decode(image, fonts.clone(), u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))
+        }),
+        FORMULA_SVG => std::str::from_utf8(payload)
+            .ok()
+            .and_then(|svg| safe_image::formula_to_pdf(svg, fonts.clone()))
+            .map(Decoded::Pdf),
+        _ => None,
+    })
+}
+
+/// Runs the helper for what only the system's decoders read.
+pub fn serve_native() -> ! {
+    close_inherited_descriptors();
+    let holds_nothing = holds_no_descriptor();
+    #[cfg(coverage)]
+    open_measurement_file();
+    for sample in WARM_UP {
+        native_pixels(sample, 64);
+    }
+    lock(NATIVE_PROFILE);
+    answer_requests(holds_nothing, |kind, payload| match kind {
+        NATIVE_IMAGE => payload
+            .split_first_chunk::<4>()
+            .and_then(|(side, image)| native_pixels(image, u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))),
+        _ => None,
+    })
+}
+
+fn lock(profile: &str) {
+    let profile = std::ffi::CString::new(profile).expect("profile without NUL");
     let mut error = std::ptr::null_mut();
     // SAFETY: a NUL-terminated profile, flags 0 for profile text, and a valid place for the error message.
     if unsafe { sandbox_init(profile.as_ptr(), 0, &mut error) } != 0 {
         eprintln!("Splat: the image decoder could not close itself off and does not start");
         std::process::exit(2);
     }
+}
+
+fn answer_requests(holds_nothing: bool, decode: impl Fn(u8, &[u8]) -> Option<Decoded>) -> ! {
     let mut input = BufReader::new(std::io::stdin().lock());
     let mut output = BufWriter::new(std::io::stdout().lock());
     loop {
         let Ok((kind, payload)) = read_request(&mut input) else {
             std::process::exit(0);
         };
-        let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match kind {
-            IMAGE => payload.split_first_chunk::<4>().and_then(|(side, image)| {
-                safe_image::decode(image, fonts.clone(), u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))
-            }),
-            FORMULA_SVG => std::str::from_utf8(&payload)
-                .ok()
-                .and_then(|svg| safe_image::formula_to_pdf(svg, fonts.clone()))
-                .map(Decoded::Pdf),
-            _ => None,
-        }));
+        let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(kind, &payload)));
         let written = if kind == SELF_CHECK {
-            output.write_all(&[SELF_CHECK, u8::from(escapes(&payload))])
+            output.write_all(&[SELF_CHECK, u8::from(escapes(&payload) || !holds_nothing)])
         } else {
             write_answer(&mut output, answer.ok().flatten())
         };
         if written.and_then(|()| output.flush()).is_err() {
             std::process::exit(0);
+        }
+    }
+}
+
+/// How many pixels a picture becomes: as many as it has, or for a vector picture what looks sharp, and no more than
+/// `side` on its longer side. `None` for a size no decoder should be asked to allocate.
+fn raster_size(pixels: (isize, isize), points: (f64, f64), side: u32) -> Option<(u32, u32)> {
+    let (w, h) = if pixels.0 > 0 && pixels.1 > 0 {
+        (pixels.0 as f64, pixels.1 as f64)
+    } else {
+        (points.0 * VECTOR_SCALE, points.1 * VECTOR_SCALE)
+    };
+    if !(w.is_finite() && h.is_finite()) || w <= 0.0 || h <= 0.0 || w.max(h) > f64::from(MAX_SIDE) {
+        return None;
+    }
+    let scale = (f64::from(side) / w.max(h)).min(1.0);
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "between 1 and `side`"
+    )]
+    let fit = |v: f64| ((v * scale).round() as u32).clamp(1, side);
+    Some((fit(w), fit(h)))
+}
+
+/// What the system's decoders make of `bytes`, drawn into pixels with straight alpha.
+fn native_pixels(bytes: &[u8], side: u32) -> Option<Decoded> {
+    autoreleasepool(|_| {
+        let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))?;
+        let size = image.size();
+        let representation = image.representations().firstObject()?;
+        let (width, height) = raster_size(
+            (representation.pixelsWide(), representation.pixelsHigh()),
+            (size.width, size.height),
+            side,
+        )?;
+        let (w, h) = (
+            crate::util::to_isize(width as usize),
+            crate::util::to_isize(height as usize),
+        );
+        // SAFETY: without plane pointers the image rep allocates its own buffer of the given size.
+        let rep = unsafe {
+            NSBitmapImageRep::initWithBitmapDataPlanes_pixelsWide_pixelsHigh_bitsPerSample_samplesPerPixel_hasAlpha_isPlanar_colorSpaceName_bytesPerRow_bitsPerPixel(
+                NSBitmapImageRep::alloc(),
+                std::ptr::null_mut(),
+                w,
+                h,
+                8,
+                4,
+                true,
+                false,
+                NSDeviceRGBColorSpace,
+                w * 4,
+                32,
+            )
+        }?;
+        let context = NSGraphicsContext::graphicsContextWithBitmapImageRep(&rep)?;
+        NSGraphicsContext::saveGraphicsState_class();
+        NSGraphicsContext::setCurrentContext(Some(&context));
+        image.drawInRect(NSRect::new(
+            NSPoint::new(0.0, 0.0),
+            NSSize::new(f64::from(width), f64::from(height)),
+        ));
+        context.flushGraphics();
+        NSGraphicsContext::restoreGraphicsState_class();
+        let target = rep.bitmapData();
+        if target.is_null() {
+            return None;
+        }
+        let len = width as usize * height as usize * 4;
+        // SAFETY: the buffer holds width × height × 4 bytes and lives as long as `rep`.
+        let mut pixels = unsafe { std::slice::from_raw_parts(target, len) }.to_vec();
+        straighten_alpha(&mut pixels);
+        Some(Decoded::Rgba {
+            width,
+            height,
+            pixels,
+            natural: (whole_points(size.width), whole_points(size.height)),
+        })
+    })
+}
+
+fn whole_points(points: f64) -> u32 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "within the range"
+    )]
+    let whole = points.round().clamp(1.0, f64::from(NATURAL_SIDE)) as u32;
+    whole
+}
+
+/// A bitmap context keeps its colours multiplied by their alpha, and what leaves a helper has them apart.
+fn straighten_alpha(pixels: &mut [u8]) {
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        let alpha = u32::from(pixel[3]);
+        if alpha != 0 && alpha != 255 {
+            for channel in &mut pixel[..3] {
+                *channel = u8::try_from((u32::from(*channel) * 255 + alpha / 2) / alpha).unwrap_or(255);
+            }
         }
     }
 }
@@ -167,17 +314,21 @@ fn mapped_system_fonts() -> Arc<fontdb::Database> {
     Arc::new(db)
 }
 
-/// Whether the helper can read the file at `path`, open a connection or still holds a file the app left open, which
-/// must all be impossible. Only a refusal by the sandbox counts: a closed port also fails, but with another error.
+/// Whether the helper can read the file at `path` or open a connection, which must both be impossible. Only a refusal by
+/// the sandbox counts: a closed port also fails, but with another error.
 fn escapes(path: &[u8]) -> bool {
-    const F_GETFD: i32 = 1;
     let path = String::from_utf8_lossy(path);
     let file = std::fs::read(path.as_ref()).is_ok();
     let network = std::net::TcpStream::connect(("127.0.0.1", 9))
         .map_or_else(|e| e.kind() != std::io::ErrorKind::PermissionDenied, |_| true);
+    file || network
+}
+
+/// Whether nothing the app left open is left, asked before the helper opens anything itself.
+fn holds_no_descriptor() -> bool {
+    const F_GETFD: i32 = 1;
     // SAFETY: asking for the flags of a descriptor number has no effect, whether it is open or not.
-    let inherited = !cfg!(coverage) && (3..256).any(|fd| unsafe { fcntl(fd, F_GETFD) } != -1);
-    file || network || inherited
+    cfg!(coverage) || (3..256).all(|fd| unsafe { fcntl(fd, F_GETFD) } == -1)
 }
 
 fn read_request(input: &mut impl Read) -> std::io::Result<(u8, Vec<u8>)> {
@@ -222,9 +373,9 @@ struct Helper {
 }
 
 impl Helper {
-    fn start() -> Option<Helper> {
+    fn start(arg: &str) -> Option<Helper> {
         let mut child = Command::new(std::env::current_exe().ok()?)
-            .arg(ARG)
+            .arg(arg)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
@@ -307,24 +458,25 @@ impl Drop for Helper {
 /// A few helpers, so a document full of images or formulas decodes on several cores.
 pub const HELPER_COUNT: usize = 3;
 static HELPERS: [Mutex<Option<Helper>>; HELPER_COUNT] = [const { Mutex::new(None) }; HELPER_COUNT];
+static NATIVE_HELPERS: [Mutex<Option<Helper>>; HELPER_COUNT] = [const { Mutex::new(None) }; HELPER_COUNT];
 static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// A free helper if there is one, so that an image that takes long holds up nothing but itself.
-fn free_helper() -> std::sync::MutexGuard<'static, Option<Helper>> {
+fn free_helper(pool: &'static [Mutex<Option<Helper>>]) -> std::sync::MutexGuard<'static, Option<Helper>> {
     let first = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    for n in 0..HELPERS.len() {
-        if let Ok(free) = HELPERS[(first + n) % HELPERS.len()].try_lock() {
+    for n in 0..pool.len() {
+        if let Ok(free) = pool[(first + n) % pool.len()].try_lock() {
             return free;
         }
     }
-    HELPERS[first % HELPERS.len()]
+    pool[first % pool.len()]
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Ends the helpers that are not decoding; the next request starts them again.
 pub fn release_idle() {
-    for slot in &HELPERS {
+    for slot in HELPERS.iter().chain(&NATIVE_HELPERS) {
         if let Ok(mut idle) = slot.try_lock() {
             *idle = None;
         }
@@ -335,12 +487,17 @@ fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
     if payload.len() > MAX_FILE_BYTES {
         return None;
     }
-    let mut guard = free_helper();
+    let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if kind == NATIVE_IMAGE {
+        (&NATIVE_HELPERS, NATIVE_ARG)
+    } else {
+        (&HELPERS, ARG)
+    };
+    let mut guard = free_helper(pool);
     // A helper can die of what the image before did to it, so a failure gets one more try with a new one; a file that
     // ends every helper or takes too long then fails on its own.
     for _ in 0..2 {
         if guard.is_none() {
-            *guard = Helper::start();
+            *guard = Helper::start(arg);
         }
         let helper = guard.as_mut()?;
         let pid = i32::try_from(helper.child.id()).ok()?;
@@ -368,9 +525,23 @@ fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
     None
 }
 
-/// An image file or download: PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`, SVG a PDF.
+/// An image file or download as pixels no wider or higher than `side`: PNG, JPEG, GIF, WebP and BMP from one helper, an
+/// SVG as a PDF from there and as pixels from the other, so that this process reads no PDF.
 pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
-    request(IMAGE, Some(side), bytes)
+    match request(IMAGE, Some(side), bytes)? {
+        Decoded::Pdf(pdf) => decode_native(&pdf, side),
+        pixels => Some(pixels),
+    }
+}
+
+/// What only the system's decoders read, as pixels no wider or higher than `side`.
+pub fn decode_native(bytes: &[u8], side: u32) -> Option<Decoded> {
+    request(NATIVE_IMAGE, Some(side), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
+}
+
+/// A diagram as WebKit drew it.
+pub fn pdf_to_pixels(pdf: &[u8]) -> Option<Decoded> {
+    decode_native(pdf, SHOWN_SIDE)
 }
 
 /// A formula as rendered by WebKit: MathJax draws the glyphs of its fonts as paths and leaves other characters as text.
@@ -381,10 +552,15 @@ pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
     }
 }
 
+/// A formula as pixels.
+pub fn svg_to_pixels(svg: &str) -> Option<Decoded> {
+    pdf_to_pixels(&svg_to_pdf(svg)?)
+}
+
 /// Asks a helper to read `path` and to open a network connection; `Some(false)` when both were refused.
 #[cfg(feature = "selftest")]
-pub fn self_check(path: &str) -> Option<bool> {
-    let mut helper = Helper::start()?;
+pub fn self_check(arg: &str, path: &str) -> Option<bool> {
+    let mut helper = Helper::start(arg)?;
     helper.input.write_all(&[SELF_CHECK]).ok()?;
     helper.input.write_all(&(path.len() as u64).to_le_bytes()).ok()?;
     helper.input.write_all(path.as_bytes()).ok()?;
@@ -394,17 +570,10 @@ pub fn self_check(path: &str) -> Option<bool> {
     (answer[0] == SELF_CHECK).then_some(answer[1] != 0)
 }
 
-/// Bytes read by the system's decoders in the app itself, outside the sandbox of the helpers. Nothing else may hand
-/// bytes to `NSImage`: formats the helpers cannot read arrive here checked by `images::native_only`, vector PDFs from the
-/// helper or from WebKit by their own origin.
-pub fn system_image(bytes: &[u8]) -> Option<Retained<NSImage>> {
-    NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))
-}
-
-/// An image from decoded pixels or from a PDF the helper wrote.
+/// An image from decoded pixels. A PDF stays out: it has to pass the other helper first.
 pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
     match decoded {
-        Decoded::Pdf(pdf) => system_image(&pdf),
+        Decoded::Pdf(_) => None,
         Decoded::Rgba {
             width,
             height,
@@ -451,6 +620,43 @@ pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_picture_keeps_its_pixels_and_a_vector_one_gets_four_per_point_within_the_limit() {
+        assert_eq!(raster_size((40, 20), (40.0, 20.0), 2560), Some((40, 20)));
+        assert_eq!(raster_size((4000, 2000), (4000.0, 2000.0), 2000), Some((2000, 1000)));
+        assert_eq!(raster_size((0, 0), (200.0, 40.0), 2560), Some((800, 160)));
+        assert_eq!(raster_size((0, 0), (2000.0, 400.0), 2560), Some((2560, 512)));
+        assert_eq!(
+            raster_size((3000, 1), (3000.0, 1.0), 300),
+            Some((300, 1)),
+            "never less than a pixel"
+        );
+        assert_eq!(
+            raster_size((1 << 20, 10), (1.0, 1.0), 2560),
+            None,
+            "too large to ask for"
+        );
+        assert_eq!(raster_size((0, 0), (0.0, 0.0), 2560), None);
+        assert_eq!(raster_size((0, 0), (f64::NAN, 1.0), 2560), None);
+    }
+
+    #[test]
+    fn colours_come_apart_from_their_alpha() {
+        let mut pixels = vec![128, 64, 0, 128, 10, 20, 30, 255, 0, 0, 0, 0, 255, 255, 255, 128];
+        straighten_alpha(&mut pixels);
+        assert_eq!(
+            pixels,
+            [255, 128, 0, 128, 10, 20, 30, 255, 0, 0, 0, 0, 255, 255, 255, 128]
+        );
+    }
+
+    #[test]
+    fn a_size_in_points_is_whole_and_at_least_one() {
+        assert_eq!(whole_points(39.6), 40);
+        assert_eq!(whole_points(0.2), 1);
+        assert_eq!(whole_points(1e12), NATURAL_SIDE);
+    }
 
     fn rgba(width: u32, height: u32, natural: (u32, u32), pixels: usize) -> Vec<u8> {
         let mut answer = vec![RGBA];

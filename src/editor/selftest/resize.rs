@@ -7,7 +7,8 @@ use objc2::MainThreadMarker;
 use objc2_app_kit::NSApplication;
 use objc2_foundation::{NSRange, NSTimer};
 
-use super::{check, editor, finish};
+use super::super::EditorController;
+use super::{after, check, editor, finish};
 
 /// Drags the window's lower right corner through AppKit's own resize tracking, as a user does, and checks that the
 /// source text follows the width while the mouse is still down.
@@ -94,7 +95,7 @@ pub(super) fn resize_probe(mtm: MainThreadMarker) {
                         lag.get()
                     ),
                 );
-                finish();
+                panes_toggled_while_scrolled_away(mtm, PANE_TOGGLE_ROUNDS);
                 return;
             }
             _ => return,
@@ -110,4 +111,45 @@ pub(super) fn resize_probe(mtm: MainThreadMarker) {
     unsafe {
         objc2_foundation::NSRunLoop::currentRunLoop().addTimer_forMode(&timer, objc2_foundation::NSRunLoopCommonModes)
     };
+}
+
+const PANE_TOGGLE_ROUNDS: usize = 100;
+
+/// When a pane stops moving, TextKit 2 scrolls the source back to its selection from a block it runs after layout, and
+/// laying out again from that scroll frees the block: a crash here is the failure, so the scrolls stay off the selection.
+fn panes_toggled_while_scrolled_away(mtm: MainThreadMarker, rounds: usize) {
+    let Some(e) = editor(mtm) else {
+        check("open document", false, "no editor window");
+        finish();
+        return;
+    };
+    if rounds == 0 {
+        check(
+            "a pane can open and close with the source scrolled off its selection",
+            true,
+            "",
+        );
+        finish();
+        return;
+    }
+    let scroll = move |e: &EditorController, factor: usize| {
+        let at = NSRange::new(rounds * factor % e.source_text().len().max(1), 0);
+        e.source().scrollRangeToVisible(at);
+        at
+    };
+    if let Some(window) = e.window() {
+        window.makeFirstResponder(Some(e.source()));
+    }
+    e.source().setSelectedRange(scroll(&e, 977));
+    e.toggle_preview();
+    after(0.03, move || {
+        let Some(e) = editor(mtm) else { return };
+        scroll(&e, 613);
+        e.toggle_preview();
+        after(0.03, move || {
+            let Some(e) = editor(mtm) else { return };
+            scroll(&e, 331);
+            after(0.12, move || panes_toggled_while_scrolled_away(mtm, rounds - 1));
+        });
+    });
 }

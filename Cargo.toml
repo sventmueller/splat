@@ -37,6 +37,7 @@ block2 = "0.6.2"
 comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
 entities = "1"
 dispatch2 = "0.3"
+libc = "0.2"
 objc2 = { version = "0.6.5", features = ["catch-all"] }
 objc2-app-kit = { version = "0.3.2", features = ["objc2-uniform-type-identifiers"] }
 objc2-foundation = "0.3.2"

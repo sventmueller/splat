@@ -14,7 +14,7 @@ pub const MAX_FILE_BYTES: usize = 64 << 20;
 /// Pixels an SVG filter may be rasterised to.
 const MAX_PIXELS: f64 = 16_000_000.0;
 /// Larger images are not decoded at all.
-const MAX_SIDE: u32 = 16_384;
+pub const MAX_SIDE: u32 = 16_384;
 /// Longest side of a decoded image in the preview and on paper, where 2480 pixels fill an A4 page at 300 dpi; larger
 /// ones are scaled down.
 pub const SHOWN_SIDE: u32 = 2560;

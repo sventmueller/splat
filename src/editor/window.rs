@@ -58,8 +58,11 @@ use super::views::{self, PreviewTextView, SourceTextView};
 use super::{EditorController, Ivars, OPEN_EDITORS, State};
 use crate::document::MdDocument;
 use crate::i18n::t;
-use crate::util::constant;
+use crate::util::{constant, perform_later};
 use crate::util::{layout_manager, ns, storage};
+
+/// A little longer than AppKit takes to collapse a pane.
+const PANE_ANIMATION_SECONDS: f64 = 0.6;
 
 impl EditorController {
     pub fn new(mtm: MainThreadMarker, document: &MdDocument, text: &str) -> Retained<Self> {
@@ -89,6 +92,9 @@ impl EditorController {
             source: OnceCell::new(),
             preview: OnceCell::new(),
             preview_item: OnceCell::new(),
+            preview_asked: Cell::new(None),
+            outline_asked: Cell::new(None),
+            scrolled_preview: Cell::new(false),
             outline: OnceCell::new(),
             outline_item: OnceCell::new(),
             state: RefCell::new(State::new()),
@@ -409,12 +415,39 @@ impl EditorController {
         let Some(item) = self.ivars().outline_item.get() else {
             return;
         };
-        let collapsed = item.isCollapsed();
-        objc2_app_kit::NSAnimatablePropertyContainer::animator(&**item).setCollapsed(!collapsed);
-        if collapsed {
+        if self.toggle_pane(item, &self.ivars().outline_asked) {
             self.show_headings();
         }
         self.invalidateRestorableState();
+    }
+
+    /// Asks a pane to go the other way than it was last asked, with its animation, and says whether it will show.
+    /// Two requests in one turn of the run loop, or any on a locked screen, end up as the animation of the first one
+    /// wants, so `settle_panes` looks when it should be over.
+    fn toggle_pane(&self, item: &NSSplitViewItem, asked: &Cell<Option<bool>>) -> bool {
+        let shows = !asked.get().unwrap_or(!item.isCollapsed());
+        asked.set(Some(shows));
+        objc2_app_kit::NSAnimatablePropertyContainer::animator(item).setCollapsed(!shows);
+        perform_later(self, sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
+        shows
+    }
+
+    /// The animations of the panes are over: each pane is what was asked for last.
+    pub(super) fn settle_panes(&self) {
+        let ivars = self.ivars();
+        let wrong = |item: &OnceCell<Retained<NSSplitViewItem>>, asked: &Cell<Option<bool>>| {
+            let shows = asked.take()?;
+            let item = item.get()?;
+            (item.isCollapsed() == shows)
+                .then(|| item.setCollapsed(!shows))
+                .map(|()| shows)
+        };
+        if wrong(&ivars.outline_item, &ivars.outline_asked) == Some(true) {
+            self.show_headings();
+        }
+        if wrong(&ivars.preview_item, &ivars.preview_asked) == Some(true) {
+            self.update();
+        }
     }
 
     /// Shows the current headings in the outline, if it is open; a closed one catches up when it opens.
@@ -439,9 +472,7 @@ impl EditorController {
         let Some(item) = self.ivars().preview_item.get() else {
             return;
         };
-        let collapsed = item.isCollapsed();
-        objc2_app_kit::NSAnimatablePropertyContainer::animator(&**item).setCollapsed(!collapsed);
-        if collapsed {
+        if self.toggle_pane(item, &self.ivars().preview_asked) {
             self.update();
         } else if self.preview_focused() {
             self.window().map(|w| w.makeFirstResponder(Some(self.source())));
