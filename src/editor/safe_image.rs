@@ -71,6 +71,16 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
 /// Converts an SVG without reading any file it references; embedded images may only be PNG or SVG, which are
 /// decoded in Rust, while JPEG would pass through to the PDF and reach the system decoder.
 pub fn svg_to_pdf(svg: &str, fonts: Arc<usvg::fontdb::Database>) -> Option<Vec<u8>> {
+    convert(svg, fonts, true)
+}
+
+/// Converts a formula: characters outside MathJax's fonts become outlines like its own glyphs, so the PDF holds no
+/// font for the system decoder to read.
+pub fn formula_to_pdf(svg: &str, fonts: Arc<usvg::fontdb::Database>) -> Option<Vec<u8>> {
+    convert(svg, fonts, false)
+}
+
+fn convert(svg: &str, fonts: Arc<usvg::fontdb::Database>, embed_text: bool) -> Option<Vec<u8>> {
     if svg.len() > MAX_BYTES {
         return None;
     }
@@ -78,6 +88,7 @@ pub fn svg_to_pdf(svg: &str, fonts: Arc<usvg::fontdb::Database>) -> Option<Vec<u
     let raster_scale = raster_scale(&tree)?;
     let conversion = svg2pdf::ConversionOptions {
         raster_scale,
+        embed_text,
         ..Default::default()
     };
     svg2pdf::to_pdf(&tree, conversion, svg2pdf::PageOptions::default()).ok()

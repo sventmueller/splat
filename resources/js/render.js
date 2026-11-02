@@ -12,9 +12,33 @@ function load(src) {
   return loading[src];
 }
 
+// MathJax draws text outside its fonts letter by letter, which breaks letters that join, combine or run from right to
+// left; a text with a font of its own stays one piece.
+const SHAPED_TEXT = /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Nko}\p{Script=Syriac}\p{Script=Thaana}\p{M}]/u;
+
+function keepShapedTextWhole({ data }) {
+  data.root.walkTree((node) => {
+    if (!node.isKind("mtext")) return;
+    const text = node.childNodes.filter((child) => child.isKind("text")).map((child) => child.getText()).join("");
+    if (!SHAPED_TEXT.test(text)) return;
+    const variant = node.attributes.get("mathvariant");
+    delete node.attributes.getAllAttributes().mathvariant;
+    node.attributes.set("fontfamily", "serif");
+    if (variant.includes("bold")) node.attributes.set("fontweight", "bold");
+    if (variant.includes("italic")) node.attributes.set("fontstyle", "italic");
+  });
+}
+
+let mathLoaded;
+function loadMath() {
+  mathLoaded ??= load("js/tex-svg-full.js")
+    .then(() => MathJax.startup.promise)
+    .then(() => MathJax.startup.input[0].postFilters.add(keepShapedTextWhole));
+  return mathLoaded;
+}
+
 async function renderMath(tex, display, color) {
-  await load("js/tex-svg-full.js");
-  await MathJax.startup.promise;
+  await loadMath();
   const node = MathJax.tex2svg(tex, { display });
   const svg = node.querySelector("svg");
   const w = parseFloat(svg.getAttribute("width"));

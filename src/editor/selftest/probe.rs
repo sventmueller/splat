@@ -489,6 +489,44 @@ const ATTACK: &str = "let net; try { await fetch('https://example.com/'); net = 
     await new Promise(r => setTimeout(r, 1500)); \
     return net + ' / inline handler ' + (window.pwned ? 'ran' : 'blocked') + ' / page ' + location.protocol;";
 
+/// What MathJax makes of text outside its fonts: letters that join or run from right to left must stay one piece,
+/// while text it has glyphs for stays in its own font.
+const FORMULA_TEXT: &str = "const svg = async (tex) => (await renderMath(tex, false, '#000')).svg; \
+    const pieces = (svg) => svg.split('<text').length - 1; \
+    const hebrew = await svg('\\\\text{שלום}'); \
+    const arabic = await svg('\\\\textbf{العربية}'); \
+    const latin = await svg('\\\\text{abc}'); \
+    return [hebrew.includes('>שלום</text>'), arabic.includes('>العربية</text>'), arabic.includes('bold'), pieces(latin)].join(' / ');";
+
+fn formula_text(mtm: MainThreadMarker) {
+    let report = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
+        let text = string_of(result)
+            .or_else(|| {
+                // SAFETY: WebKit passes nil or a valid error for the duration of the call.
+                unsafe { error.as_ref() }.map(|e| format!("error {}", e.localizedDescription()))
+            })
+            .unwrap_or_default();
+        check(
+            "a formula keeps text that joins its letters in one piece",
+            text == "true / true / true / 0",
+            &text,
+        );
+        attack_the_renderer(mtm);
+    });
+    // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
+    unsafe {
+        js::renderer(mtm)
+            .web()
+            .callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
+                &ns(FORMULA_TEXT),
+                None,
+                None,
+                &WKContentWorld::pageWorld(mtm),
+                Some(&report),
+            )
+    };
+}
+
 /// The renderer's page gets formulas and diagrams from the document, so whatever slips through its libraries runs here.
 fn attack_the_renderer(mtm: MainThreadMarker) {
     let report = RcBlock::new(|result: *mut AnyObject, error: *mut NSError| {
@@ -551,7 +589,7 @@ fn formula_editor(probe: &Probe) {
                 text == "fetch blocked / inline handler blocked / page file:",
                 &text,
             );
-            attack_the_renderer(mtm);
+            formula_text(mtm);
         });
         // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
         unsafe {

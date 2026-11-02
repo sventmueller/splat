@@ -475,8 +475,8 @@ fn number(d: &NSDictionary, key: &str) -> Option<f64> {
     v.downcast_ref::<NSNumber>().map(|n| n.doubleValue())
 }
 
-/// MathJax output is pure paths, so it converts to a vector PDF without WebKit; the SVG still derives from the
-/// document, so the conversion runs in a decoder helper.
+/// MathJax output is plain SVG, so it converts to a vector PDF without WebKit; the SVG still derives from the document,
+/// so the conversion runs in a decoder helper.
 fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
     super::decoder::svg_to_pdf(svg)
 }

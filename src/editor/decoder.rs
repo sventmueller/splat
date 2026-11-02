@@ -56,7 +56,6 @@ pub fn serve() -> ! {
         eprintln!("Splat: the image decoder could not close itself off and does not start");
         std::process::exit(2);
     }
-    let empty = Arc::new(fontdb::Database::new());
     let mut input = BufReader::new(std::io::stdin().lock());
     let mut output = BufWriter::new(std::io::stdout().lock());
     loop {
@@ -69,7 +68,7 @@ pub fn serve() -> ! {
             }),
             FORMULA_SVG => std::str::from_utf8(&payload)
                 .ok()
-                .and_then(|svg| safe_image::svg_to_pdf(svg, empty.clone()))
+                .and_then(|svg| safe_image::formula_to_pdf(svg, fonts.clone()))
                 .map(Decoded::Pdf),
             _ => None,
         }));
@@ -150,6 +149,15 @@ fn measurement_path(pattern: &str, pid: u32) -> String {
 fn mapped_system_fonts() -> Arc<fontdb::Database> {
     let mut db = fontdb::Database::new();
     db.load_system_fonts();
+    // LastResort claims every character with a placeholder, so the search for a font would stop there before emoji.
+    let placeholders: Vec<_> = db
+        .faces()
+        .filter(|f| f.post_script_name == "LastResort")
+        .map(|f| f.id)
+        .collect();
+    for id in placeholders {
+        db.remove_face(id);
+    }
     let ids: Vec<_> = db.faces().map(|f| f.id).collect();
     for id in ids {
         // SAFETY: fontdb requires that the mapped file is not changed meanwhile; system fonts sit on the read-only
@@ -365,7 +373,7 @@ pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
     request(IMAGE, Some(side), bytes)
 }
 
-/// A formula or diagram as rendered by WebKit, converted without fonts: MathJax draws glyphs as paths.
+/// A formula as rendered by WebKit: MathJax draws the glyphs of its fonts as paths and leaves other characters as text.
 pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
     match request(FORMULA_SVG, None, svg.as_bytes())? {
         Decoded::Pdf(pdf) => Some(pdf),

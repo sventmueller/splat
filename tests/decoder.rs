@@ -79,6 +79,43 @@ fn images_decode_to_pixels_and_svgs_to_pdf() {
     assert!(child.wait().unwrap().success(), "the helper ends with its input");
 }
 
+/// MathJax leaves characters outside its fonts as text, and only the system fonts have glyphs for them.
+#[test]
+fn text_in_a_formula_reaches_the_pdf_as_outlines_in_every_script() {
+    const FORMULA_SVG: u8 = 2;
+    let mut child = helper();
+    let mut pdf = |text: &str| {
+        let svg = format!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" width="240" height="40" viewBox="0 -750 12000 1000"><g fill="#000" transform="scale(1,-1)"><text transform="scale(1,-1)" font-size="884px" font-family="serif">{text}</text></g></svg>"##
+        );
+        send(&mut child, FORMULA_SVG, svg.as_bytes());
+        assert_eq!(read(&mut child, 1), [1], "{text}");
+        let len = usize::try_from(u64::from_le_bytes(read(&mut child, 8).try_into().unwrap())).unwrap();
+        read(&mut child, len)
+    };
+    let empty = pdf("").len();
+    for text in [
+        "äöü",
+        "αβγ",
+        "Привет",
+        "水",
+        "日本語",
+        "한국어",
+        "العربية",
+        "שלום",
+        "ไทย",
+        "हिन्दी",
+    ] {
+        let pdf = pdf(text);
+        assert!(pdf.len() > empty, "{text} left no outlines");
+        assert!(!pdf.windows(5).any(|w| w == b"/Font"), "{text} brought a font along");
+    }
+    assert!(
+        pdf("😀").len() > 10_000,
+        "a colored emoji is an image, unlike a placeholder"
+    );
+}
+
 unsafe extern "C" {
     fn fcntl(fd: i32, command: i32, ...) -> i32;
 }

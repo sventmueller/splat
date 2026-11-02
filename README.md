@@ -419,7 +419,9 @@ setting is off until you turn it on.
 
 ## Formulas
 
-Formulas are rendered by [MathJax](https://www.mathjax.org) with its TeX and AMS math, as crisp vector graphics.
+Formulas are rendered by [MathJax](https://www.mathjax.org) with its TeX and AMS math, as crisp vector graphics. Text in
+`\text{…}` can be in any script: what MathJax's fonts lack comes from the fonts of your Mac, with Arabic and Hebrew
+running from right to left, and emoji in color.
 
 | Kind | Syntax |
 |---|---|
