@@ -2,6 +2,7 @@
 //! the undo history and an open formula editor shows here, wherever `make test` runs.
 
 use std::cell::Cell;
+use std::rc::Rc;
 
 use objc2::AnyThread;
 use objc2::rc::Retained;
@@ -12,7 +13,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSDate, NSNotFound, NSPoint, NSRange, NSRect, NSRunLoop, NSSize, NSURL};
 
-use super::{check, compose, type_in_preview, type_in_source};
+use super::{after, check, compose, type_in_preview, type_in_source};
 use crate::document::MdDocument;
 use crate::editor::actions::Action;
 use crate::editor::{EditorController, Invalidate, js};
@@ -52,9 +53,15 @@ fn step(e: &EditorController, f: impl FnOnce()) {
     undo.endUndoGrouping();
 }
 
-/// Lets what waits for the next turn of the run loop happen.
+/// Lets what waits for the next turn of the run loop happen; a turn that lays out a new window outlasts any fixed time,
+/// so this waits for a timer that fires behind whatever is due already.
 fn next_turn() {
-    NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(0.05));
+    let turned = Rc::new(Cell::new(false));
+    let seen = turned.clone();
+    after(0.0, move || seen.set(true));
+    while !turned.get() {
+        NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(0.05));
+    }
 }
 
 fn preview_offset_behind(e: &EditorController, what: &str) -> usize {
