@@ -566,6 +566,7 @@ SplatはRustで書かれたアプリケーションで、[objc2](https://github.
 
 - Command Line Toolsを入れたmacOS（`xcode-select --install`）。Xcodeは不要です。Splatは`actool`、`ibtool`、`metal`なしでビルドされます。
 - Rust 1.99（`brew install rust`）。[rust-toolchain.toml](../../../rust-toolchain.toml)にはCIが使う正確なバージョンが書かれています。rustupは自動でそれをインストールしますが、HomebrewのRustはこのファイルを無視します。新しいコンパイラとclippyの警告がプロジェクトに届くのは、このファイルでバージョンを上げたときです。
+- rustup。`make lint`、`make check`、`make universal`に必要です。`cargo xtask check-library`がLinux向けにライブラリをビルドして、macOSが不要であることを示し、HomebrewのRustにはほかのターゲットがないためです。
 
 [Makefile](../../../Makefile)には短いエントリポイントがまとまっていて、`make help`ですべて一覧できます。
 
@@ -622,21 +623,24 @@ cargo xtask vendor fetch       # vendor.lockのバージョンを変えた後に
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | より長いランダム探索。`SPLAT_FUZZ_SEED`で入力を変えられます |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | ほかの言語が未完成の間、1つの言語だけ |
 | `cargo clippy --release --all-targets [--features selftest]` | リント。すべての`unsafe`ブロックの根拠、関数の長さ、ライブラリでは数値変換を含みます |
+| `cargo xtask check-library` | ライブラリがLinux向けにビルドできる。つまり、その中にmacOSを必要とするものはない |
 | `cargo xtask vendor check` | JavaScriptライブラリが`vendor.lock`とバイト単位で一致すること |
-| `cargo xtask selftest probe` | ウインドウなしで、それぞれ期待される結果とともに：数式、図、プロセス内のサーバに対するWebの画像、ブロックされるアドレス、Webビューの防御 |
+| `cargo xtask selftest probe` | ウインドウなしで、それぞれ期待される結果とともに：数式、図、プロセス内のサーバに対するWebの画像、ブロックされるアドレス、各コマンドが書き出すテキスト、各画像形式の両方の書き出しでの扱い、応答しなくなるページ、そして防御のないページに対するWebビューの防御。約30秒かかります。アプリを前面に必要とするものは、ロックされた画面ではスキップされます |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | 実行中のアプリを、クリックを1つずつ。ウインドウを開いて入力するため、Macは約4分間ふさがります。`--scenarios`は後半だけを約1分半で実行します |
 | `cargo xtask selftest resize` | 境界線を動かした後にウインドウを広げます：ウインドウのサイズ変更中にソースが折り返し直されます。約10秒かかります |
 | `cargo xtask selftest bench <file.md>` | 大きなファイルを開く、入力する、スクロールするタイミングの計測 |
-| `cargo test --release -- --ignored partial_updates` | 10 MBでの1回のキー入力：部分更新と全体更新の比較、結果と制限時間 |
-| `cargo test --release --test hostile` | スタックをあふれさせたり二乗時間がかかったりするよう作られた書類を、解析、レイアウト、両方の書き出し、キー入力、コマンドに通します |
+| `cargo test --release -- --ignored partial_updates` | 10 MBでの1回のキー入力：部分更新と全体更新の比較、同じ結果を最大でも4分の1の時間で |
+| `cargo test --release --test hostile` | スタックをあふれさせたり二乗時間がかかったりするよう作られた書類を、それぞれ2つの大きさで（時間はテキストと同じ比率で伸びなければなりません）、解析、レイアウト、両方の書き出し、キー入力、コマンドに通します |
 | `make mutants` | `src/markdown/`と`src/preview/`に欠陥を1つずつ仕込み、[cargo-mutants](https://mutants.rs)（`cargo install cargo-mutants`）で実行します。どのテストも気づかないものを示します。数時間かかります。`FILE=src/preview/bridge.rs`で絞り込めます |
 | `cargo test --release --test decoder` | デコーダプロセスが画像をデコードし、ファイルにもネットワークにも到達しないこと |
 | `make coverage` | `cargo test`とすべてのセルフテストの行カバレッジ。[cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)（`brew install cargo-llvm-cov llvm`）を使い、下限を下回ると失敗します。Macを約5分間占有します |
-| `make coverage-library` | `src/markdown/`、`src/preview/`、`i18n.rs`に対する下限。`cargo test`だけで計測します |
+| `make coverage-library` | `src/markdown/`、`src/preview/`、`i18n.rs`に対するより高い下限。`cargo test`だけで計測します |
 
-ユニットテストは、テスト対象のコードの隣にあります。`tests/`には、外部からライブラリに届くものが入っています。`robustness.rs`のランダムテストは、`sync.rs`のものと`src/fuzz.rs`のジェネレータを共有しています。ほかに、害をなすよう作られた書類の`hostile.rs`と、ビルドしたプログラムを起動するデコーダのテストがあります。`src/editor/`にあるウインドウを必要としない判断は、それぞれテストを持つ独立した関数にあります。コントローラが知っていることとその変わり方は`state.rs`に、レンダリングの規則は`render_queue.rs`に、テキストのコピーは`sync.rs`にあります。ウインドウのセルフテストで、待っても無駄に終わる手順があると、実行は失敗します。ウインドウのセルフテストは、メインのクリックスルーの後に後半を実行します。それは`src/editor/selftest/scenarios.rs`にあり、すべてのフォーマットコマンドと表のコマンド、ダイアログ、リンクのクリック、ペースト、ドロップ、書き出し、大きな変更、ディスク上で変わる画像、メモリ負荷、巨大な書類、クラッシュ後の復旧を扱います。
+ユニットテストは、テスト対象のコードの隣にあります。`tests/`には、外部からライブラリに届くものが入っています。`robustness.rs`のランダムテストは、`sync.rs`のものと`src/fuzz.rs`のジェネレータを共有しています。ほかに、害をなすよう作られた書類の`hostile.rs`と、ビルドしたプログラムを起動するデコーダのテストがあります。`src/editor/`にあるウインドウを必要としない判断は、それぞれテストを持つ独立した関数にあります。コントローラが知っていることとその変わり方は`state.rs`に、レンダリングの規則は`render_queue.rs`に、テキストのコピーは`sync.rs`に、段落スタイル、フォント、色は値として`render.rs`に、ツールバーの識別子が何を表すかは`toolbar.rs`に、リンクのクリックが何を意味するかは`navigation.rs`にあります。
 
-カバレッジには2つの下限があります。どのモジュールも行の80 %以上、すべてのモジュールを合わせて85 %以上です。`make coverage`は`cargo test`とセルフテストを合わせて計測し、どちらかを下回ると失敗します。下限と、クラッシュ時にしか実行されない`main.rs`のパニックフックのような少数の例外は、その理由とともに[xtask](../../../xtask/src/coverage.rs)に書かれています。計測用のビルドは`target/coverage/`に出力されるので、計測用のコードが`target/release/`やディスクイメージに混じることはありません。デコーダのヘルパーは、自らを閉じ込める前に計測ファイルを開くので、これも計測されます。
+ウインドウのセルフテストの手順は、時間ではなく名前のついた条件を待ちます。何かがないことのように合図のないものだけが、理由を添えた待ち時間を残します。待っても無駄に終わるのは、来なかったものを名指しする失敗したチェックで、パニックした手順も失敗したチェックであり、どちらの場合も実行は続きます。この実行では何も言えないチェックは`SELFTEST SKIP`を報告します。xtaskはそれを一覧にし、成功にも失敗にも数えません。xtaskは各モードに、また`--scenarios`には独自に、そのチェックのおよそ9割を求めます。ウインドウのセルフテストは、メインのクリックスルーの後に後半を実行します。それは`src/editor/selftest/scenarios.rs`にあり、すべてのフォーマットコマンドと表のコマンド、ダイアログ、リンクのクリック、ペースト、ドロップ、書き出し、大きな変更、ディスク上で変わる画像、メモリ負荷、巨大な書類、クラッシュ後の復旧を扱います。
+
+カバレッジには2つの下限があります。どのモジュールも行の84 %以上、すべてのモジュールを合わせて96 %以上です。`make coverage`は`cargo test`とセルフテストを合わせて計測し、どちらかを下回ると失敗します。`make coverage-library`は、ウインドウを必要としないものを90 %と97 %に保ちます。下限と、クラッシュ時にしか実行されない`main.rs`のパニックフックのような少数の例外は、その理由とともに[xtask](../../../xtask/src/coverage.rs)に書かれています。計測用のビルドは`target/coverage/`に出力されるので、計測用のコードが`target/release/`やディスクイメージに混じることはありません。デコーダのヘルパーは、自らを閉じ込める前に計測ファイルを開くので、これも計測されます。
 
 CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）は、`main`へのプッシュとプルリクエストのたびに、Apple Siliconで`make check`、`make coverage-library`、ユニバーサルビルドを、Intelで`cargo test`を実行します。毎晩、[.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml)が新しいランダムな入力で`make test-long`を実行します。セルフテストとディスクイメージは開発者のMacに残ります。画面と、キーチェーンにある署名用の証明書が必要だからです。
 
@@ -644,36 +648,39 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）は、`main
 
 ### プロジェクトの構成
 
-`src/lib.rs`は、ウインドウを必要としないすべてのものを、`splat`という独立したライブラリにします。`markdown/`、`preview/`、`i18n.rs`、テストジェネレータの`fuzz.rs`です。`src/main.rs`のアプリはその上に作られています。
+`src/lib.rs`は、ウインドウを必要としないすべてのものを、`splat`という独立したライブラリにします。`markdown/`、`preview/`、`i18n.rs`、テストジェネレータの`fuzz.rs`です。macOSなしでビルドできます。`src/main.rs`のアプリはその上に作られています。
 
-- `src/markdown/`：パーサのバインディング（comrak）、シンタックスカラー、そして純粋なテキスト編集（`Edit`）としてのすべてのコマンド。さらに、編集後の再解析（`incremental.rs`）、埋め込みHTMLのリーダー（`markup.rs`）、タイポグラフィ、タグ、本文中の参照と引用（`typography.rs`）、テキストの見た目とそれを決めるMarkdownとHTML（`style.rs`）、アドレスとして許されるもの（`url.rs`）、HTMLとWordの書き出し（`html.rs`、`docx.rs`と`docx/html.rs`、`docx/xml.rs`）。プレビューと両方の書き出しは、すべて同じツリー`Doc`を読みます。AppKitは使いません。
-- `src/preview/`：プレビューのレイアウト、その中の埋め込みHTML（`layout/html.rs`）、プレビューとソースの対応付け（`Bridge`、`Index`）。AppKitは使いません。
-- `src/editor/`：ウインドウ。1つの`EditorController`オブジェクトが、両方のビューのデリゲートとしてAppKitに応えます。その仕事は責務ごとに分けられています。
+- `src/markdown/`：すべての利用側が読むツリー、つまり自分のテキストを所有する`doc/`の`Doc`と、パーサへの唯一のバインディングである`reader/`（comrakはほかのどこにも名前が出ず、`reader/assumptions.rs`にはコードがcomrakについて前提としていることがあります）。シンタックスカラー、そして純粋なテキスト編集（`Edit`）としてのすべてのコマンドは`commands/`に。さらに、編集後の再解析（`incremental.rs`）、埋め込みHTMLのリーダー（`markup.rs`）、タイポグラフィ、タグ、本文中の参照と引用（`typography.rs`）、テキストの見た目とそれを決めるMarkdownとHTML（`style.rs`）、アドレスとして許されるもの（`url.rs`）、HTMLとWordの書き出し（`html.rs`、`docx.rs`と`docx/html.rs`、`docx/xml.rs`）。位置には専用の型があります：ソーステキストでは`Byte`、ソースビューでは`U16`、プレビューのビューでは`Shown`（`text.rs`）。AppKitは使いません。
+- `src/preview/`：プレビューのレイアウト（`layout/`）と、その中の埋め込みHTML（`layout/html.rs`）、プレビューとソースの対応付け（`Bridge`、`Index`）。`Bridge`は、別のバージョンの`Doc`のレイアウトを拒否します。AppKitは使いません。
+- `src/editor/`：ウインドウ。1つの`EditorController`オブジェクトが、両方のビューのデリゲートとしてAppKitに応え、コンポーネントに転送します。コンポーネントは、コントローラの上に載る小さな構造体と、それが所有する状態で、そのフィールドにはほかのモジュールから触れません。
 
 | モジュール | 責務 |
 |---|---|
-| `mod.rs` | クラス、デリゲートメソッド、`invalidate` |
+| `mod.rs` | クラス、転送するデリゲートメソッド、`invalidate` |
+| `panes.rs` | `Panes`：テキストビュー、アウトライン、ペインの表示と非表示、そしてビューへのアクセスを与えるもの |
 | `state.rs` | コントローラが書類について知っていることと、それを変えるすべての方法。フィールドは非公開で、ビューには触れません |
+| `model.rs` | 状態とテキストのコピーを、ビューに触れないクロージャに貸し出す |
 | `actions.rs` | コマンドのレジストリ：セレクタ、タイトル、ショートカット、シンボル、コマンドが有効になる条件 |
-| `editing.rs` | コマンドの実行と検証、プレビューでの入力 |
-| `update.rs` | 解析、色付け、プレビューの更新。編集後は、影響を受ける段落だけ |
+| `editing.rs` | `Editing`: コマンドの実行と検証、プレビューでの入力 |
+| `update.rs` | `Updater`: 解析、色付け、プレビューの更新。編集後は、影響を受ける段落だけ |
 | `sync.rs` | テキストのコピーとブロックの管理。AppKitなしで、ランダムテストあり |
-| `progressive.rs` | 大きなプレビューを段階的にレンダリング |
-| `selection.rs`, `scroll.rs` | 両方のペインの選択範囲とスクロール位置を揃える |
-| `atom.rs`, `atom_edit.rs` | 数式と図のエディタ |
-| `navigation.rs`, `links.rs` | リンク、ウィキリンク、タグ、タスクのチェックボックス、折りたたみ、脚注 |
+| `progressive.rs` | `Progressive`: 大きなプレビューを段階的にレンダリング |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: 両方のペインの選択範囲とスクロール位置を揃える |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: 数式と図のエディタ |
+| `navigation.rs`, `links.rs` | `Links`: リンク、ウィキリンク、タグ、タスクのチェックボックス、折りたたみ、脚注 |
 | `env.rs` | プレビューがテキストの外から読むもの：タイポグラフィ記号、`@name`と`#12`用のリポジトリ、BibTeXファイル、埋め込みノート |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | プレビューのテキスト、ローカルとリモートの画像 |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | プレビューのテキスト、ローカルとリモートの画像、`images.rs`の`Pictures` |
 | `attributes.rs` | テキスト属性。各キーには、期待される型の値しか入りません |
 | `shadow.rs` | クラッシュ後の復旧のための、未保存テキストのコピー |
 | `decoder.rs` | 画像とグラフィックをデコードする、サンドボックス化されたヘルパープロセス |
-| `export.rs`, `outline.rs` | HTMLとWordの書き出し、アウトラインサイドバー |
+| `export.rs`, `outline.rs` | `Sharing`：HTMLとWordの書き出し、共有ファイル、印刷、アウトラインサイドバー |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | MathJax、Mermaid、Graphviz、PlantUML、ビジュアルな数式エディタのためのWebKit。WebKitとは別に、何をいつレンダリングするかの規則 |
 | `webkit.rs` | WebKitへの呼び出し。ナビゲーションデリゲートの寿命だけは`js.rs`と`mathfield.rs`に残ります |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | ウインドウ、ツールバー、テキストビュー、ダイアログ、色 |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | ウインドウの構築、ツールバー、テキストビュー、ダイアログ、色 |
 
 - `src/menu.rs`、`src/app.rs`、`src/document.rs`：メニューバー、アプリデリゲート、書類（`NSDocument`のサブクラスである`MDDocument`）。
-- `src/i18n.rs`と`resources/*.lproj`：35言語。キーはドイツ語のテキストです。
+- `src/i18n.rs`と`resources/*.lproj`：35言語。キーはドイツ語のテキストで、アプリは起動時にインターフェース言語の表を組み込みます。
+- `src/util/`：ワーカースレッド（`lanes.rs`）、応答しなくなることのあるボリューム（`volumes.rs`）、AppKitのヘルパー、ファイルとプロセス。`src/diag.rs`：ユーザーの目に触れないところで起きた不具合はシステムログに送られ、書類のテキストは一切含まれません。
 - `src/large_alloc.rs`：大きなメモリ割り当てはカーネルから直接取得し、解放時にカーネルへ返すので、大きな編集の後にメモリが戻ります。
 - `resources/js/`：Webページとライブラリ。バージョンとチェックサムは[vendor.lock](../../../vendor.lock)にあります。
 - `xtask/`：バンドル、署名、ディスクイメージ、アイコン、ベンダリング、セルフテストのランナー、カバレッジの下限。
@@ -684,21 +691,21 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）は、`main
 
 1. そこでの文字の変更はすべて、テキストを読み直すことなく、テキストのコピー（`Snapshot`）をその場で更新します。
 2. 更新では、コピーを解析し、色が変わった部分だけソースの色を付け直し、プレビューをレイアウトして、内容が変わったブロックだけを置き換えます。
-3. 編集後は、隣の部分が変わらない限り、影響を受ける段落だけが再び解析、色付け、レイアウトされます。変わるかどうかは`reparse_part_and_color`が判断します。`%%`のコメントブロックがある書類、フロントマターへの変更、リンク参照定義の近くへの変更は、全体が処理されます。comrakは脚注の参照を、同じ解析の中に定義があるときにしか認識せず、定義をテキストの後ろへ移すので、その部分はラベルごとに代わりの定義を付けて解析し、番号は古いツリーから取ります。その部分の参照や定義への変更、またはインライン脚注の隣への変更は、全体が処理されます。
+3. 編集後は、隣の部分が変わらない限り、影響を受ける段落だけが再び解析、色付け、レイアウトされます。変わるかどうかは`reparse_part_and_color`が判断します。`%%`のコメントブロックがある書類、フロントマターへの変更、そしてリンク参照定義のある書類では、角括弧を含む部分への変更は、全体が処理されます。comrakは脚注の参照を、同じ解析の中に定義があるときにしか認識せず、定義をテキストの後ろへ移すので、その部分はラベルごとに代わりの定義を付けて解析し、番号は古いツリーから取ります。その部分の参照や定義への変更、またはインライン脚注の隣への変更は、全体が処理されます。
 4. `<details>`や`<div align>`を開き、後で閉じるHTMLブロックは、その間にあるMarkdownのブロックに影響します。再利用するブロックは、周囲が同じでなければなりません。
 5. 2 MBまでの書類のソースで入力している間は、部分更新がすぐに実行されます。適用できないとき、またはより大きな書類では、解析とレイアウトはバックグラウンドで実行されます。プレビューで入力している間は、プレビューのカーソルが結果に依存するため、すぐに実行されます。
 6. プレビューでの入力は、`Bridge`によってソースの編集に変換され、そこから先は同じ経路をたどります。Markdownにはテキストを構文に変える方法が多すぎて規則だけでは扱えないため、`preview/verify.rs`が変更された部分をもう一度解析し、表示される内容を入力された内容と比べます。成立しない編集は、さらにエスケープされるか、拒否されます。
-7. comrakのインライン位置は、リンク参照定義の後ろなど、いくつかの場所で狂います。`markdown/positions.rs`は、ブロックを読むときにそれをソースと照合し、合わない場所ではソースから読み直します。
+7. comrakのインライン位置は、リンク参照定義の後ろなど、いくつかの場所で狂います。`markdown/reader/positions.rs`は、ブロックを読むときにそれをソースと照合し、合わない場所ではソースから読み直します。
 
 ### コントローラの規則
 
-1. コントローラ自身によるビューへの変更は`silently()`の中で実行され、デリゲートのコールバックはそれを無視します。
-2. `state`を借用するのは、読み取りと計算のためだけで、ビューを変更、レイアウト、スクロールする呼び出しをまたいで借用することはありません。変更はそれ自身のメソッドだけで行われ、そのテストにウインドウは不要です。
+1. コントローラ自身によるビューへの変更は`Panes::silently`の中で実行され、デリゲートのコールバックはそれを無視します。それ以外の場所ではビューは読むことしかできないので、コンパイラが検査します。コールバックに聞かせたいもの、またはビューをAppKitに渡すものは、`Panes::for_appkit`を通すことでそう示します。
+2. 状態を借用するのは、読み取りと計算のためだけで、ビューを変更、レイアウト、スクロールする呼び出しをまたいで借用することはありません。`Model`はそれを`Send`なクロージャに貸し出し、`Send`なビューは存在しないので、コンパイラが検査します。変更はそれ自身のメソッドだけで行われ、そのテストにウインドウは不要です。
 3. 外部からのメッセージ（画像の読み込み完了、数式のレンダリング完了）は、`renders_arrived`と`image_arrived`を通して遅れて届き、更新の途中に届くことはありません。
 4. テキストの変更を伴わない再描画は、`invalidate(reason)`だけを通して行います。
-5. `Rc<Snapshot>`をソースの変更をまたいで保持しません。保持すると、その変更でテキスト全体がコピーされます。
-6. 新しいコマンドには、`actions.rs`のエントリ、`mod.rs`のメソッド、`editing::perform`の分岐が必要です。
-7. すべての`unsafe`ブロックには、`// SAFETY:`コメントとして根拠を付けます。アプリの中で、バイト列がシステムの画像デコーダに届くのは`decoder::system_image`だけです。
+5. テキストのコピーをソースの変更をまたいで保持しません。保持すると、その変更でテキスト全体がコピーされます。`with_text`は`Send`なクロージャの間だけそれを貸し出します。
+6. 新しいコマンドには、`actions.rs`のエントリ、`mod.rs`のメソッド、`Editing::perform`の分岐が必要です。
+7. すべての`unsafe`ブロックには、`// SAFETY:`コメントとして根拠を付けます。バイト列がシステムの画像デコーダに届くのは、ヘルパープロセスの中の`decoder::decode_native`だけです。ほかの呼び出しがないか、テストがソースを走査します。
 8. メインスレッドは、ユーザのフォルダを待ちません。ネットワークボリュームは応答しなくなることがあるからです。ファイルは`DISK`スレッドで調べ、プレビューは`Env::known`を通して答えを読みます。書き出しや保存のように、ユーザが待っている操作だけが、ディスクに直接触れてかまいません。
 
 ### コマンドの追加
@@ -707,7 +714,7 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）は、`main
 
 1. `Action`のバリアントと、その`Spec`：セレクタ、タイトル、ツールバーのラベル、ツールチップ（動詞で始め、75文字まで）、ショートカット、SFシンボル、適用される条件
 2. `src/editor/mod.rs`のメソッド
-3. `editing::perform`の分岐
+3. `Editing::perform`の分岐
 4. すべての`Localizable.strings`にあるそのテキスト
 
 テスト`every_command_has_a_method_and_every_method_a_command`は、レジストリとメソッドが一致していることを確認します。⌘E、⌘J、⌘T、⌘;、⇧⌘C、⌥⌘C、⌥⌘V、⇧⌘P、⌥⌘T、⌃⌘F、⌘,のようなAppleの標準ショートカットには手を付けません。

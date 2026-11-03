@@ -1,6 +1,6 @@
 //! The main click-through: one document edited by every means the window offers, step by step.
 
-use objc2::{DefinedClass, sel};
+use objc2::sel;
 use objc2_app_kit::{NSApplication, NSTextInputClient};
 use objc2_foundation::{NSRange, NSString};
 
@@ -22,38 +22,44 @@ pub(super) fn first_edits() -> Vec<Step> {
                 &head(&s, 40),
             );
         }),
-        step(0.15, |c| {
-            super::super::dialogs::link(&c.e.window().unwrap(), "Beispieltext", |_, _| {})
-        }),
-        step(0.8, |c| {
-            let window = c.e.window().unwrap();
-            screen_image(&window, &c.out.join("14-link-sheet.png"));
-            let Some(sheet) = window.attachedSheet() else {
-                check("link dialog fields span the sheet", false, "no sheet");
-                return;
-            };
-            let mut fields = Vec::new();
-            if let Some(content) = sheet.contentView() {
-                editable_fields(&content, &mut fields);
-            }
-            let widths: Vec<f64> = fields.iter().map(|f| f.frame().size.width).collect();
-            check(
-                "link dialog fields span the sheet",
-                widths.len() == 2 && widths.iter().all(|w| *w >= 300.0),
-                &format!("{widths:?}"),
-            );
-            window.endSheet_returnCode(&sheet, objc2_app_kit::NSAlertSecondButtonReturn);
-            window.makeFirstResponder(Some(c.e.preview()));
-        }),
-        step(0.15, |c| unsafe {
-            c.e.preview().doCommandBySelector(sel!(insertNewline:))
-        }),
+        applied(|c| super::super::dialogs::link(&c.e.window().unwrap(), "Beispieltext", |_, _| {})),
+        // A capture while the sheet slides in would show nothing to compare.
+        at_least(
+            0.8,
+            "the link sheet to show",
+            |c| c.e.window().is_some_and(|w| w.attachedSheet().is_some()),
+            |c| {
+                let window = c.e.window().unwrap();
+                screen_image(&window, &c.out.join("14-link-sheet.png"));
+                let Some(sheet) = window.attachedSheet() else {
+                    check("link dialog fields span the sheet", false, "no sheet");
+                    return;
+                };
+                let mut fields = Vec::new();
+                if let Some(content) = sheet.contentView() {
+                    editable_fields(&content, &mut fields);
+                }
+                let widths: Vec<f64> = fields.iter().map(|f| f.frame().size.width).collect();
+                check(
+                    "link dialog fields span the sheet",
+                    widths.len() == 2 && widths.iter().all(|w| *w >= 300.0),
+                    &format!("{widths:?}"),
+                );
+                window.endSheet_returnCode(&sheet, objc2_app_kit::NSAlertSecondButtonReturn);
+                window.makeFirstResponder(Some(c.e.preview()));
+            },
+        ),
+        when(
+            "the link sheet to close",
+            |c| c.e.window().is_some_and(|w| w.attachedSheet().is_none()) && quiet(&c.e),
+            |c| unsafe { c.e.preview().doCommandBySelector(sel!(insertNewline:)) },
+        ),
     ]
 }
 
 pub(super) fn toolbar_and_undo() -> Vec<Step> {
     vec![
-        step(0.15, |c| {
+        applied(|c| {
             type_in_preview(&c.e, "Neuer Absatz");
             let s = source(&c.e);
             check(
@@ -62,7 +68,7 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
                 &head(&s, 60),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let p = storage(e.preview()).string().to_string();
             let start = p.encode_utf16().count() - p[p.find("Neuer Absatz").unwrap()..].encode_utf16().count();
@@ -80,7 +86,7 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
                 &format!("{:?}", head(&s, 70)),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             if let Some(undo) = c.e.undo_manager() {
                 undo.undo();
             }
@@ -93,7 +99,7 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
         }),
         // Like selecting with the mouse: the other view's caret is already where the selection starts, so
         // nothing else redraws the spot.
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let (preview_at, _) = neuer_absatz(e);
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
@@ -102,24 +108,21 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
     ]
 }
 
+const SCREEN_LAGS: &str = "the window server shows what was drawn a frame ago and reports nothing";
+
 pub(super) fn selection_steps() -> Vec<Step> {
     vec![
-        step(0.3, |c| {
+        pause(0.3, SCREEN_LAGS, |c| {
             let e = &c.e;
             let (preview_at, source_at) = neuer_absatz(e);
             e.preview().setSelectedRange(NSRange::new(preview_at, 5));
             check(
                 "a preview selection shows in the source in the selection colour",
-                e.ivars().marks.in_source() == Some(NSRange::new(source_at, 5))
-                    && e.source().selectedRange().length == 0,
-                &format!(
-                    "{:?}, real {:?}",
-                    e.ivars().marks.in_source(),
-                    e.source().selectedRange()
-                ),
+                e.selection().in_source() == Some(NSRange::new(source_at, 5)) && e.source().selectedRange().length == 0,
+                &format!("{:?}, real {:?}", e.selection().in_source(), e.source().selectedRange()),
             );
         }),
-        step(0.4, |c| {
+        pause(0.4, SCREEN_LAGS, |c| {
             let e = &c.e;
             let image = c.out.join("12-selection-from-preview.png");
             screen_image(&e.window().unwrap(), &image);
@@ -133,18 +136,17 @@ pub(super) fn selection_steps() -> Vec<Step> {
             e.window().unwrap().makeFirstResponder(Some(e.source()));
             e.source().setSelectedRange(NSRange::new(source_at, 0));
         }),
-        step(0.3, |c| {
+        pause(0.3, SCREEN_LAGS, |c| {
             let e = &c.e;
             let (preview_at, source_at) = neuer_absatz(e);
             e.source().setSelectedRange(NSRange::new(source_at, 5));
             check(
                 "a source selection shows in the preview",
-                e.ivars().marks.in_preview() == Some(NSRange::new(preview_at, 5))
-                    && e.ivars().marks.in_source().is_none(),
-                &format!("{:?}", e.ivars().marks.in_preview()),
+                e.selection().in_preview() == Some(NSRange::new(preview_at, 5)) && e.selection().in_source().is_none(),
+                &format!("{:?}", e.selection().in_preview()),
             );
         }),
-        step(0.4, |c| {
+        pause(0.4, SCREEN_LAGS, |c| {
             let e = &c.e;
             let image = c.out.join("12-selection-from-source.png");
             screen_image(&e.window().unwrap(), &image);
@@ -163,7 +165,7 @@ pub(super) fn selection_steps() -> Vec<Step> {
 
 pub(super) fn preview_edit_steps() -> Vec<Step> {
     vec![
-        step(0.15, |c| {
+        applied(|c| {
             type_in_preview(&c.e, "*");
             let s = source(&c.e);
             check(
@@ -172,7 +174,7 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
                 &head(&s, 80),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let p = storage(e.preview()).string().to_string();
             let Some(cell) = p.find("Ergebnis").map(|b| p[..b].encode_utf16().count()) else {
@@ -195,7 +197,7 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
                 &format!("selected {selected:?}"),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let s = source(e);
             let task = s.find("- [ ] Offene").unwrap_or(0);
@@ -206,7 +208,7 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
             };
             let idx = p[..b].encode_utf16().count();
             let link: Retained<NSString> = ns("splat-task");
-            e.link_clicked(e.preview(), &obj(link), idx);
+            e.links().link_clicked(e.preview(), &obj(link), idx);
             let s2 = source(e);
             check(
                 "checkbox click toggles task",
@@ -223,7 +225,8 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
                     return;
                 };
                 let link: Retained<NSString> = ns("splat-fold");
-                e.link_clicked(e.preview(), &obj(link), p[..at].encode_utf16().count());
+                e.links()
+                    .link_clicked(e.preview(), &obj(link), p[..at].encode_utf16().count());
             };
             unfold("▸", "a click on ▸ unfolds the callout");
             let s = source(e);
@@ -243,7 +246,8 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
                 return;
             };
             let link: Retained<NSString> = ns("splat-fold");
-            e.link_clicked(e.preview(), &obj(link), p[..at].encode_utf16().count());
+            e.links()
+                .link_clicked(e.preview(), &obj(link), p[..at].encode_utf16().count());
             check(
                 "a click opens the HTML details",
                 source(e).contains("<details open>"),
@@ -263,12 +267,12 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
                 "",
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let window = e.window().unwrap();
             snapshot(&window, &c.out.join("02-edited.png"));
             window.makeFirstResponder(Some(e.source()));
-            e.set_zoom(1.0);
+            e.updater().set_zoom(1.0);
             snapshot(&window, &c.out.join("03-source-focus.png"));
             export_pdf(e, &c.out.join("export.pdf"));
         }),
@@ -277,7 +281,7 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
 
 pub(super) fn formula_editor_steps() -> Vec<Step> {
     vec![
-        step(0.5, |c| {
+        settle(|c| {
             let e = &c.e;
             let p = storage(e.preview()).string().to_string();
             let attachments = p.matches('\u{FFFC}').count();
@@ -294,7 +298,7 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 snapshot(&window, &c.out.join("04-formulas.png"));
             }
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let Some(view) = open_formula_editor(e) else {
                 check("formula popover opens", false, "no popover");
@@ -306,12 +310,12 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 &view.string().to_string(),
             );
             view.setString(&ns("E = mc^3"));
-            e.atom_text_changed();
+            e.atom_editor().text_changed();
             check("popover edits apply live", source(e).contains("$E = mc^3$"), "");
             close_popover(e);
         }),
         closed(|c| check("closing the popover commits", source(&c.e).contains("$E = mc^3$"), "")),
-        step(0.15, |c| {
+        applied(|c| {
             if let Some(undo) = c.e.undo_manager() {
                 undo.undo();
             }
@@ -326,15 +330,15 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 ),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let Some(view) = open_formula_editor(e) else {
                 check("formula popover reopens", false, "no popover");
                 return;
             };
             view.setString(&ns("x"));
-            e.atom_text_changed();
-            e.atom_command(sel!(cancelOperation:));
+            e.atom_editor().text_changed();
+            e.atom_editor().command(sel!(cancelOperation:));
         }),
         closed(|c| {
             check(
@@ -343,22 +347,22 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 "",
             )
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let len = storage(e.preview()).length();
             e.preview().setSelectedRange(NSRange::new(len, 0));
             perform(e, sel!(mdInsertFormula:), 0);
-            let open = e.ivars().atoms.edit.borrow().as_ref().map(|a| a.popover.isShown());
+            let open = e.atom_editor().open_popover().map(|p| p.isShown());
             check(
                 "inserting a formula opens its editor",
                 open == Some(true),
                 &format!("{open:?}"),
             );
-            if let Some(view) = e.ivars().atoms.edit.borrow().as_ref().map(|a| a.view.clone()) {
+            if let Some(view) = e.atom_editor().code_view() {
                 view.setString(&ns("a^2 + b^2"));
             }
-            e.atom_text_changed();
+            e.atom_editor().text_changed();
             close_popover(e);
         }),
         closed(|c| {
@@ -386,12 +390,12 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
             let responder: Option<&objc2::runtime::AnyObject> = responder.as_deref().map(|r| r.as_ref());
             check(
                 "a click into the source keeps the new formula and the focus",
-                s.trim_end().ends_with("$$\n\n$$") && e.is_source(responder),
+                s.trim_end().ends_with("$$\n\n$$") && e.panes().is_source(responder),
                 &tail(&s, 60),
             );
             set_source_caret(e, s.len());
             perform(e, sel!(mdInsertFormula:), 0);
-            e.cancel_atom_edit();
+            e.atom_editor().cancel();
         }),
         closed(|c| {
             let e = &c.e;
@@ -408,50 +412,64 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 }
             }
         }),
-        step(0.15, |c| check_context_menu(&c.e)),
-        step(0.05, |c| check_app_menu(c.e.mtm())),
-        step(0.5, |c| check_default_probe(c.e.mtm())),
+        applied(|c| check_context_menu(&c.e)),
+        applied(|c| check_app_menu(c.e.mtm())),
+        pause(
+            0.5,
+            "macOS reports an error only by a modal window, and nothing when all went well",
+            |c| check_default_probe(c.e.mtm()),
+        ),
     ]
+}
+
+/// Whether the preview stands at the heading of the tables, or as near as its end allows, its top and that of the heading.
+fn preview_shows_the_tables(e: &EditorController) -> (bool, f64, f64) {
+    let p = storage(e.preview()).string().to_string();
+    let top = e.preview().visibleRect().origin.y;
+    let tables = p.find("Tabellen\n").map_or(0, |b| p[..b].encode_utf16().count());
+    let ty = super::super::scroll::char_rect(e.preview(), tables).origin.y;
+    let bottom = e.preview().bounds().size.height - e.preview().visibleRect().size.height;
+    ((top - ty).abs() < 120.0 || (ty > top && top >= bottom - 2.0), top, ty)
 }
 
 pub(super) fn scrolling_dark_mode_and_remote_steps() -> Vec<Step> {
     vec![
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let src = source(e);
             let target = src.find("## Tabellen").unwrap();
             let map = crate::markdown::text::Utf16Map::new(&src);
-            let y = super::super::scroll::char_rect(e.source(), map.to_u16(target).0)
+            let y = super::super::scroll::char_rect(e.source(), map.to_u16(Byte::new(target)).get())
                 .origin
                 .y;
             let clip = e.source().enclosingScrollView().unwrap().contentView();
             clip.scrollToPoint(objc2_foundation::NSPoint::new(0.0, y));
             e.source().enclosingScrollView().unwrap().reflectScrolledClipView(&clip);
         }),
-        step(0.5, |c| {
-            let e = &c.e;
-            let p = storage(e.preview()).string().to_string();
-            let top = e.preview().visibleRect().origin.y;
-            let tables = p.find("Tabellen\n").map(|b| p[..b].encode_utf16().count()).unwrap_or(0);
-            let ty = super::super::scroll::char_rect(e.preview(), tables).origin.y;
-            let bottom = e.preview().bounds().size.height - e.preview().visibleRect().size.height;
-            check(
-                "scrolling the source scrolls the preview",
-                (top - ty).abs() < 120.0 || (ty > top && top >= bottom - 2.0),
-                &format!("preview top {top:.0}, heading at {ty:.0}"),
-            );
-            check(
-                "source view stays on TextKit 2",
-                e.source().textLayoutManager().is_some(),
-                "",
-            );
-            check_link_dialog(e.mtm(), &c.out.join("13-link-dialog.png"));
-            let app = NSApplication::sharedApplication(e.mtm());
-            app.setAppearance(
-                objc2_app_kit::NSAppearance::appearanceNamed(unsafe { objc2_app_kit::NSAppearanceNameDarkAqua })
-                    .as_deref(),
-            );
-        }),
+        when(
+            "the preview to follow the scrolled source",
+            |c| preview_shows_the_tables(&c.e).0,
+            |c| {
+                let e = &c.e;
+                let (follows, top, ty) = preview_shows_the_tables(e);
+                check(
+                    "scrolling the source scrolls the preview",
+                    follows,
+                    &format!("preview top {top:.0}, heading at {ty:.0}"),
+                );
+                check(
+                    "source view stays on TextKit 2",
+                    e.source().textLayoutManager().is_some(),
+                    "",
+                );
+                check_link_dialog(e.mtm(), &c.out.join("13-link-dialog.png"));
+                let app = NSApplication::sharedApplication(e.mtm());
+                app.setAppearance(
+                    objc2_app_kit::NSAppearance::appearanceNamed(unsafe { objc2_app_kit::NSAppearanceNameDarkAqua })
+                        .as_deref(),
+                );
+            },
+        ),
         settle(|c| {
             let e = &c.e;
             snapshot(&e.window().unwrap(), &c.out.join("05-dark.png"));
@@ -464,10 +482,10 @@ pub(super) fn scrolling_dark_mode_and_remote_steps() -> Vec<Step> {
             append(e, "\n\n![Badge](https://bilder.splat-test.example/badge.svg)\n");
             check(
                 "images from the web wait for permission",
-                e.ivars().remote_banner.get().is_some_and(|b| !b.isHidden()),
+                e.pictures().banner_shown() == Some(true),
                 "",
             );
-            e.allow_remote_images();
+            e.pictures().allow_remote_images();
         }),
         settle(|c| {
             let store = storage(c.e.preview());
@@ -500,7 +518,7 @@ pub(super) fn scrolling_dark_mode_and_remote_steps() -> Vec<Step> {
 
 pub(super) fn tables_and_spaces_steps() -> Vec<Step> {
     vec![
-        step(0.15, |c| {
+        applied(|c| {
             let store = storage(c.e.preview());
             let p = store.string().to_string();
             let cells = (0..store.length())
@@ -531,7 +549,7 @@ pub(super) fn tables_and_spaces_steps() -> Vec<Step> {
             );
             append(&c.e, "\n\nLeer Test\n\nAm Ende Wort\n");
         }),
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let p = storage(e.preview()).string().to_string();
@@ -540,7 +558,7 @@ pub(super) fn tables_and_spaces_steps() -> Vec<Step> {
             e.preview().setSelectedRange(NSRange::new(end, 0));
             type_in_preview(e, " ");
         }),
-        step(0.15, |c| {
+        applied(|c| {
             type_in_preview(&c.e, "z");
             let s = source(&c.e);
             check(
@@ -554,7 +572,7 @@ pub(super) fn tables_and_spaces_steps() -> Vec<Step> {
 
 pub(super) fn pending_format_steps() -> Vec<Step> {
     vec![
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let p = storage(e.preview()).string().to_string();
@@ -571,13 +589,13 @@ pub(super) fn pending_format_steps() -> Vec<Step> {
             let _ = unsafe { e.preview().tryToPerform_with(sel!(mdBold:), None) };
             check(
                 "bold at a word end waits for typing (preview)",
-                source(e).contains("Am Ende Wort\n") && e.active().bold,
+                source(e).contains("Am Ende Wort\n") && e.editing().active().bold,
                 &tail(&source(e), 30),
             );
             type_in_preview(e, " ");
         }),
-        step(0.15, |c| type_in_preview(&c.e, "n")),
-        step(0.15, |c| {
+        applied(|c| type_in_preview(&c.e, "n")),
+        applied(|c| {
             type_in_preview(&c.e, "eu");
             let s = source(&c.e);
             check(
@@ -586,7 +604,7 @@ pub(super) fn pending_format_steps() -> Vec<Step> {
                 &tail(&s, 30),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             let _ = unsafe { c.e.preview().tryToPerform_with(sel!(mdBold:), None) };
             type_in_preview(&c.e, "!");
             let s = source(&c.e);
@@ -597,18 +615,19 @@ pub(super) fn pending_format_steps() -> Vec<Step> {
             );
             append(&c.e, "\nQuelle Wort\n");
         }),
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.source()));
             let s = source(e);
             let end = s.rfind("Quelle Wort").unwrap() + "Quelle Wort".len();
             let map = crate::markdown::text::Utf16Map::new(&s);
-            e.source().setSelectedRange(NSRange::new(map.to_u16(end).0, 0));
+            e.source()
+                .setSelectedRange(NSRange::new(map.to_u16(Byte::new(end)).get(), 0));
             let _ = unsafe { e.source().tryToPerform_with(sel!(mdBold:), None) };
             type_in_source(e, " ");
         }),
-        step(0.15, |c| type_in_source(&c.e, "x")),
-        step(0.15, |c| {
+        applied(|c| type_in_source(&c.e, "x")),
+        applied(|c| {
             type_in_source(&c.e, "y");
             let s = source(&c.e);
             check(
@@ -617,12 +636,12 @@ pub(super) fn pending_format_steps() -> Vec<Step> {
                 &tail(&s, 30),
             );
         }),
-        step(0.15, |c| {
+        applied(|c| {
             if let Some(undo) = c.e.undo_manager() {
                 undo.undo();
             }
         }),
-        step(0.15, |c| {
+        applied(|c| {
             if let Some(undo) = c.e.undo_manager() {
                 undo.undo();
             }
@@ -644,7 +663,7 @@ pub(super) fn pending_format_steps() -> Vec<Step> {
 
 pub(super) fn input_method_steps() -> Vec<Step> {
     vec![
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let p = storage(e.preview()).string().to_string();
@@ -660,8 +679,8 @@ pub(super) fn input_method_steps() -> Vec<Step> {
             e.preview().setSelectedRange(NSRange::new(end, 0));
             compose(e.preview(), "にほん");
         }),
-        step(0.15, |c| compose(c.e.preview(), "にほんご")),
-        step(0.15, |c| {
+        applied(|c| compose(c.e.preview(), "にほんご")),
+        applied(|c| {
             let composing = c.e.preview().hasMarkedText();
             let before = source(&c.e);
             type_in_preview(&c.e, "日本語");
@@ -677,17 +696,17 @@ pub(super) fn input_method_steps() -> Vec<Step> {
                 &tail(&s, 30),
             );
         }),
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.source()));
             let s = source(e);
             let end = s.rfind("Eingabe日本語").map_or(s.len(), |b| b + "Eingabe日本語".len());
             e.source()
-                .setSelectedRange(NSRange::new(Utf16Map::new(&s).to_u16(end).0, 0));
+                .setSelectedRange(NSRange::new(Utf16Map::new(&s).to_u16(Byte::new(end)).get(), 0));
             compose(e.source(), "ni");
         }),
-        step(0.15, |c| compose(c.e.source(), "nihao")),
-        step(0.15, |c| {
+        applied(|c| compose(c.e.source(), "nihao")),
+        applied(|c| {
             check(
                 "an input method composes in the source",
                 c.e.source().hasMarkedText(),
@@ -695,7 +714,7 @@ pub(super) fn input_method_steps() -> Vec<Step> {
             );
             type_in_source(&c.e, "你好");
         }),
-        step(0.4, |c| {
+        applied(|c| {
             let s = source(&c.e);
             let p = storage(c.e.preview()).string().to_string();
             check(
@@ -709,7 +728,7 @@ pub(super) fn input_method_steps() -> Vec<Step> {
 
 pub(super) fn toolbar_steps() -> Vec<Step> {
     vec![
-        step(0.15, |c| {
+        applied(|c| {
             let e = &c.e;
             let ids: Vec<String> = e
                 .window()
@@ -724,7 +743,11 @@ pub(super) fn toolbar_steps() -> Vec<Step> {
                 &format!("{ids:?}"),
             );
             window_image(&e.window().unwrap(), &c.out.join("06-toolbar.png"));
-            let unshared = e.share_file(false).and_then(|u| u.path()).map(|p| p.to_string());
+            let unshared = e
+                .sharing()
+                .share_file(false)
+                .and_then(|u| u.path())
+                .map(|p| p.to_string());
             let unshared_len = unshared
                 .as_deref()
                 .and_then(|p| std::fs::metadata(p).ok())
@@ -734,57 +757,82 @@ pub(super) fn toolbar_steps() -> Vec<Step> {
                 unshared_len == Some(0),
                 &format!("{unshared:?}: {unshared_len:?} bytes"),
             );
-            let path = e.share_file(true).and_then(|u| u.path()).map(|p| p.to_string());
+            let path = e
+                .sharing()
+                .share_file(true)
+                .and_then(|u| u.path())
+                .map(|p| p.to_string());
             let content = path.as_deref().and_then(|p| std::fs::read_to_string(p).ok());
             check(
                 "share hands over the current text as a .md file",
                 path.as_deref().is_some_and(|p| p.ends_with(".md")) && content == Some(source(e)),
                 &format!("{path:?}"),
             );
-            let count = || e.window().and_then(|w| w.tabbedWindows()).map_or(1, |t| t.count());
-            let before = count();
+            let before = tab_count(e);
             let _ = unsafe { e.source().tryToPerform_with(sel!(mdNewTab:), None) };
-            let after = count();
+            let after = tab_count(e);
             check(
                 "plus opens a new document as a tab",
                 after == before + 1,
                 &format!("{before} -> {after} tabs"),
             );
         }),
-        step(0.5, |c| {
-            let window = c.e.window().unwrap();
-            window_image(&window, &c.out.join("07-tabs.png"));
-            if let Some(tabs) = window.tabbedWindows() {
-                for w in tabs.iter().filter(|w| !std::ptr::eq(&**w, &*window)) {
-                    w.performClose(None);
+        // For the picture of the tab bar, which slides in.
+        at_least(
+            0.5,
+            "the new tab to show",
+            |c| tab_count(&c.e) > 1,
+            |c| {
+                let window = c.e.window().unwrap();
+                window_image(&window, &c.out.join("07-tabs.png"));
+                if let Some(tabs) = window.tabbedWindows() {
+                    for w in tabs.iter().filter(|w| !std::ptr::eq(&**w, &*window)) {
+                        w.performClose(None);
+                    }
                 }
-            }
-        }),
+            },
+        ),
     ]
+}
+
+fn tab_count(e: &EditorController) -> usize {
+    e.window().and_then(|w| w.tabbedWindows()).map_or(1, |t| t.count())
+}
+
+/// Whether the caret of the source stands at the heading of the tables, and what stands there.
+fn caret_at_the_tables(e: &EditorController) -> (bool, String) {
+    let s = source(e);
+    let at = Utf16Map::new(&s).to_byte(crate::markdown::text::U16::new(e.source().selectedRange().location));
+    (s.from(at).starts_with("## Tabellen"), head(s.from(at), 20))
 }
 
 pub(super) fn command_and_link_steps() -> Vec<Step> {
     vec![
-        step(0.5, |c| {
-            let e = &c.e;
-            e.window().unwrap().makeKeyAndOrderFront(None);
-            append(e, "\n\n## Neue Formate\n\nEin wichtiges Wort hier.\n");
-            select_in_source(e, "wichtiges");
-            perform(e, sel!(mdHighlight:), 0);
-            check(
-                "highlight wraps the selection in <mark>",
-                source(e).contains("Ein <mark>wichtiges</mark> Wort"),
-                &tail(&source(e), 60),
-            );
-            select_in_source(e, "Wort hier");
-            perform(e, sel!(mdInsertAlert:), 3);
-            check(
-                "alert box wraps the paragraph",
-                source(e).contains("> [!WARNING]\n> Ein <mark>"),
-                &tail(&source(e), 80),
-            );
-        }),
-        step(0.3, |c| {
+        at_least(
+            0.5,
+            "the other tabs to close",
+            |c| tab_count(&c.e) == 1 && quiet(&c.e),
+            |c| {
+                let e = &c.e;
+                e.window().unwrap().makeKeyAndOrderFront(None);
+                append(e, "\n\n## Neue Formate\n\nEin wichtiges Wort hier.\n");
+                select_in_source(e, "wichtiges");
+                perform(e, sel!(mdHighlight:), 0);
+                check(
+                    "highlight wraps the selection in <mark>",
+                    source(e).contains("Ein <mark>wichtiges</mark> Wort"),
+                    &tail(&source(e), 60),
+                );
+                select_in_source(e, "Wort hier");
+                perform(e, sel!(mdInsertAlert:), 3);
+                check(
+                    "alert box wraps the paragraph",
+                    source(e).contains("> [!WARNING]\n> Ein <mark>"),
+                    &tail(&source(e), 80),
+                );
+            },
+        ),
+        applied(|c| {
             let e = &c.e;
             let p = storage(e.preview()).string().to_string();
             check(
@@ -810,15 +858,15 @@ pub(super) fn command_and_link_steps() -> Vec<Step> {
                 s.contains("- [Neue Formate](#neue-formate)") && s.contains("](#tabellen)"),
                 &tail(&s, 120),
             );
-            e.reveal_heading("tabellen");
-            let at = Utf16Map::new(&s).to_byte(crate::markdown::text::U16(e.source().selectedRange().location));
+            e.links().reveal_heading("tabellen");
+            let at = Utf16Map::new(&s).to_byte(crate::markdown::text::U16::new(e.source().selectedRange().location));
             check(
                 "anchor link jumps to its heading",
-                s[at..].starts_with("## Tabellen"),
-                &head(&s[at..], 20),
+                s.from(at).starts_with("## Tabellen"),
+                &head(s.from(at), 20),
             );
         }),
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             set_source_caret(e, 0);
             let Some(at) = preview_link(e, "#tabellen") else {
@@ -833,21 +881,20 @@ pub(super) fn command_and_link_steps() -> Vec<Step> {
             click_preview(e, at, objc2_app_kit::NSEventModifierFlags::Command);
         }),
         // AppKit reports a click on a link once a double click can no longer follow.
-        step(1.0, |c| {
-            let s = source(&c.e);
-            let at = Utf16Map::new(&s).to_byte(crate::markdown::text::U16(c.e.source().selectedRange().location));
-            check(
-                "⌘-click on a link to a heading jumps there",
-                s[at..].starts_with("## Tabellen"),
-                &head(&s[at..], 20),
-            );
-        }),
+        when(
+            "the ⌘-click to reach the heading",
+            |c| caret_at_the_tables(&c.e).0,
+            |c| {
+                let (there, shown) = caret_at_the_tables(&c.e);
+                check("⌘-click on a link to a heading jumps there", there, &shown);
+            },
+        ),
     ]
 }
 
 pub(super) fn building_block_steps() -> Vec<Step> {
     vec![
-        step(0.5, |c| {
+        closed(|c| {
             let e = &c.e;
             let window = e.window().unwrap();
             window.makeFirstResponder(Some(e.preview()));
@@ -860,25 +907,26 @@ pub(super) fn building_block_steps() -> Vec<Step> {
                 check("formula building blocks", false, "no popover");
                 return;
             };
-            e.set_atom_visual(false);
+            e.atom_editor().set_visual(false);
             unsafe { view.selectAll(None) };
-            e.atom_snippet(0);
+            e.atom_editor().snippet(0);
             check(
                 "fraction button inserts a template with the selection",
                 view.string().to_string() == "\\frac{E = mc^2}{□}" && source(e).contains("$\\frac{E = mc^2}{□}$"),
                 &view.string().to_string(),
             );
             view.setSelectedRange(NSRange::new(0, 0));
-            let jumped = e.atom_tab(false);
+            let jumped = e.atom_editor().tab(false);
             let sel = view.selectedRange();
             check(
                 "tab selects the next placeholder",
                 jumped && sel.length == 1,
                 &format!("{sel:?}"),
             );
-            e.set_atom_visual(true);
+            e.atom_editor().set_visual(true);
         }),
         when(
+            "the visual formula editor to load",
             |c| super::super::mathfield::field(c.e.mtm()).loaded.get(),
             |c| {
                 let e = &c.e;
@@ -890,18 +938,24 @@ pub(super) fn building_block_steps() -> Vec<Step> {
                 );
             },
         ),
-        step(0.8, |c| {
-            let e = &c.e;
-            if let Some(w) = super::super::mathfield::field(e.mtm()).web.window() {
-                screen_image(&w, &c.out.join("11-visual-formula.png"));
-            }
-            check(
-                "visual edits reach the document",
-                source(e).contains("$x^2+\\sqrt{y}$"),
-                &tail(&source(e), 40),
-            );
-        }),
-        step(0.5, |c| c.e.cancel_atom_edit()),
+        // For the capture: WebKit draws in another process, whose picture no condition shows.
+        at_least(
+            0.8,
+            "the visual edit to reach the document",
+            |c| source(&c.e).contains("$x^2+\\sqrt{y}$"),
+            |c| {
+                let e = &c.e;
+                if let Some(w) = super::super::mathfield::field(e.mtm()).web.window() {
+                    screen_image(&w, &c.out.join("11-visual-formula.png"));
+                }
+                check(
+                    "visual edits reach the document",
+                    source(e).contains("$x^2+\\sqrt{y}$"),
+                    &tail(&source(e), 40),
+                );
+            },
+        ),
+        applied_after(0.5, |c| c.e.atom_editor().cancel()),
         closed(|c| {
             let e = &c.e;
             check("escape restores the formula", source(e).contains("$E = mc^2$"), "");
@@ -909,14 +963,14 @@ pub(super) fn building_block_steps() -> Vec<Step> {
             let at = s.find("flowchart LR").unwrap();
             e.window().unwrap().makeFirstResponder(Some(e.source()));
             set_source_caret(e, at + 2);
-            e.edit_atom_at_selection();
-            let Some(view) = e.ivars().atoms.edit.borrow().as_ref().map(|a| a.view.clone()) else {
+            e.atom_editor().edit_at_selection();
+            let Some(view) = e.atom_editor().code_view() else {
                 check("diagram building blocks", false, "no popover");
                 return;
             };
             let len = view.string().length();
             view.setSelectedRange(NSRange::new(len, 0));
-            e.atom_snippet(super::super::atom::diagram_tag(
+            e.atom_editor().snippet(super::super::atom::diagram_tag(
                 crate::markdown::snippets::DiagramAction::Edge,
             ));
             check(
@@ -925,40 +979,39 @@ pub(super) fn building_block_steps() -> Vec<Step> {
                 &view.string().to_string(),
             );
         }),
-        step(0.3, |c| {
-            let e = &c.e;
-            if let Some(w) = e.ivars().atoms.edit.borrow().as_ref().and_then(|a| a.view.window()) {
-                window_image(&w, &c.out.join("10-diagram-popover.png"));
-            }
-            let view = e.ivars().atoms.edit.borrow().as_ref().map(|a| a.view.clone());
-            if let Some(view) = view {
-                view.setString(&ns("flowchart LR\n    A --> "));
-                e.atom_text_changed();
-            }
-        }),
+        // For the picture of the popover, which fades in.
+        at_least(
+            0.3,
+            "the diagram's editor to show",
+            |c| c.e.atom_editor().open_popover().is_some_and(|p| p.isShown()),
+            |c| {
+                let e = &c.e;
+                if let Some(w) = e.atom_editor().code_view().and_then(|v| v.window()) {
+                    window_image(&w, &c.out.join("10-diagram-popover.png"));
+                }
+                let view = e.atom_editor().code_view();
+                if let Some(view) = view {
+                    view.setString(&ns("flowchart LR\n    A --> "));
+                    e.atom_editor().text_changed();
+                }
+            },
+        ),
         settle(|c| {
             let e = &c.e;
-            let status = e
-                .ivars()
-                .atoms
-                .edit
-                .borrow()
-                .as_ref()
-                .map(|a| a.status.stringValue().to_string())
-                .unwrap_or_default();
+            let status = e.atom_editor().status_text().unwrap_or_default();
             check(
                 "diagram popover shows the Mermaid error",
                 status.starts_with("⚠︎"),
                 &status,
             );
-            e.cancel_atom_edit();
+            e.atom_editor().cancel();
         }),
     ]
 }
 
 pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
     vec![
-        step(0.6, |c| {
+        closed(|c| {
             let e = &c.e;
             append(e, "\n\nLeerzeilen Absatz\n");
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
@@ -968,10 +1021,8 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
             e.preview().setSelectedRange(NSRange::new(end, 0));
             unsafe { e.preview().doCommandBySelector(sel!(insertNewline:)) };
         }),
-        step(0.15, |c| unsafe {
-            c.e.preview().doCommandBySelector(sel!(insertNewline:))
-        }),
-        step(0.15, |c| {
+        applied(|c| unsafe { c.e.preview().doCommandBySelector(sel!(insertNewline:)) }),
+        applied(|c| {
             let e = &c.e;
             let s = source(e);
             let p = storage(e.preview()).string().to_string();
@@ -990,7 +1041,7 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
                 &format!("{:?}", tail(&s, 40)),
             );
         }),
-        step(0.3, |c| {
+        applied(|c| {
             let e = &c.e;
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let p = storage(e.preview()).string().to_string();
@@ -998,39 +1049,40 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
             e.preview().setSelectedRange(NSRange::new(at + 1, 0));
             check(
                 "edit command is available right behind a formula",
-                e.validate(Some(sel!(mdEditAtom:)), 0, None) && e.ivars().atoms.edit.borrow().is_none(),
+                e.editing().validate(Some(sel!(mdEditAtom:)), 0, None) && !e.atom_editor().is_open(),
                 "",
             );
             e.preview().setSelectedRange(NSRange::new(at, 0));
         }),
-        step(0.3, |c| {
-            let e = &c.e;
-            check(
-                "caret on a formula opens its editor",
-                e.ivars().atoms.edit.borrow().is_some(),
-                "",
-            );
-            e.cancel_atom_edit();
-        }),
-        step(0.6, |c| {
+        when(
+            "the caret on the formula to open its editor",
+            |c| c.e.atom_editor().is_open(),
+            |c| {
+                let e = &c.e;
+                check("caret on a formula opens its editor", e.atom_editor().is_open(), "");
+                e.atom_editor().cancel();
+            },
+        ),
+        closed(|c| {
             let e = &c.e;
             let at = e.preview().selectedRange().location;
             e.preview().setSelectedRange(NSRange::new(at, 0));
         }),
-        step(0.3, |c| {
+        pause(0.3, "an editor that stays closed gives no signal", |c| {
             let e = &c.e;
             check(
                 "a closed editor does not reopen while the caret stays",
-                e.ivars().atoms.edit.borrow().is_none(),
+                !e.atom_editor().is_open(),
                 "",
             );
         }),
-        step(0.3, |c| {
+        applied(|c| {
             if let Some(document) = c.e.document() {
                 unsafe { document.saveDocument(None) };
             }
         }),
         when(
+            "the document to be saved",
             |c| c.e.document().is_some_and(|d| !d.isDocumentEdited()),
             |c| {
                 let e = &c.e;
@@ -1050,14 +1102,18 @@ thread_local! {
     static PANES_BEFORE: std::cell::Cell<(bool, bool)> = const { std::cell::Cell::new((false, false)) };
 }
 
+const PANES_STILL: &str = "the panes to stop moving";
+
 pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
     vec![
         when(
+            "the file another program changed to reload",
             |c| source(&c.e).contains("Von außen geändert"),
             |c| {
                 let e = &c.e;
                 let s = source(e);
-                let at = Utf16Map::new(&s).to_byte(crate::markdown::text::U16(e.source().selectedRange().location));
+                let at =
+                    Utf16Map::new(&s).to_byte(crate::markdown::text::U16::new(e.source().selectedRange().location));
                 check(
                     "an unedited document reloads when another program changes its file",
                     s.ends_with("Von außen geändert\n"),
@@ -1065,8 +1121,8 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 );
                 check(
                     "reloading keeps the caret",
-                    s[at..].starts_with("## Tabellen"),
-                    &head(&s[at..], 20),
+                    s.from(at).starts_with("## Tabellen"),
+                    &head(s.from(at), 20),
                 );
                 check(
                     "reloading leaves no undo steps into the old text",
@@ -1078,13 +1134,13 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                     return;
                 };
                 view.setString(&ns("x"));
-                e.atom_text_changed();
+                e.atom_editor().text_changed();
                 check(
                     "an open formula edit counts as unsaved",
                     e.document().is_some_and(|d| d.isDocumentEdited()),
                     "",
                 );
-                e.atom_command(sel!(cancelOperation:));
+                e.atom_editor().command(sel!(cancelOperation:));
             },
         ),
         closed(|c| {
@@ -1093,14 +1149,18 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 c.e.document().is_some_and(|d| !d.isDocumentEdited()),
                 "",
             );
-            c.e.toggle_preview();
+            c.e.panes().toggle_preview();
         }),
-        step(0.8, |c| {
-            let e = &c.e;
-            set_source_caret(e, 0);
-            type_in_source(e, "Äußerst übersichtlich: ");
-        }),
-        step(0.5, |c| c.e.toggle_preview()),
+        when(
+            PANES_STILL,
+            |c| !c.e.panes().is_moving(),
+            |c| {
+                let e = &c.e;
+                set_source_caret(e, 0);
+                type_in_source(e, "Äußerst übersichtlich: ");
+            },
+        ),
+        applied(|c| c.e.panes().toggle_preview()),
         settle(|c| {
             let e = &c.e;
             let preview = storage(e.preview()).string().to_string();
@@ -1111,58 +1171,69 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
             );
             check(
                 "scroll positions follow the text typed while the preview was hidden",
-                e.scroll_spans().is_some_and(|spans| !spans.is_empty()),
+                !e.scroll_sync().scroll_spans().is_empty(),
                 "",
             );
-            // Graphviz lays out this graph for minutes; the renderer must give up and render the next formula.
-            let edges: String = (0..6000)
-                .map(|i| format!("n{} -> n{};", (i * 7919) % 600, (i * 104_729 + 13) % 600))
-                .collect();
-            super::super::js::renderer(e.mtm()).request(vec![super::super::js::Key::Diagram {
-                source: format!("digraph {{ {edges} }}"),
-                kind: crate::markdown::doc::DiagramKind::Graphviz,
-                dark: false,
-            }]);
         }),
-        step(12.0, |c| {
-            super::super::js::renderer(c.e.mtm()).request(vec![hang_check_formula()]);
+        applied(|c| c.e.panes().toggle_preview()),
+        when(
+            PANES_STILL,
+            |c| !c.e.panes().is_moving(),
+            |c| {
+                let e = &c.e;
+                set_source_caret(e, 0);
+                type_in_source(e, "Hinter dem Teiler: ");
+            },
+        ),
+        // No command says so when the divider brings the preview back.
+        applied(|c| c.e.panes().set_preview_collapsed(false)),
+        settle(|c| {
+            let preview = storage(c.e.preview()).string().to_string();
+            check(
+                "a preview the divider brings back has the text typed while it was hidden",
+                preview.starts_with("Hinter dem Teiler: "),
+                &head(&preview, 40),
+            );
+        }),
+        applied(|c| {
+            let e = &c.e;
+            PANES_BEFORE.set((e.panes().preview_visible(), e.panes().outline_visible()));
+            e.panes().toggle_preview();
+            e.panes().toggle_preview();
+            e.panes().toggle_outline();
+            e.panes().toggle_outline();
         }),
         when(
-            |_| super::super::js::outcome(&hang_check_formula()).is_some(),
-            |_| {
-                let outcome = super::super::js::outcome(&hang_check_formula());
+            PANES_STILL,
+            |c| !c.e.panes().is_moving(),
+            |c| {
+                let now = (c.e.panes().preview_visible(), c.e.panes().outline_visible());
                 check(
-                    "formulas render again after a diagram that never finishes",
-                    outcome == Some(Ok(())),
-                    &format!("{outcome:?}"),
+                    "panes toggled twice in a moment end as they were",
+                    now == PANES_BEFORE.get(),
+                    &format!("{:?} -> {now:?}", PANES_BEFORE.get()),
+                );
+                c.e.panes().toggle_preview();
+            },
+        ),
+        pause(
+            0.05,
+            "the second request has to land while the first one's animation runs",
+            |c| {
+                c.e.panes().toggle_preview();
+            },
+        ),
+        when(
+            PANES_STILL,
+            |c| !c.e.panes().is_moving(),
+            |c| {
+                let now = c.e.panes().preview_visible();
+                check(
+                    "a pane toggled twice during its animation ends as it was",
+                    now == PANES_BEFORE.get().0,
+                    "",
                 );
             },
         ),
-        step(0.1, |c| {
-            let e = &c.e;
-            PANES_BEFORE.set((e.preview_visible(), e.outline_visible()));
-            e.toggle_preview();
-            e.toggle_preview();
-            e.toggle_outline();
-            e.toggle_outline();
-        }),
-        step(1.0, |c| {
-            let now = (c.e.preview_visible(), c.e.outline_visible());
-            check(
-                "panes toggled twice in a moment end as they were",
-                now == PANES_BEFORE.get(),
-                &format!("{:?} -> {now:?}", PANES_BEFORE.get()),
-            );
-            c.e.toggle_preview();
-        }),
-        step(0.05, |c| c.e.toggle_preview()),
-        step(1.0, |c| {
-            let now = c.e.preview_visible();
-            check(
-                "a pane toggled twice during its animation ends as it was",
-                now == PANES_BEFORE.get().0,
-                "",
-            );
-        }),
     ]
 }

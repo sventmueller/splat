@@ -566,6 +566,7 @@ Voraussetzungen:
 
 - macOS mit den Command Line Tools (`xcode-select --install`). Xcode wird nicht gebraucht; Splat baut ohne `actool`, `ibtool` und `metal`.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) nennt die genaue Version, die CI nutzt; rustup installiert sie selbst, das Rust von Homebrew ignoriert die Datei. Sie dort anzuheben ist der Weg, auf dem neue Compiler- und Clippy-Warnungen ins Projekt gelangen.
+- rustup, für `make lint`, `make check` und `make universal`: `cargo xtask check-library` baut die Bibliothek für Linux, um zu zeigen, dass sie kein macOS braucht, und das Rust von Homebrew hat keine anderen Targets.
 
 Das [Makefile](../../../Makefile) enthält kurze Einstiegspunkte; `make help` listet alle auf:
 
@@ -621,21 +622,24 @@ Das Disk-Image ist ein Universal Binary für Apple Silicon und Intel; andere Bui
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | eine längere Zufallssuche; `SPLAT_FUZZ_SEED` variiert die Eingaben |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | eine Sprache, solange andere unvollständig sind |
 | `cargo clippy --release --all-targets [--features selftest]` | Lints, darunter die Begründung jedes `unsafe`-Blocks, die Länge von Funktionen und, in der Bibliothek, Zahlenkonvertierungen |
+| `cargo xtask check-library` | die Bibliothek baut für Linux, nichts darin braucht also macOS |
 | `cargo xtask vendor check` | die JavaScript-Bibliotheken stimmen Byte für Byte mit `vendor.lock` überein |
-| `cargo xtask selftest probe` | ohne Fenster, jeweils mit erwartetem Ergebnis: Formeln, Diagramme, Web-Bilder gegen einen Server im Prozess, blockierte Adressen, die Abwehr der Web-Ansichten |
+| `cargo xtask selftest probe` | ohne Fenster, jeweils mit erwartetem Ergebnis: Formeln, Diagramme, Web-Bilder gegen einen Server im Prozess, blockierte Adressen, der Text, den jeder Befehl schreibt, jedes Bildformat durch beide Exporte, eine Seite, die nicht mehr antwortet, und die Abwehr der Web-Ansichten gegen eine Seite ohne sie. Dauert etwa eine halbe Minute. Was die App vor sich braucht, wird bei gesperrtem Bildschirm übersprungen |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | die laufende App, Klick für Klick. Öffnet ein Fenster und tippt hinein; der Mac ist etwa vier Minuten beschäftigt. `--scenarios` führt nur den zweiten Teil aus, in etwa anderthalb Minuten |
 | `cargo xtask selftest resize` | verbreitert das Fenster, nachdem die Trennlinie verschoben wurde: Der Quelltext bricht um, während die Fenstergröße geändert wird. Dauert etwa zehn Sekunden |
 | `cargo xtask selftest bench <file.md>` | Zeiten für Öffnen, Tippen und Scrollen einer großen Datei |
-| `cargo test --release -- --ignored partial_updates` | ein Tastendruck in 10 MB: Teil- gegen Vollaktualisierung, Ergebnis und Zeitlimit |
-| `cargo test --release --test hostile` | Dokumente, die den Stack überlaufen lassen oder quadratische Zeit brauchen, durch Parsen, Layout, beide Exporte, Tastendrücke und Befehle |
+| `cargo test --release -- --ignored partial_updates` | ein Tastendruck in 10 MB: Teil- gegen Vollaktualisierung, dasselbe Ergebnis in höchstens einem Viertel der Zeit |
+| `cargo test --release --test hostile` | Dokumente, die den Stack überlaufen lassen oder quadratische Zeit brauchen, jedes in zwei Größen, deren Zeiten wie der Text wachsen müssen, durch Parsen, Layout, beide Exporte, Tastendrücke und Befehle |
 | `make mutants` | nacheinander eingebaute Fehler in `src/markdown/` und `src/preview/`, durch [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); sagt, welche kein Test bemerkt. Dauert Stunden; `FILE=src/preview/bridge.rs` grenzt es ein |
 | `cargo test --release --test decoder` | der Decoder-Prozess dekodiert Bilder und erreicht weder Dateien noch das Netzwerk |
 | `make coverage` | Zeilenabdeckung von `cargo test` und allen Selbsttests, durch [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); schlägt unter den Untergrenzen fehl. Belegt den Mac etwa fünf Minuten |
-| `make coverage-library` | die Untergrenzen für `src/markdown/`, `src/preview/` und `i18n.rs`, allein durch `cargo test` gemessen |
+| `make coverage-library` | `src/markdown/`, `src/preview/` und `i18n.rs` gegen ihre höheren Untergrenzen, allein durch `cargo test` gemessen |
 
-Unit-Tests stehen neben dem Code, den sie testen. `tests/` enthält, was die Bibliothek von außen erreicht: die Zufallstests in `robustness.rs`, die den Generator in `src/fuzz.rs` mit denen von `sync.rs` teilen, die Dokumente, die Schaden anrichten sollen, in `hostile.rs` und den Decoder-Test, der das gebaute Programm startet. Entscheidungen in `src/editor/`, die kein Fenster brauchen, liegen in freien Funktionen mit eigenen Tests: alles, was der Controller weiß und wie sich das ändert, in `state.rs`, die Regeln der Darstellung in `render_queue.rs`, die Textkopie in `sync.rs`. Ein Schritt des Fenster-Selbsttests, der vergeblich wartet, lässt den Lauf scheitern. Der Fenster-Selbsttest führt nach seinem Haupt-Durchklicken einen zweiten Teil aus, in `src/editor/selftest/scenarios.rs`: jeden Formatierungs- und Tabellenbefehl, die Dialoge, Linkklicks, Einsetzen, Ablegen, Exporte, eine große Änderung, Bilder, die sich auf dem Datenträger ändern, Speicherdruck, ein riesiges Dokument und die Wiederherstellung nach einem Absturz.
+Unit-Tests stehen neben dem Code, den sie testen. `tests/` enthält, was die Bibliothek von außen erreicht: die Zufallstests in `robustness.rs`, die den Generator in `src/fuzz.rs` mit denen von `sync.rs` teilen, die Dokumente, die Schaden anrichten sollen, in `hostile.rs` und den Decoder-Test, der das gebaute Programm startet. Entscheidungen in `src/editor/`, die kein Fenster brauchen, liegen in freien Funktionen mit eigenen Tests: alles, was der Controller weiß und wie sich das ändert, in `state.rs`, die Regeln der Darstellung in `render_queue.rs`, die Textkopie in `sync.rs`, Absatzstile, Schriften und Farben als Werte in `render.rs`, wofür die Kennungen der Symbolleiste stehen, in `toolbar.rs`, was ein Klick auf einen Link bedeutet, in `navigation.rs`.
 
-Die Abdeckung hat zwei Untergrenzen: jedes Modul mindestens 80 % seiner Zeilen, alle Module zusammen mindestens 85 %. `make coverage` misst `cargo test` zusammen mit den Selbsttests und schlägt unter einer von beiden fehl; die Untergrenzen und die wenigen Ausnahmen, etwa der Panic-Hook in `main.rs`, der nur bei einem Absturz läuft, stehen in [xtask](../../../xtask/src/coverage.rs) neben ihren Gründen. Gemessene Builds gehen nach `target/coverage/`, sodass Messcode nie nach `target/release/` oder in ein Disk-Image gelangt. Der Decoder-Hilfsprozess öffnet seine Messdatei, bevor er sich einsperrt, und wird deshalb ebenfalls gemessen.
+Ein Schritt des Fenster-Selbsttests wartet auf eine benannte Bedingung, nicht auf eine Zeit; nur was kein Signal gibt, wie das Fehlen von etwas, behält eine Pause mit ihrer Begründung. Vergebliches Warten ist eine gescheiterte Prüfung, die nennt, was nie kam, ein Schritt, der in Panik gerät, ist ebenfalls eine gescheiterte Prüfung, und der Lauf geht in beiden Fällen weiter. Eine Prüfung, die in diesem Lauf nichts aussagen kann, meldet `SELFTEST SKIP`: xtask listet sie auf, und sie besteht weder, noch scheitert sie. xtask verlangt von jedem Modus, und von `--scenarios` für sich, etwa neun Zehntel seiner Prüfungen. Der Fenster-Selbsttest führt nach seinem Haupt-Durchklicken einen zweiten Teil aus, in `src/editor/selftest/scenarios.rs`: jeden Formatierungs- und Tabellenbefehl, die Dialoge, Linkklicks, Einsetzen, Ablegen, Exporte, eine große Änderung, Bilder, die sich auf dem Datenträger ändern, Speicherdruck, ein riesiges Dokument und die Wiederherstellung nach einem Absturz.
+
+Die Abdeckung hat zwei Untergrenzen: jedes Modul mindestens 84 % seiner Zeilen, alle Module zusammen mindestens 96 %. `make coverage` misst `cargo test` zusammen mit den Selbsttests und schlägt unter einer von beiden fehl; `make coverage-library` hält, was kein Fenster braucht, auf 90 % und 97 %. Die Untergrenzen und die wenigen Ausnahmen, etwa der Panic-Hook in `main.rs`, der nur bei einem Absturz läuft, stehen in [xtask](../../../xtask/src/coverage.rs) neben ihren Gründen. Gemessene Builds gehen nach `target/coverage/`, sodass Messcode nie nach `target/release/` oder in ein Disk-Image gelangt. Der Decoder-Hilfsprozess öffnet seine Messdatei, bevor er sich einsperrt, und wird deshalb ebenfalls gemessen.
 
 CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) führt `make check`, `make coverage-library` und den Universal-Build auf Apple Silicon sowie `cargo test` auf Intel bei jedem Push auf `main` und jedem Pull Request aus. Jede Nacht führt [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) `make test-long` mit neuen Zufallseingaben aus. Die Selbsttests und das Disk-Image bleiben auf dem Mac des Entwicklers: Sie brauchen einen Bildschirm und die Signaturzertifikate im Schlüsselbund.
 
@@ -643,36 +647,39 @@ Die Ausgabe der Selbsttests geht nach `target/selftest/`. Der Selbsttest baut ei
 
 ### Projektaufbau
 
-`src/lib.rs` macht alles, was kein Fenster braucht, zu einer eigenen Bibliothek, `splat`: `markdown/`, `preview/`, `i18n.rs` und den Testgenerator `fuzz.rs`. Die App in `src/main.rs` baut darauf auf.
+`src/lib.rs` macht alles, was kein Fenster braucht, zu einer eigenen Bibliothek, `splat`: `markdown/`, `preview/`, `i18n.rs` und den Testgenerator `fuzz.rs`. Sie baut ohne macOS. Die App in `src/main.rs` baut darauf auf.
 
-- `src/markdown/`: die Parser-Anbindung (comrak), Syntaxfarben und alle Befehle als reine Textänderungen (`Edit`). Außerdem das erneute Parsen nach einer Änderung (`incremental.rs`), der Leser für eingebettetes HTML (`markup.rs`), Typografie, Tags, Verweise und Zitate im Fließtext (`typography.rs`), wie Text aussieht und welches Markdown und HTML ihn so macht (`style.rs`), was eine Adresse sein darf (`url.rs`) sowie der HTML- und Word-Export (`html.rs`, `docx.rs` mit `docx/html.rs` und `docx/xml.rs`). Die Vorschau und beide Exporte lesen denselben Baum, `Doc`. Kein AppKit.
-- `src/preview/`: das Layout der Vorschau, eingebettetes HTML darin (`layout/html.rs`) und die Zuordnung zwischen Vorschau und Quelltext (`Bridge`, `Index`). Kein AppKit.
-- `src/editor/`: das Fenster. Ein `EditorController`-Objekt bedient AppKit als Delegate beider Ansichten; seine Arbeit ist nach Verantwortung aufgeteilt:
+- `src/markdown/`: der Baum, den jeder Verbraucher liest, `Doc` in `doc/`, der seinen Text besitzt, und die einzige Anbindung an den Parser in `reader/`: comrak wird sonst nirgends genannt, und `reader/assumptions.rs` hält fest, was der Code über ihn annimmt. Syntaxfarben und alle Befehle als reine Textänderungen (`Edit`) in `commands/`. Außerdem das erneute Parsen nach einer Änderung (`incremental.rs`), der Leser für eingebettetes HTML (`markup.rs`), Typografie, Tags, Verweise und Zitate im Fließtext (`typography.rs`), wie Text aussieht und welches Markdown und HTML ihn so macht (`style.rs`), was eine Adresse sein darf (`url.rs`) sowie der HTML- und Word-Export (`html.rs`, `docx.rs` mit `docx/html.rs` und `docx/xml.rs`). Eine Position hat ihren Typ: `Byte` im Quelltext, `U16` in der Quelltextansicht, `Shown` in der Vorschauansicht (`text.rs`). Kein AppKit.
+- `src/preview/`: das Layout der Vorschau in `layout/`, mit eingebettetem HTML in `layout/html.rs`, und die Zuordnung zwischen Vorschau und Quelltext (`Bridge`, `Index`). Eine `Bridge` weist ein Layout einer anderen Version des `Doc` zurück. Kein AppKit.
+- `src/editor/`: das Fenster. Ein `EditorController`-Objekt bedient AppKit als Delegate beider Ansichten und leitet an Komponenten weiter, kleine Structs über dem Controller und dem Zustand, den sie besitzen, deren Felder die anderen Module nicht erreichen:
 
 | Modul | Verantwortung |
 |---|---|
-| `mod.rs` | Klasse, Delegate-Methoden, `invalidate` |
+| `mod.rs` | Klasse, Delegate-Methoden, die weiterleiten, `invalidate` |
+| `panes.rs` | `Panes`: die Textansichten, die Gliederung, Bereiche ein- und ausblenden und was Zugriff auf die Ansichten gibt |
 | `state.rs` | was der Controller über das Dokument weiß und jede Art, wie sich das ändert; seine Felder sind privat, und es berührt keine Ansicht |
+| `model.rs` | leiht den Zustand und die Textkopie an Closures, die keine Ansicht erreichen |
 | `actions.rs` | Befehlsregister: Selektor, Titel, Kurzbefehl, Symbol, wann der Befehl gilt |
-| `editing.rs` | Befehle ausführen und prüfen, Tippen in der Vorschau |
-| `update.rs` | Parsen, Färben, Aktualisieren der Vorschau; nach einer Änderung nur die betroffenen Absätze |
+| `editing.rs` | `Editing`: Befehle ausführen und prüfen, Tippen in der Vorschau |
+| `update.rs` | `Updater`: Parsen, Färben, Aktualisieren der Vorschau; nach einer Änderung nur die betroffenen Absätze |
 | `sync.rs` | Textkopie und Block-Buchführung, ohne AppKit und mit Zufallstests |
-| `progressive.rs` | große Vorschauen Schritt für Schritt darstellen |
-| `selection.rs`, `scroll.rs` | Auswahl und Scrollposition beider Bereiche im Gleichschritt |
-| `atom.rs`, `atom_edit.rs` | der Formel- und Diagrammeditor |
-| `navigation.rs`, `links.rs` | Links, Wiki-Links, Tags, Aufgabenkästchen, Falten, Fußnoten |
+| `progressive.rs` | `Progressive`: große Vorschauen Schritt für Schritt darstellen |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: Auswahl und Scrollposition beider Bereiche im Gleichschritt |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: der Formel- und Diagrammeditor |
+| `navigation.rs`, `links.rs` | `Links`: Links, Wiki-Links, Tags, Aufgabenkästchen, Falten, Fußnoten |
 | `env.rs` | was die Vorschau von außerhalb des Textes liest: typografische Satzzeichen, das Repository für `@name` und `#12`, die BibTeX-Datei, eingebettete Notizen |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | Vorschautext, lokale und entfernte Bilder |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | Vorschautext, lokale und entfernte Bilder; `Pictures` in `images.rs` |
 | `attributes.rs` | Textattribute; jeder Schlüssel bekommt nur einen Wert des Typs, den er erwartet |
 | `shadow.rs` | Kopien ungesicherten Textes für die Wiederherstellung nach einem Absturz |
 | `decoder.rs` | Hilfsprozesse in einer Sandbox, die Bilder und Grafiken dekodieren |
-| `export.rs`, `outline.rs` | HTML- und Word-Export; die Gliederung in der Seitenleiste |
+| `export.rs`, `outline.rs` | `Sharing`: HTML- und Word-Export, die Weitergabedatei, Drucken; die Gliederung in der Seitenleiste |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit für MathJax, Mermaid, Graphviz, PlantUML und den visuellen Formeleditor; die Regeln, was wann dargestellt wird, abseits von WebKit |
 | `webkit.rs` | Aufrufe in WebKit; nur die Lebensdauer des Navigation-Delegates bleibt bei `js.rs` und `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | Fenster, Symbolleiste, Textansichten, Dialoge, Farben |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | das Fenster aufbauen, Symbolleiste, Textansichten, Dialoge, Farben |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: Menüleiste, App-Delegate, Dokument (`MDDocument`, eine Unterklasse von `NSDocument`).
-- `src/i18n.rs` mit `resources/*.lproj`: 35 Sprachen; die Schlüssel sind die deutschen Texte.
+- `src/i18n.rs` mit `resources/*.lproj`: 35 Sprachen; die Schlüssel sind die deutschen Texte, und die App installiert beim Start die Tabelle der Oberflächensprache.
+- `src/util/`: Arbeitsthreads (`lanes.rs`), Volumes, die aufhören können zu antworten (`volumes.rs`), AppKit-Helfer, Dateien und Prozesse. `src/diag.rs`: was außerhalb der Sicht des Benutzers schiefgeht, geht ins Systemprotokoll, ohne irgendeinen Text eines Dokuments.
 - `src/large_alloc.rs`: große Allokationen kommen direkt vom Kernel und gehen beim Freigeben dorthin zurück, sodass der Speicher nach großen Änderungen zurückkehrt.
 - `resources/js/`: Webseiten und Bibliotheken; Versionen und Prüfsummen in [vendor.lock](../../../vendor.lock).
 - `xtask/`: Bundling, Signieren, das Disk-Image, das Symbol, Vendoring, der Selbsttest-Runner und die Abdeckungs-Untergrenzen.
@@ -683,21 +690,21 @@ Der Quelltext in der linken Textansicht ist die einzige Quelle der Wahrheit.
 
 1. Jede Zeichenänderung dort aktualisiert die Textkopie (`Snapshot`) an Ort und Stelle, ohne den Text erneut zu lesen.
 2. Eine Aktualisierung parst die Kopie, färbt den Quelltext nur dort neu, wo sich Farben geändert haben, setzt die Vorschau und ersetzt nur die Blöcke, deren Inhalt sich geändert hat.
-3. Nach einer Änderung werden nur die betroffenen Absätze neu geparst, gefärbt und gesetzt, solange ihre Nachbarn gleich bleiben; `reparse_part_and_color` sagt, wann sie es nicht tun. Dokumente mit `%%`-Kommentarblöcken, Änderungen am Front Matter und Änderungen nahe an Link-Referenzdefinitionen werden vollständig verarbeitet. comrak erkennt einen Fußnotenverweis nur mit seiner Definition im selben Parse und verschiebt Definitionen hinter den Text, daher wird der Teil mit einer Platzhalterdefinition je Label geparst und übernimmt seine Nummern aus dem alten Baum; eine Änderung an den Verweisen oder Definitionen im Teil oder neben einer Inline-Fußnote wird vollständig verarbeitet.
+3. Nach einer Änderung werden nur die betroffenen Absätze neu geparst, gefärbt und gesetzt, solange ihre Nachbarn gleich bleiben; `reparse_part_and_color` sagt, wann sie es nicht tun. Dokumente mit `%%`-Kommentarblöcken, Änderungen am Front Matter und, in einem Dokument mit Link-Referenzdefinitionen, Änderungen an einem Teil mit einer Klammer werden vollständig verarbeitet. comrak erkennt einen Fußnotenverweis nur mit seiner Definition im selben Parse und verschiebt Definitionen hinter den Text, daher wird der Teil mit einer Platzhalterdefinition je Label geparst und übernimmt seine Nummern aus dem alten Baum; eine Änderung an den Verweisen oder Definitionen im Teil oder neben einer Inline-Fußnote wird vollständig verarbeitet.
 4. HTML-Blöcke, die `<details>` oder `<div align>` öffnen und später schließen, wirken auf die Markdown-Blöcke dazwischen; ein wiederverwendeter Block muss dieselbe Umgebung haben.
 5. Beim Tippen im Quelltext eines Dokuments bis 2 MB läuft die Teilaktualisierung sofort; trifft sie nicht zu, oder in einem größeren Dokument, laufen Parsen und Layout im Hintergrund. Beim Tippen in der Vorschau laufen sie sofort, weil der Cursor der Vorschau vom Ergebnis abhängt.
 6. Eingaben in der Vorschau übersetzt `Bridge` in eine Änderung am Quelltext, und sie nehmen von da an denselben Weg. Markdown hat zu viele Möglichkeiten, Text in Syntax zu verwandeln, als dass Regeln allein genügten, daher parst `preview/verify.rs` den geänderten Teil erneut und vergleicht, was er zeigt, mit dem, was getippt wurde; eine Änderung, die nicht standhält, wird weiter maskiert oder abgelehnt.
-7. Die Inline-Positionen von comrak stimmen an einigen Stellen nicht, zum Beispiel hinter einer Link-Referenzdefinition. `markdown/positions.rs` prüft sie beim Lesen eines Blocks am Quelltext und liest sie dort, wo sie nicht passen, erneut aus dem Quelltext.
+7. Die Inline-Positionen von comrak stimmen an einigen Stellen nicht, zum Beispiel hinter einer Link-Referenzdefinition. `markdown/reader/positions.rs` prüft sie beim Lesen eines Blocks am Quelltext und liest sie dort, wo sie nicht passen, erneut aus dem Quelltext.
 
 ### Regeln im Controller
 
-1. Die eigenen Änderungen des Controllers an den Ansichten laufen innerhalb von `silently()`; die Delegate-Callbacks ignorieren sie.
-2. `state` wird nur zum Lesen und Berechnen geborgt, nie über einen Aufruf hinweg, der eine Ansicht ändert, setzt oder scrollt. Es ändert sich nur über seine eigenen Methoden, deren Tests kein Fenster brauchen.
+1. Die eigenen Änderungen des Controllers an den Ansichten laufen innerhalb von `Panes::silently`; die Delegate-Callbacks ignorieren sie. Überall sonst lassen sich die Ansichten nur lesen, der Compiler prüft das also. Was die Callbacks hören sollen oder was eine Ansicht an AppKit gibt, sagt das, indem es über `Panes::for_appkit` geht.
+2. Der Zustand wird nur zum Lesen und Berechnen geborgt, nie über einen Aufruf hinweg, der eine Ansicht ändert, setzt oder scrollt: `Model` leiht ihn an `Send`-Closures, und keine Ansicht ist `Send`, der Compiler prüft das also. Er ändert sich nur über seine eigenen Methoden, deren Tests kein Fenster brauchen.
 3. Nachrichten von außen (ein Bild geladen, eine Formel dargestellt) kommen verzögert über `renders_arrived` und `image_arrived` an, nie mitten in einer Aktualisierung.
 4. Neu zeichnen ohne Textänderung läuft nur über `invalidate(reason)`.
-5. Ein `Rc<Snapshot>` wird nicht über eine Änderung des Quelltextes hinweg gehalten, sonst kopiert diese Änderung den ganzen Text.
-6. Ein neuer Befehl braucht einen Eintrag in `actions.rs`, eine Methode in `mod.rs` und einen Zweig in `editing::perform`.
-7. Jeder `unsafe`-Block trägt seine Begründung als `// SAFETY:`-Kommentar. Bytes erreichen die Bild-Decoder des Systems in der App nur über `decoder::system_image`.
+5. Die Textkopie wird nicht über eine Änderung des Quelltextes hinweg gehalten, sonst kopiert diese Änderung den ganzen Text: `with_text` leiht sie nur für die Dauer einer `Send`-Closure.
+6. Ein neuer Befehl braucht einen Eintrag in `actions.rs`, eine Methode in `mod.rs` und einen Zweig in `Editing::perform`.
+7. Jeder `unsafe`-Block trägt seine Begründung als `// SAFETY:`-Kommentar. Bytes erreichen die Bild-Decoder des Systems nur im Hilfsprozess, über `decoder::decode_native`; ein Test durchsucht die Quellen nach anderen Aufrufen.
 8. Nichts im Hauptthread wartet auf die Ordner des Benutzers, da ein Netzwerkvolume aufhören kann zu antworten: Dateien werden im Thread `DISK` angesehen, und die Vorschau liest die Antworten über `Env::known`. Nur eine Aktion, auf die der Benutzer wartet, etwa ein Export oder das Sichern, darf den Datenträger direkt berühren.
 
 ### Einen Befehl hinzufügen
@@ -706,7 +713,7 @@ Die Menüleiste, die Symbolleiste und das Kontextmenü bauen ihre Einträge alle
 
 1. eine Variante von `Action` mit ihrem `Spec`: Selektor, Titel, Beschriftung in der Symbolleiste, Tooltip (beginnt mit einem Verb, höchstens 75 Zeichen), Kurzbefehl, SF Symbol und wann er gilt
 2. die Methode in `src/editor/mod.rs`
-3. einen Zweig in `editing::perform`
+3. einen Zweig in `Editing::perform`
 4. seine Texte in jeder `Localizable.strings`
 
 Der Test `every_command_has_a_method_and_every_method_a_command` prüft, dass Register und Methoden zusammenpassen. Die Standardkurzbefehle von Apple wie ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F und ⌘, bleiben unberührt.

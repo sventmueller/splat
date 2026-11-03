@@ -290,18 +290,8 @@ pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distributio
 /// The release program for Apple Silicon and Intel in one file, through rustup with the toolchain rust-toolchain.toml
 /// names, since Homebrew's Rust ships the standard library for the host processor alone.
 pub(crate) fn universal_program() -> Result<PathBuf, String> {
-    let root = root();
-    let rustup = rustup()?;
-    run(Command::new(&rustup).current_dir(&root).args(["toolchain", "install"]))?;
-    let tool = |name: &str| {
-        stdout(Command::new(&rustup).current_dir(&root).args(["which", name])).map(|path| path.trim().to_string())
-    };
-    let mut build = Command::new(tool("cargo")?);
-    // Cargo would otherwise run the rustc first on the PATH, which may be Homebrew's.
-    build
-        .current_dir(&root)
-        .env("RUSTC", tool("rustc")?)
-        .args(["build", "--package", PACKAGE, "--release"]);
+    let mut build = rustup_cargo()?;
+    build.args(["build", "--package", PACKAGE, "--release"]);
     let mut join = Command::new("lipo");
     join.arg("-create");
     for (target, _) in UNIVERSAL {
@@ -312,6 +302,32 @@ pub(crate) fn universal_program() -> Result<PathBuf, String> {
     let program = target_dir().join(format!("{PACKAGE}-universal"));
     run(join.arg("-output").arg(&program))?;
     Ok(program)
+}
+
+/// That the library builds for a system without AppKit, through rustup for the same reason.
+pub(crate) fn check_library() -> Result<(), String> {
+    run(rustup_cargo()?.args([
+        "check",
+        "--package",
+        PACKAGE,
+        "--lib",
+        "--target",
+        "x86_64-unknown-linux-gnu",
+    ]))
+}
+
+/// cargo of the toolchain rust-toolchain.toml names, with its targets.
+fn rustup_cargo() -> Result<Command, String> {
+    let root = root();
+    let rustup = rustup()?;
+    run(Command::new(&rustup).current_dir(&root).args(["toolchain", "install"]))?;
+    let tool = |name: &str| {
+        stdout(Command::new(&rustup).current_dir(&root).args(["which", name])).map(|path| path.trim().to_string())
+    };
+    let mut cargo = Command::new(tool("cargo")?);
+    // Cargo would otherwise run the rustc first on the PATH, which may be Homebrew's.
+    cargo.current_dir(&root).env("RUSTC", tool("rustc")?);
+    Ok(cargo)
 }
 
 /// rustup from the PATH, or from Homebrew, which keeps it off the PATH beside its own Rust.
@@ -327,7 +343,7 @@ fn rustup() -> Result<PathBuf, String> {
         .map(|prefix| Path::new(prefix.trim()).join("bin/rustup"))
         .ok()
         .filter(|path| path.exists())
-        .ok_or_else(|| "the universal program needs rustup; install it with `brew install rustup`".into())
+        .ok_or_else(|| "this needs rustup; install it with `brew install rustup`".into())
 }
 
 /// The architectures of `UNIVERSAL` that are not in the output of `lipo -archs`.

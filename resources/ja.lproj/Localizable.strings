@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "先に書類を保存してください";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "ペーストした画像は、ファイルとして書類と同じ場所に保存されます。書類を保存してから、もう一度画像をペーストしてください。";
 "Export fehlgeschlagen" = "書き出しに失敗しました";
+"Das Dokument ließ sich nicht umwandeln." = "書類を変換できませんでした。";
+"Das Dokument ist zu groß für eine Word-Datei." = "書類が大きすぎるため、Wordファイルにできません。";
 "Gliederung ausblenden" = "アウトラインを非表示";
 "Gliederung einblenden" = "アウトラインを表示";
 "Metadaten" = "メタデータ";

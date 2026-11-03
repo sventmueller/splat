@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Hãy lưu tài liệu trước";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Hình ảnh được dán sẽ được lưu dưới dạng tệp bên cạnh tài liệu. Hãy lưu tài liệu, sau đó dán lại hình ảnh.";
 "Export fehlgeschlagen" = "Xuất không thành công";
+"Das Dokument ließ sich nicht umwandeln." = "Không thể chuyển đổi tài liệu.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Tài liệu quá lớn cho tệp Word.";
 "Gliederung ausblenden" = "Ẩn Dàn ý";
 "Gliederung einblenden" = "Hiển thị Dàn ý";
 "Metadaten" = "Siêu dữ liệu";

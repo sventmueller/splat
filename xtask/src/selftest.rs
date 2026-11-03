@@ -85,8 +85,11 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
             println!("output in {}", work.display());
             let report = report.join().map_err(|_| "reading the selftest's output failed")?;
-            let stops_early = args.iter().any(|a| a == "--stop-after");
-            return verdict(mode, stops_early, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
+            let part = Part::of(args);
+            if fewest_checks(mode, part).is_some() {
+                println!("{}", report.summary());
+            }
+            return verdict(mode, part, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
         }
         if started.elapsed() > std::time::Duration::from_secs(600) {
             let _ = child.kill();
@@ -101,6 +104,8 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
 pub(crate) struct Report {
     passed: usize,
     failed: Vec<String>,
+    /// Checks that could not say anything in this run: neither passed nor failed, and listed so nobody takes them for either.
+    skipped: Vec<String>,
     done: bool,
 }
 
@@ -110,24 +115,71 @@ impl Report {
             self.passed += 1;
         } else if let Some(failure) = line.strip_prefix("SELFTEST FAIL ") {
             self.failed.push(failure.to_string());
+        } else if let Some(skip) = line.strip_prefix("SELFTEST SKIP ") {
+            self.skipped.push(skip.to_string());
         } else if line.starts_with("SELFTEST DONE ") {
             self.done = true;
         }
     }
+
+    pub(crate) fn summary(&self) -> String {
+        let mut summary = format!(
+            "{} checks passed, {} failed, {} skipped",
+            self.passed,
+            self.failed.len(),
+            self.skipped.len()
+        );
+        for skip in &self.skipped {
+            summary.push_str("\n  skipped: ");
+            summary.push_str(skip);
+        }
+        summary
+    }
 }
 
-/// The checks a whole run makes at least, far below their number: an exit code alone would also pass a run that a stray
-/// environment variable ended before it began.
-pub(crate) fn fewest_checks(mode: &str, stops_early: bool) -> Option<usize> {
-    match mode {
-        "gui" if stops_early => Some(1),
-        "gui" => Some(150),
-        "probe" => Some(20),
+/// How much of its checks a mode was told to run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Part {
+    Whole,
+    /// `gui --scenarios`, without the click-through in front.
+    Scenarios,
+    /// `gui --stop-after`, which ends at a check of the caller's choice.
+    StopsEarly,
+}
+
+impl Part {
+    fn of(args: &[String]) -> Part {
+        if args.iter().any(|a| a == "--stop-after") {
+            Part::StopsEarly
+        } else if args.iter().any(|a| a == "--scenarios") {
+            Part::Scenarios
+        } else {
+            Part::Whole
+        }
+    }
+}
+
+/// About nine tenths of the checks a run makes: an exit code alone would also pass a run that a stray environment variable
+/// ended before it began, and `--scenarios` must not be enough for a whole run. Skipped checks do not count, so a run that
+/// skips many shows here.
+pub(crate) fn fewest_checks(mode: &str, part: Part) -> Option<usize> {
+    match (mode, part) {
+        ("gui", Part::StopsEarly) => Some(1),
+        ("gui", Part::Scenarios) => Some(GUI_SCENARIOS),
+        ("gui", Part::Whole) => Some(GUI_WHOLE),
+        ("probe", _) => Some(PROBE),
+        ("resize", _) => Some(RESIZE),
         _ => None,
     }
 }
 
-pub(crate) fn verdict(mode: &str, stops_early: bool, exited_well: bool, report: &Report) -> Result<(), String> {
+/// Nine of ten of the checks a run makes, of which an inactive app skips some: 144, 168 and 253.
+const PROBE: usize = 130;
+const RESIZE: usize = 2;
+const GUI_SCENARIOS: usize = 151;
+const GUI_WHOLE: usize = 228;
+
+pub(crate) fn verdict(mode: &str, part: Part, exited_well: bool, report: &Report) -> Result<(), String> {
     if !report.failed.is_empty() {
         return Err(format!(
             "{} checks failed:\n  {}",
@@ -138,13 +190,13 @@ pub(crate) fn verdict(mode: &str, stops_early: bool, exited_well: bool, report: 
     if !exited_well {
         return Err("the app ended with an error".into());
     }
-    if let Some(fewest) = fewest_checks(mode, stops_early) {
+    if let Some(fewest) = fewest_checks(mode, part) {
         if !report.done {
             return Err("the app ended before reporting that it was done".into());
         }
         if report.passed < fewest {
             return Err(format!(
-                "only {} checks ran, at least {fewest} were expected",
+                "only {} checks passed, at least {fewest} were expected",
                 report.passed
             ));
         }
@@ -175,65 +227,105 @@ pub(crate) fn screen_locked() -> bool {
 mod tests {
     use super::*;
 
+    fn report(lines: &str) -> Report {
+        let mut r = Report::default();
+        lines.lines().for_each(|l| r.note(l));
+        r
+    }
+
+    fn passes(n: usize) -> String {
+        format!("{}SELFTEST DONE failures=0", "SELFTEST PASS x\n".repeat(n))
+    }
+
     #[test]
     fn a_run_passes_only_when_it_says_it_finished_all_its_checks() {
-        let report = |lines: &str| {
-            let mut r = Report::default();
-            lines.lines().for_each(|l| r.note(l));
-            r
-        };
-        let many = "SELFTEST PASS x\n".repeat(20);
+        assert!(verdict("probe", Part::Whole, true, &report(&passes(PROBE))).is_ok());
+        let unfinished = "SELFTEST PASS x\n".repeat(PROBE);
         assert!(
-            verdict(
-                "probe",
-                false,
-                true,
-                &report(&format!("{many}SELFTEST DONE failures=0"))
-            )
-            .is_ok()
-        );
-        assert!(
-            verdict("probe", false, true, &report(&many))
+            verdict("probe", Part::Whole, true, &report(&unfinished))
                 .unwrap_err()
                 .contains("before reporting")
         );
-        assert!(verdict("probe", false, true, &report("MENU a | b")).is_err());
-        assert!(
-            verdict(
-                "probe",
-                false,
-                true,
-                &report("SELFTEST PASS x\nSELFTEST DONE failures=0")
-            )
-            .unwrap_err()
-            .contains("only 1 checks")
+        assert!(verdict("probe", Part::Whole, true, &report("MENU a | b")).is_err());
+        assert_eq!(
+            verdict("probe", Part::Whole, true, &report(&passes(1))).unwrap_err(),
+            format!("only 1 checks passed, at least {PROBE} were expected")
         );
         let failed = verdict(
             "probe",
-            false,
+            Part::Whole,
             false,
             &report("SELFTEST FAIL one: why\nSELFTEST FAIL two: how"),
         )
         .unwrap_err();
         assert!(failed.contains("one: why") && failed.contains("two: how"), "{failed}");
-        assert!(
-            verdict(
-                "probe",
-                false,
-                false,
-                &report(&format!("{many}SELFTEST DONE failures=0"))
-            )
-            .is_err()
+        assert_eq!(
+            verdict("probe", Part::Whole, false, &report(&passes(PROBE))).unwrap_err(),
+            "the app ended with an error"
         );
-        assert!(verdict("resize", false, true, &report("")).is_ok());
-        let two = "SELFTEST PASS a\nSELFTEST PASS b\nSELFTEST DONE failures=0";
+    }
+
+    #[test]
+    fn every_mode_and_part_has_its_own_floor() {
+        let at_floor = |mode, part| fewest_checks(mode, part).map(|n| verdict(mode, part, true, &report(&passes(n))));
+        let below_floor =
+            |mode, part| fewest_checks(mode, part).map(|n| verdict(mode, part, true, &report(&passes(n - 1))));
+        for (mode, part) in [
+            ("probe", Part::Whole),
+            ("resize", Part::Whole),
+            ("gui", Part::Whole),
+            ("gui", Part::Scenarios),
+            ("gui", Part::StopsEarly),
+        ] {
+            assert_eq!(at_floor(mode, part), Some(Ok(())), "{mode} {part:?}");
+            assert!(below_floor(mode, part).is_some_and(|v| v.is_err()), "{mode} {part:?}");
+        }
+        assert_eq!(fewest_checks("bench", Part::Whole), None);
+        let scenarios = fewest_checks("gui", Part::Scenarios).unwrap();
         assert!(
-            verdict("gui", false, true, &report(two)).is_err(),
-            "all of them were to run"
+            verdict("gui", Part::Whole, true, &report(&passes(scenarios))).is_err(),
+            "what `--scenarios` reaches is not a whole run"
         );
         assert!(
-            verdict("gui", true, true, &report(two)).is_ok(),
+            verdict("resize", Part::Whole, true, &report(&passes(1))).is_err(),
+            "a resize run that ended before its second check"
+        );
+        assert!(
+            verdict("gui", Part::StopsEarly, true, &report(&passes(1))).is_ok(),
             "a run told to stop early"
+        );
+    }
+
+    #[test]
+    fn the_arguments_say_which_part_runs() {
+        let part = |args: &[&str]| Part::of(&args.iter().map(ToString::to_string).collect::<Vec<_>>());
+        assert_eq!(part(&["gui"]), Part::Whole);
+        assert_eq!(part(&["gui", "--scenarios"]), Part::Scenarios);
+        assert_eq!(part(&["gui", "--stop-after", "a check"]), Part::StopsEarly);
+        assert_eq!(
+            part(&["gui", "--scenarios", "--stop-after", "a check"]),
+            Part::StopsEarly
+        );
+    }
+
+    #[test]
+    fn a_skipped_check_neither_passes_nor_fails() {
+        let skipping = format!("SELFTEST SKIP needs the app: not active\n{}", passes(PROBE));
+        let run = report(&skipping);
+        assert!(verdict("probe", Part::Whole, true, &run).is_ok(), "no failure");
+        assert_eq!(
+            run.summary(),
+            format!("{PROBE} checks passed, 0 failed, 1 skipped\n  skipped: needs the app: not active")
+        );
+        let only_skips = format!(
+            "{}SELFTEST DONE failures=0",
+            "SELFTEST SKIP x: not active\n".repeat(PROBE)
+        );
+        assert!(
+            verdict("probe", Part::Whole, true, &report(&only_skips))
+                .unwrap_err()
+                .contains("only 0 checks passed"),
+            "and no pass"
         );
     }
 }

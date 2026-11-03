@@ -5,19 +5,19 @@
 
 use std::ops::Range;
 
-use super::doc::{Inline, InlineKind};
-use super::text::decode_entity;
+use crate::markdown::doc::{Inline, InlineKind};
+use crate::markdown::text::{Byte, TextAt, decode_entity, offsets};
 
 /// Inlines of a leaf after the check: `None` if their positions could not be told, so the caller keeps them from being
 /// edited by showing the source as it stands.
-pub(super) fn checked(text: &str, block: &Range<usize>, mut inlines: Vec<Inline>) -> Option<Vec<Inline>> {
+pub(super) fn checked(text: &str, block: &Range<Byte>, mut inlines: Vec<Inline>) -> Option<Vec<Inline>> {
     if inlines.iter().all(|i| plausible(text, i)) {
         return Some(inlines);
     }
     let mut walker = Walker {
         text,
         at: block.start,
-        end: block.end.min(text.len()),
+        end: block.end.min(text.end()),
         steps: MAX_STEPS,
     };
     inlines.iter_mut().try_for_each(|i| walker.place(i))?;
@@ -30,7 +30,7 @@ const MAX_STEPS: usize = 1 << 20;
 /// Whether the source at an inline's position looks like that inline, and likewise for what it holds. This has to say
 /// yes wherever comrak is right, and it is cheap enough to ask of every inline.
 fn plausible(text: &str, i: &Inline) -> bool {
-    let Some(source) = text.get(i.range.clone()) else {
+    let Some(source) = text.get(offsets(&i.range)) else {
         return false;
     };
     let spelled = match &i.kind {
@@ -84,18 +84,18 @@ fn markers(kind: &InlineKind) -> Option<&'static [&'static str]> {
 /// quotes and lists, or a link reference definition, between them.
 struct Walker<'t> {
     text: &'t str,
-    at: usize,
-    end: usize,
+    at: Byte,
+    end: Byte,
     steps: usize,
 }
 
 impl<'t> Walker<'t> {
     fn rest(&self) -> &'t str {
-        self.text.get(self.at..self.end).unwrap_or("")
+        self.text.get(offsets(&(self.at..self.end))).unwrap_or("")
     }
 
     /// The first place from here on where `matches` finds what it wants, and what it found there.
-    fn search<T>(&mut self, matches: impl Fn(&str) -> Option<T>) -> Option<(usize, T)> {
+    fn search<T>(&mut self, matches: impl Fn(&str) -> Option<T>) -> Option<(Byte, T)> {
         let rest = self.rest();
         let at = self.at;
         for (i, _) in rest.char_indices() {
@@ -152,7 +152,7 @@ impl<'t> Walker<'t> {
                 })?;
                 start = s;
                 // Its children, the title or else the target, stand behind any `|`.
-                let inner = &self.text[s..s + len - 2];
+                let inner = self.text.at(s..s + len - 2);
                 self.at = s + inner
                     .rfind('|')
                     .map_or_else(|| inner.find('[').map_or(0, |o| o + 2), |bar| bar + 1);
@@ -186,7 +186,7 @@ impl<'t> Walker<'t> {
             }
             markers?.iter().find(|m| rest.starts_with(**m)).map(|m| m.len())
         })?;
-        let opening = &self.text[start..start + open];
+        let opening = self.text.at(start..start + open);
         self.at = start + open;
         i.children.iter_mut().try_for_each(|c| self.place(c))?;
         let rest = self.rest();
@@ -291,6 +291,11 @@ fn footnote_len(rest: &str) -> Option<usize> {
     if rest.starts_with("[^") {
         return Some(rest.find(']')? + 1);
     }
+    inline_note_len(rest)
+}
+
+/// How long the inline note `^[…]` at the start of `rest` is, found by its brackets: comrak's end position is unreliable.
+pub(super) fn inline_note_len(rest: &str) -> Option<usize> {
     let inner = rest.strip_prefix("^[")?;
     let mut depth = 1;
     let mut chars = inner.char_indices();
@@ -382,7 +387,9 @@ fn link_close_len(rest: &str) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::markdown::doc::{Block, Inline, InlineKind, parse, walk_blocks, walk_inlines};
+    use crate::markdown::doc::{Block, Inline, InlineKind, walk_blocks, walk_inlines};
+    use crate::markdown::reader::parse;
+    use crate::markdown::text::{Byte, TextAt, bytes};
 
     /// Every text of the document as it stands in the source, in order.
     fn texts(source: &str) -> Vec<(String, String)> {
@@ -390,7 +397,7 @@ mod tests {
         walk_blocks(&parse(source).blocks, &mut |b: &Block| {
             walk_inlines(b.inlines(), &mut |i: &Inline| {
                 if let InlineKind::Text(t) = &i.kind {
-                    out.push((t.to_string(), source[i.range.clone()].to_string()));
+                    out.push((t.to_string(), source.at(i.range.clone()).to_string()));
                 }
             });
         });
@@ -414,7 +421,7 @@ mod tests {
     }
 
     /// Every inline with its range and its children's, moved by `by`.
-    fn ranges(inlines: &[Inline], by: usize) -> Vec<(String, std::ops::Range<usize>)> {
+    fn ranges(inlines: &[Inline], by: usize) -> Vec<(String, std::ops::Range<Byte>)> {
         let mut out = Vec::new();
         for i in inlines {
             let name = format!("{:?}", i.kind);
@@ -509,7 +516,7 @@ mod tests {
     #[test]
     fn a_paragraph_behind_a_link_definition_starts_at_its_text() {
         let source = "[a]: b\nfoo\n";
-        assert_eq!(parse(source).blocks[0].range, 7..10);
+        assert_eq!(parse(source).blocks[0].range, bytes(7..10));
     }
 
     #[test]
@@ -551,13 +558,13 @@ mod tests {
         assert_eq!(spelled_len("ab", "ax"), None);
         let mut walker = Walker {
             text: "nichts",
-            at: 0,
-            end: 6,
+            at: Byte::new(0),
+            end: Byte::new(6),
             steps: 100,
         };
         let mut missing = Inline {
             kind: InlineKind::Strong,
-            range: 0..2,
+            range: bytes(0..2),
             children: Box::default(),
         };
         assert!(walker.place(&mut missing).is_none());

@@ -13,19 +13,20 @@ use objc2_app_kit::{
 use objc2_foundation::{NSNotification, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize};
 
 use super::EditorController;
+use crate::markdown::text::Byte;
 use crate::util::ns;
 
 /// One heading of the tree.
 #[derive(Debug, PartialEq)]
 pub struct Node {
     pub title: String,
-    pub start: usize,
+    pub start: Byte,
     pub children: Vec<usize>,
 }
 
 /// Headings as `(level, title, source range)` in document order, nested under the closest heading of a higher
 /// level above them. Returns the nodes and the indexes of the top-level ones.
-pub fn tree(headings: &[(u8, String, Range<usize>)]) -> (Vec<Node>, Vec<usize>) {
+pub fn tree(headings: &[(u8, String, Range<Byte>)]) -> (Vec<Node>, Vec<usize>) {
     let mut nodes: Vec<Node> = Vec::with_capacity(headings.len());
     let mut roots = Vec::new();
     let mut open: Vec<(u8, usize)> = Vec::new();
@@ -123,7 +124,7 @@ define_class!(
                 .and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.start));
             let controller = self.ivars().controller.borrow().as_ref().and_then(Weak::load);
             if let (Some(start), Some(c)) = (start, controller) {
-                c.reveal_source(start);
+                c.links().reveal_source(start);
             }
         }
     }
@@ -194,7 +195,7 @@ impl Outline {
 
     /// Shows the headings; the tree is only rebuilt when headings were added, removed or renamed, so typing does
     /// not collapse what the user opened.
-    pub fn update(&self, headings: &[(u8, String, Range<usize>)]) {
+    pub fn update(&self, headings: &[(u8, String, Range<Byte>)]) {
         let ivars = self.source.ivars();
         let (nodes, roots) = tree(headings);
         let shape: Vec<(u8, String)> = headings.iter().map(|(l, t, _)| (*l, t.clone())).collect();
@@ -215,10 +216,11 @@ impl Outline {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::markdown::text::bytes;
 
     #[test]
     fn headings_nest_under_the_closest_higher_level() {
-        let h = |level, title: &str, start| (level, title.to_string(), start..start + 1);
+        let h = |level, title: &str, start| (level, title.to_string(), bytes(start..start + 1));
         let (nodes, roots) = tree(&[
             h(2, "a", 0),
             h(3, "a1", 5),
@@ -231,6 +233,6 @@ mod tests {
         assert_eq!(nodes[0].children, [1, 3]);
         assert_eq!(nodes[1].children, [2]);
         assert_eq!(nodes[4].children, [5]);
-        assert_eq!(nodes[3].start, 12);
+        assert_eq!(nodes[3].start, Byte::new(12));
     }
 }

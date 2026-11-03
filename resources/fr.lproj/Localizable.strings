@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Enregistrez d’abord le document";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Les images collées sont enregistrées sous forme de fichiers à côté du document. Enregistrez-le, puis collez de nouveau l’image.";
 "Export fehlgeschlagen" = "Échec de l’exportation";
+"Das Dokument ließ sich nicht umwandeln." = "Impossible de convertir le document.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Le document est trop volumineux pour un fichier Word.";
 "Gliederung ausblenden" = "Masquer le plan";
 "Gliederung einblenden" = "Afficher le plan";
 "Metadaten" = "Métadonnées";

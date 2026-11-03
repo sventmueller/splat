@@ -21,31 +21,41 @@ fn field(mtm: MainThreadMarker, value: &str, placeholder: &str) -> Retained<NSTe
     f
 }
 
+/// The height of a form of `rows` rows, and the frames of each row's label and field.
+fn form_frames(rows: usize) -> (f64, Vec<(NSRect, NSRect)>) {
+    let row = LABEL_HEIGHT + 4.0 + FIELD_HEIGHT;
+    let gap = 12.0;
+    let height = rows as f64 * row + rows.saturating_sub(1) as f64 * gap;
+    let frames = (0..rows)
+        .map(|n| {
+            let top = height - n as f64 * (row + gap);
+            (
+                // Indented so the label text lines up with the text inside the field and the alert title.
+                NSRect::new(
+                    NSPoint::new(LABEL_INDENT, top - LABEL_HEIGHT),
+                    NSSize::new(FORM_WIDTH - LABEL_INDENT, LABEL_HEIGHT),
+                ),
+                NSRect::new(NSPoint::new(0.0, top - row), NSSize::new(FORM_WIDTH, FIELD_HEIGHT)),
+            )
+        })
+        .collect();
+    (height, frames)
+}
+
 /// Labels above full-width fields, placed by frame: in a stack view the fields shrank to their placeholder, and
 /// NSAlert then centred the narrow column.
 fn form(mtm: MainThreadMarker, rows: &[(&str, &Retained<NSTextField>)]) -> Retained<NSView> {
-    let row = LABEL_HEIGHT + 4.0 + FIELD_HEIGHT;
-    let gap = 12.0;
-    let height = rows.len() as f64 * row + rows.len().saturating_sub(1) as f64 * gap;
+    let (height, frames) = form_frames(rows.len());
     let view = NSView::initWithFrame(
         NSView::alloc(mtm),
         NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(FORM_WIDTH, height)),
     );
-    let mut top = height;
-    for (label, f) in rows {
+    for ((label, f), (label_frame, field_frame)) in rows.iter().zip(frames) {
         let l = NSTextField::labelWithString(&ns(label), mtm);
-        // Indented so the label text lines up with the text inside the field and the alert title.
-        l.setFrame(NSRect::new(
-            NSPoint::new(LABEL_INDENT, top - LABEL_HEIGHT),
-            NSSize::new(FORM_WIDTH - LABEL_INDENT, LABEL_HEIGHT),
-        ));
+        l.setFrame(label_frame);
         view.addSubview(&l);
-        f.setFrame(NSRect::new(
-            NSPoint::new(0.0, top - row),
-            NSSize::new(FORM_WIDTH, FIELD_HEIGHT),
-        ));
+        f.setFrame(field_frame);
         view.addSubview(f);
-        top -= row + gap;
     }
     for pair in rows.windows(2) {
         // SAFETY: Both views belong to the dialog's window, which keeps them alive.
@@ -67,13 +77,36 @@ fn alert(mtm: MainThreadMarker, title: &str, info: &str, accessory: &NSView) -> 
     a
 }
 
+/// What the address and the text field of the link dialog start with: a selected address is the address.
+fn link_fields(selected: &str) -> (&str, &str) {
+    if selected.starts_with("http://") || selected.starts_with("https://") {
+        (selected, "")
+    } else {
+        ("", selected)
+    }
+}
+
+/// What the link dialog hands on: no address, no link.
+fn link_answer(address: &str, text: &str) -> Option<(String, String)> {
+    let address = address.trim();
+    (!address.is_empty()).then(|| (address.to_string(), text.to_string()))
+}
+
+/// The size of a new table from what was typed: it needs a header and a row, and a field that holds no number counts as 0.
+fn table_size(rows: isize, columns: isize) -> (usize, usize) {
+    (
+        crate::util::to_usize(rows.clamp(2, 100)),
+        crate::util::to_usize(columns.clamp(1, 30)),
+    )
+}
+
 type LinkAlert = (Retained<NSAlert>, Retained<NSTextField>, Retained<NSTextField>);
 
 /// The link dialog with its address and text fields, laid out but not shown.
 pub fn link_alert(mtm: MainThreadMarker, selected: &str) -> LinkAlert {
-    let looks_like_url = selected.starts_with("http://") || selected.starts_with("https://");
-    let url = field(mtm, if looks_like_url { selected } else { "" }, "https://");
-    let text = field(mtm, if looks_like_url { "" } else { selected }, t("Angezeigter Text"));
+    let (address, shown) = link_fields(selected);
+    let url = field(mtm, address, "https://");
+    let text = field(mtm, shown, t("Angezeigter Text"));
     let view = form(mtm, &[(t("Adresse:"), &url), (t("Text:"), &text)]);
     let a = alert(
         mtm,
@@ -89,11 +122,10 @@ pub fn link_alert(mtm: MainThreadMarker, selected: &str) -> LinkAlert {
 pub fn link(window: &NSWindow, selected: &str, done: impl Fn(String, String) + 'static) {
     let (a, url, text) = link_alert(window.mtm(), selected);
     let handler = RcBlock::new(move |response: NSModalResponse| {
-        if response == NSAlertFirstButtonReturn {
-            let u = url.stringValue().to_string();
-            if !u.trim().is_empty() {
-                done(u.trim().to_string(), text.stringValue().to_string());
-            }
+        if response == NSAlertFirstButtonReturn
+            && let Some((address, shown)) = link_answer(&url.stringValue().to_string(), &text.stringValue().to_string())
+        {
+            done(address, shown);
         }
     });
     a.beginSheetModalForWindow_completionHandler(window, Some(&handler));
@@ -116,8 +148,7 @@ pub fn table(window: &NSWindow, done: impl Fn(usize, usize) + 'static) {
     );
     let handler = RcBlock::new(move |response: NSModalResponse| {
         if response == NSAlertFirstButtonReturn {
-            let r = crate::util::to_usize(rows.integerValue().clamp(2, 100));
-            let c = crate::util::to_usize(cols.integerValue().clamp(1, 30));
+            let (r, c) = table_size(rows.integerValue(), cols.integerValue());
             done(r, c);
         }
     });
@@ -145,4 +176,55 @@ pub fn image(window: &NSWindow, done: impl Fn(Retained<NSURL>) + 'static) {
         }
     });
     panel.beginSheetModalForWindow_completionHandler(window, &handler);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_selected_address_goes_into_the_address_field_and_all_else_into_the_text() {
+        assert_eq!(link_fields("https://a.de"), ("https://a.de", ""));
+        assert_eq!(link_fields("http://a.de"), ("http://a.de", ""));
+        assert_eq!(link_fields("a.de"), ("", "a.de"));
+        assert_eq!(link_fields("Text mit https://a.de"), ("", "Text mit https://a.de"));
+        assert_eq!(link_fields(""), ("", ""));
+    }
+
+    #[test]
+    fn a_link_needs_an_address_and_keeps_its_text_as_typed() {
+        assert_eq!(
+            link_answer("  https://a.de \n", " Text "),
+            Some(("https://a.de".to_string(), " Text ".to_string()))
+        );
+        assert_eq!(link_answer("x", ""), Some(("x".to_string(), String::new())));
+        assert_eq!(link_answer("", "Text"), None);
+        assert_eq!(link_answer(" \t\n", "Text"), None);
+    }
+
+    #[test]
+    fn a_table_has_a_header_and_a_row_and_stays_within_reason() {
+        assert_eq!(table_size(3, 3), (3, 3));
+        assert_eq!(table_size(0, 0), (2, 1), "what no number gives");
+        assert_eq!(table_size(-5, -5), (2, 1));
+        assert_eq!(table_size(2, 1), (2, 1));
+        assert_eq!(table_size(100, 30), (100, 30));
+        assert_eq!(table_size(101, 31), (100, 30));
+    }
+
+    #[test]
+    fn labels_stand_above_full_width_fields_from_the_top_down() {
+        let (height, frames) = form_frames(2);
+        assert_eq!(height, 102.0);
+        let frame = |x, y, w, h| NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
+        assert_eq!(
+            frames,
+            [
+                (frame(4.0, 85.0, 316.0, 17.0), frame(0.0, 57.0, 320.0, 24.0)),
+                (frame(4.0, 28.0, 316.0, 17.0), frame(0.0, 0.0, 320.0, 24.0)),
+            ]
+        );
+        assert_eq!(form_frames(1).0, 45.0, "no gap below a single row");
+        assert_eq!(form_frames(0), (0.0, Vec::new()));
+    }
 }

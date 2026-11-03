@@ -7,17 +7,19 @@ use std::time::Instant;
 
 use objc2::AnyThread;
 use objc2::rc::Retained;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, msg_send};
+use objc2::{MainThreadMarker, MainThreadOnly, msg_send};
 use objc2_app_kit::{
     NSBezierPath, NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSDocumentController, NSGraphicsContext,
     NSTextInputClient, NSTextView,
 };
 use objc2_foundation::{NSDate, NSNotFound, NSPoint, NSRange, NSRect, NSRunLoop, NSSize, NSURL};
 
-use super::{after, check, compose, type_in_preview, type_in_source};
+use super::scenarios::{self, COMMANDS, SECTION, TABLE_COMMANDS};
+use super::{after, check, check_in_front, compose, guarded, type_in_preview, type_in_source};
 use crate::document::MdDocument;
 use crate::editor::actions::Action;
 use crate::editor::{EditorController, Invalidate, js};
+use crate::markdown::text::Byte;
 use crate::util::ns;
 
 thread_local! {
@@ -38,7 +40,7 @@ fn open(mtm: MainThreadMarker, text: &str) -> (Retained<MdDocument>, Retained<Ed
     if let Some(undo) = editor.undo_manager() {
         undo.setGroupsByEvent(false);
     }
-    editor.update();
+    editor.updater().update_now();
     (document, editor)
 }
 
@@ -114,13 +116,15 @@ fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
     }
     e.preview().unmarkText();
     next_turn();
-    check(
+    check_in_front(
+        mtm,
         "a cancelled composition does not leave the preview waiting for its edit",
-        !e.preview_editing(),
+        !e.editing().preview_editing(),
         "",
     );
     e.preview().setSelectedRange(NSRange::new(20, 0));
-    check(
+    check_in_front(
+        mtm,
         "the caret mirrors to the source after a cancelled composition",
         e.source().selectedRange().location > 14,
         &format!("{:?}", e.source().selectedRange()),
@@ -131,8 +135,8 @@ fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
 fn a_preview_of_many_tables_answers_at_once(mtm: MainThreadMarker) {
     let table = format!("| A | B | C |\n|---|---|---|\n{}\n", "| 1 | 2 | 3 |\n".repeat(50));
     let (document, e) = open(mtm, &table.repeat(771));
-    let count = e.ivars().state.borrow().blocks().placeholders.len();
-    e.render_blocks(0..count, 0, None);
+    let count = e.model().read(|st| st.blocks().placeholders.len());
+    e.progressive().render_blocks(0..count, 0, None);
     let preview = e.preview();
     let layout = crate::util::layout_manager(preview).expect("a layout manager");
     let len = crate::util::storage(preview).length();
@@ -151,13 +155,40 @@ fn a_preview_of_many_tables_answers_at_once(mtm: MainThreadMarker) {
     document.close();
 }
 
+fn the_notice_of_a_huge_document_takes_no_input(mtm: MainThreadMarker) {
+    let (document, e) = open(mtm, "Absatz\n");
+    let huge = "| Zeile |\n".repeat(3 << 20);
+    e.updater().replace_all_text(&huge);
+    e.updater().update_now();
+    let notice = e.preview().string().to_string();
+    caret_in_preview(&e, 3);
+    type_in_preview(&e, "x");
+    next_turn();
+    check(
+        "a keystroke in the notice of a huge document changes nothing",
+        !e.preview().isEditable() && source(&e) == huge && e.preview().string().to_string() == notice,
+        &notice,
+    );
+    e.window().expect("a window").makeFirstResponder(Some(e.source()));
+    e.updater().replace_all_text("Absatz\n");
+    e.updater().update_now();
+    caret_in_preview(&e, 3);
+    step(&e, || type_in_preview(&e, "x"));
+    check(
+        "the preview takes input again once the text is small enough",
+        e.preview().isEditable() && source(&e) == "Absxatz\n",
+        &source(&e),
+    );
+    document.close();
+}
+
 fn a_click_on_a_task_behind_the_text_changes_nothing(mtm: MainThreadMarker) {
     let (document, e) = open(mtm, "Absatz\n\n- [ ] Aufgabe\n");
     let at = e.preview().string().to_string().encode_utf16().count() - 3;
     step(&e, || {
         type_in_source(&e, "Hallo Welt ");
         let view: &NSTextView = e.preview();
-        e.link_clicked(view, &ns("splat-task"), at);
+        e.links().link_clicked(view, &ns("splat-task"), at);
     });
     let written = source(&e);
     check(
@@ -192,27 +223,19 @@ fn a_space_behind_bold_and_the_next_word_stay_bold(mtm: MainThreadMarker) {
 fn editor_with_edit(mtm: MainThreadMarker) -> (Retained<MdDocument>, Retained<EditorController>) {
     let (document, e) = open(mtm, "Formel $x$ und Rest des Absatzes\n");
     step(&e, || type_in_source(&e, "abc "));
-    e.update();
+    e.updater().update_now();
     open_editor(&e);
     (document, e)
 }
 
 fn open_editor(e: &EditorController) {
     let at = source(e).find('$').expect("a formula");
-    let range = e.atom_starting_at(at).expect("a formula there");
-    e.open_atom_editor(range, None);
+    let range = e.atom_editor().starting_at(Byte::new(at)).expect("a formula there");
+    e.atom_editor().open(range, None);
 }
 
 fn type_in_editor(e: &EditorController) {
-    let view = e
-        .ivars()
-        .atoms
-        .edit
-        .borrow()
-        .as_ref()
-        .expect("an open editor")
-        .view
-        .clone();
+    let view = e.atom_editor().code_view().expect("an open editor");
     let all = NSRange::new(0, view.string().length());
     view.setSelectedRange(all);
     // SAFETY: The range lies within the view's text.
@@ -220,16 +243,15 @@ fn type_in_editor(e: &EditorController) {
 }
 
 fn is_open(e: &EditorController) -> bool {
-    e.ivars().atoms.edit.borrow().is_some()
+    e.atom_editor().is_open()
 }
 
 fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
     KEEP_EDITOR.set(true);
 
     let (document, e) = editor_with_edit(mtm);
-    let separate = e.ivars().atoms.edit.borrow().as_ref().is_some_and(|edit| {
-        edit.view
-            .undoManager()
+    let separate = e.atom_editor().code_view().is_some_and(|view| {
+        view.undoManager()
             .zip(e.undo_manager())
             .is_some_and(|(own, shared)| !std::ptr::eq(&*own, &*shared))
     });
@@ -244,7 +266,7 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
 
     let (document, e) = editor_with_edit(mtm);
     type_in_editor(&e);
-    step(&e, || e.perform(Action::BulletList, None));
+    step(&e, || e.editing().perform(Action::BulletList, None));
     check(
         "a command with the editor open commits the formula first",
         !is_open(&e) && source(&e) == "- abc Formel $y$ und Rest des Absatzes\n",
@@ -260,15 +282,8 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
         source(&e).contains("$y$"),
         &source(&e),
     );
-    e.ivars()
-        .atoms
-        .edit
-        .borrow()
-        .as_ref()
-        .expect("an open editor")
-        .cancelled
-        .set(true);
-    step(&e, || e.atom_edit_closed());
+    e.atom_editor().mark_cancelled();
+    step(&e, || e.atom_editor().editor_closed());
     check(
         "a discarded formula leaves text and document as they were",
         source(&e) == "Formel $x$ und Rest\n" && !document.isDocumentEdited(),
@@ -279,7 +294,7 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
     let (document, e) = open(mtm, "Formel $x$ und Rest\n");
     open_editor(&e);
     type_in_editor(&e);
-    step(&e, || e.atom_edit_closed());
+    step(&e, || e.atom_editor().editor_closed());
     check(
         "closing the editor commits the formula",
         source(&e) == "Formel $y$ und Rest\n",
@@ -361,7 +376,7 @@ fn a_panic_saves_what_is_unsaved_and_only_that(mtm: MainThreadMarker) {
             .collect()
     };
     let before = listed();
-    let _ = std::panic::catch_unwind(|| panic!("a panic the checks provoke"));
+    crate::util::uncontained(|| std::panic::catch_unwind(|| panic!("a panic the checks provoke"))).ok();
     let new: Vec<_> = listed().into_iter().filter(|f| !before.contains(f)).collect();
     let texts: Vec<String> = new.iter().filter_map(|f| std::fs::read_to_string(f).ok()).collect();
     check(
@@ -410,7 +425,7 @@ fn the_file_under_a_document_may_do_anything(mtm: MainThreadMarker) {
     document.makeWindowControllers();
     controller.addDocument(&document);
     let e = document.editor().expect("an editor");
-    e.update();
+    e.updater().update_now();
 
     let look = || crate::document::reload_changed_documents(mtm);
     let shows = |text: &str| {
@@ -451,14 +466,75 @@ fn the_file_under_a_document_may_do_anything(mtm: MainThreadMarker) {
     document.close();
 }
 
+/// The text the command steps of the window self-test find, once its click-through has edited the quick reference.
+fn text_of_the_command_steps() -> String {
+    let reference = include_str!("../../../resources/de.lproj/QuickReference.md");
+    format!(
+        "{}\n\n## Neue Formate\n\nEin wichtiges Wort hier.\n{SECTION}",
+        reference.replacen("# Markdown-Kurzreferenz", "# Markdown-Kurzreferenz X", 1)
+    )
+}
+
+/// The table of what each command writes, on the text the window self-test runs it on, and each one's undo.
+fn every_command_writes_exactly_its_text(mtm: MainThreadMarker) {
+    let (document, e) = open(mtm, &text_of_the_command_steps());
+    let undo = e.undo_manager().expect("an undo manager");
+    for command in COMMANDS.iter().chain(&TABLE_COMMANDS) {
+        let old = source(&e);
+        step(&e, || command.run(&e));
+        command.check_text(&e, &old);
+        undo.undo();
+        e.updater().update_now();
+        check(
+            &format!("{} is undone in one step", command.name),
+            source(&e) == old,
+            &format!("{} bytes, before {}", source(&e).len(), old.len()),
+        );
+    }
+    document.close();
+}
+
+/// The images of the test section in every format, through both exports.
+fn the_exports_carry_every_image_format(mtm: MainThreadMarker) {
+    let dir = std::env::temp_dir().join(format!("splat-probe-section-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    scenarios::write_files(&dir);
+    let (document, e) = open(mtm, SECTION);
+    let path = dir.join("Abschnitt.md");
+    document.setFileURL(Some(&NSURL::fileURLWithPath(&ns(path.to_str().unwrap_or_default()))));
+    scenarios::check_html_export(&e, &dir);
+    scenarios::check_word_export(&e, &dir);
+    document.close();
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 pub(super) fn checks(mtm: MainThreadMarker) {
-    a_panic_saves_what_is_unsaved_and_only_that(mtm);
-    the_file_under_a_document_may_do_anything(mtm);
-    a_translucent_pixel_stays_translucent();
-    a_formula_arriving_during_a_composition_leaves_the_text_alone(mtm);
-    a_cancelled_composition_ends_the_edit_it_announced(mtm);
-    a_preview_of_many_tables_answers_at_once(mtm);
-    a_click_on_a_task_behind_the_text_changes_nothing(mtm);
-    a_space_behind_bold_and_the_next_word_stay_bold(mtm);
-    the_formula_editor_keeps_the_text_whole(mtm);
+    type Part = (&'static str, fn(MainThreadMarker));
+    let parts: [Part; 12] = [
+        ("the panic check", a_panic_saves_what_is_unsaved_and_only_that),
+        ("the file checks", the_file_under_a_document_may_do_anything),
+        ("the transparency check", |_| a_translucent_pixel_stays_translucent()),
+        (
+            "the composition check",
+            a_formula_arriving_during_a_composition_leaves_the_text_alone,
+        ),
+        (
+            "the cancelled composition check",
+            a_cancelled_composition_ends_the_edit_it_announced,
+        ),
+        ("the huge document check", the_notice_of_a_huge_document_takes_no_input),
+        ("the many tables check", a_preview_of_many_tables_answers_at_once),
+        (
+            "the task click check",
+            a_click_on_a_task_behind_the_text_changes_nothing,
+        ),
+        ("the bold typing check", a_space_behind_bold_and_the_next_word_stay_bold),
+        ("the formula editor checks", the_formula_editor_keeps_the_text_whole),
+        ("the command table", every_command_writes_exactly_its_text),
+        ("the image formats of the exports", the_exports_carry_every_image_format),
+    ];
+    for (name, part) in parts {
+        guarded(name, || part(mtm));
+    }
+    KEEP_EDITOR.set(false);
 }

@@ -4,22 +4,24 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::ops::Range;
-use std::rc::Rc;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use objc2::rc::Weak;
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
-use objc2_app_kit::{NSTextInputClient, NSTextStorage};
+use objc2_app_kit::NSTextStorage;
 use objc2_foundation::NSRange;
 
 use super::attributes::{attributed, set_typing_attributes};
+use super::panes::Views;
 use super::render::RenderCtx;
-use super::scroll::top_offset;
-use super::state::{Invalidate, PreviewInput, PreviewPlan, images_of, laid_out};
+use super::state::{
+    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, laid_out,
+};
 use super::style::{self, SourceFonts};
-use super::sync::Snapshot;
 use super::{EditorController, js, string_of};
 use crate::markdown::doc::{DiagramKind, Figure, figures};
-use crate::markdown::incremental::{Parsed, Splice, parse_and_color, stays_plain};
+use crate::markdown::incremental::{Parsed, parse_shared_and_color};
 use crate::preview::layout::{Layout, Resolver, TopBlock};
 use crate::preview::map::Index;
 use crate::util::{Lane, contained, free_in_background, from_nsrange, perform_later, shown_to_ns, storage};
@@ -31,11 +33,8 @@ const EAGER_BLOCKS: usize = 120;
 /// A whole new text of this many UTF-16 units or more is parsed in the background, so the window of a large document
 /// opens before its colors and preview are ready.
 const BACKGROUND_FROM: usize = 200_000;
-/// Up to this many bytes, typing in the source parses around the edit right away, in about 8 ms. Above, that would eat
-/// into the frame the keystroke itself needs, and everything is parsed in the background.
-const PARTS_ON_MAIN_UP_TO: usize = 2 << 20;
 
-/// Whether `invalidate` updates right away rather than through `refresh`.
+/// Whether `invalidate` updates right away rather than through `catch_up`.
 pub(super) fn updates_at_once(why: Invalidate, len_u16: usize) -> bool {
     match why {
         Invalidate::Text => len_u16 < BACKGROUND_FROM,
@@ -50,7 +49,7 @@ pub(super) fn updates_at_once(why: Invalidate, len_u16: usize) -> bool {
 
 /// Images that finished loading and wait to be shown, by resolved path or URL.
 #[derive(Default)]
-pub(super) struct Arrivals {
+struct Arrivals {
     keys: RefCell<HashSet<String>>,
     scheduled: Cell<bool>,
 }
@@ -74,9 +73,15 @@ impl Arrivals {
     }
 
     #[cfg(feature = "selftest")]
-    pub(super) fn is_scheduled(&self) -> bool {
+    fn is_scheduled(&self) -> bool {
         self.scheduled.get()
     }
+}
+
+#[derive(Default)]
+pub(super) struct UpdateState {
+    fonts: RefCell<Option<SourceFonts>>,
+    arrivals: Arrivals,
 }
 
 pub(super) struct Images {
@@ -128,96 +133,113 @@ fn eager_blocks(changed: Range<usize>, visible: impl FnOnce() -> usize) -> Range
     from..(from + EAGER_BLOCKS).min(changed.end)
 }
 
+pub(super) struct Updater<'a> {
+    host: &'a EditorController,
+    state: &'a UpdateState,
+}
+
 impl EditorController {
+    pub(super) fn updater(&self) -> Updater<'_> {
+        Updater {
+            host: self,
+            state: &self.ivars().updates,
+        }
+    }
+}
+
+#[cfg(feature = "selftest")]
+impl Updater<'_> {
+    pub(super) fn arrivals_scheduled(&self) -> bool {
+        self.state.arrivals.is_scheduled()
+    }
+}
+
+impl Updater<'_> {
     /// The source storage changed its characters: the copy of its text follows, or is read anew if it cannot.
     pub(super) fn source_edited(&self, storage: &NSTextStorage, range: NSRange, delta: isize) {
         // Not the editor's own mirror of its text, so the offsets of an open editor mean nothing anymore.
-        if !self.ivars().busy.get() {
-            self.abandon_atom_edit();
+        if !self.host.panes().is_silent() {
+            self.host.atom_editor().abandon();
         }
         let inserted = string_of(&storage.string().substringWithRange(range));
-        self.ivars()
-            .copy
-            .edited(from_nsrange(range), delta, &inserted, storage.length());
-    }
-
-    /// The current source text. Edits patch it in place; it is read from the view only when that is not possible.
-    /// Holding on to it across an edit of the source makes that edit copy the whole text.
-    pub fn snapshot(&self) -> Rc<Snapshot> {
-        self.ivars().copy.current(|| {
-            let string = self.source().string();
-            (string_of(&string), string.length())
-        })
-    }
-
-    pub fn source_text(&self) -> String {
-        self.snapshot().text.clone()
-    }
-
-    /// The text exactly as the source view holds it, for saving.
-    pub fn exact_text(&self) -> String {
-        string_of(&self.source().string())
+        self.host
+            .model()
+            .source_edited(from_nsrange(range), delta, &inserted, storage.length());
     }
 
     /// Replaces the whole source, e.g. after loading or reverting, without an undo step. The caret and the scroll
     /// position stay where they were, as far as the new text reaches.
-    pub fn replace_all_text(&self, text: &str) {
-        self.abandon_atom_edit();
-        let source = self.source();
-        let selection = source.selectedRange();
-        let clip = source.enclosingScrollView().map(|s| s.contentView());
+    pub(super) fn replace_all_text(&self, text: &str) {
+        self.host.atom_editor().abandon();
+        let panes = self.host.panes();
+        let source = panes.source();
+        let selection = source.selected_range();
+        let clip = source.enclosing_scroll_view().map(|s| s.contentView());
         let origin = clip.as_ref().map(|c| c.bounds().origin);
-        let source_storage = storage(source);
         // A plain string would take the attributes of the replaced text's first character, or TextKit's default font
         // in an empty view, until the colors arrive from the background.
-        let fonts = self.ivars().state.borrow().fonts().cloned();
+        let fonts = self.state.fonts.borrow().clone();
         let base = fonts.as_ref().map(style::base_source_attributes);
         let new_text = attributed(text, base.as_ref());
-        let silent = self.silently();
-        source_storage
-            .replaceCharactersInRange_withAttributedString(NSRange::new(0, source_storage.length()), &new_text);
-        let string = source_storage.string();
-        let length = string.length();
-        let start = match selection.location.min(length) {
-            at if at < length => string.rangeOfComposedCharacterSequenceAtIndex(at).location,
-            at => at,
-        };
-        self.set_source_selection(NSRange::new(start, 0));
-        drop(silent);
+        panes.silently(|views| {
+            let source_storage = storage(views.source);
+            source_storage
+                .replaceCharactersInRange_withAttributedString(NSRange::new(0, source_storage.length()), &new_text);
+            let string = source_storage.string();
+            let length = string.length();
+            let start = match selection.location.min(length) {
+                at if at < length => string.rangeOfComposedCharacterSequenceAtIndex(at).location,
+                at => at,
+            };
+            self.host.selection().set_source_selection(NSRange::new(start, 0));
+        });
         if let (Some(clip), Some(origin)) = (clip, origin) {
             clip.scrollToPoint(origin);
-            if let Some(scroll) = source.enclosingScrollView() {
+            if let Some(scroll) = source.enclosing_scroll_view() {
                 scroll.reflectScrolledClipView(&clip);
             }
         }
-        self.invalidate(Invalidate::Text);
+        self.host.invalidate(Invalidate::Text);
     }
 
+    /// The right one while typing in the source: runs `catch_up` once the keys pause for a moment.
     pub(super) fn schedule_update(&self) {
-        if self.ivars().copy.schedule_update() {
-            perform_later(self, sel!(flushUpdate), 0.04, false);
+        if self.host.model().schedule_update() {
+            perform_later(self.host, sel!(scheduledUpdateDue), 0.04, false);
         }
+    }
+
+    /// The panes changed size; dragging the divider can bring back a preview without a command saying so.
+    pub(super) fn panes_resized(&self) {
+        if self.host.panes().preview_visible() && self.host.model().read(|st| st.stale_layout()) {
+            self.schedule_update();
+        }
+    }
+
+    /// The pause `schedule_update` waited for is over.
+    pub(super) fn scheduled_update_due(&self) {
+        self.host.model().update_ran();
+        self.catch_up();
     }
 
     /// Asks the shared renderer for formulas and diagrams after a short pause in typing.
     pub(super) fn schedule_render_requests(&self) {
-        perform_later(self, sel!(flushRenderRequests), 0.35, false);
+        perform_later(self.host, sel!(requestRenders), 0.35, false);
     }
 
     pub(super) fn request_renders(&self) {
-        let dark = self.is_dark();
-        let (current, other): (Vec<_>, Vec<_>) = {
-            let st = self.ivars().state.borrow();
+        let dark = self.host.is_dark();
+        let (current, other): (Vec<_>, Vec<_>) = self.host.model().read(move |st| {
             figures(st.doc())
                 .iter()
                 .map(|(_, f)| (render_key(f, dark), render_key(f, !dark)))
                 .unzip()
-        };
+        });
         if current.is_empty() {
             return;
         }
-        let renderer = js::renderer(self.mtm());
-        renderer.listen(self);
+        let renderer = js::renderer(self.host.mtm());
+        renderer.listen(self.host);
         // Rendering ahead for the other appearance makes switching instant, but not at the price of doubling the
         // work for documents full of formulas.
         let prefetch = current.len() <= 200;
@@ -229,34 +251,56 @@ impl EditorController {
 
     /// The renderer calls this when formulas and diagrams arrive, possibly while this controller is itself rendering
     /// and would see its own state half-changed; the update therefore waits for the current event to finish.
-    pub fn renders_arrived(&self) {
-        perform_later(self, sel!(applyArrivedRenders), 0.0, true);
+    pub(super) fn renders_arrived(&self) {
+        perform_later(self.host, sel!(applyArrivedRenders), 0.0, true);
     }
 
-    pub(super) fn image_loaded(&self, path: std::path::PathBuf, file: super::images::ImageFile) {
-        let key = path.to_string_lossy().into_owned();
-        self.ivars().images.borrow_mut().finish(path, file);
-        self.image_arrived(key);
+    pub(super) fn apply_arrived_renders(&self) {
+        self.host.invalidate(Invalidate::Arrivals);
+        self.host.atom_editor().show_status();
+    }
+
+    /// The undo manager undid or redid a step, in the source or elsewhere.
+    pub(super) fn undo_did_change(&self) {
+        self.host.scroll_sync().undo_happened();
+        let selection = self.host.selection();
+        if selection.mirrors_source() {
+            selection.set_source_selection(self.host.panes().source().selected_range());
+        }
+        // With TextKit 2, undoing in the source sends no textDidChange.
+        if !self.host.panes().is_silent() {
+            self.catch_up();
+        }
     }
 
     /// An image finished loading. A document with hundreds of them must not start over for each one, so they are
     /// collected, and also not wait until the last one, as a pause in arrivals would make them.
+    /// The addresses of the images from the web this document shows, wherever they stand.
+    pub(super) fn web_images_shown(&self) -> Vec<String> {
+        self.host.model().read(|st| {
+            let urls = st.layout().blocks.iter().flat_map(|block| images_of(block));
+            urls.filter(|url| super::remote::is_remote(url))
+                .map(str::to_string)
+                .collect()
+        })
+    }
+
     pub(super) fn image_arrived(&self, key: String) {
-        if self.ivars().arrivals.add(key) {
-            perform_later(self, sel!(showArrivedImages), 0.1, true);
+        if self.state.arrivals.add(key) {
+            perform_later(self.host, sel!(showArrivedImages), 0.1, true);
         }
     }
 
     /// Renders the blocks of the images that arrived anew, those in view at once and the others when they come near:
     /// an image changes neither the layout nor any other block.
     pub(super) fn show_arrived_images(&self) {
-        let arrived = self.ivars().arrivals.take();
-        if self.ivars().busy.get() || self.preview_editing() {
-            self.ivars().arrivals.put_back(arrived);
-            perform_later(self, sel!(showArrivedImages), 0.1, true);
+        let arrived = self.state.arrivals.take();
+        if self.host.panes().is_silent() || self.host.editing().preview_editing() {
+            self.state.arrivals.put_back(arrived);
+            perform_later(self.host, sel!(showArrivedImages), 0.1, true);
             return;
         }
-        let doc_dir = self.doc_dir();
+        let doc_dir = self.host.doc_dir();
         let shows_arrived = |block: &TopBlock| {
             images_of(block).any(|url| {
                 let key = if super::remote::is_remote(url) {
@@ -267,17 +311,9 @@ impl EditorController {
                 key.is_some_and(|k| arrived.contains(&k))
             })
         };
-        let any = {
-            let Ok(mut guard) = self.ivars().state.try_borrow_mut() else {
-                self.ivars().arrivals.put_back(arrived);
-                perform_later(self, sel!(showArrivedImages), 0.1, true);
-                return;
-            };
-            guard.mark_arrived(shows_arrived)
-        };
-        if any {
-            self.render_visible_blocks();
-            self.schedule_pending_blocks();
+        if self.host.model().change(move |st| st.mark_arrived(shows_arrived)) {
+            self.host.progressive().render_visible_blocks();
+            self.host.progressive().schedule_pending_blocks();
         }
     }
 
@@ -285,150 +321,157 @@ impl EditorController {
         let fonts = SourceFonts::new(zoom);
         let base = style::base_source_attributes(&fonts);
         let regular = fonts.regular().retain();
-        {
-            self.ivars().state.borrow_mut().set_fonts(zoom, fonts);
+        *self.state.fonts.borrow_mut() = Some(fonts);
+        self.host.model().change(move |st| st.set_zoom(zoom));
+        let panes = self.host.panes();
+        if panes.is_built() {
+            panes.silently(|views| {
+                set_typing_attributes(views.source, &base);
+                views.source.setFont(Some(&regular));
+            });
+            self.host.invalidate(Invalidate::Zoom);
         }
-        if let Some(source) = self.ivars().source.get() {
-            set_typing_attributes(source, &base);
-            source.setFont(Some(&regular));
-            self.invalidate(Invalidate::Zoom);
-        }
-        self.invalidateRestorableState();
+        self.host.invalidateRestorableState();
     }
 
-    pub fn appearance_changed(&self) {
-        if self.ivars().state.borrow().rendered_dark() != Some(self.is_dark()) {
-            self.invalidate(Invalidate::Appearance);
+    pub(super) fn appearance_changed(&self) {
+        if self.host.model().read(|st| st.rendered_dark()) != Some(self.host.is_dark()) {
+            self.host.invalidate(Invalidate::Appearance);
         }
     }
 
-    /// Updates right away while the preview has the focus, since its caret depends on the result; otherwise parses in
-    /// the background.
-    pub(super) fn refresh(&self) {
-        if self.preview_focused() {
-            self.update();
-        } else if !self.update_part() {
+    /// The right one when nobody reads the result next, after a delay or an undo: updates right away while the preview
+    /// has the focus, since its caret depends on the result; otherwise only what changed, or in the background.
+    pub(super) fn catch_up(&self) {
+        if self.host.panes().is_silent() {
+            return;
+        }
+        if self.host.panes().preview_focused() {
+            self.update_now();
+        } else if !self.updated_in_part() {
             self.update_in_background();
         }
     }
 
-    /// Updates right away if only a part of a text of moderate size has to be parsed; whether that is so.
-    fn update_part(&self) -> bool {
-        if self.ivars().busy.get() {
-            return true;
+    fn view_facts(&self) -> ViewFacts {
+        ViewFacts {
+            caret_at: self
+                .host
+                .panes()
+                .preview_focused()
+                .then(|| self.host.selection().source_range().start),
+            visible: self.host.panes().preview_visible(),
+            shown_len: self.host.panes().preview().length(),
+            dark: self.host.is_dark(),
         }
-        let snap = self.snapshot();
-        let visible = self.preview_visible();
-        let parsed = {
-            let mut st = self.ivars().state.borrow_mut();
-            if st.wants_whole_parse(visible) || snap.text.len() > PARTS_ON_MAIN_UP_TO || st.is_current(&snap) {
-                return false;
-            }
-            st.parse_part(&snap.text)
-        };
-        let Some(parsed) = parsed else {
+    }
+
+    /// Whether only a part of a text of moderate size had to be parsed, and everything is up to date.
+    fn updated_in_part(&self) -> bool {
+        let views = self.view_facts();
+        let doc_dir = self.host.doc_dir();
+        let update = self.host.change_with_text(move |snap, st| {
+            st.advance_in_part(snap, views, |text| images_for(views.dark, doc_dir, text))
+        });
+        let Some(update) = update else {
             return false;
         };
-        self.ivars().copy.next_generation();
-        self.ivars().state.borrow_mut().set_preview_failed(false);
-        self.apply_update(&snap, Some(parsed), None);
+        self.host.model().next_generation();
+        self.show_update(update);
         true
     }
 
-    /// Re-parses, re-highlights and re-renders the preview blocks that changed.
-    pub(super) fn update(&self) {
+    /// The right one when the caller reads the result next, as every command does: re-parses, re-highlights and
+    /// re-renders the preview blocks that changed, unless a composition or the controller's own change is under way.
+    pub(super) fn update_now(&self) {
         // Replacing the text under a composition would write its marked text and offsets into the wrong place; its end
         // comes back here.
-        if self.ivars().busy.get() || self.preview().hasMarkedText() {
+        if self.host.panes().is_silent() || self.host.panes().preview().has_marked_text() {
             return;
         }
-        self.ivars().copy.next_generation();
-        let snap = self.snapshot();
-        let parsed = {
-            let mut st = self.ivars().state.borrow_mut();
-            (!st.is_current(&snap)).then(|| st.parse(&snap.text))
-        };
-        self.apply_update(&snap, parsed, None);
+        self.host.model().next_generation();
+        self.advance(None);
     }
 
-    /// Parses and lays out the source on the background thread; the result is applied only if nothing changed since.
+    /// Brings the state in line with the source text, then the views with the state.
+    fn advance(&self, background: Option<Background>) {
+        let views = self.view_facts();
+        let doc_dir = self.host.doc_dir();
+        let update = self.host.change_with_text(move |snap, st| {
+            st.advance(snap, views, background, |text| images_for(views.dark, doc_dir, text))
+        });
+        self.show_update(update);
+    }
+
+    /// The right one for a text too long to parse between two keys: parses and lays out the source on the background
+    /// thread, and the result is applied only if nothing changed since.
     pub(super) fn update_in_background(&self) {
-        if self.ivars().busy.get() {
+        if self.host.panes().is_silent() {
             return;
         }
-        let snap = self.snapshot();
-        let (current, stale_layout) = {
-            let st = self.ivars().state.borrow();
-            (st.is_current(&snap), st.stale_layout())
-        };
+        let (current, stale_layout, len_u16) = self
+            .host
+            .with_text(|snap, st| (st.is_current(snap), st.stale_layout(), snap.len_u16));
         // Formulas that arrived change the layout only, but in a large text that takes long as well.
-        let small = updates_at_once(Invalidate::Text, snap.len_u16);
-        if current && (small || !stale_layout || !self.preview_visible()) {
-            self.update();
+        let small = updates_at_once(Invalidate::Text, len_u16);
+        if current && (small || !stale_layout || !self.host.panes().preview_visible()) {
+            self.update_now();
             return;
         }
-        let copy = &self.ivars().copy;
-        let generation = copy.next_generation();
-        let latest = copy.latest_generation();
-        let text = snap.text.clone();
-        let dark = self.is_dark();
-        let env = super::env::Env::known(self.doc_dir(), &text);
-        let with_layout = self.preview_visible();
-        let me = dispatch2::MainThreadBound::new(Weak::from(self), self.mtm());
+        let generation = self.host.model().next_generation();
+        let latest = self.host.model().latest_generation();
+        let text: Arc<str> = self.host.on_source_text(|text| Arc::from(text));
+        let dark = self.host.is_dark();
+        let env = super::env::Env::known(self.host.doc_dir(), &text);
+        let with_layout = self.host.panes().preview_visible();
+        let me = dispatch2::MainThreadBound::new(Weak::from(self.host), self.host.mtm());
         PARSER.run(move || {
             let current = || latest.load(std::sync::atomic::Ordering::SeqCst) == generation;
             if !current() {
                 return;
             }
-            let parsed = contained(|| parse_and_color(&text));
+            let parsed = contained(|| parse_shared_and_color(text.clone()));
             let mut failed = parsed.is_none();
-            let parsed = parsed.unwrap_or_else(Parsed::plain);
+            let parsed = parsed.unwrap_or_else(|| Parsed::plain(text.clone()));
             // A newer text is waiting; the layout of this one would be thrown away.
             if !current() {
                 return;
             }
             let layout = with_layout.then(|| {
-                let l = laid_out(&text, &parsed.doc, &Images { dark, env }, None);
+                let l = laid_out(&parsed.doc, &Images { dark, env }, None);
                 failed |= l.is_none();
-                let l = l.unwrap_or_default();
+                let l = l.unwrap_or_else(|| Layout::nothing_of(&parsed.doc));
                 let index = Index::new(&l);
                 (l, index)
             });
             if !current() {
                 return;
             }
+            let background = Background { parsed, layout, failed };
             dispatch2::DispatchQueue::main().exec_async(move || {
                 let Some(mtm) = MainThreadMarker::new() else { return };
                 if let Some(c) = me.get(mtm).load() {
-                    c.apply_background(generation, &text, parsed, layout, failed);
+                    c.updater().apply_background(generation, &text, background);
                 }
             });
         });
     }
 
-    fn apply_background(
-        &self,
-        generation: u64,
-        text: &str,
-        parsed: Parsed,
-        layout: Option<(Layout, Index)>,
-        failed: bool,
-    ) {
+    fn apply_background(&self, generation: u64, text: &str, background: Background) {
         // Freeing a large document tree takes long enough to be felt while typing.
-        if !self.ivars().copy.is_latest(generation) {
-            free_in_background((parsed, layout));
+        if !self.host.model().is_latest(generation) {
+            free_in_background(background);
             return;
         }
-        let snap = self.snapshot();
-        if snap.text != text || self.ivars().busy.get() || self.preview_editing() {
-            free_in_background((parsed, layout));
+        let same_text = self.host.on_source_text(|current| current == text);
+        if !same_text || self.host.panes().is_silent() || self.host.editing().preview_editing() {
+            free_in_background(background);
             self.schedule_update();
             return;
         }
-        self.ivars().state.borrow_mut().set_preview_failed(failed);
         #[cfg(feature = "selftest")]
         let started = std::time::Instant::now();
-        self.apply_update(&snap, Some(parsed), layout);
+        self.advance(Some(background));
         #[cfg(feature = "selftest")]
         if std::env::var_os("SPLAT_BENCH").is_some() {
             eprintln!(
@@ -438,60 +481,62 @@ impl EditorController {
         }
     }
 
-    /// Brings source colors and preview in line with `snap`. `parsed` is `None` when the text is unchanged; `layout`
-    /// is one computed elsewhere for that text without a caret.
-    fn apply_update(&self, snap: &Snapshot, parsed: Option<Parsed>, layout_done: Option<(Layout, Index)>) {
-        let preview_focused = self.preview_focused();
-        let caret = preview_focused.then(|| self.source_selection(snap).start);
-        let dark = self.is_dark();
-        let changed = parsed.is_some();
-        let splice = parsed.as_ref().and_then(|p| p.splice.clone());
-        self.apply_colors(snap, parsed);
-        let switched = self.ivars().state.borrow().rendered_dark() != Some(dark);
-        let plan = self.plan_preview(caret, dark, changed, layout_done, splice.as_ref());
-        let shown = plan.is_some();
-        if let Some(plan) = plan
-            && self.show_preview(plan, dark)
-        {
-            self.schedule_pending_blocks();
+    /// Brings source colors and preview in line with the state, which already says what comes next: until the preview
+    /// view shows that, nothing may measure one against the other, so all of this counts as the controller's own.
+    fn show_update(&self, update: Update) {
+        let Update {
+            recolor,
+            preview,
+            text_changed,
+            appearance_switched,
+        } = update;
+        let preview_focused = self.host.panes().preview_focused();
+        let shown = preview.is_some();
+        let pending = self.host.panes().silently(|views| {
+            if let Some(recolor) = recolor {
+                self.apply_colors(views, recolor);
+            }
+            preview.map(|change| self.show_preview(views, change))
+        });
+        if pending == Some(true) {
+            self.host.progressive().schedule_pending_blocks();
         }
         // These depend on the text, not on the preview: the outline stays visible while the preview is hidden, and a
         // formula typed meanwhile is rendered when the preview comes back.
-        if changed || switched {
+        if text_changed || appearance_switched {
             self.schedule_render_requests();
         }
-        if changed {
-            self.refresh_outline();
+        if text_changed {
+            self.host.panes().show_headings_if_open();
         }
-        if changed && !self.ivars().remote_allowed.get() {
-            let remote = crate::markdown::doc::has_remote_images(self.ivars().state.borrow().doc());
-            self.show_remote_banner(remote);
+        if text_changed && !self.host.pictures().remote_allowed() {
+            let remote = self
+                .host
+                .model()
+                .read(|st| crate::markdown::doc::has_remote_images(st.doc()));
+            self.host.pictures().show_remote_banner(remote);
         }
         if !shown {
             return;
         }
         if preview_focused {
-            self.place_preview_selection();
+            self.host.selection().place_preview_selection();
         }
-        self.refresh_marks();
-        if self.ivars().scroll_after_undo.replace(false) {
-            self.reveal_selection_in_preview();
+        self.host.selection().show_marks();
+        if self.host.scroll_sync().take_undo_happened() {
+            self.host.selection().reveal_selection_in_preview();
         }
     }
 
-    /// Takes over a new parse result and recolors the source where its colors changed, or all of it when the
-    /// colors are stale.
-    fn apply_colors(&self, snap: &Snapshot, parsed: Option<Parsed>) {
-        let Some(recolor) = self.ivars().state.borrow_mut().adopt(snap, parsed) else {
-            return;
-        };
-        if let Some(fonts) = &recolor.fonts {
-            let _silent = self.silently();
+    /// Recolors the source where its colors changed, or all of it when the colors are stale.
+    fn apply_colors(&self, views: Views<'_>, recolor: Recolor) {
+        let fonts = self.state.fonts.borrow().clone();
+        if let Some(fonts) = &fonts {
             style::apply_highlight_changes(
-                &storage(self.source()),
+                &storage(views.source),
                 &recolor.old_text,
                 &recolor.old_spans,
-                &snap.text,
+                &recolor.text,
                 &recolor.spans,
                 fonts,
             );
@@ -499,62 +544,37 @@ impl EditorController {
         free_in_background((recolor.old_text, recolor.old_spans));
     }
 
-    /// Lays out the text and finds the blocks that changed; `None` when the preview stays as it is.
-    fn plan_preview(
-        &self,
-        caret: Option<usize>,
-        dark: bool,
-        text_changed: bool,
-        layout_done: Option<(Layout, Index)>,
-        splice: Option<&Splice>,
-    ) -> Option<PreviewPlan> {
-        let input = PreviewInput {
-            caret,
-            text_changed,
-            layout_done,
-            splice,
-            visible: self.preview_visible(),
-            shown_len: storage(self.preview()).length(),
+    /// Replaces the changed blocks in the preview view; returns whether blocks are left to render.
+    fn show_preview(&self, views: Views<'_>, change: PreviewChange) -> bool {
+        let PreviewChange {
+            blocks,
+            diff,
+            mode,
+            zoom,
+        } = change;
+        let changed = diff.prefix..diff.prefix + blocks.len();
+        let notice = match mode {
+            PreviewMode::Shows => None,
+            PreviewMode::Failed => Some(crate::i18n::t("Darstellung fehlgeschlagen")),
+            PreviewMode::TooLarge => Some(crate::i18n::t(
+                "Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten.",
+            )),
         };
-        let doc_dir = self.doc_dir();
-        self.ivars().state.borrow_mut().plan_preview(input, |text| Images {
-            dark,
-            env: super::env::Env::known(doc_dir, text),
-        })
-    }
-
-    /// Replaces the changed blocks in the preview view and stores the new layout; returns whether some blocks
-    /// were left as placeholders.
-    fn show_preview(&self, plan: PreviewPlan, dark: bool) -> bool {
-        let changed = plan.diff.prefix..plan.keys.len() - plan.diff.suffix;
-        let notice = {
-            let st = self.ivars().state.borrow();
-            if st.preview_failed() {
-                Some(crate::i18n::t("Darstellung fehlgeschlagen"))
-            } else {
-                stays_plain(st.text()).then(|| {
-                    crate::i18n::t(
-                        "Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten.",
-                    )
-                })
-            }
-        };
-        let eager = eager_blocks(changed.clone(), || self.visible_preview_block());
-        let doc_dir = self.doc_dir();
+        let eager = eager_blocks(changed.clone(), || self.host.progressive().visible_preview_block());
+        let doc_dir = self.host.doc_dir();
         let ctx = RenderCtx {
-            mtm: self.mtm(),
-            zoom: plan.zoom,
+            mtm: self.host.mtm(),
+            zoom,
             doc_dir: doc_dir.as_deref(),
-            images: &self.ivars().images,
-            max_image_width: (self.preview().bounds().size.width - 60.0).max(200.0),
-            dark,
-            controller: Some(self),
-            remote_images: self.ivars().remote_allowed.get(),
+            images: self.host.pictures().store(),
+            max_image_width: (self.host.panes().preview().bounds().size.width - 60.0).max(200.0),
+            dark: self.host.is_dark(),
+            controller: Some(self.host),
+            remote_images: self.host.pictures().remote_allowed(),
         };
         let replacement = objc2_foundation::NSMutableAttributedString::new();
         let mut plain = String::new();
-        for i in changed {
-            let block = &plan.layout.blocks[i];
+        for (i, block) in changed.clone().zip(&blocks) {
             if eager.contains(&i) {
                 if !plain.is_empty() {
                     replacement.appendAttributedString(&ctx.placeholder(&std::mem::take(&mut plain)));
@@ -570,26 +590,27 @@ impl EditorController {
         if let Some(notice) = notice {
             replacement.appendAttributedString(&ctx.placeholder(notice));
         }
-        let storage = storage(self.preview());
-        let range = shown_to_ns(plan.diff.replace.clone());
-        {
-            let _silent = self.silently();
-            storage.beginEditing();
-            storage.replaceCharactersInRange_withAttributedString(range, &replacement);
-            storage.endEditing();
+        let storage = storage(views.preview);
+        storage.beginEditing();
+        storage.replaceCharactersInRange_withAttributedString(shown_to_ns(diff.replace), &replacement);
+        storage.endEditing();
+        let takes_input = mode == PreviewMode::Shows;
+        if views.preview.isEditable() != takes_input {
+            views.preview.setEditable(takes_input);
         }
-        self.ivars().state.borrow_mut().adopt_preview(plan, &eager, dark)
+        self.host.model().change(move |st| st.preview_shown(changed, &eager))
     }
 
-    /// Index of the first preview block in view.
-    pub(super) fn visible_preview_block(&self) -> usize {
-        let top = top_offset(self.preview()).unwrap_or(0);
-        self.ivars().state.try_borrow().map_or(0, |st| {
-            st.index()
-                .block_starts
-                .partition_point(|&s| s.0 <= top)
-                .saturating_sub(1)
-        })
+    /// Whether what is typed into the preview can reach the source: a notice in its place stands for no text.
+    pub(super) fn preview_takes_input(&self) -> bool {
+        self.host.model().read(|st| st.preview_mode()) == PreviewMode::Shows
+    }
+}
+
+fn images_for(dark: bool, doc_dir: Option<PathBuf>, text: &str) -> Images {
+    Images {
+        dark,
+        env: super::env::Env::known(doc_dir, text),
     }
 }
 
@@ -611,6 +632,31 @@ mod tests {
             let seen = visible.clamp(changed.start, changed.end - 1);
             assert!(eager.contains(&seen), "{eager:?} misses {seen}");
         }
+    }
+
+    #[test]
+    fn images_that_arrive_together_are_shown_together() {
+        let arrivals = Arrivals::default();
+        assert!(arrivals.add("a".into()), "the first one schedules the showing");
+        assert!(!arrivals.add("b".into()), "the next ones wait for it");
+        assert_eq!(arrivals.take().len(), 2);
+        assert!(arrivals.take().is_empty());
+        assert!(
+            arrivals.add("c".into()),
+            "the next arrival after the showing schedules anew"
+        );
+    }
+
+    #[test]
+    fn images_that_could_not_be_shown_wait_with_the_ones_arriving_meanwhile() {
+        let arrivals = Arrivals::default();
+        arrivals.add("a".into());
+        arrivals.put_back(arrivals.take());
+        assert!(
+            !arrivals.add("b".into()),
+            "putting them back comes with its own schedule"
+        );
+        assert_eq!(arrivals.take().len(), 2);
     }
 
     #[test]

@@ -567,6 +567,7 @@ Forudsætninger:
 
 - macOS med Command Line Tools (`xcode-select --install`). Xcode er ikke nødvendigt; Splat bygges uden `actool`, `ibtool` og `metal`.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) angiver den nøjagtige version, som CI bruger; rustup installerer den selv, Homebrews Rust ignorerer filen. Ved at hæve den dér når nye advarsler fra compileren og clippy frem til projektet.
+- rustup, til `make lint`, `make check` og `make universal`: `cargo xtask check-library` bygger biblioteket til Linux for at vise, at det ikke kræver macOS, og Homebrews Rust har ingen andre mål.
 
 [Makefile](../../../Makefile) rummer korte indgangspunkter; `make help` viser dem alle:
 
@@ -624,21 +625,24 @@ Appen i det har en anden signatur end et lokalt build, så macOS fører separate
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | en længere randomiseret søgning; `SPLAT_FUZZ_SEED` varierer inddata |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | ét sprog, mens andre er ufuldstændige |
 | `cargo clippy --release --all-targets [--features selftest]` | lints, herunder begrundelsen for hver `unsafe`-blok, funktionernes længde og, i biblioteket, talkonverteringer |
+| `cargo xtask check-library` | biblioteket bygger til Linux, så intet i det kræver macOS |
 | `cargo xtask vendor check` | JavaScript-bibliotekerne stemmer byte for byte med `vendor.lock` |
-| `cargo xtask selftest probe` | uden vindue, hver med sit forventede resultat: formler, diagrammer, webbilleder mod en server inde i processen, blokerede adresser, webvisningernes forsvar |
+| `cargo xtask selftest probe` | uden vindue, hver med sit forventede resultat: formler, diagrammer, webbilleder mod en server i processen, blokerede adresser, den tekst, hver kommando skriver, hvert billedformat gennem begge eksporter, en side, der holder op med at svare, og webvisningernes forsvar mod en side uden dem. Tager omkring et halvt minut. Det, der kræver appen foran sig, springes over på en låst skærm |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | den kørende app, klik for klik. Åbner et vindue og taster i det; Macen er optaget i cirka fire minutter. `--scenarios` kører kun anden del, på cirka halvanden minut |
 | `cargo xtask selftest resize` | gør vinduet bredere, efter skillelinjen er flyttet: kildeteksten ombrydes, mens vinduets størrelse ændres. Tager cirka ti sekunder |
 | `cargo xtask selftest bench <file.md>` | tider for at åbne, taste i og rulle i en stor fil |
-| `cargo test --release -- --ignored partial_updates` | et tastetryk i 10 MB: delvis mod fuld opdatering, resultat og tidsgrænse |
-| `cargo test --release --test hostile` | dokumenter bygget til at overfylde stakken eller tage kvadratisk tid, gennem parsing, layout, begge eksporter, tastetryk og kommandoer |
+| `cargo test --release -- --ignored partial_updates` | et tastetryk i 10 MB: delvis mod fuld opdatering, det samme resultat på højst en fjerdedel af tiden |
+| `cargo test --release --test hostile` | dokumenter bygget til at løbe over på stakken eller tage kvadratisk tid, hver i to størrelser, hvis tider skal vokse som teksten, gennem parsing, layout, begge eksporter, tastetryk og kommandoer |
 | `make mutants` | fejl indbygget i `src/markdown/` og `src/preview/` en ad gangen, gennem [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); siger, hvilke ingen test opdager. Tager timer; `FILE=src/preview/bridge.rs` afgrænser det |
 | `cargo test --release --test decoder` | dekoderprocessen afkoder billeder og når hverken filer eller netværket |
 | `make coverage` | linjedækning for `cargo test` og alle selvtests, gennem [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fejler under de nedre grænser. Lægger beslag på Macen i cirka fem minutter |
-| `make coverage-library` | de nedre grænser for `src/markdown/`, `src/preview/` og `i18n.rs`, målt af `cargo test` alene |
+| `make coverage-library` | `src/markdown/`, `src/preview/` og `i18n.rs` mod deres højere nedre grænser, målt af `cargo test` alene |
 
-Enhedstests ligger ved siden af den kode, de tester. `tests/` rummer det, der når biblioteket udefra: de randomiserede tests i `robustness.rs`, som deler generatoren i `src/fuzz.rs` med dem i `sync.rs`, de dokumenter, der er bygget til at gøre ondt, i `hostile.rs`, og dekodertesten, som starter det byggede program. Beslutninger i `src/editor/`, der ikke kræver et vindue, ligger i frie funktioner med egne tests: alt, hvad controlleren ved, og hvordan det ændrer sig, i `state.rs`, gengivelsens regler i `render_queue.rs`, tekstkopien i `sync.rs`. Et trin i vinduets selvtest, der venter forgæves, får kørslen til at fejle. Vinduets selvtest kører en anden del efter sit hovedgennemløb af klik, i `src/editor/selftest/scenarios.rs`: hver formaterings- og tabelkommando, dialogerne, linkklik, indsættelse, slip, eksporter, en stor ændring, billeder der ændrer sig på disken, hukommelsespres, et kæmpedokument og genopretningen efter et nedbrud.
+Enhedstests ligger ved siden af den kode, de tester. `tests/` rummer det, der når biblioteket udefra: de randomiserede tests i `robustness.rs`, som deler generatoren i `src/fuzz.rs` med dem i `sync.rs`, de dokumenter, der er bygget til at gøre ondt, i `hostile.rs`, og dekodertesten, som starter det byggede program. Beslutninger i `src/editor/`, der ikke kræver et vindue, ligger i frie funktioner med egne tests: alt, hvad controlleren ved, og hvordan det ændrer sig, i `state.rs`, gengivelsens regler i `render_queue.rs`, tekstkopien i `sync.rs`, afsnitstypografier, skrifttyper og farver som værdier i `render.rs`, hvad værktøjslinjens identifikatorer står for i `toolbar.rs`, hvad et klik på et link betyder i `navigation.rs`.
 
-Dækningen har to nedre grænser: hvert modul mindst 80 % af sine linjer, alle moduler tilsammen mindst 85 %. `make coverage` måler `cargo test` sammen med selvtestene og fejler under en af dem; grænserne og de få undtagelser, som panic-hooket i `main.rs`, der kun kører ved et nedbrud, står i [xtask](../../../xtask/src/coverage.rs) sammen med deres begrundelser. Målte builds havner i `target/coverage/`, så målekode aldrig når `target/release/` eller et diskaftryk. Dekoderhjælperen åbner sin målefil, før den spærrer sig selv inde, så den måles også.
+Et trin i vinduets selvtest venter på en navngiven betingelse, ikke på et tidsrum; kun det, der ikke giver noget signal, som fraværet af noget, beholder en pause med sin begrundelse. At vente forgæves er en fejlet kontrol, der nævner, hvad der aldrig kom, et trin, der gør panic, er også en fejlet kontrol, og kørslen fortsætter i begge tilfælde. En kontrol, der ikke kan sige noget i denne kørsel, melder `SELFTEST SKIP`: xtask opregner den, og den hverken består eller fejler. xtask kræver af hver tilstand, og af `--scenarios` for sig, omkring ni tiendedele af dens kontroller. Vinduets selvtest kører en anden del efter sit hovedgennemløb af klik, i `src/editor/selftest/scenarios.rs`: hver formaterings- og tabelkommando, dialogerne, linkklik, indsættelse, slip, eksporter, en stor ændring, billeder der ændrer sig på disken, hukommelsespres, et kæmpedokument og genopretningen efter et nedbrud.
+
+Dækningen har to nedre grænser: hvert modul mindst 84 % af sine linjer, alle moduler tilsammen mindst 96 %. `make coverage` måler `cargo test` sammen med selvtestene og fejler under en af dem; `make coverage-library` holder det, der ikke kræver et vindue, til 90 % og 97 %. Grænserne og de få undtagelser, som panic-hooket i `main.rs`, der kun kører ved et nedbrud, står i [xtask](../../../xtask/src/coverage.rs) sammen med deres begrundelser. Målte builds havner i `target/coverage/`, så målekode aldrig når `target/release/` eller et diskaftryk. Dekoderhjælperen åbner sin målefil, før den spærrer sig selv inde, så den måles også.
 
 CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) kører `make check`, `make coverage-library` og det universelle build på Apple Silicon og `cargo test` på Intel for hvert push til `main` og hver pull request. Hver nat kører [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) `make test-long` med nye tilfældige inddata. Selvtestene og diskaftrykket bliver på udviklerens Mac: De kræver en skærm og signeringscertifikaterne i nøgleringen.
 
@@ -646,36 +650,39 @@ Selvtestens output havner i `target/selftest/`. Selvtesten bygger en separat app
 
 ### Projektstruktur
 
-`src/lib.rs` gør alt, hvad der ikke kræver et vindue, til et bibliotek for sig, `splat`: `markdown/`, `preview/`, `i18n.rs` og testgeneratoren `fuzz.rs`. Appen i `src/main.rs` bygger oven på det.
+`src/lib.rs` gør alt, hvad der ikke kræver et vindue, til et bibliotek for sig, `splat`: `markdown/`, `preview/`, `i18n.rs` og testgeneratoren `fuzz.rs`. Det bygger uden macOS. Appen i `src/main.rs` bygger oven på det.
 
-- `src/markdown/`: parserbindingen (comrak), syntaksfarver og alle kommandoer som rene tekstændringer (`Edit`). Desuden ny parsing efter en ændring (`incremental.rs`), læseren til indlejret HTML (`markup.rs`), typografi, tags, henvisninger og citater i løbende tekst (`typography.rs`), hvordan tekst ser ud, og hvilken Markdown og HTML der giver den udseendet (`style.rs`), hvad en adresse må være (`url.rs`) samt HTML- og Word-eksporten (`html.rs`, `docx.rs` med `docx/html.rs` og `docx/xml.rs`). Eksemplet og begge eksporter læser alle det samme træ, `Doc`. Ingen AppKit.
-- `src/preview/`: eksemplets layout, indlejret HTML i det (`layout/html.rs`) og afbildningen mellem eksempel og kildetekst (`Bridge`, `Index`). Ingen AppKit.
-- `src/editor/`: vinduet. Ét `EditorController`-objekt betjener AppKit som delegate for begge visninger; arbejdet er delt efter ansvar:
+- `src/markdown/`: det træ, som alle forbrugere læser, `Doc` i `doc/`, der ejer sin tekst, og den eneste binding til parseren i `reader/`: comrak nævnes ingen andre steder, og `reader/assumptions.rs` rummer, hvad koden antager om den. Syntaksfarver og alle kommandoer som rene tekstændringer (`Edit`) i `commands/`. Dertil ny parsing efter en ændring (`incremental.rs`), læseren af indlejret HTML (`markup.rs`), typografi, tags, henvisninger og citater i løbende tekst (`typography.rs`), hvordan tekst ser ud, og hvilken Markdown og HTML der giver den udseendet (`style.rs`), hvad en adresse må være (`url.rs`) og HTML- og Word-eksporten (`html.rs`, `docx.rs` med `docx/html.rs` og `docx/xml.rs`). En position har sin type: `Byte` i kildeteksten, `U16` i kildevisningen, `Shown` i eksempelvisningen (`text.rs`). Ingen AppKit.
+- `src/preview/`: eksemplets layout i `layout/` med indlejret HTML i `layout/html.rs` og afbildningen mellem eksempel og kildetekst (`Bridge`, `Index`). En `Bridge` afviser et layout fra en anden version af `Doc`. Ingen AppKit.
+- `src/editor/`: vinduet. Ét `EditorController`-objekt betjener AppKit som delegate for begge visninger og videresender til komponenter, små structs oven på controlleren og den tilstand, de ejer, hvis felter de andre moduler ikke kan nå:
 
 | Modul | Ansvar |
 |---|---|
-| `mod.rs` | klasse, delegatemetoder, `invalidate` |
+| `mod.rs` | klasse, delegatemetoder, der videresender, `invalidate` |
+| `panes.rs` | `Panes`: tekstvisningerne, dispositionen, visning og skjulning af ruder og det, der giver adgang til visningerne |
 | `state.rs` | hvad controlleren ved om dokumentet, og enhver måde det ændrer sig på; felterne er private, og den rører ingen visning |
+| `model.rs` | låner tilstanden og tekstkopien ud til closures, der ikke kan nå en visning |
 | `actions.rs` | kommandoregister: selector, titel, genvej, symbol, hvornår kommandoen gælder |
-| `editing.rs` | kørsel og validering af kommandoer, tastning i eksemplet |
-| `update.rs` | parsing, farvelægning, opdatering af eksemplet; efter en ændring kun de berørte afsnit |
+| `editing.rs` | `Editing`: kørsel og validering af kommandoer, tastning i eksemplet |
+| `update.rs` | `Updater`: parsing, farvelægning, opdatering af eksemplet; efter en ændring kun de berørte afsnit |
 | `sync.rs` | tekstkopi og blokbogholderi, uden AppKit og med randomiserede tests |
-| `progressive.rs` | trinvis gengivelse af store eksempler |
-| `selection.rs`, `scroll.rs` | markering og rulleposition i begge felter i takt |
-| `atom.rs`, `atom_edit.rs` | formel- og diagrameditoren |
-| `navigation.rs`, `links.rs` | links, wikilinks, tags, afkrydsningsfelter i opgaver, foldning, fodnoter |
+| `progressive.rs` | `Progressive`: trinvis gengivelse af store eksempler |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: markering og rulleposition i begge felter i takt |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: formel- og diagrameditoren |
+| `navigation.rs`, `links.rs` | `Links`: links, wikilinks, tags, afkrydsningsfelter i opgaver, foldning, fodnoter |
 | `env.rs` | hvad eksemplet læser uden for teksten: typografisk tegnsætning, repositoryet til `@name` og `#12`, BibTeX-filen, indlejrede noter |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | eksempeltekst, lokale og eksterne billeder |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | eksempeltekst, lokale og eksterne billeder; `Pictures` i `images.rs` |
 | `attributes.rs` | tekstattributter; hver nøgle får kun en værdi af den type, den forventer |
 | `shadow.rs` | kopier af ugemt tekst til genopretning efter et nedbrud |
 | `decoder.rs` | helperprocesser i en sandbox, der afkoder billeder og grafik |
-| `export.rs`, `outline.rs` | HTML- og Word-eksport; dispositionslisten |
+| `export.rs`, `outline.rs` | `Sharing`: HTML- og Word-eksport, delefilen, udskrivning; dispositionslisten |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit til MathJax, Mermaid, Graphviz, PlantUML og den visuelle formeleditor; reglerne for, hvad der gengives hvornår, uafhængigt af WebKit |
 | `webkit.rs` | kald ind i WebKit; kun navigationsdelegatens levetid bliver hos `js.rs` og `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | vindue, værktøjslinje, tekstvisninger, dialoger, farver |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | opbygning af vinduet, værktøjslinje, tekstvisninger, dialoger, farver |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menulinje, appdelegate, dokument (`MDDocument`, en underklasse af `NSDocument`).
-- `src/i18n.rs` med `resources/*.lproj`: 35 sprog; nøglerne er de tyske tekster.
+- `src/i18n.rs` med `resources/*.lproj`: 35 sprog; nøglerne er de tyske tekster, og appen installerer tabellen for grænsefladens sprog ved start.
+- `src/util/`: arbejdstråde (`lanes.rs`), diske, der kan holde op med at svare (`volumes.rs`), AppKit-hjælpere, filer og processer. `src/diag.rs`: det, der går galt uden for brugerens syn, går til systemloggen, uden nogen tekst fra et dokument.
 - `src/large_alloc.rs`: store allokeringer kommer direkte fra kernen og går tilbage til den, når de frigives, så hukommelsen vender tilbage efter store ændringer.
 - `resources/js/`: websider og biblioteker; versioner og kontrolsummer i [vendor.lock](../../../vendor.lock).
 - `xtask/`: bundling, signering, diskaftrykket, ikonet, vendoring, selvtestkøreren og de nedre grænser for dækning.
@@ -686,21 +693,21 @@ Kildeteksten i den venstre tekstvisning er den eneste sandhedskilde.
 
 1. Hver tegnændring dér opdaterer tekstkopien (`Snapshot`) på stedet uden at læse teksten igen.
 2. En opdatering parser kopien, farvelægger kun kildeteksten igen, hvor farverne er ændret, lægger eksemplet ud og erstatter kun de blokke, hvis indhold er ændret.
-3. Efter en ændring parses, farvelægges og lægges kun de berørte afsnit ud igen, så længe deres naboer forbliver de samme; `reparse_part_and_color` afgør, hvornår de ikke gør. Dokumenter med `%%`-kommentarblokke, ændringer i front matter og ændringer nær definitioner af linkreferencer behandles i fuld. comrak genkender en fodnotehenvisning kun med sin definition i samme parsing og flytter definitioner bag teksten, så delen parses med en stedfortrædende definition pr. etiket og henter sine numre fra det gamle træ; en ændring af henvisningerne eller definitionerne i delen, eller ved siden af en fodnote i teksten, behandles i fuld.
+3. Efter en ændring parses, farvelægges og lægges kun de berørte afsnit ud igen, så længe deres naboer forbliver de samme; `reparse_part_and_color` afgør, hvornår de ikke gør. Dokumenter med `%%`-kommentarblokke, ændringer i front matter og, i et dokument med definitioner af linkreferencer, ændringer i en del med en kantet parentes behandles i fuld. comrak genkender en fodnotehenvisning kun med sin definition i samme parsing og flytter definitioner bag teksten, så delen parses med en stedfortrædende definition pr. etiket og henter sine numre fra det gamle træ; en ændring af henvisningerne eller definitionerne i delen, eller ved siden af en fodnote i teksten, behandles i fuld.
 4. HTML-blokke, der åbner `<details>` eller `<div align>` og lukker det senere, påvirker Markdown-blokkene imellem; en genbrugt blok skal have de samme omgivelser.
 5. Mens du taster i kildeteksten i et dokument på op til 2 MB, kører den delvise opdatering med det samme; gælder den ikke, eller er dokumentet større, kører parsing og layout i baggrunden. Mens du taster i eksemplet, kører de med det samme, fordi eksemplets markør afhænger af resultatet.
 6. Inddata i eksemplet oversættes af `Bridge` til en ændring af kildeteksten og følger derfra samme vej. Markdown har for mange måder at gøre tekst til syntaks på til, at regler alene slår til, så `preview/verify.rs` parser den ændrede del igen og sammenligner det, den viser, med det, der blev tastet; en ændring, der ikke holder, escapes yderligere eller afvises.
-7. comraks positioner i teksten går galt nogle få steder, for eksempel bag en definition af en linkreference. `markdown/positions.rs` kontrollerer dem mod kildeteksten, når en blok læses, og læser dem igen fra kildeteksten, hvor de ikke passer.
+7. comraks positioner i teksten går galt nogle få steder, for eksempel bag en definition af en linkreference. `markdown/reader/positions.rs` kontrollerer dem mod kildeteksten, når en blok læses, og læser dem igen fra kildeteksten, hvor de ikke passer.
 
 ### Regler i controlleren
 
-1. Controllerens egne ændringer af visningerne kører inde i `silently()`; delegatens callbacks ignorerer dem.
-2. `state` lånes kun til at læse og beregne, aldrig henover et kald, der ændrer, lægger ud eller ruller en visning. Den ændrer sig kun gennem sine egne metoder, hvis tests ikke kræver et vindue.
+1. Controllerens egne ændringer af visningerne kører inde i `Panes::silently`; delegatens callbacks ignorerer dem. Alle andre steder kan visningerne kun læses, så compileren tjekker det. Det, callbacks skal høre, eller det, der giver en visning til AppKit, siger det ved at gå gennem `Panes::for_appkit`.
+2. Tilstanden lånes kun til at læse og beregne, aldrig henover et kald, der ændrer, lægger ud eller ruller en visning: `Model` låner den ud til `Send`-closures, og ingen visning er `Send`, så compileren tjekker det. Den ændrer sig kun gennem sine egne metoder, hvis tests ikke kræver et vindue.
 3. Meddelelser udefra (et billede er indlæst, en formel er gengivet) ankommer forsinket gennem `renders_arrived` og `image_arrived`, aldrig midt i en opdatering.
 4. Gentegning uden tekstændring går kun gennem `invalidate(reason)`.
-5. En `Rc<Snapshot>` holdes ikke henover en ændring af kildeteksten, ellers kopierer ændringen hele teksten.
-6. En ny kommando kræver en post i `actions.rs`, en metode i `mod.rs` og en gren i `editing::perform`.
-7. Hver `unsafe`-blok bærer sin begrundelse som en `// SAFETY:`-kommentar. Bytes når systemets billeddekodere i appen kun gennem `decoder::system_image`.
+5. Tekstkopien holdes ikke henover en ændring af kildeteksten, ellers kopierer ændringen hele teksten: `with_text` låner den kun ud i en `Send`-closures levetid.
+6. En ny kommando kræver en post i `actions.rs`, en metode i `mod.rs` og en gren i `Editing::perform`.
+7. Hver `unsafe`-blok bærer sin begrundelse som en `// SAFETY:`-kommentar. Bytes når systemets billeddekodere kun i hjælpeprocessen, gennem `decoder::decode_native`; en test gennemsøger kilderne for andre kald.
 8. Intet på hovedtråden venter på brugerens mapper, da et netværksdrev kan holde op med at svare: Filer undersøges på tråden `DISK`, og eksemplet læser svarene gennem `Env::known`. Kun en handling, som brugeren venter på, som en eksport eller en arkivering, må røre disken direkte.
 
 ### Tilføj en kommando
@@ -709,7 +716,7 @@ Menulinjen, værktøjslinjen og lokalmenuen bygger alle deres punkter ud fra reg
 
 1. en variant af `Action` med sin `Spec`: selector, titel, knaptekst i værktøjslinjen, værktøjstip (begynder med et udsagnsord, højst 75 tegn), genvej, SF Symbol og hvornår den gælder
 2. metoden i `src/editor/mod.rs`
-3. en gren i `editing::perform`
+3. en gren i `Editing::perform`
 4. dens tekster i hver `Localizable.strings`
 
 Testen `every_command_has_a_method_and_every_method_a_command` kontrollerer, at register og metoder passer sammen. Apples standardgenveje som ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F og ⌘, forbliver urørte.

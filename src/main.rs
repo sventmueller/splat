@@ -1,4 +1,5 @@
 mod app;
+mod diag;
 mod document;
 mod editor;
 mod large_alloc;
@@ -20,12 +21,15 @@ fn main() {
         Some(editor::decoder::NATIVE_ARG) => editor::decoder::serve_native(),
         _ => {}
     }
+    i18n::install(&app::localized_strings());
     let mtm = MainThreadMarker::new().expect("Splat must start on the main thread");
     let report = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
+        // Only the place: the message of a failed slice quotes the text around it.
+        diag::report("panic", info.location().map_or_else(String::new, ToString::to_string));
         if !editor::panic_is_contained() {
             for path in editor::emergency_save() {
-                eprintln!("Splat: Text gesichert in {}", path.display());
+                diag::report("text saved after a panic", path.display());
             }
         }
         report(info);

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Save the Document First";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Pasted images are stored as files next to the document. Save it, then paste the image again.";
 "Export fehlgeschlagen" = "Export Failed";
+"Das Dokument ließ sich nicht umwandeln." = "The document could not be converted.";
+"Das Dokument ist zu groß für eine Word-Datei." = "The document is too large for a Word file.";
 "Gliederung ausblenden" = "Hide Outline";
 "Gliederung einblenden" = "Show Outline";
 "Metadaten" = "Metadata";

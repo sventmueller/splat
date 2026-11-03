@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Najprej shranite dokument";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Prilepljene slike se shranijo kot datoteke poleg dokumenta. Shranite ga in nato znova prilepite sliko.";
 "Export fehlgeschlagen" = "Izvoz ni uspel";
+"Das Dokument ließ sich nicht umwandeln." = "Dokumenta ni bilo mogoče pretvoriti.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokument je prevelik za datoteko Word.";
 "Gliederung ausblenden" = "Skrij oris";
 "Gliederung einblenden" = "Prikaži oris";
 "Metadaten" = "Metapodatki";

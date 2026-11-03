@@ -15,7 +15,6 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSPoint, NSRange, NSRect, NSRectEdge, NSSize, NSUndoManager, NSUserDefaults};
 
 use super::attributes::{Attribute, add_attribute};
-use super::scroll::char_rect;
 use super::style::token_color;
 use super::update::render_key;
 use super::{EditorController, js, mathfield};
@@ -23,10 +22,15 @@ use crate::i18n::t;
 use crate::markdown::code;
 use crate::markdown::doc::figure_at;
 use crate::markdown::snippets::{self, DIRECTIONS, DiagramAction, MermaidKind, Shape};
-use crate::markdown::text::{U16, Utf16Map};
+use crate::markdown::text::{Byte, TextAt, U16, Utf16Map, bytes, units};
 use crate::preview::map::preview_offset;
 use crate::util::constant;
 use crate::util::{byte_range_to_ns, from_nsrange, insert_text, ns, storage};
+
+mod edit;
+
+pub(super) use edit::atom_at_preview;
+use edit::atom_content;
 
 const GREEK_TAG: isize = 100;
 const RELATION_TAG: isize = 200;
@@ -63,44 +67,69 @@ pub(super) fn diagram_tag(action: DiagramAction) -> isize {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum AtomKind {
+enum AtomKind {
     Formula { display: bool },
     Diagram(crate::markdown::doc::DiagramKind),
 }
 
 /// An open popover editing the source of a formula or diagram in place.
-pub(super) struct AtomEdit {
-    pub(super) popover: Retained<NSPopover>,
-    pub(super) view: Retained<NSTextView>,
-    pub(super) start: usize,
-    pub(super) len: Cell<usize>,
-    pub(super) original: String,
-    pub(super) cancelled: Cell<bool>,
-    pub(super) range_start: usize,
-    pub(super) kind: AtomKind,
-    pub(super) diagram: crate::markdown::snippets::MermaidKind,
-    pub(super) status: Retained<objc2_app_kit::NSTextField>,
-    pub(super) scroll: Retained<NSScrollView>,
-    pub(super) editor_frame: NSRect,
-    pub(super) visual: Cell<bool>,
+struct AtomEdit {
+    popover: Retained<NSPopover>,
+    view: Retained<NSTextView>,
+    start: Byte,
+    len: Cell<usize>,
+    original: String,
+    cancelled: Cell<bool>,
+    range_start: Byte,
+    kind: AtomKind,
+    diagram: crate::markdown::snippets::MermaidKind,
+    status: Retained<objc2_app_kit::NSTextField>,
+    scroll: Retained<NSScrollView>,
+    editor_frame: NSRect,
+    visual: Cell<bool>,
     /// Text just inserted for a new formula, removed again if the editor closes without one.
-    pub(super) inserted: Cell<Option<(usize, usize)>>,
+    inserted: Cell<Option<(Byte, Byte)>>,
     /// The document counts as edited while the editor holds changes, so quitting saves them.
-    pub(super) marked_edited: Cell<bool>,
+    marked_edited: Cell<bool>,
     /// Steps within the editor, which end with it. In the document's undo history they would point at a text that the
     /// editor mirrors into the source without a step of its own.
-    pub(super) undo: Retained<NSUndoManager>,
+    undo: Retained<NSUndoManager>,
 }
 
 #[derive(Default)]
 pub(super) struct Atoms {
-    pub(super) edit: RefCell<Option<AtomEdit>>,
+    edit: RefCell<Option<AtomEdit>>,
     /// Start of the formula or diagram whose editor just closed; the caret resting on it does not reopen it.
-    pub(super) closed: Cell<Option<usize>>,
+    closed: Cell<Option<Byte>>,
+}
+
+impl Atoms {
+    /// Whether the caret resting on the formula starting at `start` opens its editor.
+    fn opens_at(&self, start: Byte) -> bool {
+        self.closed.get() != Some(start)
+    }
+
+    fn forget_closed(&self) {
+        self.closed.set(None);
+    }
+}
+
+pub(super) struct AtomEditor<'a> {
+    host: &'a EditorController,
+    state: &'a Atoms,
+}
+
+impl EditorController {
+    pub(super) fn atom_editor(&self) -> AtomEditor<'_> {
+        AtomEditor {
+            host: self,
+            state: &self.ivars().atoms,
+        }
+    }
 }
 
 impl AtomKind {
-    pub fn undo_name(self) -> &'static str {
+    fn undo_name(self) -> &'static str {
         match self {
             AtomKind::Formula { .. } => t("Formel bearbeiten"),
             AtomKind::Diagram(_) => t("Diagramm bearbeiten"),
@@ -266,22 +295,73 @@ fn mode_switch(target: &AnyObject, visual: bool, width: f64, mtm: MainThreadMark
     mode
 }
 
-impl EditorController {
-    pub(super) fn open_atom_editor(&self, range: Range<usize>, frame: Option<NSRect>) {
-        if self.ivars().atoms.edit.borrow().is_some() {
+#[cfg(feature = "selftest")]
+impl AtomEditor<'_> {
+    pub(super) fn is_open(&self) -> bool {
+        self.state.edit.borrow().is_some()
+    }
+
+    pub(super) fn code_view(&self) -> Option<Retained<NSTextView>> {
+        self.state.edit.borrow().as_ref().map(|e| e.view.clone())
+    }
+
+    pub(super) fn open_popover(&self) -> Option<Retained<NSPopover>> {
+        self.state.edit.borrow().as_ref().map(|e| e.popover.clone())
+    }
+
+    pub(super) fn status_text(&self) -> Option<String> {
+        self.state
+            .edit
+            .borrow()
+            .as_ref()
+            .map(|e| e.status.stringValue().to_string())
+    }
+
+    pub(super) fn mark_cancelled(&self) {
+        if let Some(edit) = self.state.edit.borrow().as_ref() {
+            edit.cancelled.set(true);
+        }
+    }
+}
+
+impl AtomEditor<'_> {
+    /// The undo history of the editor's code view; every other view has the document's.
+    pub(super) fn undo_manager_of(&self, view: &NSTextView) -> Option<Retained<NSUndoManager>> {
+        match self.state.edit.borrow().as_ref() {
+            Some(edit) if std::ptr::eq(&*edit.view, view) => Some(edit.undo.clone()),
+            _ => None,
+        }
+    }
+
+    pub(super) fn cell_clicked(&self, view: &NSTextView, frame: NSRect, index: usize) {
+        if self.host.panes().is_preview(Some(view)) {
+            self.edit_at_preview(crate::markdown::text::Shown::new(index), Some(frame));
+        }
+    }
+
+    pub(super) fn popover_closed(&self, object: Option<&AnyObject>) {
+        let current = self.state.edit.borrow().as_ref().map(|e| e.popover.clone());
+        if let (Some(current), Some(object)) = (current, object)
+            && std::ptr::eq(&*current as &AnyObject, object)
+        {
+            self.editor_closed();
+        }
+    }
+
+    pub(super) fn open(&self, range: Range<Byte>, frame: Option<NSRect>) {
+        if self.state.edit.borrow().is_some() {
             return;
         }
-        let mtm = self.mtm();
-        let (content, kind, original, source_at) = {
-            let snap = self.snapshot();
-            let (content, kind) = self.atom_content(&snap.text, &range);
+        let mtm = self.host.mtm();
+        let (content, kind, original, source_at) = self.host.with_text(|snap, st| {
+            let (content, kind) = atom_content(st, &snap.text, &range);
             (
                 content.clone(),
                 kind,
-                snap.text[content].to_string(),
+                snap.text.at(content).to_string(),
                 snap.u16_at(range.start),
             )
-        };
+        });
         let width = 560.0;
         let editor_height = if matches!(kind, AtomKind::Diagram(_)) {
             220.0
@@ -291,7 +371,7 @@ impl EditorController {
         let size = NSSize::new(width, 30.0 + editor_height + 26.0);
         let root = NSView::initWithFrame(NSView::alloc(mtm), NSRect::new(NSPoint::new(0.0, 0.0), size));
 
-        let target: &AnyObject = self;
+        let target: &AnyObject = self.host;
         let mut row = Row {
             view: NSView::initWithFrame(
                 NSView::alloc(mtm),
@@ -313,7 +393,7 @@ impl EditorController {
         root.addSubview(&row.view);
 
         let editor_frame = NSRect::new(NSPoint::new(0.0, 26.0), NSSize::new(width, editor_height));
-        let (scroll, view) = self.atom_code_view(editor_frame, &original, kind);
+        let (scroll, view) = self.code_view_in_scroll_view(editor_frame, &original, kind);
         root.addSubview(&scroll);
 
         let status = NSTextField::labelWithString(&ns(""), mtm);
@@ -331,14 +411,14 @@ impl EditorController {
             root.addSubview(&mode);
         }
 
-        let popover = self.atom_popover(&root, size);
+        let popover = self.popover(&root, size);
 
-        let (anchor_view, rect) = self.atom_anchor(range.start, source_at, frame);
-        *self.ivars().atoms.edit.borrow_mut() = Some(AtomEdit {
+        let (anchor_view, rect) = self.anchor(range.start, source_at, frame);
+        *self.state.edit.borrow_mut() = Some(AtomEdit {
             popover: popover.clone(),
             view: view.clone(),
             start: content.start,
-            len: Cell::new(content.len()),
+            len: Cell::new(units(&content)),
             original,
             cancelled: Cell::new(false),
             range_start: range.start,
@@ -352,15 +432,16 @@ impl EditorController {
             marked_edited: Cell::new(false),
             undo: NSUndoManager::new(mtm),
         });
-        self.color_atom_code();
-        self.refresh_atom_status();
+        self.color_code();
+        self.show_status();
         popover.showRelativeToRect_ofView_preferredEdge(rect, anchor_view, NSRectEdge::MaxY);
         #[cfg(feature = "selftest")]
         let kept_for_checks = super::selftest::keeps_unshown_editor();
         #[cfg(not(feature = "selftest"))]
         let kept_for_checks = false;
         if !popover.isShown() && !kept_for_checks {
-            self.ivars().atoms.edit.borrow_mut().take();
+            let never_shown = self.state.edit.borrow_mut().take();
+            drop(never_shown);
             return;
         }
         if let Some(w) = view.window() {
@@ -369,48 +450,51 @@ impl EditorController {
         // SAFETY: Select All accepts a missing sender.
         unsafe { view.selectAll(None) };
         if visual {
-            self.set_atom_visual(true);
+            self.set_visual(true);
         }
     }
 
-    fn atom_popover(&self, root: &NSView, size: NSSize) -> Retained<NSPopover> {
-        let mtm = self.mtm();
+    fn popover(&self, root: &NSView, size: NSSize) -> Retained<NSPopover> {
+        let mtm = self.host.mtm();
         let controller = NSViewController::new(mtm);
         controller.setView(root);
         let popover = NSPopover::new(mtm);
         popover.setBehavior(NSPopoverBehavior::Transient);
         popover.setContentViewController(Some(&controller));
         popover.setContentSize(size);
-        popover.setDelegate(Some(ProtocolObject::from_ref(self)));
+        popover.setDelegate(Some(ProtocolObject::from_ref(self.host)));
         popover
     }
 
     /// Where the popover points: at a given frame, or at the formula in whichever view shows it.
-    fn atom_anchor(&self, start: usize, source_at: U16, frame: Option<NSRect>) -> (&NSTextView, NSRect) {
+    fn anchor(&self, start: Byte, source_at: U16, frame: Option<NSRect>) -> (&NSTextView, NSRect) {
+        let panes = self.host.panes();
+        let views = panes.for_appkit();
         if let Some(frame) = frame {
-            return (self.preview(), frame);
+            return (views.preview, frame);
         }
-        if self.preview_visible() {
-            let st = self.ivars().state.borrow();
-            let p = preview_offset(st.layout(), st.index(), start);
-            drop(st);
+        if panes.preview_visible() {
+            let p = self
+                .host
+                .model()
+                .read(move |st| preview_offset(st.layout(), st.index(), start));
             // NSPopover refuses to appear at a spot that is scrolled out of view.
-            self.preview().scrollRangeToVisible(NSRange::new(p.0, 1));
-            (self.preview(), char_rect(self.preview(), p.0))
+            views.preview.scrollRangeToVisible(NSRange::new(p.get(), 1));
+            (views.preview, panes.preview().char_rect(p.get()))
         } else {
-            self.source().scrollRangeToVisible(NSRange::new(source_at.0, 1));
-            (self.source(), char_rect(self.source(), source_at.0))
+            views.source.scrollRangeToVisible(NSRange::new(source_at.get(), 1));
+            (views.source, panes.source().char_rect(source_at.get()))
         }
     }
 
     /// The text view for a formula's or diagram's code, in its scroll view.
-    fn atom_code_view(
+    fn code_view_in_scroll_view(
         &self,
         editor_frame: NSRect,
         original: &str,
         kind: AtomKind,
     ) -> (Retained<NSScrollView>, Retained<NSTextView>) {
-        let mtm = self.mtm();
+        let mtm = self.host.mtm();
         let scroll = NSScrollView::initWithFrame(NSScrollView::alloc(mtm), editor_frame);
         scroll.setHasVerticalScroller(true);
         scroll.setDrawsBackground(false);
@@ -438,15 +522,15 @@ impl EditorController {
         } else {
             t("LaTeX-Formel")
         })));
-        view.setDelegate(Some(ProtocolObject::from_ref(self)));
+        view.setDelegate(Some(ProtocolObject::from_ref(self.host)));
         scroll.setDocumentView(Some(&view));
         (scroll, view)
     }
 
     /// Switches a formula popover between the visual editor and the LaTeX code.
-    pub(super) fn set_atom_visual(&self, visual: bool) {
+    pub(super) fn set_visual(&self, visual: bool) {
         let (root, frame, scroll, latex, view) = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             let Some(e) = edit.as_ref() else { return };
             if !matches!(e.kind, AtomKind::Formula { .. }) {
                 return;
@@ -461,7 +545,7 @@ impl EditorController {
                 e.view.clone(),
             )
         };
-        let field = mathfield::field(self.mtm());
+        let field = mathfield::field(self.host.mtm());
         scroll.setHidden(visual);
         if visual {
             if let Some(root) = root {
@@ -472,29 +556,29 @@ impl EditorController {
                 root.addSubview(&field.web);
             }
             field.web.setHidden(false);
-            field.attach(self, &latex);
+            field.attach(self.host, &latex);
             if let Some(w) = field.web.window() {
                 w.makeFirstResponder(Some(&field.web));
             }
         } else {
-            field.detach();
+            field.detach(self.host);
             if let Some(w) = view.window() {
                 w.makeFirstResponder(Some(&view));
             }
         }
-        self.refresh_atom_status();
+        self.show_status();
     }
 
-    pub(super) fn atom_mode_changed(&self, segment: isize) {
+    pub(super) fn mode_changed(&self, segment: isize) {
         let visual = segment == 0;
         NSUserDefaults::standardUserDefaults().setBool_forKey(!visual, &ns(VISUAL_DEFAULT));
-        self.set_atom_visual(visual);
+        self.set_visual(visual);
     }
 
     /// The visual editor changed the formula: keep the code view and the document in step.
     pub(super) fn visual_formula_changed(&self, latex: &str) {
         let view = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             let Some(e) = edit.as_ref() else { return };
             e.view.clone()
         };
@@ -502,12 +586,12 @@ impl EditorController {
             return;
         }
         view.setString(&ns(latex));
-        self.atom_text_changed();
+        self.text_changed();
     }
 
-    pub(super) fn cancel_atom_edit(&self) {
+    pub(super) fn cancel(&self) {
         let popover = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             edit.as_ref().map(|e| {
                 e.cancelled.set(true);
                 e.popover.clone()
@@ -519,9 +603,9 @@ impl EditorController {
     }
 
     /// A building-block control was used; the tag says which one.
-    pub(super) fn atom_snippet(&self, tag: isize) {
+    pub(super) fn snippet(&self, tag: isize) {
         let (kind, visual, view) = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             let Some(e) = edit.as_ref() else { return };
             (e.kind, e.visual.get(), e.view.clone())
         };
@@ -531,10 +615,10 @@ impl EditorController {
             };
             let code = view.string().to_string();
             let map = Utf16Map::new(&code);
-            let caret = map.to_byte(U16(view.selectedRange().location));
-            let edit = snippets::diagram_snippet(&code, caret, *action, &today());
+            let caret = map.to_byte(U16::new(view.selectedRange().location));
+            let edit = snippets::diagram_snippet(&code, caret.get(), *action, &today());
             let select = edit.range.start + edit.select.start..edit.range.start + edit.select.end;
-            replace_in_view(&view, &edit.range, &edit.text, Some(select));
+            replace_in_view(&view, &bytes(edit.range), &edit.text, Some(bytes(select)));
             return;
         }
         let template = if tag >= RELATION_TAG {
@@ -553,14 +637,14 @@ impl EditorController {
             return;
         }
         if visual {
-            mathfield::field(self.mtm()).insert(&snippets::mathlive_template(template));
+            mathfield::field(self.host.mtm()).insert(&snippets::mathlive_template(template));
             return;
         }
         let code = view.string().to_string();
         let map = Utf16Map::new(&code);
         let sel = from_nsrange(view.selectedRange());
         let sel = map.to_byte(sel.start)..map.to_byte(sel.end);
-        let (text, next) = snippets::formula_insert(template, &code[sel.clone()]);
+        let (text, next) = snippets::formula_insert(template, code.at(sel.clone()));
         let select = match next {
             Some(p) => sel.start + p.start..sel.start + p.end,
             None => sel.start + text.len()..sel.start + text.len(),
@@ -569,9 +653,9 @@ impl EditorController {
     }
 
     /// Tab and Shift-Tab in the formula code jump between placeholders.
-    pub(super) fn atom_tab(&self, backwards: bool) -> bool {
+    pub(super) fn tab(&self, backwards: bool) -> bool {
         let view = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             match edit.as_ref() {
                 Some(e) if matches!(e.kind, AtomKind::Formula { .. }) => e.view.clone(),
                 _ => return false,
@@ -581,17 +665,17 @@ impl EditorController {
         let map = Utf16Map::new(&code);
         let sel = from_nsrange(view.selectedRange());
         let from = map.to_byte(if backwards { sel.start } else { sel.end });
-        let Some(next) = snippets::next_placeholder(&code, from, backwards) else {
+        let Some(next) = snippets::next_placeholder(&code, from.get(), backwards) else {
             return false;
         };
-        view.setSelectedRange(byte_range_to_ns(&map, &next));
+        view.setSelectedRange(byte_range_to_ns(&map, &bytes(next)));
         true
     }
 
     /// Colors the TeX or Mermaid code in the popover. Attribute changes stay out of the undo history.
-    pub(super) fn color_atom_code(&self) {
+    pub(super) fn color_code(&self) {
         let (view, lang) = {
-            let edit = self.ivars().atoms.edit.borrow();
+            let edit = self.state.edit.borrow();
             let Some(e) = edit.as_ref() else { return };
             (
                 e.view.clone(),
@@ -616,17 +700,16 @@ impl EditorController {
             add_attribute(
                 &store,
                 &Attribute::foreground(&token_color(token.into())),
-                byte_range_to_ns(&map, &range),
+                byte_range_to_ns(&map, &bytes(range)),
             );
         }
         store.endEditing();
     }
 
     /// Shows the MathJax or Mermaid error for the current code, or a hint when there is none.
-    pub(super) fn refresh_atom_status(&self) {
+    pub(super) fn show_status(&self) {
         let Some((status, kind, diagram, visual)) = self
-            .ivars()
-            .atoms
+            .state
             .edit
             .borrow()
             .as_ref()
@@ -634,7 +717,7 @@ impl EditorController {
         else {
             return;
         };
-        let outcome = self.atom_key().and_then(|k| js::outcome(&k));
+        let outcome = self.render_key().and_then(|k| js::outcome(&k));
         let (message, error) = match outcome {
             Some(Err(e)) => (format!("⚠︎ {}", e.lines().next().unwrap_or("")), true),
             _ => {
@@ -659,11 +742,12 @@ impl EditorController {
     }
 
     /// Render key of the formula or diagram being edited, as the preview requests it.
-    fn atom_key(&self) -> Option<js::Key> {
-        let start = self.ivars().atoms.edit.borrow().as_ref()?.start;
-        let dark = self.is_dark();
-        let st = self.ivars().state.borrow();
-        figure_at(st.doc(), start).map(|(_, figure)| render_key(&figure, dark))
+    fn render_key(&self) -> Option<js::Key> {
+        let start = self.state.edit.borrow().as_ref()?.start;
+        let dark = self.host.is_dark();
+        self.host
+            .model()
+            .read(move |st| figure_at(st.doc(), start).map(|(_, figure)| render_key(&figure, dark)))
     }
 }
 
@@ -672,7 +756,7 @@ fn code_font() -> Retained<NSFont> {
 }
 
 /// Replaces a byte range of the popover code like typing would, so it lands in the popover's undo history.
-fn replace_in_view(view: &NSTextView, range: &Range<usize>, text: &str, select: Option<Range<usize>>) {
+fn replace_in_view(view: &NSTextView, range: &Range<Byte>, text: &str, select: Option<Range<Byte>>) {
     let code = view.string().to_string();
     let map = Utf16Map::new(&code);
     if let Some(w) = view.window() {
@@ -682,7 +766,7 @@ fn replace_in_view(view: &NSTextView, range: &Range<usize>, text: &str, select: 
     if let Some(select) = select {
         let new = view.string().to_string();
         let new_map = Utf16Map::new(&new);
-        if select.end <= new.len() {
+        if select.end <= new.end() {
             view.setSelectedRange(byte_range_to_ns(&new_map, &select));
         }
     }
@@ -691,4 +775,20 @@ fn replace_in_view(view: &NSTextView, range: &Range<usize>, text: &str, select: 
 /// Today's date as `YYYY-MM-DD` in the user's time zone, for new Gantt tasks.
 fn today() -> String {
     crate::util::now("yyyy-MM-dd")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_caret_resting_on_a_closed_editor_opens_it_only_after_leaving() {
+        let atoms = Atoms::default();
+        assert!(atoms.opens_at(Byte::new(3)));
+        atoms.closed.set(Some(Byte::new(3)));
+        assert!(!atoms.opens_at(Byte::new(3)));
+        assert!(atoms.opens_at(Byte::new(9)), "another formula opens right away");
+        atoms.forget_closed();
+        assert!(atoms.opens_at(Byte::new(3)));
+    }
 }

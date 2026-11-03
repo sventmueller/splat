@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Desa primer el document";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Les imatges enganxades es desen com a fitxers al costat del document. Desa’l i torna a enganxar la imatge.";
 "Export fehlgeschlagen" = "No s’ha pogut exportar";
+"Das Dokument ließ sich nicht umwandeln." = "No s’ha pogut convertir el document.";
+"Das Dokument ist zu groß für eine Word-Datei." = "El document és massa gran per a un fitxer Word.";
 "Gliederung ausblenden" = "Oculta l’esquema";
 "Gliederung einblenden" = "Mostra l’esquema";
 "Metadaten" = "Metadades";

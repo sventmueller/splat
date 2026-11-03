@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "पहले दस्तावेज़ सहेजें";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "पेस्ट की गई इमेज दस्तावेज़ के पास फ़ाइल के रूप में रखी जाती हैं। दस्तावेज़ सहेजें, फिर इमेज को दोबारा पेस्ट करें।";
 "Export fehlgeschlagen" = "एक्सपोर्ट विफल";
+"Das Dokument ließ sich nicht umwandeln." = "दस्तावेज़ को रूपांतरित नहीं किया जा सका।";
+"Das Dokument ist zu groß für eine Word-Datei." = "दस्तावेज़ Word फ़ाइल के लिए बहुत बड़ा है।";
 "Gliederung ausblenden" = "आउटलाइन छिपाएँ";
 "Gliederung einblenden" = "आउटलाइन दिखाएँ";
 "Metadaten" = "मेटाडेटा";

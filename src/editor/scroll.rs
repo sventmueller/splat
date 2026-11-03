@@ -3,17 +3,18 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use objc2::DefinedClass;
 use objc2::rc::Retained;
-use objc2::runtime::ProtocolObject;
+use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::{DefinedClass, sel};
 use objc2_app_kit::{
     NSTextContentManager, NSTextElementProvider, NSTextLayoutManager, NSTextLayoutManagerSegmentOptions,
     NSTextLayoutManagerSegmentType, NSTextLocation, NSTextRange, NSTextView,
 };
-use objc2_foundation::{NSPoint, NSRange, NSRect, NSSize};
+use objc2_foundation::{NSNotification, NSPoint, NSRange, NSRect, NSSize};
 
-use super::{EditorController, Raised};
-use crate::util::{layout_manager, storage};
+use super::EditorController;
+use super::panes::with_raised;
+use crate::util::{layout_manager, perform_later, storage};
 
 #[derive(Clone, Copy)]
 pub(super) struct ScrollSpan {
@@ -21,50 +22,128 @@ pub(super) struct ScrollSpan {
     preview: (usize, usize),
 }
 
-impl EditorController {
-    /// `None` while the state is in use: layout queries made then can resize a view and post a scroll.
-    pub(super) fn scroll_spans(&self) -> Option<Rc<Vec<ScrollSpan>>> {
-        let mut st = self.ivars().state.try_borrow_mut().ok()?;
-        if let Some(spans) = st.scroll_spans() {
-            return Some(spans);
+#[derive(Default)]
+pub(super) struct ScrollState {
+    /// Raised while the sync measures and scrolls; the bounds changes that causes are its own.
+    syncing: Cell<bool>,
+    /// Which view the last scroll was in, for the other one to follow.
+    scrolled_preview: Cell<bool>,
+    after_undo: Cell<bool>,
+}
+
+impl ScrollState {
+    /// A view scrolled: whether the other one has to follow, which the sync's own scrolling never asks for.
+    fn view_scrolled(&self, from_preview: bool) -> bool {
+        if self.syncing.get() {
+            return false;
         }
-        let mut cursor = crate::markdown::text::Utf16Cursor::new(st.text());
-        // Footnote definitions comrak moved behind the text keep no place in the source order.
-        let spans: Vec<ScrollSpan> = st
-            .layout()
-            .blocks
-            .iter()
-            .take(st.index().in_order)
-            .zip(&st.index().block_starts)
-            .map(|(b, &p)| {
-                let s0 = cursor.at(b.src.start);
-                let s1 = cursor.at(b.src.end.max(b.src.start));
-                ScrollSpan {
-                    source: (s0, s1),
-                    preview: (p.0, p.0 + b.len_u16),
-                }
-            })
-            .collect();
-        let spans = Rc::new(spans);
-        st.remember_scroll_spans(spans.clone());
-        Some(spans)
+        self.scrolled_preview.set(from_preview);
+        true
+    }
+
+    fn take_after_undo(&self) -> bool {
+        self.after_undo.replace(false)
+    }
+}
+
+pub(super) struct ScrollSync<'a> {
+    host: &'a EditorController,
+    state: &'a ScrollState,
+}
+
+impl EditorController {
+    pub(super) fn scroll_sync(&self) -> ScrollSync<'_> {
+        ScrollSync {
+            host: self,
+            state: &self.ivars().scroll,
+        }
+    }
+}
+
+impl ScrollSync<'_> {
+    /// An undo or redo moves the selection, and the next update brings it into view.
+    pub(super) fn undo_happened(&self) {
+        self.state.after_undo.set(true);
+    }
+
+    pub(super) fn take_undo_happened(&self) -> bool {
+        self.state.take_after_undo()
+    }
+
+    /// One of the views scrolled.
+    pub(super) fn view_scrolled(&self, notification: &NSNotification) {
+        let preview_clip = self
+            .host
+            .panes()
+            .preview()
+            .enclosing_scroll_view()
+            .map(|s| s.contentView());
+        let from_preview = preview_clip
+            .zip(notification.object())
+            .is_some_and(|(c, o)| std::ptr::eq(&*c as &AnyObject, &*o));
+        // Rendered blocks have other heights than their placeholders, so the sync measures after rendering.
+        if from_preview {
+            self.host.progressive().render_visible_blocks();
+        }
+        // Not from here: the scroll may be AppKit's own, from a block it runs when layout is done, and laying out the view
+        // again inside it frees that block while it runs.
+        if self.state.view_scrolled(from_preview) {
+            perform_later(self.host, sel!(syncScroll), 0.0, true);
+        }
+        if self.host.model().read(|st| st.blocks().pending()) {
+            self.host.progressive().schedule_pending_blocks();
+        }
+    }
+
+    pub(super) fn scroll_spans(&self) -> Rc<Vec<ScrollSpan>> {
+        self.host.model().change(|st| {
+            if let Some(spans) = st.scroll_spans() {
+                return spans;
+            }
+            let mut cursor = crate::markdown::text::Utf16Cursor::new(st.text());
+            // Footnote definitions comrak moved behind the text keep no place in the source order.
+            let spans: Vec<ScrollSpan> = st
+                .layout()
+                .blocks
+                .iter()
+                .take(st.index().in_order)
+                .zip(&st.index().block_starts)
+                .map(|(b, &p)| {
+                    let s0 = cursor.at(b.src.start);
+                    let s1 = cursor.at(b.src.end.max(b.src.start));
+                    ScrollSpan {
+                        source: (s0.get(), s1.get()),
+                        preview: (p.get(), p.get() + b.len_u16),
+                    }
+                })
+                .collect();
+            let spans = Rc::new(spans);
+            st.remember_scroll_spans(spans.clone());
+            spans
+        })
     }
 
     pub(super) fn sync_scroll(&self) {
-        if self.ivars().scrolling.get() || self.ivars().busy.get() || !self.preview_visible() {
+        let panes = self.host.panes();
+        if self.state.syncing.get() || panes.is_silent() || !panes.preview_visible() {
             return;
         }
-        let from_source = !self.ivars().scrolled_preview.get();
+        let from_source = !self.state.scrolled_preview.get();
+        let views = panes.for_appkit();
         let (from, to): (&NSTextView, &NSTextView) = if from_source {
-            (self.source(), self.preview())
+            (views.source, views.preview)
         } else {
-            (self.preview(), self.source())
+            (views.preview, views.source)
         };
-        let Some(spans) = self.scroll_spans().filter(|s| !s.is_empty()) else {
+        let spans = self.scroll_spans();
+        if spans.is_empty() {
             return;
-        };
+        }
         // Asking either view for positions can lay it out and resize it, which posts another bounds change.
-        let _scrolling = Raised::new(&self.ivars().scrolling);
+        with_raised(&self.state.syncing, || self.follow(from, to, from_source, &spans));
+    }
+
+    fn follow(&self, from: &NSTextView, to: &NSTextView, from_source: bool, spans: &[ScrollSpan]) {
         let side = |s: &ScrollSpan, from_side: bool| if from_side == from_source { s.source } else { s.preview };
         // Only positions near the visible part are cheap: elsewhere both TextKit versions have to lay out first.
         let Some(offset) = top_offset(from) else {
@@ -86,7 +165,9 @@ impl EditorController {
         };
         if from_source {
             let len = spans.len();
-            self.render_blocks(i.saturating_sub(2)..(i + 40).min(len), i, None);
+            self.host
+                .progressive()
+                .render_blocks(i.saturating_sub(2)..(i + 40).min(len), i, None);
         }
         let t0 = reach(to, side(&spans[i], false).0).unwrap_or_else(|| char_top(to, side(&spans[i], false).0));
         let t1 = spans.get(i + 1).map_or_else(
@@ -267,4 +348,52 @@ fn segment_rect(tlm: &NSTextLayoutManager, index: usize) -> Option<NSRect> {
         &block,
     );
     found.get()
+}
+
+#[cfg(feature = "selftest")]
+impl ScrollSync<'_> {
+    /// Keeps the sync still while a measurement scrolls the views itself.
+    pub(super) fn hold(&self, held: bool) {
+        self.state.syncing.set(held);
+    }
+
+    pub(super) fn follow_source_next(&self) {
+        self.state.scrolled_preview.set(false);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_other_view_follows_the_view_that_scrolled_last() {
+        let state = ScrollState::default();
+        assert!(state.view_scrolled(true));
+        assert!(state.scrolled_preview.get());
+        assert!(state.view_scrolled(false));
+        assert!(!state.scrolled_preview.get());
+    }
+
+    #[test]
+    fn the_syncs_own_scrolling_neither_asks_for_a_sync_nor_turns_it_around() {
+        let state = ScrollState::default();
+        assert!(state.view_scrolled(true));
+        let asked = with_raised(&state.syncing, || state.view_scrolled(false));
+        assert!(!asked);
+        assert!(state.scrolled_preview.get(), "the preview still leads");
+        assert!(
+            state.view_scrolled(false),
+            "and once the sync is over, a scroll counts again"
+        );
+    }
+
+    #[test]
+    fn an_undo_brings_the_selection_into_view_once() {
+        let state = ScrollState::default();
+        assert!(!state.take_after_undo());
+        state.after_undo.set(true);
+        assert!(state.take_after_undo());
+        assert!(!state.take_after_undo());
+    }
 }

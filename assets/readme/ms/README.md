@@ -565,6 +565,7 @@ Prasyarat:
 
 - macOS dengan Command Line Tools (`xcode-select --install`). Xcode tidak diperlukan; Splat dibina tanpa `actool`, `ibtool` dan `metal`.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) menamakan versi tepat yang digunakan CI; rustup memasangnya sendiri, Rust Homebrew mengabaikan fail itu. Menaikkannya di sana ialah cara amaran pengkompil dan clippy baharu sampai ke projek.
+- rustup, untuk `make lint`, `make check` dan `make universal`: `cargo xtask check-library` membina pustaka untuk Linux bagi menunjukkan bahawa ia tidak memerlukan macOS, dan Rust Homebrew tidak mempunyai sasaran lain.
 
 [Makefile](../../../Makefile) menyimpan titik masuk ringkas; `make help` menyenaraikan kesemuanya:
 
@@ -621,21 +622,24 @@ App di dalamnya membawa tandatangan yang berbeza daripada binaan setempat, jadi 
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | carian rawak yang lebih panjang; `SPLAT_FUZZ_SEED` mengubah input |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | satu bahasa, semasa yang lain belum lengkap |
 | `cargo clippy --release --all-targets [--features selftest]` | lint, termasuk justifikasi setiap blok `unsafe`, panjang fungsi dan, dalam pustaka, penukaran nombor |
+| `cargo xtask check-library` | pustaka boleh dibina untuk Linux, jadi tiada apa-apa di dalamnya memerlukan macOS |
 | `cargo xtask vendor check` | pustaka JavaScript sepadan dengan `vendor.lock` bait demi bait |
-| `cargo xtask selftest probe` | tanpa tetingkap, masing-masing dengan keputusan yang dijangka: formula, rajah, imej web terhadap pelayan di dalam proses, alamat yang disekat, pertahanan paparan web |
+| `cargo xtask selftest probe` | tanpa tetingkap, masing-masing dengan keputusan yang dijangka: formula, rajah, imej web terhadap pelayan di dalam proses, alamat yang disekat, teks yang ditulis oleh setiap arahan, setiap format imej melalui kedua-dua eksport, halaman yang berhenti menjawab, dan pertahanan paparan web terhadap halaman tanpanya. Mengambil masa kira-kira setengah minit. Apa yang memerlukan app di hadapan skrin dilangkau pada skrin yang dikunci |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | app yang berjalan, klik demi klik. Membuka tetingkap dan menaip di dalamnya; Mac sibuk selama kira-kira empat minit. `--scenarios` hanya menjalankan bahagian kedua, dalam kira-kira satu setengah minit |
 | `cargo xtask selftest resize` | melebarkan tetingkap selepas menggerakkan pembahagi: sumber dibungkus semula semasa tetingkap diubah saiz. Mengambil masa kira-kira sepuluh saat |
 | `cargo xtask selftest bench <file.md>` | masa untuk membuka, menaip dan menggulung fail besar |
-| `cargo test --release -- --ignored partial_updates` | satu ketukan kekunci dalam 10 MB: kemas kini separa berbanding penuh, keputusan dan had masa |
-| `cargo test --release --test hostile` | dokumen yang dibina untuk melimpahkan tindanan atau mengambil masa kuadratik, melalui penghuraian, susun atur, kedua-dua eksport, ketukan kekunci dan arahan |
+| `cargo test --release -- --ignored partial_updates` | satu ketukan kekunci dalam 10 MB: kemas kini separa berbanding penuh, keputusan yang sama dalam suku masa paling lama |
+| `cargo test --release --test hostile` | dokumen yang dibina untuk melimpahkan tindanan atau mengambil masa kuadratik, masing-masing dalam dua saiz yang masanya mesti bertambah seperti teks, melalui penghuraian, susun atur, kedua-dua eksport, ketukan kekunci dan arahan |
 | `make mutants` | kesalahan dibina ke dalam `src/markdown/` dan `src/preview/` satu demi satu, melalui [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); menyatakan yang mana tiada ujian menyedarinya. Mengambil masa berjam-jam; `FILE=src/preview/bridge.rs` mengecilkan skop |
 | `cargo test --release --test decoder` | proses penyahkod menyahkod imej dan tidak mencapai fail mahupun rangkaian |
 | `make coverage` | liputan baris `cargo test` dan semua ujian kendiri, melalui [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); gagal di bawah paras minimum. Menduduki Mac selama kira-kira lima minit |
-| `make coverage-library` | paras minimum untuk `src/markdown/`, `src/preview/` dan `i18n.rs`, diukur oleh `cargo test` sahaja |
+| `make coverage-library` | `src/markdown/`, `src/preview/` dan `i18n.rs` terhadap paras minimum yang lebih tinggi, diukur oleh `cargo test` sahaja |
 
-Ujian unit terletak di sebelah kod yang diujinya. `tests/` menyimpan apa yang mencapai pustaka dari luar: ujian rawak dalam `robustness.rs`, yang berkongsi penjana dalam `src/fuzz.rs` dengan ujian `sync.rs`, dokumen yang dibina untuk mencederakan dalam `hostile.rs`, dan ujian penyahkod, yang memulakan program yang dibina. Keputusan dalam `src/editor/` yang tidak memerlukan tetingkap terletak dalam fungsi bebas dengan ujian tersendiri: segala yang diketahui pengawal dan cara ia berubah dalam `state.rs`, peraturan pemaparan dalam `render_queue.rs`, salinan teks dalam `sync.rs`. Langkah ujian kendiri tetingkap yang menunggu dengan sia-sia menggagalkan larian. Ujian kendiri tetingkap menjalankan bahagian kedua selepas klik-lalu utamanya, dalam `src/editor/selftest/scenarios.rs`: setiap arahan pemformatan dan jadual, dialog, klik pautan, menampal, melepas, eksport, perubahan besar, imej yang berubah pada cakera, tekanan memori, dokumen yang sangat besar dan pemulihan selepas ranap.
+Ujian unit terletak di sebelah kod yang diujinya. `tests/` menyimpan apa yang mencapai pustaka dari luar: ujian rawak dalam `robustness.rs`, yang berkongsi penjana dalam `src/fuzz.rs` dengan ujian `sync.rs`, dokumen yang dibina untuk mencederakan dalam `hostile.rs`, dan ujian penyahkod, yang memulakan program yang dibina. Keputusan dalam `src/editor/` yang tidak memerlukan tetingkap terletak dalam fungsi bebas dengan ujian tersendiri: segala yang diketahui pengawal dan cara ia berubah dalam `state.rs`, peraturan pemaparan dalam `render_queue.rs`, salinan teks dalam `sync.rs`, gaya perenggan, fon dan warna sebagai nilai dalam `render.rs`, maksud pengecam bar alat dalam `toolbar.rs`, maksud klik pada pautan dalam `navigation.rs`.
 
-Liputan mempunyai dua paras minimum: setiap modul sekurang-kurangnya 80 % barisnya, semua modul bersama sekurang-kurangnya 85 %. `make coverage` mengukur `cargo test` bersama ujian kendiri dan gagal di bawah mana-mana satu; paras minimum dan beberapa pengecualian, seperti cangkuk panik dalam `main.rs` yang hanya berjalan semasa ranap, terdapat dalam [xtask](../../../xtask/src/coverage.rs) di sebelah sebabnya. Binaan yang diukur masuk ke `target/coverage/`, jadi kod pengukuran tidak pernah sampai ke `target/release/` atau imej cakera. Pembantu penyahkod membuka fail pengukurannya sebelum ia mengunci dirinya, jadi ia diukur juga.
+Langkah ujian kendiri tetingkap menunggu syarat yang bernama, bukan masa; hanya yang tidak memberi isyarat, seperti ketiadaan sesuatu, mengekalkan jeda beserta sebabnya. Menunggu dengan sia-sia ialah semakan yang gagal dan menamakan apa yang tidak pernah tiba, langkah yang panik juga semakan yang gagal, dan larian diteruskan dalam kedua-dua kes. Semakan yang tidak dapat menyatakan apa-apa dalam larian ini melaporkan `SELFTEST SKIP`: xtask menyenaraikannya, dan ia tidak lulus mahupun gagal. xtask mengikat setiap mod, dan `--scenarios` secara tersendiri, kepada kira-kira sembilan persepuluh daripada semakannya. Ujian kendiri tetingkap menjalankan bahagian kedua selepas klik-lalu utamanya, dalam `src/editor/selftest/scenarios.rs`: setiap arahan pemformatan dan jadual, dialog, klik pautan, menampal, melepas, eksport, perubahan besar, imej yang berubah pada cakera, tekanan memori, dokumen yang sangat besar dan pemulihan selepas ranap.
+
+Liputan mempunyai dua paras minimum: setiap modul sekurang-kurangnya 84 % barisnya, semua modul bersama sekurang-kurangnya 96 %. `make coverage` mengukur `cargo test` bersama ujian kendiri dan gagal di bawah mana-mana satu; `make coverage-library` mengekalkan apa yang tidak memerlukan tetingkap pada 90 % dan 97 %. Paras minimum dan beberapa pengecualian, seperti cangkuk panik dalam `main.rs` yang hanya berjalan semasa ranap, terdapat dalam [xtask](../../../xtask/src/coverage.rs) di sebelah sebabnya. Binaan yang diukur masuk ke `target/coverage/`, jadi kod pengukuran tidak pernah sampai ke `target/release/` atau imej cakera. Pembantu penyahkod membuka fail pengukurannya sebelum ia mengunci dirinya, jadi ia diukur juga.
 
 CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) menjalankan `make check`, `make coverage-library` dan binaan universal pada Apple Silicon serta `cargo test` pada Intel untuk setiap push ke `main` dan setiap pull request. Setiap malam, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) menjalankan `make test-long` dengan input rawak baharu. Ujian kendiri dan imej cakera kekal pada Mac pembangun: ia memerlukan skrin dan sijil penandatanganan dalam keychain.
 
@@ -643,36 +647,39 @@ Output ujian kendiri masuk ke `target/selftest/`. Ujian kendiri membina app bera
 
 ### Susun atur projek
 
-`src/lib.rs` menjadikan segala yang tidak memerlukan tetingkap sebuah pustaka tersendiri, `splat`: `markdown/`, `preview/`, `i18n.rs` dan penjana ujian `fuzz.rs`. App dalam `src/main.rs` dibina di atasnya.
+`src/lib.rs` menjadikan segala yang tidak memerlukan tetingkap sebuah pustaka tersendiri, `splat`: `markdown/`, `preview/`, `i18n.rs` dan penjana ujian `fuzz.rs`. Ia dibina tanpa macOS. App dalam `src/main.rs` dibina di atasnya.
 
-- `src/markdown/`: pengikatan penghurai (comrak), warna sintaks, dan semua arahan sebagai suntingan teks tulen (`Edit`). Juga penghuraian semula selepas suntingan (`incremental.rs`), pembaca untuk HTML terbenam (`markup.rs`), tipografi, teg, rujukan dan petikan dalam teks berjalan (`typography.rs`), rupa teks dan Markdown serta HTML yang menjadikannya begitu (`style.rs`), apa yang boleh menjadi alamat (`url.rs`), serta eksport HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Pratonton dan kedua-dua eksport semuanya membaca pepohon yang sama, `Doc`. Tiada AppKit.
-- `src/preview/`: susun atur pratonton, HTML terbenam di dalamnya (`layout/html.rs`), dan pemetaan antara pratonton dan sumber (`Bridge`, `Index`). Tiada AppKit.
-- `src/editor/`: tetingkap. Satu objek `EditorController` melayani AppKit sebagai delegasi kedua-dua paparan; kerjanya dibahagikan mengikut tanggungjawab:
+- `src/markdown/`: pepohon yang dibaca setiap pengguna, `Doc` dalam `doc/`, yang memiliki teksnya sendiri, dan satu-satunya pengikatan kepada penghurai dalam `reader/`: comrak tidak dinamakan di tempat lain, dan `reader/assumptions.rs` memuatkan apa yang diandaikan kod tentangnya. Warna sintaks, dan semua arahan sebagai suntingan teks tulen (`Edit`) dalam `commands/`. Juga penghuraian semula selepas suntingan (`incremental.rs`), pembaca untuk HTML terbenam (`markup.rs`), tipografi, teg, rujukan dan petikan dalam teks berjalan (`typography.rs`), rupa teks dan Markdown serta HTML yang menjadikannya begitu (`style.rs`), apa yang boleh menjadi alamat (`url.rs`), serta eksport HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Kedudukan mempunyai jenisnya sendiri: `Byte` dalam teks sumber, `U16` dalam paparan sumber, `Shown` dalam paparan pratonton (`text.rs`). Tiada AppKit.
+- `src/preview/`: susun atur pratonton dalam `layout/`, dengan HTML terbenam dalam `layout/html.rs`, dan pemetaan antara pratonton dan sumber (`Bridge`, `Index`). `Bridge` menolak susun atur daripada versi `Doc` yang lain. Tiada AppKit.
+- `src/editor/`: tetingkap. Satu objek `EditorController` melayani AppKit sebagai delegasi kedua-dua paparan dan meneruskan kepada komponen, struct kecil di atas pengawal dan keadaan yang dimilikinya, yang medannya tidak dapat dicapai modul lain:
 
 | Modul | Tanggungjawab |
 |---|---|
-| `mod.rs` | kelas, kaedah delegasi, `invalidate` |
+| `mod.rs` | kelas, kaedah delegasi yang meneruskan, `invalidate` |
+| `panes.rs` | `Panes`: paparan teks, rangka, memaparkan dan menyembunyikan anak tetingkap, dan apa yang memberi akses kepada paparan |
 | `state.rs` | apa yang diketahui pengawal tentang dokumen dan setiap cara ia berubah; medannya persendirian, dan ia tidak menyentuh paparan |
+| `model.rs` | meminjamkan keadaan dan salinan teks kepada closure yang tidak dapat mencapai paparan |
 | `actions.rs` | daftar arahan: pemilih, tajuk, pintasan, simbol, bila arahan terpakai |
-| `editing.rs` | menjalankan dan mengesahkan arahan, menaip dalam pratonton |
-| `update.rs` | menghurai, mewarnakan, mengemas kini pratonton; selepas suntingan hanya perenggan yang terjejas |
+| `editing.rs` | `Editing`: menjalankan dan mengesahkan arahan, menaip dalam pratonton |
+| `update.rs` | `Updater`: menghurai, mewarnakan, mengemas kini pratonton; selepas suntingan hanya perenggan yang terjejas |
 | `sync.rs` | salinan teks dan pengurusan blok, tanpa AppKit dan dengan ujian rawak |
-| `progressive.rs` | memaparkan pratonton besar langkah demi langkah |
-| `selection.rs`, `scroll.rs` | pilihan dan kedudukan skrol kedua-dua anak tetingkap selaras |
-| `atom.rs`, `atom_edit.rs` | penyunting formula dan rajah |
-| `navigation.rs`, `links.rs` | pautan, pautan wiki, teg, kotak semak tugas, pelipatan, nota kaki |
+| `progressive.rs` | `Progressive`: memaparkan pratonton besar langkah demi langkah |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: pilihan dan kedudukan skrol kedua-dua anak tetingkap selaras |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: penyunting formula dan rajah |
+| `navigation.rs`, `links.rs` | `Links`: pautan, pautan wiki, teg, kotak semak tugas, pelipatan, nota kaki |
 | `env.rs` | apa yang dibaca pratonton dari luar teks: tanda baca tipografi, repositori untuk `@name` dan `#12`, fail BibTeX, nota terbenam |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | teks pratonton, imej setempat dan jauh |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | teks pratonton, imej setempat dan jauh; `Pictures` dalam `images.rs` |
 | `attributes.rs` | atribut teks; setiap kunci hanya mendapat nilai jenis yang dijangkanya |
 | `shadow.rs` | salinan teks yang belum disimpan untuk pemulihan selepas ranap |
 | `decoder.rs` | proses pembantu berkotak pasir yang menyahkod imej dan grafik |
-| `export.rs`, `outline.rs` | eksport HTML dan Word; bar sisi rangka |
+| `export.rs`, `outline.rs` | `Sharing`: eksport HTML dan Word, fail kongsi, pencetakan; bar sisi rangka |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit untuk MathJax, Mermaid, Graphviz, PlantUML dan penyunting formula visual; peraturan apa yang dipaparkan bila, selain WebKit |
 | `webkit.rs` | panggilan ke dalam WebKit; hanya hayat delegasi navigasi kekal pada `js.rs` dan `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | tetingkap, bar alat, paparan teks, dialog, warna |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | membina tetingkap, bar alat, paparan teks, dialog, warna |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: bar menu, delegasi app, dokumen (`MDDocument`, subkelas `NSDocument`).
-- `src/i18n.rs` dengan `resources/*.lproj`: 35 bahasa; kuncinya ialah teks bahasa Jerman.
+- `src/i18n.rs` dengan `resources/*.lproj`: 35 bahasa; kuncinya ialah teks bahasa Jerman, dan app memasang jadual bahasa antara muka semasa bermula.
+- `src/util/`: thread pekerja (`lanes.rs`), volum yang boleh berhenti menjawab (`volumes.rs`), pembantu AppKit, fail dan proses. `src/diag.rs`: apa yang tersilap di luar penglihatan pengguna pergi ke log sistem, tanpa sebarang teks dokumen.
 - `src/large_alloc.rs`: peruntukan besar datang terus daripada kernel dan dikembalikan kepadanya apabila dibebaskan, supaya memori kembali selepas suntingan besar.
 - `resources/js/`: halaman web dan pustaka; versi dan checksum dalam [vendor.lock](../../../vendor.lock).
 - `xtask/`: pembundelan, penandatanganan, imej cakera, ikon, vendor, penjalan ujian kendiri dan paras minimum liputan.
@@ -683,21 +690,21 @@ Teks sumber dalam paparan teks kiri ialah satu-satunya sumber kebenaran.
 
 1. Setiap perubahan aksara di sana mengemas kini salinan teks (`Snapshot`) di tempatnya, tanpa membaca teks itu semula.
 2. Satu kemas kini menghuraikan salinan, mewarnakan semula sumber hanya di tempat warna berubah, menyusun atur pratonton dan menggantikan hanya blok yang kandungannya berubah.
-3. Selepas suntingan, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula, selagi jirannya kekal sama; `reparse_part_and_color` menyatakan bila ia tidak sama. Dokumen dengan blok ulasan `%%`, perubahan pada front matter dan perubahan berhampiran takrifan rujukan pautan diproses sepenuhnya. comrak mengenali rujukan nota kaki hanya dengan takrifannya dalam penghuraian yang sama dan mengalihkan takrifan ke belakang teks, jadi bahagian itu dihuraikan dengan takrifan gantian bagi setiap label dan mengambil nombornya daripada pepohon lama; perubahan pada rujukan atau takrifan dalam bahagian itu, atau di sebelah nota kaki sebaris, diproses sepenuhnya.
+3. Selepas suntingan, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula, selagi jirannya kekal sama; `reparse_part_and_color` menyatakan bila ia tidak sama. Dokumen dengan blok ulasan `%%`, perubahan pada front matter dan, dalam dokumen yang mempunyai takrifan rujukan pautan, perubahan pada bahagian yang mengandungi kurungan siku diproses sepenuhnya. comrak mengenali rujukan nota kaki hanya dengan takrifannya dalam penghuraian yang sama dan mengalihkan takrifan ke belakang teks, jadi bahagian itu dihuraikan dengan takrifan gantian bagi setiap label dan mengambil nombornya daripada pepohon lama; perubahan pada rujukan atau takrifan dalam bahagian itu, atau di sebelah nota kaki sebaris, diproses sepenuhnya.
 4. Blok HTML yang membuka `<details>` atau `<div align>` dan menutupnya kemudian menjejaskan blok Markdown di antaranya; blok yang digunakan semula mesti mempunyai persekitaran yang sama.
 5. Semasa anda menaip dalam sumber dokumen sehingga 2 MB, kemas kini separa berjalan serta-merta; apabila ia tidak terpakai, atau dalam dokumen yang lebih besar, penghuraian dan susun atur berjalan di latar belakang. Semasa anda menaip dalam pratonton, ia berjalan serta-merta, kerana kursor pratonton bergantung pada hasilnya.
 6. Input dalam pratonton diterjemahkan oleh `Bridge` menjadi suntingan sumber dan mengambil laluan yang sama selepas itu. Markdown mempunyai terlalu banyak cara untuk menukar teks menjadi sintaks bagi peraturan sahaja, jadi `preview/verify.rs` menghuraikan bahagian yang berubah sekali lagi dan membandingkan apa yang ditunjukkannya dengan apa yang ditaip; suntingan yang tidak bertahan di-escape lebih jauh atau ditolak.
-7. Kedudukan sebaris comrak tersasar di beberapa tempat, contohnya di belakang takrifan rujukan pautan. `markdown/positions.rs` menyemaknya terhadap sumber semasa membaca blok dan membacanya semula daripada sumber di tempat ia tidak sepadan.
+7. Kedudukan sebaris comrak tersasar di beberapa tempat, contohnya di belakang takrifan rujukan pautan. `markdown/reader/positions.rs` menyemaknya terhadap sumber semasa membaca blok dan membacanya semula daripada sumber di tempat ia tidak sepadan.
 
 ### Peraturan dalam pengawal
 
-1. Perubahan pengawal sendiri pada paparan berjalan di dalam `silently()`; panggil balik delegasi mengabaikannya.
-2. `state` dipinjam hanya untuk membaca dan mengira, tidak pernah merentasi panggilan yang mengubah, menyusun atur atau menggulung paparan. Ia berubah melalui kaedahnya sendiri sahaja, yang ujiannya tidak memerlukan tetingkap.
+1. Perubahan pengawal sendiri pada paparan berjalan di dalam `Panes::silently`; panggil balik delegasi mengabaikannya. Di tempat lain paparan hanya boleh dibaca, jadi pengkompil yang menyemaknya. Apa yang memang patut didengar oleh panggil balik, atau apa yang menyerahkan paparan kepada AppKit, menyatakannya dengan melalui `Panes::for_appkit`.
+2. Keadaan dipinjam hanya untuk membaca dan mengira, tidak pernah merentasi panggilan yang mengubah, menyusun atur atau menggulung paparan: `Model` meminjamkannya kepada closure `Send`, dan tiada paparan yang `Send`, jadi pengkompil yang menyemaknya. Ia berubah melalui kaedahnya sendiri sahaja, yang ujiannya tidak memerlukan tetingkap.
 3. Mesej dari luar (imej dimuatkan, formula dipaparkan) tiba tertunda melalui `renders_arrived` dan `image_arrived`, tidak pernah di tengah-tengah kemas kini.
 4. Lukisan semula tanpa perubahan teks hanya melalui `invalidate(reason)`.
-5. `Rc<Snapshot>` tidak dipegang merentasi perubahan sumber, atau perubahan itu menyalin seluruh teks.
-6. Arahan baharu memerlukan entri dalam `actions.rs`, kaedah dalam `mod.rs` dan cabang dalam `editing::perform`.
-7. Setiap blok `unsafe` membawa justifikasinya sebagai ulasan `// SAFETY:`. Bait sampai ke penyahkod imej sistem dalam app melalui `decoder::system_image` sahaja.
+5. Salinan teks tidak dipegang merentasi perubahan sumber, atau perubahan itu menyalin seluruh teks: `with_text` meminjamkannya hanya selama satu closure `Send`.
+6. Arahan baharu memerlukan entri dalam `actions.rs`, kaedah dalam `mod.rs` dan cabang dalam `Editing::perform`.
+7. Setiap blok `unsafe` membawa justifikasinya sebagai ulasan `// SAFETY:`. Bait sampai ke penyahkod imej sistem dalam proses pembantu sahaja, melalui `decoder::decode_native`; satu ujian mengimbas sumber untuk panggilan lain.
 8. Tiada apa-apa pada urutan utama menunggu folder pengguna, kerana volum rangkaian boleh berhenti menjawab: fail dilihat pada urutan `DISK`, dan pratonton membaca jawapannya melalui `Env::known`. Hanya tindakan yang ditunggu pengguna, seperti eksport atau menyimpan, boleh menyentuh cakera secara langsung.
 
 ### Menambah arahan
@@ -706,7 +713,7 @@ Bar menu, bar alat dan menu konteks semuanya membina itemnya daripada daftar dal
 
 1. varian `Action` dengan `Spec`-nya: pemilih, tajuk, label bar alat, tip alat (bermula dengan kata kerja, paling banyak 75 aksara), pintasan, SF Symbol dan bila ia terpakai
 2. kaedah dalam `src/editor/mod.rs`
-3. cabang dalam `editing::perform`
+3. cabang dalam `Editing::perform`
 4. teksnya dalam setiap `Localizable.strings`
 
 Ujian `every_command_has_a_method_and_every_method_a_command` menyemak bahawa daftar dan kaedah sepadan. Pintasan standard Apple seperti ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F dan ⌘, tidak disentuh.

@@ -3,13 +3,15 @@
 
 use std::ops::Range;
 
+use super::blocks::marker_text;
+use super::inlines::{align, atom, atom_styled};
 use super::{
     ATTACHMENT, Align, Atom, Builder, CharMap, Ctx, ImageAtom, LINE_SEPARATOR, Link, Marker, ParaKind, Run, RunMap,
-    RunStyle, align, atom, atom_styled, marker_text,
+    RunStyle,
 };
 use crate::markdown::markup::{self, Element, Node, find, raw_text};
 use crate::markdown::style::{TextStyle, styled_element};
-use crate::markdown::text::count32;
+use crate::markdown::text::{Byte, count32};
 use crate::markdown::url::is_harmless;
 
 /// Offsets in the HTML literal, which inside a quote lacks the `>` prefixes, as source offsets.
@@ -17,18 +19,19 @@ struct Map<'t> {
     literal: &'t str,
     /// `None` if the source does not spell the literal: every piece then points to the whole block.
     chars: Option<CharMap>,
-    block: Range<usize>,
+    block: Range<Byte>,
     /// Where each char of `literal` starts; a block with thousands of elements asks once per tag.
     char_starts: std::cell::OnceCell<Vec<usize>>,
 }
 
 impl Map<'_> {
-    fn source(&self, range: &Range<usize>) -> Range<usize> {
+    /// `range` of the literal as a range of the source.
+    fn source(&self, range: &Range<usize>) -> Range<Byte> {
         let Some(chars) = &self.chars else {
             return self.block.clone();
         };
         let at = |byte: usize| match chars {
-            CharMap::Verbatim(start) if byte < self.literal.len() => start + byte,
+            CharMap::Verbatim(start) if byte < self.literal.len() => *start + byte,
             CharMap::Verbatim(_) => self.block.end,
             CharMap::Offsets(base, offsets) => {
                 let starts = self
@@ -36,7 +39,7 @@ impl Map<'_> {
                     .get_or_init(|| self.literal.char_indices().map(|(b, _)| b).collect());
                 offsets
                     .get(starts.partition_point(|&b| b < byte))
-                    .map_or(self.block.end, |&o| base + o as usize)
+                    .map_or(self.block.end, |&o| *base + o as usize)
             }
         };
         let start = at(range.start);
@@ -54,10 +57,10 @@ struct Around {
 struct HtmlWriter<'b, 'a, 't> {
     b: &'b mut Builder<'a>,
     map: Map<'t>,
-    block: Range<usize>,
+    block: Range<Byte>,
     runs: Vec<Run>,
     /// The list or footnote marker the next paragraph starts with.
-    marker: Option<(Marker, Range<usize>)>,
+    marker: Option<(Marker, Range<Byte>)>,
     in_cell: bool,
     /// Where the current line of a cell starts in `runs`.
     line_start: usize,
@@ -70,9 +73,9 @@ impl Builder<'_> {
     pub(super) fn html_block(
         &mut self,
         literal: &str,
-        range: Range<usize>,
+        range: Range<Byte>,
         ctx: &Ctx,
-        marker: Option<(Marker, Range<usize>)>,
+        marker: Option<(Marker, Range<Byte>)>,
     ) {
         let chars = align(literal, self.text, range.clone());
         let nodes = markup::parse(literal);
@@ -287,7 +290,7 @@ impl HtmlWriter<'_, '_, '_> {
         self.flush(&c);
     }
 
-    fn image(&mut self, e: &Element, src: Range<usize>, style: &RunStyle) {
+    fn image(&mut self, e: &Element, src: Range<Byte>, style: &RunStyle) {
         let alt = e.attr("alt").unwrap_or("");
         match e.attr("src").filter(|u| is_harmless(u)) {
             Some(url) => self.runs.push(atom_styled(
@@ -483,7 +486,11 @@ impl HtmlWriter<'_, '_, '_> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::tests::{laid, para_with, paras, texts};
+    use super::super::{NoImages, Para, layout};
     use super::*;
+    use crate::markdown::reader::parse;
+    use crate::markdown::text::{TextAt, bytes};
 
     #[test]
     fn source_offsets_are_the_same_with_and_without_a_table_of_chars() {
@@ -491,19 +498,258 @@ mod tests {
         let starts: Vec<u32> = literal.char_indices().map(|(b, _)| count32(b)).collect();
         let verbatim = Map {
             literal,
-            chars: Some(CharMap::Verbatim(100)),
-            block: 100..200,
+            chars: Some(CharMap::Verbatim(Byte::new(100))),
+            block: bytes(100..200),
             char_starts: Default::default(),
         };
         let table = Map {
             literal,
-            chars: Some(CharMap::Offsets(100, starts.into())),
-            block: 100..200,
+            chars: Some(CharMap::Offsets(Byte::new(100), starts.into())),
+            block: bytes(100..200),
             char_starts: Default::default(),
         };
         for range in [0..3, 3..5, 9..12, 12..14, 14..literal.len(), 0..literal.len()] {
             assert_eq!(verbatim.source(&range), table.source(&range), "{range:?}");
         }
-        assert_eq!(verbatim.source(&(3..literal.len())), 103..200);
+        assert_eq!(verbatim.source(&(3..literal.len())), bytes(103..200));
+    }
+
+    #[test]
+    fn embedded_html_renders_and_points_into_its_source() {
+        let t = "<p align=\"center\">\n  <img src=\"logo.png\" width=\"120\">\n  <br><b>Splat</b> &amp; <a href=\"https://x.de\">Web</a>\n</p>\n\n\
+                 <details>\n<summary>Mehr</summary>\n\nVersteckt\n\n</details>\n\n<details open>\n<summary>Offen</summary>\n\nSichtbar\n\n</details>\n\n\
+                 <table><tr><th colspan=2>Kopf</th></tr><tr><td>a</td><td>b</td></tr></table>\n\n\
+                 Text mit <kbd>⌘</kbd> und <img src=\"x.png\" height=\"10\"> <!-- weg --> <b>fett</b>\n";
+        let d = parse(t);
+        let l = layout(&d, &NoImages, None);
+        let o = ATTACHMENT;
+        let shown = texts(&l);
+        assert_eq!(
+            shown,
+            vec![
+                format!("{o}\u{2028}Splat & Web"),
+                "▸ Mehr".to_string(),
+                "▾ Offen".into(),
+                "Sichtbar".into(),
+                "Kopf".into(),
+                "a".into(),
+                "b".into(),
+                format!("Text mit ⌘ und {o}  fett"),
+            ]
+        );
+        let paras: Vec<&Para> = l.blocks.iter().flat_map(|b| &b.paras).collect();
+        assert_eq!(paras[0].style.align, Align::Center);
+        assert!(paras[0].style.html);
+        let RunMap::Atom {
+            atom: Atom::Image(img),
+            src,
+        } = &paras[0].runs[0].map
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (img.width, t.at(src.clone())),
+            (Some(120), "<img src=\"logo.png\" width=\"120\">")
+        );
+        let web = paras[0].runs.iter().find(|r| r.text == "Web").unwrap();
+        assert_eq!(web.style.link, Some(Link::Address("https://x.de".into())));
+        let RunMap::Atom {
+            atom: Atom::Details { open: false },
+            src,
+        } = &paras[1].runs[0].map
+        else {
+            panic!()
+        };
+        assert_eq!(t.at(src.clone()), "<details>");
+        assert!(matches!(
+            paras[4].style.kind,
+            ParaKind::TableCell {
+                span: 2,
+                header: true,
+                ..
+            }
+        ));
+        let last = paras[7];
+        assert!(last.runs.iter().any(|r| r.text == "⌘" && r.style.text.code));
+        assert!(
+            last.runs
+                .iter()
+                .any(|r| matches!(&r.map, RunMap::Atom { atom: Atom::Image(i), .. } if i.height == Some(10)))
+        );
+        assert!(last.runs.iter().any(|r| r.text == "fett" && r.style.text.bold));
+    }
+
+    #[test]
+    fn embedded_html_collapses_only_ascii_whitespace() {
+        let t = "<p><img src=\"a.png\">&nbsp;&nbsp;&nbsp;<img src=\"b.png\"></p>\n\n<p>a  \n\t b&#8195;c</p>\n";
+        let d = parse(t);
+        let l = layout(&d, &NoImages, None);
+        let o = ATTACHMENT;
+        assert_eq!(
+            texts(&l),
+            vec![format!("{o}\u{a0}\u{a0}\u{a0}{o}"), "a b\u{2003}c".to_string()]
+        );
+    }
+
+    #[test]
+    fn html_blocks_become_headings_rules_code_quotes_lists_and_tables() {
+        let t = "<div>\n<h3>Titel</h3>\n<hr>\n<pre>\nlet x = 1;\n</pre>\n<blockquote>Zitat</blockquote>\n\
+                 <ol start=\"3\"><li>drei</li><li>vier</li></ol>\n<ul><li>Punkt</li></ul>\n\
+                 <dl><dt>Begriff</dt><dd>Erklärung</dd></dl>\n\
+                 <picture><source srcset=\"a.webp\"><img src=\"a.png\" alt=\"Bild\"></picture>\n\
+                 <img src=\"javascript:x\" alt=\"Ersatz\">\n\
+                 <table><thead><tr><th>K</th><th>L</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>\n\
+                 </div>\n";
+        let d = parse(t);
+        let l = layout(&d, &NoImages, None);
+        let paras: Vec<&Para> = l.blocks.iter().flat_map(|b| &b.paras).collect();
+        let text = |p: &Para| p.runs.iter().map(|r| r.text.as_str()).collect::<String>();
+        let find = |s: &str| {
+            *paras
+                .iter()
+                .find(|p| text(p).contains(s))
+                .unwrap_or_else(|| panic!("{s}"))
+        };
+        assert_eq!(find("Titel").style.kind, ParaKind::Heading(3));
+        assert!(paras.iter().any(|p| p.style.kind == ParaKind::Rule));
+        assert!(matches!(find("let x = 1;").style.kind, ParaKind::Code { .. }));
+        assert_eq!(find("Zitat").style.quote_depth, 1);
+        assert_eq!(find("drei").style.marker, Some(Marker::Number(3)));
+        assert_eq!(find("vier").style.marker, Some(Marker::Number(4)));
+        assert_eq!(find("Punkt").style.marker, Some(Marker::Bullet(0)));
+        assert!(find("Begriff").runs.iter().all(|r| r.style.text.bold));
+        assert_eq!(find("Erklärung").style.list_depth, 1);
+        assert!(find("Ersatz").runs.iter().any(|r| r.text == "Ersatz"));
+        let images: Vec<String> = paras
+            .iter()
+            .flat_map(|p| &p.runs)
+            .filter_map(|r| match &r.map {
+                RunMap::Atom {
+                    atom: Atom::Image(i), ..
+                } => Some(i.url.to_string()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(images, ["a.png"]);
+        let cells: Vec<(&str, bool)> = paras
+            .iter()
+            .filter_map(|p| match p.style.kind {
+                ParaKind::TableCell { header, .. } => Some((p.runs.first().map_or("", |r| r.text.as_str()), header)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(cells, [("K", true), ("L", true), ("1", false), ("", false)]);
+    }
+
+    #[test]
+    fn a_picture_element_shows_its_image_and_a_refused_one_its_text() {
+        let image = |t: &str| {
+            let l = laid(t);
+            paras(&l).iter().any(|p| {
+                p.runs.iter().any(|r| {
+                    matches!(
+                        r.map,
+                        RunMap::Atom {
+                            atom: Atom::Image(_),
+                            ..
+                        }
+                    )
+                })
+            })
+        };
+        assert!(image(
+            "<picture><source srcset=\"b.png\"><img src=\"a.png\"></picture>\n"
+        ));
+        let l = laid("<p><img src=\"javascript:x\" alt=\"A\"></p>\n");
+        assert_eq!(texts(&l), ["A"]);
+        assert!(
+            texts(&laid("<p><img src=\"javascript:x\"> b</p>\n"))
+                .iter()
+                .all(|t| t.trim() == "b")
+        );
+        let empty = laid("<p><img src=\"javascript:x\">b</p>\n");
+        assert!(paras(&empty)[0].runs.iter().all(|r| !r.text.is_empty()));
+    }
+
+    #[test]
+    fn only_a_center_element_centers_itself() {
+        assert_eq!(para_with(&laid("<center>a</center>\n"), "a").style.align, Align::Center);
+        assert_eq!(para_with(&laid("<p>a</p>\n"), "a").style.align, Align::None);
+    }
+
+    #[test]
+    fn a_list_in_html_goes_deeper_with_its_nesting() {
+        let l = laid("<ul><li>a<ul><li>b</li></ul></li></ul>\n");
+        assert_eq!(para_with(&l, "a").style.list_depth, 1);
+        let b = para_with(&l, "b");
+        assert_eq!(b.style.list_depth, 2);
+        assert_eq!(b.style.marker, Some(Marker::Bullet(1)));
+    }
+
+    #[test]
+    fn tables_in_html_count_up_and_keep_bold_of_their_head_and_their_text() {
+        let l =
+            laid("<table><tr><th>a</th><td>b</td><td><b>c</b></td></tr></table><table><tr><td>d</td></tr></table>\n");
+        assert!(para_with(&l, "a").runs[0].style.text.bold);
+        assert!(!para_with(&l, "b").runs[0].style.text.bold);
+        assert!(para_with(&l, "c").runs[0].style.text.bold);
+        let table = |text: &str| match para_with(&l, text).style.kind {
+            ParaKind::TableCell { table, .. } => table,
+            _ => panic!("no cell"),
+        };
+        assert_eq!((table("a"), table("d")), (1, 2));
+    }
+
+    #[test]
+    fn details_in_html_fold_by_a_click_and_their_summary_is_bold() {
+        let t = "<details><summary>a</summary>b</details>\n";
+        let l = laid(t);
+        let p = paras(&l)[0];
+        assert_eq!(p.runs[0].style.link, Some(Link::Fold));
+        let summary = p.runs.iter().find(|r| r.text == "a").unwrap();
+        assert!(summary.style.text.bold && summary.style.link.is_none());
+    }
+
+    #[test]
+    fn a_refused_picture_without_a_text_leaves_nothing_behind() {
+        assert!(
+            paras(&laid("<p><img src=\"javascript:x\"></p>\n"))
+                .iter()
+                .all(|p| p.runs.is_empty())
+        );
+    }
+
+    #[test]
+    fn blocks_in_a_table_cell_of_html_become_its_lines() {
+        let cell = |content: &str| {
+            let t = format!("<table><tr><td>{content}</td><td>z</td></tr></table>\n\n<p>behind</p>\n");
+            let l = laid(&t);
+            let shown = texts(&l);
+            assert_eq!(
+                shown.len(),
+                3,
+                "the cell, its neighbour and the paragraph behind: {shown:?}"
+            );
+            assert_eq!(shown[1], "z");
+            assert_eq!(
+                para_with(&l, "behind").style.kind,
+                ParaKind::Body,
+                "it ends with the table"
+            );
+            assert!(matches!(paras(&l)[0].style.kind, ParaKind::TableCell { .. }));
+            shown[0].clone()
+        };
+        let line = LINE_SEPARATOR;
+        assert_eq!(cell("a"), "a");
+        assert_eq!(cell("<p>a</p>"), "a");
+        assert_eq!(cell("<p>a</p><p>b</p>"), format!("a{line}b"));
+        assert_eq!(cell("a<p>b</p>c"), format!("a{line}b{line}c"));
+        assert_eq!(cell("<div><p>a</p></div>"), "a");
+        assert_eq!(cell("<ul><li>a</li><li>b</li></ul>"), format!("• a{line}• b"));
+        assert_eq!(cell("x<ol start=\"3\"><li>a</li></ol>"), format!("x{line}3. a"));
+        assert_eq!(cell("<hr>a"), "a");
+        assert_eq!(cell("<pre>x\ny</pre>"), format!("x{line}y"));
+        assert_eq!(cell("<table><tr><td>a</td><td>b</td></tr></table>"), "a b");
+        assert_eq!(cell("<h2>a</h2>b"), format!("a{line}b"));
     }
 }

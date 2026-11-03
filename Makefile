@@ -13,13 +13,14 @@ build: ## Build target/release/Splat.app, signed with the local certificate; rai
 universal: ## Build target/splat-universal for Apple Silicon and Intel, unsigned, as the disk image carries it; needs rustup
 	cargo xtask universal
 
-lint: ## Formatting and clippy, also with the selftest feature; warnings fail
+lint: ## Formatting and clippy, also with the selftest feature, warnings fail; the library builds without macOS, needs rustup
 	cargo fmt --all --check
 	cargo clippy --release --workspace --all-targets -- -D warnings
 	cargo clippy --release --all-targets --features selftest -- -D warnings
+	cargo xtask check-library
 
 check: lint ## lint, all cargo tests, vendored scripts; what CI runs, needs no keychain and no window
-	CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true cargo test --release --workspace
+	cargo test --release --workspace
 	cargo xtask vendor check
 
 test: check ## check, then the selftest without a window
@@ -30,17 +31,17 @@ test-gui: ## Click-through and resize selftests; occupy the Mac for about four m
 	cargo xtask selftest resize
 
 test-long: ## Longer random search (ROUNDS=20000, SPLAT_FUZZ_SEED=<n>) and the 10 MB partial-update check
-	CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true SPLAT_FUZZ_ROUNDS=$(ROUNDS) cargo test --release
+	SPLAT_FUZZ_ROUNDS=$(ROUNDS) cargo test --release
 	cargo test --release -- --ignored partial_updates
 
 mutants: ## Faults built into the model and the preview one by one, which the tests must notice; takes hours (FILE=<file> narrows it)
 	cargo mutants $(if $(FILE),--file "$(FILE)",--file "src/markdown/**/*.rs" --file "src/preview/**/*.rs") --jobs 4 --output target/mutants; code=$$?; case $$code in 0|2|3) ;; *) exit $$code ;; esac
 	@echo "survivors: target/mutants/mutants.out/missed.txt"
 
-coverage: ## Line coverage of all tests and selftests; fails below 80 % in a module or 85 % overall. About five minutes
+coverage: ## Line coverage of all tests and selftests; fails below 84 % in a module or 96 % overall. About five minutes
 	cargo xtask coverage
 
-coverage-library: ## The same floors for the modules without a window, measured by cargo test alone, as in CI
+coverage-library: ## The modules without a window, measured by cargo test alone, as in CI; fails below 90 % in a module or 97 % overall
 	cargo xtask coverage --library
 
 bench: ## Open, type and scroll timings: make bench FILE=<file.md>

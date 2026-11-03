@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Αποθηκεύστε πρώτα το έγγραφο";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Οι εικόνες που επικολλάτε αποθηκεύονται ως αρχεία δίπλα στο έγγραφο. Αποθηκεύστε το και μετά επικολλήστε ξανά την εικόνα.";
 "Export fehlgeschlagen" = "Η εξαγωγή απέτυχε";
+"Das Dokument ließ sich nicht umwandeln." = "Δεν ήταν δυνατή η μετατροπή του εγγράφου.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Το έγγραφο είναι πολύ μεγάλο για αρχείο Word.";
 "Gliederung ausblenden" = "Απόκρυψη διάρθρωσης";
 "Gliederung einblenden" = "Εμφάνιση διάρθρωσης";
 "Metadaten" = "Μεταδεδομένα";

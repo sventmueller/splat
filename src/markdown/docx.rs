@@ -7,7 +7,7 @@ mod xml;
 use std::collections::HashMap;
 
 use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, Piece, code_figure};
-use super::text::{count32, right_to_left};
+use super::text::{Byte, TextAt, count32, right_to_left};
 use super::typography::{Mark, Open, Quotes, before_text, marks, smarten};
 use super::url::is_web_or_mail;
 use crate::i18n::t;
@@ -23,8 +23,6 @@ pub struct Picture {
 
 /// What the document needs from outside the text.
 pub struct WordExport<'a> {
-    /// The Markdown the document was parsed from.
-    pub source: &'a str,
     pub figure: &'a dyn Fn(&Figure) -> Option<Picture>,
     pub image: &'a dyn Fn(&str) -> Option<Picture>,
     /// Quotation marks for straight quotes, when typographic punctuation is on.
@@ -41,8 +39,13 @@ const EMU_PER_POINT: f64 = 12_700.0;
 /// Space after a paragraph, in twentieths of a point, as the default paragraph style sets it.
 const GAP: u32 = 160;
 
-pub fn to_docx(doc: &Doc, export: &WordExport) -> Vec<u8> {
+/// More than a ZIP holds without its 64-bit extension.
+#[derive(Debug, PartialEq)]
+pub struct TooLarge;
+
+pub fn to_docx(doc: &Doc, export: &WordExport) -> Result<Vec<u8>, TooLarge> {
     let mut w = Writer {
+        source: doc.text(),
         export,
         body: String::new(),
         last: None,
@@ -87,6 +90,8 @@ struct WordCtx {
 }
 
 struct Writer<'a> {
+    /// The Markdown the document was parsed from.
+    source: &'a str,
     export: &'a WordExport<'a>,
     body: String,
     /// The last paragraph, not yet in `body`, as the end of a framed block may still change its spacing.
@@ -172,10 +177,10 @@ impl<'a> Writer<'a> {
         };
         let title = Inline {
             kind: InlineKind::Strong,
-            range: 0..0,
+            range: Byte::default()..Byte::default(),
             children: Box::new([Inline {
                 kind: InlineKind::Text(label.into()),
-                range: 0..0,
+                range: Byte::default()..Byte::default(),
                 children: Box::default(),
             }]),
         };
@@ -351,7 +356,7 @@ impl<'a> Writer<'a> {
 
     fn table(&mut self, table: &'a Block, alignments: &[Align]) {
         self.table_gap();
-        let mirrored = right_to_left(&self.export.source[table.range.clone()]) == Some(true);
+        let mirrored = right_to_left(self.source.at(table.range.clone())) == Some(true);
         self.raw(&format!(
             "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/>{}<w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid>",
             if mirrored { "<w:bidiVisual/>" } else { "" }
@@ -427,15 +432,24 @@ impl<'a> Writer<'a> {
     }
 
     /// Running text, with typographic punctuation, tags, references and citations as in the preview.
-    fn text(&mut self, literal: &str, at: usize, props: Props, out: &mut Runs) {
+    fn text(&mut self, literal: &str, at: Byte, props: Props, out: &mut Runs) {
         if literal.is_empty() {
             return;
         }
-        let before = before_text(self.export.source, at);
+        if props.text.code {
+            out.push(literal, props);
+            return;
+        }
+        let before = before_text(self.source, at);
         let shown = match self.export.quotes {
-            Some(q) if !props.text.code => smarten(literal, before, q, &mut self.open),
-            _ => literal.to_string(),
+            Some(q) => smarten(literal, before, q, &mut self.open),
+            None => literal.to_string(),
         };
+        // Word opens no link inside a link, and a mark in one would be one.
+        if props.link {
+            out.push(&shown, props);
+            return;
+        }
         let mut done = 0;
         for (range, mark) in marks(&shown, before, true) {
             let piece = &shown[range.clone()];
@@ -535,7 +549,7 @@ impl<'a> Writer<'a> {
         )
     }
 
-    fn package(self) -> Vec<u8> {
+    fn package(self) -> Result<Vec<u8>, TooLarge> {
         let document = format!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<w:document {NAMESPACES}><w:body>{}\
              <w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/><w:pgMar w:top=\"1417\" w:right=\"1417\" w:bottom=\"1134\" w:left=\"1417\" w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/></w:sectPr>\
@@ -565,21 +579,21 @@ impl<'a> Writer<'a> {
         }
         rels.push_str("</Relationships>");
         let mut zip = Zip::default();
-        zip.add("[Content_Types].xml", CONTENT_TYPES.as_bytes());
-        zip.add("_rels/.rels", PACKAGE_RELS.as_bytes());
-        zip.add("word/document.xml", document.as_bytes());
-        zip.add("word/_rels/document.xml.rels", rels.as_bytes());
-        zip.add("word/styles.xml", STYLES.as_bytes());
-        zip.add("word/numbering.xml", numbering(&self.numbers).as_bytes());
-        zip.add("word/fontTable.xml", FONT_TABLE.as_bytes());
-        zip.add("word/settings.xml", SETTINGS.as_bytes());
+        zip.add("[Content_Types].xml", CONTENT_TYPES.as_bytes())?;
+        zip.add("_rels/.rels", PACKAGE_RELS.as_bytes())?;
+        zip.add("word/document.xml", document.as_bytes())?;
+        zip.add("word/_rels/document.xml.rels", rels.as_bytes())?;
+        zip.add("word/styles.xml", STYLES.as_bytes())?;
+        zip.add("word/numbering.xml", numbering(&self.numbers).as_bytes())?;
+        zip.add("word/fontTable.xml", FONT_TABLE.as_bytes())?;
+        zip.add("word/settings.xml", SETTINGS.as_bytes())?;
         for (n, (data, jpeg)) in self.media.iter().enumerate() {
             zip.add(
                 &format!("word/media/image{}.{}", n + 1, if *jpeg { "jpeg" } else { "png" }),
                 data,
-            );
+            )?;
         }
-        zip.finish()
+        Ok(zip.finish())
     }
 }
 
@@ -721,16 +735,25 @@ const SETTINGS: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"ye
 struct Zip {
     data: Vec<u8>,
     directory: Vec<u8>,
-    count: u16,
+    count: usize,
 }
 
-// Without the 64-bit extension of the format: a document stays far below its 4 GB.
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "a document stays far below the 4 GB of a ZIP without extensions"
-)]
+/// The highest values the format allows: the next ones announce its 64-bit extension.
+const MAX_ZIP_ENTRIES: usize = 0xFFFE;
+const MAX_ZIP_BYTES: usize = 0xFFFF_FFFE;
+
+fn zip_holds(entries: usize, bytes: usize) -> bool {
+    entries <= MAX_ZIP_ENTRIES && bytes <= MAX_ZIP_BYTES
+}
+
+#[expect(clippy::cast_possible_truncation, reason = "`add` turns away what would not fit")]
 impl Zip {
-    fn add(&mut self, name: &str, content: &[u8]) {
+    fn add(&mut self, name: &str, content: &[u8]) -> Result<(), TooLarge> {
+        const HEADERS_AND_END: usize = 30 + 46 + 22;
+        let bytes = self.data.len() + self.directory.len() + HEADERS_AND_END + 2 * name.len() + content.len();
+        if !zip_holds(self.count + 1, bytes) {
+            return Err(TooLarge);
+        }
         let crc = crc32(content);
         let offset = self.data.len() as u32;
         let size = content.len() as u32;
@@ -763,6 +786,7 @@ impl Zip {
         self.data.extend_from_slice(content);
         self.directory.extend(header(0x0201_4b50, true));
         self.count += 1;
+        Ok(())
     }
 
     fn finish(mut self) -> Vec<u8> {
@@ -770,7 +794,8 @@ impl Zip {
         let size = self.directory.len() as u32;
         self.data.append(&mut self.directory);
         self.data.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
-        for v in [0u16, 0, self.count, self.count] {
+        let count = self.count as u16;
+        for v in [0u16, 0, count, count] {
             self.data.extend_from_slice(&v.to_le_bytes());
         }
         self.data.extend_from_slice(&size.to_le_bytes());
@@ -798,16 +823,55 @@ fn crc32(bytes: &[u8]) -> u32 {
         .fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xFF) as usize] ^ (c >> 8))
 }
 
+/// Entry names and contents of a stored ZIP, read with nothing but the format description.
+#[cfg(any(test, feature = "selftest"))]
+pub fn stored_entries(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while zip.get(at..at + 4) == Some(&0x0403_4b50u32.to_le_bytes()) {
+        let field = |o: usize, n: usize| {
+            zip[at + o..at + o + n]
+                .iter()
+                .rev()
+                .fold(0usize, |v, b| v << 8 | *b as usize)
+        };
+        let (size, name_len, extra) = (field(18, 4), field(26, 2), field(28, 2));
+        let name = String::from_utf8_lossy(&zip[at + 30..at + 30 + name_len]).into_owned();
+        let start = at + 30 + name_len + extra;
+        let content = zip[start..start + size].to_vec();
+        assert_eq!(crc32(&content) as usize, field(14, 4), "{name}");
+        out.push((name, content));
+        at = start + size;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::doc::{AlertKind, parse};
+    use crate::markdown::doc::AlertKind;
+    use crate::markdown::reader::parse;
+
+    #[test]
+    fn a_zip_turns_away_what_needs_its_extension() {
+        assert!(zip_holds(MAX_ZIP_ENTRIES, MAX_ZIP_BYTES));
+        assert!(!zip_holds(MAX_ZIP_ENTRIES + 1, 0));
+        assert!(!zip_holds(1, MAX_ZIP_BYTES + 1));
+        let mut zip = Zip::default();
+        for _ in 0..MAX_ZIP_ENTRIES {
+            zip.add("a", b"").expect("room for it");
+        }
+        assert_eq!(zip.add("a", b""), Err(TooLarge));
+        let bytes = zip.finish();
+        let end = &bytes[bytes.len() - 22..];
+        assert_eq!(end[..4], 0x0605_4b50u32.to_le_bytes());
+        assert_eq!(end[10..12], 0xFFFEu16.to_le_bytes());
+    }
 
     fn export(text: &str) -> Vec<u8> {
         to_docx(
             &parse(text),
             &WordExport {
-                source: text,
                 quotes: Some(Quotes {
                     open: '„',
                     close: '“',
@@ -827,28 +891,26 @@ mod tests {
                 },
             },
         )
+        .expect("a small document")
     }
 
-    /// Entry names and contents of a stored ZIP, read with nothing but the format description.
-    fn entries(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
-        let mut out = Vec::new();
-        let mut at = 0;
-        while zip.get(at..at + 4) == Some(&0x0403_4b50u32.to_le_bytes()) {
-            let field = |o: usize, n: usize| {
-                zip[at + o..at + o + n]
-                    .iter()
-                    .rev()
-                    .fold(0usize, |v, b| v << 8 | *b as usize)
-            };
-            let (size, name_len, extra) = (field(18, 4), field(26, 2), field(28, 2));
-            let name = String::from_utf8(zip[at + 30..at + 30 + name_len].to_vec()).unwrap();
-            let start = at + 30 + name_len + extra;
-            let content = zip[start..start + size].to_vec();
-            assert_eq!(crc32(&content) as usize, field(14, 4), "{name}");
-            out.push((name, content));
-            at = start + size;
-        }
-        out
+    fn document_xml(text: &str) -> String {
+        let entries = stored_entries(&export(text));
+        let (_, xml) = entries
+            .iter()
+            .find(|(name, _)| name == "word/document.xml")
+            .expect("the document");
+        String::from_utf8(xml.clone()).unwrap()
+    }
+
+    #[test]
+    fn marks_stay_text_in_a_link_and_in_code_as_they_do_in_the_html_export() {
+        let linked = document_xml("[#12](https://example.com/x) und #12\n");
+        assert_eq!(linked.matches("<w:hyperlink").count(), 2, "{linked}");
+        assert!(!linked.contains("<w:hyperlink r:id=\"rIdL1\"><w:hyperlink"), "{linked}");
+        let code = document_xml("`#12 \"a\"`\n");
+        assert_eq!(code.matches("<w:hyperlink").count(), 0, "{code}");
+        assert!(code.contains("#12 &quot;a&quot;"), "{code}");
     }
 
     #[test]
@@ -856,7 +918,7 @@ mod tests {
         let zip = export(
             "# כותרת\n\n- פריט\n\nEnglish\n\n& \"שלום\" <ברכה>\n\n| שם | ערך |\n|---|---|\n| 1 | 2 |\n\n```\n# הערה\n```\n",
         );
-        let files = entries(&zip);
+        let files = stored_entries(&zip);
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         assert!(
@@ -877,7 +939,7 @@ mod tests {
     #[test]
     fn quotes_without_spaces_pair_across_runs_of_a_paragraph_only() {
         let zip = export("彼は\"今日は\n晴れ\"です\n\n\"x\"\n");
-        let files = entries(&zip);
+        let files = stored_entries(&zip);
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         assert!(document.contains("晴れ“です") && document.contains("„x“"), "{document}");
@@ -894,7 +956,7 @@ mod tests {
             "# Titel\n\nText mit **fett** und <mark>hell</mark> & [Web](https://example.com) [Skript](javascript:x)\n\n\
              - a\n- b\n\n1. eins\n2. zwei\n\n| A | B |\n|---|--:|\n| 1 | 2 |\n\n![Bild](a.png)\n\nNote[^1]\n\n[^1]: Fuß",
         );
-        let files = entries(&zip);
+        let files = stored_entries(&zip);
         let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
         for part in [
             "[Content_Types].xml",
@@ -934,13 +996,13 @@ mod tests {
 
     #[test]
     fn quote_bars_and_code_shading_end_at_their_text_and_type_is_sans_serif() {
-        let files = entries(&export(
+        let files = stored_entries(&export(
             "> Zitat\n>\n> - Punkt\n\nDanach\n\n```\ncode\n```\n\n| A |\n|---|\n| 1 |\n\n> [!NOTE]\n> Hinweis\n",
         ));
         for (name, content) in &files {
             if name.ends_with(".xml") || name.ends_with(".rels") {
                 let xml = std::str::from_utf8(content).unwrap();
-                svg2pdf::usvg::roxmltree::Document::parse(xml).unwrap_or_else(|e| panic!("{name}: {e}"));
+                roxmltree::Document::parse(xml).unwrap_or_else(|e| panic!("{name}: {e}"));
             }
         }
         let part = |name: &str| String::from_utf8(files.iter().find(|(n, _)| n == name).unwrap().1.clone()).unwrap();
@@ -977,7 +1039,7 @@ mod tests {
 
     #[test]
     fn extended_syntax_and_running_text_reach_the_document() {
-        let files = entries(&export(
+        let files = stored_entries(&export(
             "Er sagte \"Ja\" -- #idee, #12, [@doe] :rocket: ||geheim|| %%still%% ==hell==\n\n\
              Begriff\n\n: Erklärung\n\n```math\nx^2\n```\n",
         ));
@@ -1015,14 +1077,14 @@ mod tests {
 
     #[test]
     fn embedded_html_becomes_word_paragraphs() {
-        let files = entries(&export(
+        let files = stored_entries(&export(
             "<p align=\"center\"><img src=\"logo.png\" width=\"200\"><br><b>Splat</b> <a href=\"https://x.de\">Web</a></p>\n\n\
              <h2>Kopf</h2>\n\n<ul><li>eins<li>zwei</ul>\n\n<table><tr><th colspan=2>A</th></tr><tr><td>1</td><td>2</td></tr></table>\n\n\
              <details>\n<summary>Mehr</summary>\n\nInhalt\n\n</details>\n",
         ));
         for (name, content) in &files {
             if name.ends_with(".xml") || name.ends_with(".rels") {
-                svg2pdf::usvg::roxmltree::Document::parse(std::str::from_utf8(content).unwrap())
+                roxmltree::Document::parse(std::str::from_utf8(content).unwrap())
                     .unwrap_or_else(|e| panic!("{name}: {e}"));
             }
         }
@@ -1042,7 +1104,7 @@ mod tests {
 
     #[test]
     fn embedded_html_keeps_non_breaking_spaces_in_word() {
-        let files = entries(&export("<p>a&nbsp;&nbsp;&nbsp;b   \n c</p>\n"));
+        let files = stored_entries(&export("<p>a&nbsp;&nbsp;&nbsp;b   \n c</p>\n"));
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         assert!(document.contains("a\u{a0}\u{a0}\u{a0}b c"), "{document}");
@@ -1050,7 +1112,7 @@ mod tests {
 
     #[test]
     fn embedded_html_quotes_lists_code_and_table_parts_reach_word() {
-        let files = entries(&export(
+        let files = stored_entries(&export(
             "<div align=\"right\">\n<blockquote>Zitat <a href=\"javascript:x\">kein Link</a></blockquote>\n\
              <ol start=\"4\"><li>vier<ul><li>tief</li></ul></li></ol>\n<pre>\nlet x = 1;<br>y\n</pre>\n<hr>\n\
              <table><thead><tr><th align=\"center\">K</th><th align=\"right\">L</th></tr></thead>\
@@ -1058,7 +1120,7 @@ mod tests {
         ));
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
-        svg2pdf::usvg::roxmltree::Document::parse(&document).unwrap();
+        roxmltree::Document::parse(&document).unwrap();
         assert!(document.contains("<w:pStyle w:val=\"Quote\"/>"), "{document}");
         assert!(document.contains("kein Link") && !document.contains("javascript"));
         assert!(document.contains("<w:ilvl w:val=\"1\"/>"), "nested list: {document}");
@@ -1072,7 +1134,7 @@ mod tests {
 
     #[test]
     fn footnotes_keep_their_lists_and_code() {
-        let files = entries(&export(
+        let files = stored_entries(&export(
             "x[^1]\n\n[^1]: note\n\n    - item-a\n    - item-b\n\n    ```\n    code-c\n    ```\n",
         ));
         let document =
@@ -1085,7 +1147,7 @@ mod tests {
 
     #[test]
     fn a_footnote_starting_with_a_list_shows_its_number_above_it() {
-        let files = entries(&export("x[^1]\n\n[^1]:\n    - item\n"));
+        let files = stored_entries(&export("x[^1]\n\n[^1]:\n    - item\n"));
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         assert!(
@@ -1096,7 +1158,7 @@ mod tests {
 
     #[test]
     fn a_link_around_code_is_valid_word() {
-        let files = entries(&export("[`code`](https://x.example) [plain](https://y.example)\n"));
+        let files = stored_entries(&export("[`code`](https://x.example) [plain](https://y.example)\n"));
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         for run in document.split("<w:r>").skip(1) {
@@ -1109,7 +1171,6 @@ mod tests {
         to_docx(
             &parse(text),
             &WordExport {
-                source: text,
                 quotes: Some(Quotes {
                     open: '„',
                     close: '“',
@@ -1122,10 +1183,11 @@ mod tests {
                 image: &|_| None,
             },
         )
+        .expect("a small document")
     }
 
     fn document(text: &str) -> String {
-        let files = entries(&export(text));
+        let files = stored_entries(&export(text));
         String::from_utf8(files.into_iter().find(|(n, _)| n == "word/document.xml").unwrap().1).unwrap()
     }
 
@@ -1140,7 +1202,7 @@ mod tests {
             })
         };
         let word = |text: &str| {
-            let files = entries(&export_with(text, &picture));
+            let files = stored_entries(&export_with(text, &picture));
             String::from_utf8(files.into_iter().find(|(n, _)| n == "word/document.xml").unwrap().1).unwrap()
         };
         let diagram = word("```mermaid\nabcd\n```\n");
@@ -1302,7 +1364,7 @@ mod tests {
         let end = zip.len() - 22;
         assert_eq!(&zip[end..end + 4], &0x0605_4b50u32.to_le_bytes());
         let count = u16::from_le_bytes([zip[end + 10], zip[end + 11]]);
-        assert_eq!(usize::from(count), entries(&zip).len());
+        assert_eq!(usize::from(count), stored_entries(&zip).len());
     }
 
     #[test]
@@ -1380,7 +1442,7 @@ mod tests {
     fn a_list_stays_within_what_word_knows() {
         let deep: String = (0..12).map(|i| format!("{}- x\n", "  ".repeat(i))).collect();
         assert!(!document(&deep).contains("<w:ilvl w:val=\"9\"/>"));
-        let files = entries(&export("<ol start=\"99999999999\"><li>x</li></ol>\n"));
+        let files = stored_entries(&export("<ol start=\"99999999999\"><li>x</li></ol>\n"));
         let numbering =
             String::from_utf8(files.into_iter().find(|(n, _)| n == "word/numbering.xml").unwrap().1).unwrap();
         assert!(!numbering.contains("99999999999"), "{numbering}");

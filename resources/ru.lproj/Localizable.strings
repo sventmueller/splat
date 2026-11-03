@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Сначала сохраните документ";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Вставленные изображения сохраняются как файлы рядом с документом. Сохраните документ, затем вставьте изображение еще раз.";
 "Export fehlgeschlagen" = "Не удалось экспортировать";
+"Das Dokument ließ sich nicht umwandeln." = "Не удалось преобразовать документ.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Документ слишком велик для файла Word.";
 "Gliederung ausblenden" = "Скрыть структуру";
 "Gliederung einblenden" = "Показать структуру";
 "Metadaten" = "Метаданные";

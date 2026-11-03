@@ -1,24 +1,26 @@
 //! What needs the app but no visible window: rendering, remote images, exports, the sharing menu and what injected
 //! content can do in the formula editor. Every result is a check, so a broken one fails the run.
 
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, Bool};
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly};
+use objc2::runtime::Bool;
+use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSAttachmentAttributeName, NSBitmapImageFileType, NSBitmapImageRep, NSDocument,
     NSDocumentChangeType, NSDocumentController, NSPasteboard, NSPasteboardTypePNG, NSTextAttachment,
 };
-use objc2_foundation::{NSData, NSDictionary, NSError, NSRange, NSString, NSURL};
-use objc2_web_kit::WKContentWorld;
+use objc2_foundation::{NSData, NSDictionary, NSError, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL};
+use objc2_web_kit::WKWebView;
 
 use super::super::EditorController;
 use super::super::js::{self, Key};
 use super::super::mathfield::{self, MathField};
+use super::super::webkit;
 use super::mock_web::{HOST, requests_of};
-use super::{after, check, finish};
+use super::{after, check, finish, guarded, once};
 use crate::document::MdDocument;
 use crate::markdown::doc::DiagramKind;
 use crate::util::{constant, ns};
@@ -26,7 +28,7 @@ use crate::util::{constant, ns};
 /// How long rendering, the reload and the downloads may take together.
 const PATIENCE: f64 = 45.0;
 
-const REMOTE_PICTURES: [&str; 7] = [
+const REMOTE_PICTURES: [&str; 8] = [
     "/badge.svg",
     "/fehlt.png",
     "/kein-bild.png",
@@ -34,6 +36,7 @@ const REMOTE_PICTURES: [&str; 7] = [
     "/umleitung.png",
     "/wackelig.svg",
     "/ohne-netz.svg",
+    "/nicht-gezeigt.svg",
 ];
 
 fn url_in_probe(path: &str) -> String {
@@ -60,7 +63,9 @@ pub(super) fn run(mtm: MainThreadMarker) {
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
     let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
     document.set_initial_text(&format!(
-        "# Probe\n\n## Teil\n\n![a](https://192.168.0.1/x.png) ![b](https://localhost/y.png)\n\n![c](https://intranet/z.png)\n\n![lokal](<{}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+        "# Probe\n\n## Teil\n\n![a](https://192.168.0.1/x.png) ![b](https://localhost/y.png)\n\n![c](https://intranet/z.png)\n\n![w]({0}) ![n]({1})\n\n![lokal](<{2}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+        url_in_probe("/wackelig.svg"),
+        url_in_probe("/ohne-netz.svg"),
         local.display()
     ));
     document.makeWindowControllers();
@@ -184,18 +189,28 @@ fn open_and_change_after_saving(mtm: MainThreadMarker) -> (PathBuf, Retained<NSU
     NSDocumentController::sharedDocumentController(mtm)
         .openDocumentWithContentsOfURL_display_completionHandler(&url, false, &done);
     let (opened, rewrite) = (url.clone(), changed.clone());
-    after(1.0, move || {
-        let document = NSDocumentController::sharedDocumentController(mtm)
-            .documentForURL(&opened)
-            .and_then(|d| d.downcast::<MdDocument>().ok());
-        if let Some(document) = document {
-            document.makeWindowControllers();
-            document.updateChangeCount(NSDocumentChangeType::ChangeDone);
-            // SAFETY: NSDocument's action method, called on the main thread without a sender.
-            unsafe { document.saveDocument(None) };
-            write_once_saved(mtm, opened.clone(), rewrite.clone());
-        }
-    });
+    let asked = url.clone();
+    once(
+        0.0,
+        "the document to reload to open",
+        move || {
+            NSDocumentController::sharedDocumentController(mtm)
+                .documentForURL(&asked)
+                .is_some()
+        },
+        move || {
+            let document = NSDocumentController::sharedDocumentController(mtm)
+                .documentForURL(&opened)
+                .and_then(|d| d.downcast::<MdDocument>().ok());
+            if let Some(document) = document {
+                document.makeWindowControllers();
+                document.updateChangeCount(NSDocumentChangeType::ChangeDone);
+                // SAFETY: NSDocument's action method, called on the main thread without a sender.
+                unsafe { document.saveDocument(None) };
+                write_once_saved(mtm, opened.clone(), rewrite.clone());
+            }
+        },
+    );
     (changed, url)
 }
 
@@ -212,17 +227,20 @@ fn write_once_saved(mtm: MainThreadMarker, url: Retained<NSURL>, path: PathBuf) 
 }
 
 impl Probe {
-    fn reloaded_text(&self) -> Option<String> {
+    fn reloaded_document(&self) -> Option<Retained<MdDocument>> {
         NSDocumentController::sharedDocumentController(self.mtm)
             .documentForURL(&self.changed_url)
             .and_then(|d| d.downcast::<MdDocument>().ok())
-            .map(|d| d.text())
+    }
+
+    fn reloaded_text(&self) -> Option<String> {
+        self.reloaded_document().map(|d| d.text())
     }
 
     fn local_image_shown(&self) -> Option<bool> {
         self.editor
             .as_ref()
-            .and_then(|e| e.ivars().images.borrow().shown(&self.local))
+            .and_then(|e| e.pictures().store().borrow().shown(&self.local))
     }
 
     /// Everything the checks below look at has happened.
@@ -258,6 +276,11 @@ fn report(probe: &Probe) {
         reloaded.as_deref() == Some("# Nachher\n"),
         &format!("{reloaded:?}"),
     );
+    check(
+        "a saved and reloaded document holds its text in its editor only",
+        probe.reloaded_document().is_some_and(|d| !d.keeps_a_copy_of_its_text()),
+        "",
+    );
     let _ = std::fs::remove_file(&probe.changed);
     let recent: Vec<String> = NSDocumentController::sharedDocumentController(probe.mtm)
         .recentDocumentURLs()
@@ -278,20 +301,20 @@ fn report(probe: &Probe) {
         );
         write_picture(name, key);
     }
-    remote_answers();
+    guarded("the remote answers", remote_answers);
     check(
         "a local image is decoded in a helper",
         probe.local_image_shown() == Some(true),
         "",
     );
     if let Some(e) = &probe.editor {
-        exports(e);
-        sharing(e, probe.mtm);
+        guarded("the exports", || exports(e));
+        guarded("the sharing menu", || sharing(e, probe.mtm));
     }
     let _ = std::fs::remove_file(&probe.local);
     if let Some(e) = &probe.editor {
-        outline_and_web_permission(e);
-        pasting_a_picture(e, &probe.document);
+        guarded("the outline and web permission", || outline_and_web_permission(e));
+        guarded("pasting a picture", || pasting_a_picture(e, &probe.document));
     }
     super::controller::checks(probe.mtm);
     formula_editor(probe);
@@ -352,6 +375,11 @@ fn remote_answers() {
         "",
     );
     check(
+        "a failure no document shows any more is not asked for again",
+        failed("/nicht-gezeigt.svg") && requests_of(&url_in_probe("/nicht-gezeigt.svg")) == 1,
+        &requests_of(&url_in_probe("/nicht-gezeigt.svg")).to_string(),
+    );
+    check(
         "a final failure is not asked for again",
         requests_of(&url_in_probe("/fehlt.png")) == 1,
         &requests_of(&url_in_probe("/fehlt.png")).to_string(),
@@ -360,6 +388,7 @@ fn remote_answers() {
 
 fn exports(e: &EditorController) {
     let page = e
+        .sharing()
         .export_source()
         .html("Probe", &std::env::temp_dir().join("probe.html"));
     check(
@@ -368,7 +397,7 @@ fn exports(e: &EditorController) {
         "",
     );
     check("the HTML export holds no script", !page.contains("<script"), "");
-    let word = e.export_source().word();
+    let word = e.sharing().export_source().word().expect("a small document");
     let listing = String::from_utf8_lossy(&word);
     check(
         "the Word export holds its document and pictures",
@@ -376,7 +405,7 @@ fn exports(e: &EditorController) {
         &format!("{} bytes", word.len()),
     );
     // The 2 × 1 px image shrinks with the text to 0.75 pt per pixel, on paper and in Word.
-    let printed = e.printable(400.0);
+    let printed = e.sharing().printable(400.0);
     let mut sizes = Vec::new();
     let mut at = 0;
     while at < printed.length() {
@@ -404,6 +433,7 @@ fn exports(e: &EditorController) {
 
 fn sharing(e: &EditorController, mtm: MainThreadMarker) {
     let titles: Vec<String> = e
+        .sharing()
         .export_sharing_services()
         .iter()
         .map(|s| s.title().to_string())
@@ -435,20 +465,20 @@ fn sharing(e: &EditorController, mtm: MainThreadMarker) {
 }
 
 fn outline_and_web_permission(e: &EditorController) {
-    e.toggle_outline();
-    let rows = e.ivars().outline.get().map(|o| o.view.numberOfRows());
+    e.panes().toggle_outline();
+    let rows = e.panes().outline_rows();
     check(
         "the outline lists two nested headings",
         rows == Some(2),
         &format!("{rows:?}"),
     );
-    let banner = |e: &EditorController| e.ivars().remote_banner.get().map(|b| !b.isHidden());
+    let banner = |e: &EditorController| e.pictures().banner_shown();
     check(
         "web images wait for permission",
         banner(e) == Some(true),
         &format!("{:?}", banner(e)),
     );
-    e.allow_remote_images();
+    e.pictures().allow_remote_images();
     check(
         "allowing web images hides the question",
         banner(e) == Some(false),
@@ -468,7 +498,7 @@ fn pasting_a_picture(e: &EditorController, document: &MdDocument) {
     let pasteboard = NSPasteboard::pasteboardWithUniqueName();
     pasteboard.clearContents();
     pasteboard.setData_forType(Some(&NSData::with_bytes(&png)), constant!(NSPasteboardTypePNG));
-    let handled = e.paste_image(&pasteboard);
+    let handled = e.editing().paste_image(&pasteboard);
     let written = std::fs::read_dir(&dir).map_or(0, |d| {
         d.flatten()
             .filter(|f| f.path().extension().is_some_and(|x| x == "png"))
@@ -486,18 +516,32 @@ fn in_dir(dir: &Path, name: &str) -> PathBuf {
     dir.join(name)
 }
 
-fn string_of(result: *mut AnyObject) -> Option<String> {
-    // SAFETY: WebKit passes nil or a valid object for the duration of the call.
-    unsafe { result.as_ref() }.and_then(|r| r.downcast_ref::<NSString>().map(|s| s.to_string()))
-}
+/// What injected content would try. A `data:` address needs no network and has no origin for CORS to refuse, so only the
+/// page's policy can stop this fetch; and the image is known to fail, so a handler that stays silent was stopped as well.
+const INJECTED: &str = "const violated = new Set(); \
+    document.addEventListener('securitypolicyviolation', (e) => violated.add(e.effectiveDirective)); \
+    let net; \
+    try { await (await fetch('data:text/plain,splat')).text(); net = 'fetch allowed'; } catch (e) { net = 'fetch blocked'; } \
+    document.body.insertAdjacentHTML('beforeend', '<img id=\"splat-probe\" src=\"data:,\" onerror=\"window.pwned = 1\">'); \
+    const image = document.getElementById('splat-probe'); \
+    const failed = await new Promise((done) => { \
+        image.addEventListener('error', () => done('failed')); \
+        setTimeout(() => done('did not fail'), 5000); \
+    }); \
+    await new Promise((done) => setTimeout(done, 100)); \
+    const said = [net, 'image ' + failed, 'inline handler ' + (window.pwned ? 'ran' : 'blocked'), \
+        'violated ' + [...violated].sort().join()].join(' / ');";
 
-/// What injected content would try: load from the network, run an inline handler, navigate away.
-const ATTACK: &str = "let net; try { await fetch('https://example.com/'); net = 'fetch allowed'; } catch (e) { net = 'fetch blocked'; } \
-    document.body.insertAdjacentHTML('beforeend', '<img src=x onerror=\"window.pwned = 1\">'); \
-    await new Promise(r => setTimeout(r, 300)); \
-    location.href = 'https://example.com/'; \
-    await new Promise(r => setTimeout(r, 1500)); \
-    return net + ' / inline handler ' + (window.pwned ? 'ran' : 'blocked') + ' / page ' + location.protocol;";
+/// Leads a page to a file beside it, which takes no network either, so only the navigation policy can keep it there. Nothing
+/// reports a navigation that did not happen, so it gets a moment.
+const LEAVE_THE_PAGE: &str = "const name = () => location.pathname.split('/').pop(); \
+    const page = name(); \
+    location.href = page === 'render.html' ? 'mathfield.html' : 'render.html'; \
+    await new Promise((done) => setTimeout(done, 1500)); \
+    return said + ' / ' + (name() === page ? 'stayed' : 'left');";
+
+const STOPPED: &str =
+    "fetch blocked / image failed / inline handler blocked / violated connect-src,script-src-attr / stayed";
 
 /// What MathJax makes of text outside its fonts: letters that join or run from right to left must stay one piece,
 /// while text it has glyphs for stays in its own font.
@@ -508,63 +552,35 @@ const FORMULA_TEXT: &str = "const svg = async (tex) => (await renderMath(tex, fa
     const latin = await svg('\\\\text{abc}'); \
     return [hebrew.includes('>שלום</text>'), arabic.includes('>العربية</text>'), arabic.includes('bold'), pieces(latin)].join(' / ');";
 
-fn formula_text(mtm: MainThreadMarker) {
-    let report = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
-        let text = string_of(result)
-            .or_else(|| {
-                // SAFETY: WebKit passes nil or a valid error for the duration of the call.
-                unsafe { error.as_ref() }.map(|e| format!("error {}", e.localizedDescription()))
-            })
-            .unwrap_or_default();
-        check(
-            "a formula keeps text that joins its letters in one piece",
-            text == "true / true / true / 0",
-            &text,
-        );
-        attack_the_renderer(mtm);
-    });
-    // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
-    unsafe {
-        js::renderer(mtm)
-            .web()
-            .callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-                &ns(FORMULA_TEXT),
-                None,
-                None,
-                &WKContentWorld::pageWorld(mtm),
-                Some(&report),
-            )
-    };
+thread_local! {
+    /// The last script asked, so that only the watch on the one still unanswered fires.
+    static ASKED: Cell<u32> = const { Cell::new(0) };
 }
 
-/// The renderer's page gets formulas and diagrams from the document, so whatever slips through its libraries runs here.
-fn attack_the_renderer(mtm: MainThreadMarker) {
-    let report = RcBlock::new(|result: *mut AnyObject, error: *mut NSError| {
-        let text = string_of(result)
-            .or_else(|| {
-                // SAFETY: WebKit passes nil or a valid error for the duration of the call.
-                unsafe { error.as_ref() }.map(|e| format!("error {}", e.localizedDescription()))
-            })
-            .unwrap_or_default();
-        check(
-            "injected content in the renderer can do nothing",
-            text == "fetch blocked / inline handler blocked / page file:",
-            &text,
-        );
-        finish();
+/// One script in a web view gets this long to answer, on a machine that may be busy with anything.
+const ANSWER_PATIENCE: f64 = 30.0;
+
+/// Runs `script` in `web` and hands on what it returned or the message of its failure. A script that does not answer is a
+/// failed check that names it, and ends the run: what stands behind it follows only from its answer.
+fn ask(web: &WKWebView, name: &'static str, script: &str, answered: impl Fn(String) + 'static) {
+    let number = ASKED.get() + 1;
+    ASKED.set(number);
+    after(ANSWER_PATIENCE, move || {
+        if ASKED.get() == number {
+            check(name, false, &format!("no answer within {ANSWER_PATIENCE} s"));
+            finish();
+        }
     });
-    // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
-    unsafe {
-        js::renderer(mtm)
-            .web()
-            .callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-                &ns(ATTACK),
-                None,
-                None,
-                &WKContentWorld::pageWorld(mtm),
-                Some(&report),
-            )
-    };
+    webkit::call_script(web, script, &[], move |result| {
+        ASKED.set(number + 1);
+        let text = match result {
+            Ok(value) => value
+                .and_then(|v| v.downcast_ref::<NSString>())
+                .map_or_else(String::new, ToString::to_string),
+            Err(message) => format!("error {message}"),
+        };
+        guarded(name, || answered(text.clone()));
+    });
 }
 
 fn formula_editor(probe: &Probe) {
@@ -580,47 +596,168 @@ fn formula_editor(probe: &Probe) {
         "",
     );
     let mtm = probe.mtm;
-    let done = RcBlock::new(move |result: *mut AnyObject, _: *mut NSError| {
-        let script = string_of(result).unwrap_or_default();
-        check(
-            "the formula editor's script runs",
-            script == "function/function/true",
-            &script,
-        );
-        let report = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
-            let text = string_of(result)
-                .or_else(|| {
-                    // SAFETY: WebKit passes nil or a valid error for the duration of the call.
-                    unsafe { error.as_ref() }.map(|e| format!("error {}", e.localizedDescription()))
-                })
-                .unwrap_or_default();
+    let target = web.clone();
+    let editor = probe.editor.clone();
+    ask(
+        &web,
+        "the formula editor's script runs",
+        "return typeof MathfieldElement + '/' + typeof setLatex + '/' + (document.getElementById('mf') instanceof MathfieldElement);",
+        move |script| {
             check(
+                "the formula editor's script runs",
+                script == "function/function/true",
+                &script,
+            );
+            let editor = editor.clone();
+            ask(
+                &target,
                 "injected content in the formula editor can do nothing",
-                text == "fetch blocked / inline handler blocked / page file:",
+                &format!("{INJECTED} {LEAVE_THE_PAGE}"),
+                move |text| {
+                    check(
+                        "injected content in the formula editor can do nothing",
+                        text == STOPPED,
+                        &text,
+                    );
+                    the_formula_survives_its_web_process(mtm, editor.clone());
+                },
+            );
+        },
+    );
+}
+
+/// The number of the web process behind `web`, private in WebKit like the way `js.rs` uses it.
+fn web_process(web: &objc2_web_kit::WKWebView) -> i32 {
+    // SAFETY: A WKWebView method without arguments that returns a pid_t, which `js.rs` relies on as well.
+    unsafe { objc2::msg_send![web, _webProcessIdentifier] }
+}
+
+/// The page that comes back after the web process ended starts empty, and the next input would replace the formula.
+fn the_formula_survives_its_web_process(mtm: MainThreadMarker, editor: Option<Retained<EditorController>>) {
+    let name = "the formula editor shows its formula again after its web process ended";
+    let Some(editor) = editor else {
+        check(name, false, "no editor to attach");
+        the_same_attack_without_a_policy(mtm);
+        return;
+    };
+    let field = mathfield::field(mtm);
+    field.attach(&editor, "x^2");
+    let ended = web_process(&field.web);
+    crate::util::end_process(ended);
+    let watched = field.clone();
+    let back = move || watched.loaded.get() && ![0, ended].contains(&web_process(&watched.web));
+    once(0.0, "the formula editor's page to load again", back, move || {
+        let web = field.web.clone();
+        let (field, editor) = (field.clone(), editor.clone());
+        ask(&web, name, "return document.getElementById('mf').value;", move |text| {
+            check(name, text == "x^2", &text);
+            field.detach(&editor);
+            the_same_attack_without_a_policy(mtm);
+        });
+    });
+}
+
+/// The positive control of the attacks: in a page without the policy the fetch and the handler work, so where they do not,
+/// the policy stopped them.
+fn the_same_attack_without_a_policy(mtm: MainThreadMarker) {
+    let name = "without the policy, injected content can fetch and run its handler";
+    let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(100.0, 100.0));
+    let web = webkit::new_view(mtm, frame, &webkit::configuration(mtm));
+    // SAFETY: A constant page without a base address.
+    let _ = unsafe { web.loadHTMLString_baseURL(&ns("<!doctype html><body></body>"), None) };
+    let watched = web.clone();
+    // SAFETY: Reading whether the view is loading asks for nothing.
+    let loaded = move || !unsafe { watched.isLoading() };
+    once(0.0, "the page without a policy to load", loaded, move || {
+        // WebKit answers only while its view lives.
+        let keep = web.clone();
+        ask(&web, name, &format!("{INJECTED} return said;"), move |text| {
+            let _ = &keep;
+            check(
+                name,
+                text == "fetch allowed / image failed / inline handler ran / violated ",
                 &text,
             );
             formula_text(mtm);
         });
-        // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
-        unsafe {
-            web.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-                &ns(ATTACK),
-                None,
-                None,
-                &WKContentWorld::pageWorld(mtm),
-                Some(&report),
-            )
-        };
     });
-    // SAFETY: The script is a constant, and the block outlives the call as WebKit retains it.
-    unsafe {
-        probe.field.web.evaluateJavaScript_completionHandler(
-            &ns("typeof MathfieldElement + '/' + typeof setLatex + '/' + (document.getElementById('mf') instanceof MathfieldElement)"),
-            Some(&done),
-        )
+}
+
+fn formula_text(mtm: MainThreadMarker) {
+    let name = "a formula keeps text that joins its letters in one piece";
+    ask(&js::renderer(mtm).web(), name, FORMULA_TEXT, move |text| {
+        check(name, text == "true / true / true / 0", &text);
+        // A render already under way would run out of time before this one.
+        once(
+            0.0,
+            "the renderer to finish what the documents asked for",
+            move || js::renderer(mtm).idle(),
+            move || the_defaults_of_a_graph_find_its_brace(mtm),
+        );
+    });
+}
+
+const GRAPH_BRACES: &str = "const opens = ['// {\\ndigraph { a }', '/* { */ digraph { a }', '# {\\ndigraph { a }', \
+    'digraph \"x{\\\\\"{\" { a }', 'digraph { a }']; \
+    const closed = ['digraph', '/* {', '// {', '\"{']; \
+    const wrong = [...opens.filter((c) => graphBrace(c) !== c.lastIndexOf('{')), ...closed.filter((c) => graphBrace(c) !== -1)]; \
+    return 'wrong: ' + wrong.join(' | ');";
+
+/// The colors of the page go into the graph as defaults, so a graph without them shows black on a dark window.
+const GRAPH_COLORS: &str = "await renderGraphviz('// {\\ndigraph { a }', true); \
+    return document.getElementById('out').innerHTML.includes('#e8e8ed') ? 'colored' : 'not colored';";
+
+fn the_defaults_of_a_graph_find_its_brace(mtm: MainThreadMarker) {
+    let name = "the defaults of a graph go behind its brace, not into a comment or name";
+    ask(&js::renderer(mtm).web(), name, GRAPH_BRACES, move |text| {
+        check(name, text == "wrong: ", &text);
+        let name = "a graph behind a comment with a brace takes the colors of the page";
+        ask(&js::renderer(mtm).web(), name, GRAPH_COLORS, move |text| {
+            check(name, text == "colored", &text);
+            a_page_that_stops_answering(mtm);
+        });
+    });
+}
+
+/// Whatever a document's formula or diagram sets off in the page, the renderer gives up on it at its time limit and goes on
+/// in a new page. The formula is one no other check asks for, so its answer can only come from there.
+fn a_page_that_stops_answering(mtm: MainThreadMarker) {
+    let renderer = js::renderer(mtm);
+    webkit::run_script(&renderer.web(), "while (true) {}", &[]);
+    let formula = || Key::math("a^2 + b^2 = c^2", false, false);
+    renderer.request(vec![formula()]);
+    let limit = js::RENDER_TIMEOUT.as_secs_f64();
+    let started = std::time::Instant::now();
+    let answered = move || js::outcome(&formula()).is_some();
+    let then = move || {
+        let outcome = js::outcome(&formula());
+        let waited = started.elapsed().as_secs_f64();
+        check(
+            "a formula renders in a new page after the old one stopped answering",
+            outcome == Some(Ok(())) && waited >= limit,
+            &format!("{outcome:?} after {waited:.1} s, the limit is {limit} s"),
+        );
+        attack_the_renderer(mtm);
     };
-    after(8.0, || {
-        check("the formula editor answers", false, "no answer within 8 s");
-        finish();
-    });
+    super::poll_once(
+        "the renderer to give up on a page that stopped answering",
+        limit + super::UNTIL_TIMEOUT,
+        std::rc::Rc::new(answered),
+        std::rc::Rc::new(then),
+        started,
+    );
+}
+
+/// The renderer's page gets formulas and diagrams from the document, so whatever slips through its libraries runs here.
+fn attack_the_renderer(mtm: MainThreadMarker) {
+    let name = "injected content in the renderer can do nothing";
+    ask(
+        &js::renderer(mtm).web(),
+        name,
+        &format!("{INJECTED} {LEAVE_THE_PAGE}"),
+        move |text| {
+            check(name, text == STOPPED, &text);
+            finish();
+        },
+    );
 }

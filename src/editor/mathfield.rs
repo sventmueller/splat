@@ -39,9 +39,13 @@ define_class!(
             if let Some(value) = dict.objectForKey(&latex)
                 && let Some(s) = value.downcast_ref::<NSString>()
             {
-                editor.visual_formula_changed(&s.to_string());
+                let latex = s.to_string();
+                if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+                    field.shown.replace(latex.clone());
+                }
+                editor.atom_editor().visual_formula_changed(&latex);
             } else if dict.objectForKey(&ns("cancel")).is_some() {
-                editor.cancel_atom_edit();
+                editor.atom_editor().cancel();
             }
         }
     }
@@ -71,6 +75,9 @@ define_class!(
         fn terminated(&self, web: &WKWebView) {
             if let Some(field) = FIELD.with(|f| f.get().cloned()) {
                 field.loaded.set(false);
+                // The new page starts empty, and the next input would replace the formula with what it then holds.
+                let shown = field.shown.borrow().clone();
+                *field.pending.borrow_mut() = field.has_owner().then_some(shown);
                 webkit::load_bundled_page(web, PAGE);
             }
         }
@@ -84,6 +91,8 @@ pub struct MathField {
     bridge: Retained<Bridge>,
     pub(super) loaded: Cell<bool>,
     pending: RefCell<Option<String>>,
+    /// What the field holds for the editor attached to it, to show it again after the web process ended.
+    shown: RefCell<String>,
 }
 
 thread_local! {
@@ -132,12 +141,14 @@ impl MathField {
             bridge,
             loaded: Cell::new(false),
             pending: RefCell::new(None),
+            shown: RefCell::new(String::new()),
         }
     }
 
     /// Shows `latex` and reports edits to `editor` until `detach`.
     pub fn attach(&self, editor: &EditorController, latex: &str) {
         *self.bridge.ivars().borrow_mut() = Some(Weak::from(editor));
+        self.shown.replace(latex.to_string());
         if self.loaded.get() {
             self.run("setLatex(latex)", latex);
         } else {
@@ -145,9 +156,17 @@ impl MathField {
         }
     }
 
-    pub fn detach(&self) {
-        *self.bridge.ivars().borrow_mut() = None;
-        self.web.removeFromSuperview();
+    /// Ends what `attach` began for `editor`. A popover that closes late must not take the field from the next one.
+    pub fn detach(&self, editor: &EditorController) {
+        let owner = self.bridge.ivars().borrow().as_ref().and_then(Weak::load);
+        if owner.is_some_and(|owner| std::ptr::eq(&*owner, editor)) {
+            *self.bridge.ivars().borrow_mut() = None;
+            self.web.removeFromSuperview();
+        }
+    }
+
+    fn has_owner(&self) -> bool {
+        self.bridge.ivars().borrow().as_ref().and_then(Weak::load).is_some()
     }
 
     /// Inserts a template in MathLive syntax at the selection.

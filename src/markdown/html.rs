@@ -6,11 +6,12 @@ use std::collections::HashMap;
 
 use super::commands::heading_anchors;
 use super::doc::{
-    AlertKind, Align, Block, BlockKind, Figure, Inline, InlineKind, ListKind, Piece, code_figure, parse, plain_text,
+    AlertKind, Align, Block, BlockKind, Figure, Inline, InlineKind, ListKind, Piece, code_figure, plain_text,
 };
 use super::markup::{self, Element, Node, is_void, kept_in_exports, read_tag, stray_closes};
+use super::reader::parse;
 use super::style::html_element;
-use super::text::right_to_left;
+use super::text::{Byte, offsets, right_to_left};
 use super::typography::{Mark, Open, Quotes, before_text, marks, smarten};
 use crate::i18n::t;
 
@@ -39,7 +40,7 @@ const KEPT_ATTRIBUTES: [&str; 11] = [
 pub fn to_html(text: &str, export: &Export) -> String {
     let doc = parse(text);
     let mut page = Page {
-        text,
+        text: doc.text(),
         export,
         anchors: heading_anchors(&doc)
             .into_iter()
@@ -87,7 +88,7 @@ struct Page<'a> {
     text: &'a str,
     export: &'a Export<'a>,
     /// The anchor of every heading, by where it starts in the source, as links and the table of contents name it.
-    anchors: HashMap<usize, String>,
+    anchors: HashMap<Byte, String>,
     notes: Vec<&'a Block>,
     /// Quotes the runs of the paragraph being written left open.
     open: Open,
@@ -361,7 +362,7 @@ impl<'a> Page<'a> {
             }
             // Written as a tag, it keeps its size and all else the tag says.
             Piece::Picture(_) if matches!(i.kind, InlineKind::HtmlImage { .. }) => {
-                let tag = self.text.get(i.range.clone()).unwrap_or("");
+                let tag = self.text.get(offsets(&i.range)).unwrap_or("");
                 self.body.push_str(&clean_tag(tag, self.export));
             }
             Piece::Picture(picture) => {
@@ -394,8 +395,8 @@ impl<'a> Page<'a> {
     fn html_tags(&self, i: &Inline) -> Option<(&'a str, &'a str)> {
         let first = i.children.first()?;
         let last = i.children.last()?;
-        let open = self.text.get(i.range.start..first.range.start)?;
-        let close = self.text.get(last.range.end..i.range.end)?;
+        let open = self.text.get(i.range.start.get()..first.range.start.get())?;
+        let close = self.text.get(last.range.end.get()..i.range.end.get())?;
         (open.starts_with('<') && close.starts_with("</")).then_some((open, close))
     }
 
@@ -436,7 +437,7 @@ impl<'a> Page<'a> {
     }
 
     /// Running text, with typographic punctuation, tags, references and citations as in the preview.
-    fn text(&mut self, literal: &str, at: usize, around: Inside) {
+    fn text(&mut self, literal: &str, at: Byte, around: Inside) {
         if around.code {
             self.body.push_str(&escape(literal));
             return;
@@ -879,7 +880,7 @@ mod tests {
 
     #[test]
     fn the_direction_of_a_page_also_reads_embedded_html() {
-        let direction = |t: &str| blocks_direction(&crate::markdown::doc::parse(t).blocks);
+        let direction = |t: &str| blocks_direction(&crate::markdown::reader::parse(t).blocks);
         assert_eq!(direction("<p>שלום</p>\n"), Some(true));
         assert_eq!(direction("```\nשלום\n```\n\nabc\n"), Some(false), "code does not count");
     }

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Előbb mentse a dokumentumot";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "A beillesztett képek fájlként a dokumentum mellé kerülnek. Mentse a dokumentumot, majd illessze be újra a képet.";
 "Export fehlgeschlagen" = "Az exportálás sikertelen";
+"Das Dokument ließ sich nicht umwandeln." = "A dokumentumot nem sikerült átalakítani.";
+"Das Dokument ist zu groß für eine Word-Datei." = "A dokumentum túl nagy egy Word-fájlhoz.";
 "Gliederung ausblenden" = "Vázlat elrejtése";
 "Gliederung einblenden" = "Vázlat megjelenítése";
 "Metadaten" = "Metaadatok";

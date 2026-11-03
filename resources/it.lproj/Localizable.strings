@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Salva prima il documento";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Le immagini incollate vengono salvate come file accanto al documento. Salvalo, poi incolla di nuovo l’immagine.";
 "Export fehlgeschlagen" = "Esportazione non riuscita";
+"Das Dokument ließ sich nicht umwandeln." = "Impossibile convertire il documento.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Il documento è troppo grande per un file Word.";
 "Gliederung ausblenden" = "Nascondi struttura";
 "Gliederung einblenden" = "Mostra struttura";
 "Metadaten" = "Metadati";

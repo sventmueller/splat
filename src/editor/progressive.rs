@@ -2,15 +2,17 @@
 //! visible part, while the app is idle and right away when they scroll into view.
 
 use std::ops::Range;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use objc2::runtime::AnyObject;
-use objc2::{DefinedClass, MainThreadOnly, sel};
-use objc2_foundation::{NSMutableAttributedString, NSNotification, NSRange};
+use objc2::{MainThreadOnly, sel};
+use objc2_foundation::{NSMutableAttributedString, NSRange};
 
-use super::EditorController;
+use super::panes::Side;
 use super::render::RenderCtx;
-use super::scroll::offset_at;
+use super::{EditorController, State};
+use crate::markdown::text::Shown;
+use crate::preview::layout::TopBlock;
 use crate::util::{perform_later, storage};
 
 /// Placeholders this many blocks before and after the visible one get rendered while idle.
@@ -47,64 +49,49 @@ fn window_around(top: usize, bottom: usize, count: usize) -> Range<usize> {
     top.min(bottom).saturating_sub(2).min(end)..end
 }
 
-impl EditorController {
-    /// One of the views scrolled.
-    pub(super) fn view_scrolled(&self, notification: &NSNotification) {
-        let preview_clip = self.preview().enclosingScrollView().map(|s| s.contentView());
-        let from_preview = preview_clip
-            .zip(notification.object())
-            .is_some_and(|(c, o)| std::ptr::eq(&*c as &AnyObject, &*o));
-        // Rendered blocks have other heights than their placeholders, so the sync measures after rendering.
-        if from_preview {
-            self.render_visible_blocks();
-        }
-        // Not from here: the scroll may be AppKit's own, from a block it runs when layout is done, and laying out the view
-        // again inside it frees that block while it runs.
-        if !self.ivars().scrolling.get() {
-            self.ivars().scrolled_preview.set(from_preview);
-            perform_later(self, sel!(syncScroll), 0.0, true);
-        }
-        let pending = self.ivars().state.try_borrow().is_ok_and(|st| st.blocks().pending());
-        if pending {
-            self.schedule_pending_blocks();
-        }
-    }
+pub(super) struct Progressive<'a> {
+    host: &'a EditorController,
+}
 
+impl EditorController {
+    pub(super) fn progressive(&self) -> Progressive<'_> {
+        Progressive { host: self }
+    }
+}
+
+impl Progressive<'_> {
     pub(super) fn schedule_pending_blocks(&self) {
         // Common modes, so rendering goes on while the scroller is dragged.
-        perform_later(self, sel!(renderPendingBlocks), 0.0, true);
+        perform_later(self.host, sel!(renderPendingBlocks), 0.0, true);
     }
 
     /// Renders the placeholder blocks in view right away, so scrolling never shows them unformatted.
     pub(super) fn render_visible_blocks(&self) {
         // Rendered blocks change height and can pull further placeholders into view.
         for _ in 0..3 {
-            if self.ivars().busy.get() || self.preview_editing() {
+            if self.host.panes().is_silent() || self.host.editing().preview_editing() {
                 return;
             }
-            let view = self.preview();
-            let visible = view.visibleRect();
-            let top = offset_at(view, visible.origin.y).unwrap_or(0);
-            let bottom = offset_at(view, visible.origin.y + visible.size.height).unwrap_or(0);
-            let window = {
-                let Ok(st) = self.ivars().state.try_borrow() else {
-                    return;
-                };
+            let view = self.host.panes().preview();
+            let visible = view.visible_rect();
+            let top = view.offset_at(visible.origin.y).unwrap_or(0);
+            let bottom = view.offset_at(visible.origin.y + visible.size.height).unwrap_or(0);
+            let window = self.host.model().read(move |st| {
                 let placeholders = &st.blocks().placeholders;
                 if placeholders.len() != st.layout().blocks.len() {
-                    return;
+                    return None;
                 }
                 let block_at = |offset: usize| {
                     st.index()
                         .block_starts
-                        .partition_point(|&s| s.0 <= offset)
+                        .partition_point(|&s| s.get() <= offset)
                         .saturating_sub(1)
                 };
                 let window = window_around(block_at(top), block_at(bottom), placeholders.len());
-                if !placeholders[window.clone()].iter().any(|p| *p) {
-                    return;
-                }
-                window
+                placeholders[window.clone()].iter().any(|p| *p).then_some(window)
+            });
+            let Some(window) = window else {
+                return;
             };
             self.render_blocks(window.clone(), window.start, None);
         }
@@ -114,18 +101,17 @@ impl EditorController {
     /// Blocks further away wait until scrolled near: in a large document, TextKit takes longer for every edit the
     /// further the rendered part reaches beyond the visible one.
     pub(super) fn render_pending_blocks(&self) {
-        if self.ivars().busy.get() || self.preview_editing() || self.ivars().state.try_borrow().is_err() {
+        if self.host.panes().is_silent() || self.host.editing().preview_editing() {
             self.schedule_pending_blocks();
             return;
         }
         let near = self.visible_preview_block();
-        let window = {
-            let st = self.ivars().state.borrow();
+        let window = self.host.model().read(|st| {
             let blocks = &st.layout().blocks;
             idle_window(near, st.blocks().placeholders.len(), |block| {
                 blocks.get(block).map_or(0, |b| b.paras.len())
             })
-        };
+        });
         if self.render_blocks(window, near, Some(Duration::from_millis(16))) {
             self.schedule_pending_blocks();
         }
@@ -136,71 +122,102 @@ impl EditorController {
     pub(super) fn render_blocks(&self, window: Range<usize>, from: usize, budget: Option<Duration>) -> bool {
         let started = Instant::now();
         let in_time = || budget.is_none_or(|b| started.elapsed() < b);
-        let dark = self.is_dark();
-        let doc_dir = self.doc_dir();
-        let max_width = (self.preview().bounds().size.width - 60.0).max(200.0);
-        let storage = storage(self.preview());
-        let shown_len = storage.length();
-        let (chunks, remaining) = {
-            let Ok(mut guard) = self.ivars().state.try_borrow_mut() else {
-                return true;
-            };
-            let zoom = guard.zoom();
-            let (layout, index, placeholders) = guard.placeholders();
-            let count = placeholders.len();
-            if count != layout.blocks.len() || window.end > count || window.start > window.end {
-                return false;
-            }
-            let ctx = RenderCtx {
-                mtm: self.mtm(),
-                zoom,
-                doc_dir: doc_dir.as_deref(),
-                images: &self.ivars().images,
-                max_image_width: max_width,
-                dark,
-                controller: Some(self),
-                remote_images: self.ivars().remote_allowed.get(),
-            };
-            let from = from.clamp(window.start, window.end);
-            let mut order = (from..window.end).chain(window.start..from);
-            // Consecutive blocks go in as one replacement: every single edit of a large text storage has a fixed cost.
-            let mut chunks = Vec::new();
-            while in_time() {
-                let Some(first) = order.by_ref().find(|&i| placeholders[i]) else {
-                    break;
-                };
-                let start = index.block_starts[first];
-                let chunk = NSMutableAttributedString::new();
-                let (mut last, mut len) = (first, 0);
-                while last < window.end && placeholders[last] && in_time() {
-                    let block = &layout.blocks[last];
-                    if start.0 + len + block.len_u16 > shown_len {
-                        break;
-                    }
-                    chunk.appendAttributedString(&ctx.render_block(block));
-                    placeholders[last] = false;
-                    len += block.len_u16;
-                    last += 1;
-                }
-                if last == first {
-                    break;
-                }
-                chunks.push((NSRange::new(start.0, len), chunk));
-            }
-            (chunks, placeholders[window].iter().any(|p| *p))
+        let dark = self.host.is_dark();
+        let doc_dir = self.host.doc_dir();
+        let max_width = (self.host.panes().preview().bounds().size.width - 60.0).max(200.0);
+        let shown_len = self.host.panes().preview().length();
+        let wanted = window.clone();
+        let Some((zoom, waiting)) = self.host.model().read(move |st| waiting_blocks(st, wanted, from)) else {
+            return false;
         };
-        if !chunks.is_empty() {
-            let _silent = self.silently();
-            storage.beginEditing();
-            for (range, chunk) in &chunks {
-                storage.replaceCharactersInRange_withAttributedString(*range, chunk);
+        let ctx = RenderCtx {
+            mtm: self.host.mtm(),
+            zoom,
+            doc_dir: doc_dir.as_deref(),
+            images: self.host.pictures().store(),
+            max_image_width: max_width,
+            dark,
+            controller: Some(self.host),
+            remote_images: self.host.pictures().remote_allowed(),
+        };
+        // Consecutive blocks go in as one replacement: every single edit of a large text storage has a fixed cost.
+        let mut chunks = Vec::new();
+        let mut done = Vec::new();
+        let mut waiting = waiting.iter().peekable();
+        while in_time() {
+            let Some(&Waiting { at: first, start, .. }) = waiting.peek().copied() else {
+                break;
+            };
+            let chunk = NSMutableAttributedString::new();
+            let (mut next, mut len) = (first, 0);
+            while let Some(found) =
+                waiting.next_if(|w| w.at == next && in_time() && start.get() + len + w.block.len_u16 <= shown_len)
+            {
+                chunk.appendAttributedString(&ctx.render_block(&found.block));
+                done.push(found.at);
+                len += found.block.len_u16;
+                next += 1;
             }
-            storage.endEditing();
+            if next == first {
+                break;
+            }
+            chunks.push((NSRange::new(start.get(), len), chunk));
+        }
+        let remaining = self.host.model().change(move |st| st.rendered(&done, window));
+        if !chunks.is_empty() {
+            self.host.panes().silently(|views| {
+                let storage = storage(views.preview);
+                storage.beginEditing();
+                for (range, chunk) in &chunks {
+                    storage.replaceCharactersInRange_withAttributedString(*range, chunk);
+                }
+                storage.endEditing();
+            });
         }
         // Replacing a block drops the highlight on it.
-        self.mark(self.preview(), self.ivars().marks.in_preview());
+        let selection = self.host.selection();
+        selection.mark(Side::Preview, selection.in_preview());
         remaining
     }
+
+    /// Index of the first preview block in view.
+    pub(super) fn visible_preview_block(&self) -> usize {
+        let top = self.host.panes().preview().top_offset().unwrap_or(0);
+        self.host.model().read(move |st| {
+            st.index()
+                .block_starts
+                .partition_point(|&s| s.get() <= top)
+                .saturating_sub(1)
+        })
+    }
+}
+
+/// A placeholder block, its number and where it starts in the preview text.
+struct Waiting {
+    at: usize,
+    block: Arc<TopBlock>,
+    start: Shown,
+}
+
+/// The zoom and the placeholder blocks of `window`, from `from` on and then those before; `None` when the layout is not
+/// the one the preview view shows.
+fn waiting_blocks(st: &State, window: Range<usize>, from: usize) -> Option<(f64, Vec<Waiting>)> {
+    let placeholders = &st.blocks().placeholders;
+    let count = placeholders.len();
+    if count != st.layout().blocks.len() || window.end > count || window.start > window.end {
+        return None;
+    }
+    let from = from.clamp(window.start, window.end);
+    let waiting = (from..window.end)
+        .chain(window.start..from)
+        .filter(|&at| placeholders[at])
+        .map(|at| Waiting {
+            at,
+            block: st.layout().blocks[at].clone(),
+            start: st.index().block_starts[at],
+        })
+        .collect();
+    Some((st.zoom(), waiting))
 }
 
 #[cfg(test)]

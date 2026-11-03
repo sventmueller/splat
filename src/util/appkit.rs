@@ -1,0 +1,201 @@
+use std::ops::Range;
+
+use objc2::rc::Retained;
+use objc2::runtime::Sel;
+use objc2::{MainThreadMarker, MainThreadOnly};
+use objc2_app_kit::{
+    NSEventModifierFlags, NSLayoutManager, NSMenu, NSMenuItem, NSTextContainer, NSTextInputClient, NSTextStorage,
+    NSTextView,
+};
+use objc2_foundation::{NSRange, NSString};
+
+use crate::markdown::text::{Byte, Shown, U16, Utf16Map};
+
+/// Reads a constant that AppKit, Foundation or WebKit exports.
+macro_rules! constant {
+    ($name:path) => {
+        // SAFETY: the frameworks set their exported constants when they load, before any Rust code runs, and never
+        // change them.
+        unsafe { $name }
+    };
+}
+pub(crate) use constant;
+
+/// A size as AppKit's signed counts have it; no text or table comes near the difference.
+pub fn to_isize(n: usize) -> isize {
+    isize::try_from(n).unwrap_or(isize::MAX)
+}
+
+/// A count from AppKit as a size; a negative one, which says "none", counts nothing.
+pub fn to_usize(n: isize) -> usize {
+    usize::try_from(n).unwrap_or(0)
+}
+
+/// Upcasts any Objective-C object for heterogeneous containers such as attribute dictionaries.
+pub fn obj<T: objc2::ClassType + 'static>(r: Retained<T>) -> Retained<objc2::runtime::AnyObject> {
+    r.into()
+}
+
+/// How many arguments the method behind `selector` takes: its name has one colon for each.
+fn arguments_of(selector: Sel) -> usize {
+    selector.name().to_bytes().iter().filter(|&&byte| byte == b':').count()
+}
+
+/// Sends `selector` to `target` after `delay` seconds, replacing a request for it that has not run yet. With
+/// `common_modes` it also runs while a scroller is dragged or a menu is open.
+pub fn perform_later(target: &objc2::runtime::NSObject, selector: Sel, delay: f64, common_modes: bool) {
+    use objc2_foundation::NSObjectNSDelayedPerforming;
+    assert_eq!(arguments_of(selector), 0, "{selector:?} would get nil as its argument");
+    // SAFETY: A selector without arguments, checked above; the run loop retains the target until the call.
+    unsafe {
+        objc2::runtime::NSObject::cancelPreviousPerformRequestsWithTarget_selector_object(target, selector, None);
+        if common_modes {
+            let modes = objc2_foundation::NSArray::from_slice(&[objc2_foundation::NSRunLoopCommonModes]);
+            target.performSelector_withObject_afterDelay_inModes(selector, None, delay, &modes);
+        } else {
+            target.performSelector_withObject_afterDelay(selector, None, delay);
+        }
+    }
+}
+
+/// The current local time in `format`, an NSDateFormatter pattern read with fixed English conventions.
+pub fn now(format: &str) -> String {
+    let formatter = objc2_foundation::NSDateFormatter::new();
+    formatter.setLocale(Some(&objc2_foundation::NSLocale::localeWithLocaleIdentifier(&ns(
+        "en_US_POSIX",
+    ))));
+    formatter.setDateFormat(Some(&ns(format)));
+    formatter.stringFromDate(&objc2_foundation::NSDate::now()).to_string()
+}
+
+pub fn ns(s: &str) -> Retained<NSString> {
+    NSString::from_str(s)
+}
+
+pub fn to_nsrange(r: Range<U16>) -> NSRange {
+    NSRange::new(r.start.get(), r.end.get().saturating_sub(r.start.get()))
+}
+
+pub fn from_nsrange(r: NSRange) -> Range<U16> {
+    U16::new(r.location)..U16::new(r.location + r.length)
+}
+
+/// A range of the preview view's text.
+pub fn shown_to_ns(r: Range<Shown>) -> NSRange {
+    NSRange::new(r.start.get(), r.end.get().saturating_sub(r.start.get()))
+}
+
+/// A range of the preview view's text.
+pub fn shown_from_ns(r: NSRange) -> Range<Shown> {
+    Shown::new(r.location)..Shown::new(r.location + r.length)
+}
+
+pub fn byte_range_to_ns(map: &Utf16Map, r: &Range<Byte>) -> NSRange {
+    to_nsrange(map.to_u16(r.start)..map.to_u16(r.end))
+}
+
+/// Key equivalent with modifiers: "cmd", "shift", "alt", "ctrl" joined by '+', e.g. "alt+cmd+p".
+pub fn item(mtm: MainThreadMarker, title: &str, action: Option<Sel>, key: &str) -> Retained<NSMenuItem> {
+    let mut modifiers = NSEventModifierFlags::empty();
+    let mut equivalent = "";
+    if !key.is_empty() {
+        let parts: Vec<&str> = key.split('+').collect();
+        let (last, mods) = parts.split_last().unwrap();
+        equivalent = last;
+        for m in mods {
+            modifiers |= match *m {
+                "cmd" => NSEventModifierFlags::Command,
+                "shift" => NSEventModifierFlags::Shift,
+                "alt" => NSEventModifierFlags::Option,
+                "ctrl" => NSEventModifierFlags::Control,
+                _ => NSEventModifierFlags::empty(),
+            };
+        }
+    }
+    assert!(
+        action.is_none_or(|action| arguments_of(action) <= 1),
+        "{action:?} takes more than the sender"
+    );
+    // SAFETY: With at most one argument, checked above, the action takes nothing but the sender AppKit passes.
+    let item = unsafe {
+        NSMenuItem::initWithTitle_action_keyEquivalent(NSMenuItem::alloc(mtm), &ns(title), action, &ns(equivalent))
+    };
+    if !equivalent.is_empty() {
+        item.setKeyEquivalentModifierMask(modifiers);
+    }
+    item
+}
+
+pub fn tagged(mtm: MainThreadMarker, title: &str, action: Sel, key: &str, tag: isize) -> Retained<NSMenuItem> {
+    let i = item(mtm, title, Some(action), key);
+    i.setTag(tag);
+    i
+}
+
+pub fn submenu(
+    mtm: MainThreadMarker,
+    title: &str,
+    items: Vec<Retained<NSMenuItem>>,
+) -> (Retained<NSMenuItem>, Retained<NSMenu>) {
+    let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &ns(title));
+    for i in &items {
+        menu.addItem(i);
+    }
+    let parent = item(mtm, title, None, "");
+    parent.setSubmenu(Some(&menu));
+    (parent, menu)
+}
+
+pub fn separator(mtm: MainThreadMarker) -> Retained<NSMenuItem> {
+    NSMenuItem::separatorItem(mtm)
+}
+
+pub fn storage(view: &NSTextView) -> Retained<NSTextStorage> {
+    // SAFETY: A text view keeps its text system alive, those made in `views.rs` through their `owner`.
+    unsafe { view.textStorage() }.expect("text view without storage")
+}
+
+pub fn layout_manager(view: &NSTextView) -> Option<Retained<NSLayoutManager>> {
+    // SAFETY: A text view keeps its text system alive, those made in `views.rs` through their `owner`.
+    unsafe { view.layoutManager() }
+}
+
+pub fn text_container(view: &NSTextView) -> Option<Retained<NSTextContainer>> {
+    // SAFETY: A text view keeps its text system alive, those made in `views.rs` through their `owner`.
+    unsafe { view.textContainer() }
+}
+
+/// Replaces `range` like typing would.
+pub fn insert_text(view: &NSTextView, text: &NSString, range: NSRange) {
+    // SAFETY: The inserted object is an NSString, one of the two types this method accepts.
+    unsafe { view.insertText_replacementRange(text, range) };
+}
+
+#[cfg(test)]
+mod exception_tests {
+    /// Without objc2's `catch-all`, an Objective-C exception ends the process before the panic hook can save text.
+    #[test]
+    #[should_panic]
+    fn objective_c_exceptions_become_panics() {
+        let array = objc2_foundation::NSArray::<objc2_foundation::NSString>::new();
+        let _ = array.objectAtIndex(3);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_selector_has_one_argument_for_each_colon() {
+        assert_eq!(arguments_of(objc2::sel!(a)), 0);
+        assert_eq!(arguments_of(objc2::sel!(a:)), 1);
+        assert_eq!(arguments_of(objc2::sel!(a:b:)), 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "would get nil")]
+    fn a_selector_that_expects_an_argument_is_not_performed_later() {
+        perform_later(&objc2::runtime::NSObject::new(), objc2::sel!(a:), 0.0, false);
+    }
+}

@@ -42,7 +42,7 @@ define_class!(
             // SAFETY: The superclass's implementation, with this method's signature.
             let accepted: bool = unsafe { msg_send![super(self), becomeFirstResponder] };
             if accepted && let Some(c) = controller(self.ivars()) {
-                c.source_became_focused();
+                c.selection().source_became_focused();
             }
             accepted
         }
@@ -52,7 +52,7 @@ define_class!(
             let pasteboard = sender.draggingPasteboard();
             let point = self.convertPoint_fromView(sender.draggingLocation(), None);
             let index = self.characterIndexForInsertionAtPoint(point);
-            let handled = controller(self.ivars()).is_some_and(|c| c.handle_source_drop(&pasteboard, index));
+            let handled = controller(self.ivars()).is_some_and(|c| c.editing().handle_source_drop(&pasteboard, index));
             // SAFETY: The superclass's implementation, with this method's signature.
             handled || unsafe { msg_send![super(self), performDragOperation: sender] }
         }
@@ -60,7 +60,7 @@ define_class!(
         #[unsafe(method(paste:))]
         fn paste(&self, sender: Option<&AnyObject>) {
             let pasteboard = NSPasteboard::generalPasteboard();
-            if controller(self.ivars()).is_some_and(|c| c.paste_image(&pasteboard)) {
+            if controller(self.ivars()).is_some_and(|c| c.editing().paste_image(&pasteboard)) {
                 return;
             }
             // SAFETY: The superclass's implementation, with this method's signature.
@@ -88,8 +88,9 @@ define_class!(
             let Some(container) = (unsafe { self.textContainer() }) else {
                 return;
             };
-            let width = size.width - 2.0 * self.textContainerInset().width;
-            if self.inLiveResize() && (container.size().width - width).abs() >= 0.5 {
+            if self.inLiveResize()
+                && let Some(width) = followed_width(size.width, self.textContainerInset().width, container.size().width)
+            {
                 container.setSize(NSSize::new(width, container.size().height));
             }
         }
@@ -111,7 +112,7 @@ define_class!(
             // SAFETY: The superclass's implementation, with this method's signature.
             let accepted: bool = unsafe { msg_send![super(self), becomeFirstResponder] };
             if accepted && let Some(c) = controller(self.ivars()) {
-                c.preview_became_focused();
+                c.selection().preview_became_focused();
             }
             accepted
         }
@@ -128,7 +129,7 @@ define_class!(
         #[unsafe(method(paste:))]
         fn paste(&self, sender: Option<&AnyObject>) {
             let pasteboard = NSPasteboard::generalPasteboard();
-            if controller(self.ivars()).is_some_and(|c| c.paste_image(&pasteboard)) {
+            if controller(self.ivars()).is_some_and(|c| c.updater().preview_takes_input() && c.editing().paste_image(&pasteboard)) {
                 return;
             }
             // SAFETY: The superclass's implementation, with this method's signature.
@@ -142,9 +143,7 @@ define_class!(
 
         #[unsafe(method(draggingEntered:))]
         fn dragging_entered(&self, sender: &ProtocolObject<dyn NSDraggingInfo>) -> NSDragOperation {
-            let pasteboard = sender.draggingPasteboard();
-            let types = NSArray::from_slice(&[constant!(NSPasteboardTypeString)]);
-            if pasteboard.availableTypeFromArray(&types).is_none() {
+            if !offers_text(&sender.draggingPasteboard()) {
                 NSDragOperation::None
             } else {
                 // SAFETY: The superclass's implementation, with this method's signature.
@@ -163,7 +162,7 @@ define_class!(
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), viewDidChangeEffectiveAppearance] };
             if let Some(c) = controller(self.ivars()) {
-                c.appearance_changed();
+                c.updater().appearance_changed();
             }
         }
     }
@@ -261,6 +260,17 @@ impl PreviewTextView {
     }
 }
 
+/// The width a text container has to take for a view of `view_width`, unless it stands there already.
+fn followed_width(view_width: f64, inset: f64, container_width: f64) -> Option<f64> {
+    let width = view_width - 2.0 * inset;
+    ((container_width - width).abs() >= 0.5).then_some(width)
+}
+
+pub fn offers_text(pasteboard: &NSPasteboard) -> bool {
+    let text = NSArray::from_slice(&[constant!(NSPasteboardTypeString)]);
+    pasteboard.availableTypeFromArray(&text).is_some()
+}
+
 /// File URLs and web URLs on a pasteboard, in drop order.
 pub fn pasteboard_urls(pasteboard: &NSPasteboard) -> Vec<Retained<NSURL>> {
     let classes = NSArray::from_slice(&[NSURL::class()]);
@@ -298,4 +308,62 @@ pub fn fit_height(view: &NSTextView) {
     lm.ensureLayoutForTextContainer(&tc);
     let used = lm.usedRectForTextContainer(&tc);
     view.setFrameSize(NSSize::new(view.frame().size.width, used.size.height + 4.0));
+}
+
+#[cfg(test)]
+mod tests {
+    use objc2_foundation::NSData;
+
+    use super::*;
+    use crate::util::ns;
+
+    #[test]
+    fn a_container_follows_the_view_only_when_it_stands_elsewhere() {
+        assert_eq!(followed_width(500.0, 18.0, 300.0), Some(464.0));
+        assert_eq!(followed_width(500.0, 18.0, 464.0), None);
+        assert_eq!(
+            followed_width(500.0, 18.0, 464.4),
+            None,
+            "too little to lay anything out again"
+        );
+        assert_eq!(followed_width(500.0, 18.0, 464.5), Some(464.0));
+        assert_eq!(followed_width(500.0, 18.0, 463.5), Some(464.0));
+    }
+
+    /// NSPasteboard shares state between its objects, and two threads at once make it throw now and then.
+    static ONE_PASTEBOARD_TEST: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn a_drag_is_taken_for_its_text_and_not_for_a_picture_alone() {
+        let _alone = ONE_PASTEBOARD_TEST.lock();
+        let board = NSPasteboard::pasteboardWithUniqueName();
+        board.clearContents();
+        board.setData_forType(Some(&NSData::with_bytes(b"x")), constant!(NSPasteboardTypePNG));
+        assert!(!offers_text(&board));
+        board.clearContents();
+        board.setString_forType(&ns("Text"), constant!(NSPasteboardTypeString));
+        assert!(offers_text(&board));
+    }
+
+    #[test]
+    fn a_drop_keeps_its_addresses_in_order_and_nothing_else() {
+        let _alone = ONE_PASTEBOARD_TEST.lock();
+        let board = NSPasteboard::pasteboardWithUniqueName();
+        board.clearContents();
+        let urls = [
+            NSURL::fileURLWithPath(&ns("/tmp/a b.png")),
+            NSURL::URLWithString(&ns("https://example.org/seite")).unwrap(),
+        ];
+        let objects: Vec<_> = urls.into_iter().map(ProtocolObject::from_retained).collect();
+        let written: Vec<Retained<ProtocolObject<dyn objc2_app_kit::NSPasteboardWriting>>> = objects;
+        board.writeObjects(&NSArray::from_retained_slice(&written));
+        let read: Vec<String> = pasteboard_urls(&board)
+            .iter()
+            .filter_map(|u| u.absoluteString().map(|s| s.to_string()))
+            .collect();
+        assert_eq!(read, ["file:///tmp/a%20b.png", "https://example.org/seite"]);
+        board.clearContents();
+        board.setString_forType(&ns("kein Link"), constant!(NSPasteboardTypeString));
+        assert!(pasteboard_urls(&board).is_empty());
+    }
 }

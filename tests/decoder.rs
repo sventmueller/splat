@@ -186,6 +186,24 @@ fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
     assert!(child.wait().unwrap().success(), "the helper ends with its input");
 }
 
+/// A pasted TIFF becomes a PNG of the full size, which pixels drawn for the preview would not be.
+#[test]
+fn a_pasted_tiff_becomes_a_png_inside_the_sandbox() {
+    const PASTED_TIFF: u8 = 5;
+    let tiff = include_bytes!("../src/editor/warmup/sample.tiff").as_slice();
+    let mut child = native_helper();
+    send(&mut child, PASTED_TIFF, tiff);
+    assert_eq!(read(&mut child, 1), [3], "a file comes back");
+    let len = u64::from_le_bytes(read(&mut child, 8).try_into().unwrap());
+    let png = read(&mut child, usize::try_from(len).unwrap());
+    assert!(png.starts_with(b"\x89PNG"));
+    let (_, _, natural, _) = pixels_of(&mut child, tiff, 2560).expect("the TIFF");
+    let (_, _, same, _) = pixels_of(&mut child, &png, 2560).expect("the PNG");
+    assert_eq!(same, natural);
+    send(&mut child, PASTED_TIFF, b"not an image");
+    assert_eq!(read(&mut child, 1), [0]);
+}
+
 /// A PDF has no pixels of its own, so it is drawn sharp, within what was asked for and as large as it says it is.
 #[test]
 fn a_vector_picture_is_drawn_at_four_pixels_per_point_within_the_limit() {

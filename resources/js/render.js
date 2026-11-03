@@ -106,6 +106,29 @@ function place(svgText) {
   return { x: r.x, y: r.y, w: r.width, h: r.height };
 }
 
+// Where the graph opens: a brace in a comment or a quoted name before it would take the defaults along.
+function graphBrace(code) {
+  let i = 0;
+  while (i < code.length) {
+    const c = code[i];
+    if (c === "{") return i;
+    if (c === '"') {
+      for (i++; i < code.length && code[i] !== '"'; i += code[i] === "\\" ? 2 : 1);
+      i++;
+    } else if (code.startsWith("/*", i)) {
+      const end = code.indexOf("*/", i + 2);
+      if (end < 0) return -1;
+      i = end + 2;
+    } else if (code.startsWith("//", i) || (c === "#" && (i === 0 || code[i - 1] === "\n"))) {
+      i = code.indexOf("\n", i);
+      if (i < 0) return -1;
+    } else {
+      i++;
+    }
+  }
+  return -1;
+}
+
 async function renderGraphviz(code, dark) {
   await load("js/viz-global.js");
   const viz = await Viz.instance();
@@ -113,7 +136,7 @@ async function renderGraphviz(code, dark) {
   const font = `fontname="Helvetica", fontcolor="${c}", color="${c}"`;
   // Defaults at the top of the graph; what the graph sets itself later wins.
   const defaults = `graph [${font}, bgcolor="transparent"]; node [${font}]; edge [${font}]; `;
-  const at = code.indexOf("{");
+  const at = graphBrace(code);
   const source = at < 0 ? code : code.slice(0, at + 1) + defaults + code.slice(at + 1);
   try {
     return place(viz.renderString(source, { format: "svg" }));

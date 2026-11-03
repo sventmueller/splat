@@ -9,8 +9,8 @@ use std::ptr::NonNull;
 use std::sync::OnceLock;
 
 use block2::RcBlock;
+use objc2::MainThreadMarker;
 use objc2::rc::{Retained, Weak};
-use objc2::{DefinedClass, MainThreadMarker};
 use objc2_foundation::NSTimer;
 
 use super::{EditorController, OPEN_EDITORS, recovery_dir};
@@ -151,7 +151,7 @@ pub(super) fn copy_unsaved() {
     let mut unsaved = Vec::new();
     for editor in &editors {
         let edited = editor.document().is_some_and(|d| d.isDocumentEdited());
-        if edited && editor.ivars().source.get().is_some() {
+        if edited && editor.panes().is_built() {
             unsaved.push(editor);
         }
     }
@@ -166,7 +166,7 @@ pub(super) fn copy_unsaved() {
     });
     let mut writes = Vec::new();
     for (editor, id) in unsaved.into_iter().zip(ids) {
-        let version = editor.ivars().copy.version();
+        let version = editor.model().text_version();
         let file = COPIES.with(|c| {
             let mut copies = c.borrow_mut();
             match copies.get_mut(&id) {
@@ -194,7 +194,7 @@ pub(super) fn copy_unsaved() {
             }
         });
         if let Some(file) = file {
-            writes.push((file, editor.snapshot().text.clone()));
+            writes.push((file, editor.source_text()));
         }
     }
     if writes.is_empty() && outdated.is_empty() {
@@ -209,12 +209,78 @@ pub(super) fn copy_unsaved() {
             for (file, text) in writes {
                 // Through a second file, so a crash while writing leaves the last copy whole.
                 let partial = file.with_extension("partial");
-                if std::fs::write(&partial, text).is_ok() {
-                    let _ = std::fs::rename(&partial, &file);
+                if let Err(error) = std::fs::write(&partial, text).and_then(|()| std::fs::rename(&partial, &file)) {
+                    crate::diag::report("copying unsaved text failed", error);
                 }
             }
         }
     });
+}
+
+/// The folder for the files the share menu hands out, with the text as it stands, saved or not. Each run has its own, for
+/// `discard_share_files` to tell whose it is.
+pub(super) fn share_root() -> PathBuf {
+    std::env::temp_dir().join("Splat-Teilen")
+}
+
+/// The folder of this run for one shared file.
+pub(super) fn new_share_folder() -> Option<PathBuf> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_nanos();
+    let dir = share_root()
+        .join(std::process::id().to_string())
+        .join(stamp.to_string());
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
+}
+
+/// How long a share service gets to read a file after its window closed; a transfer can outlast the window.
+const SHARED_FOR: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// A window with a shared file has closed.
+pub(super) fn discard_share_file_later(file: &Path) {
+    let Some(folder) = file.parent().map(Path::to_path_buf) else {
+        return;
+    };
+    if let Ok(later) = dispatch2::DispatchTime::try_from(SHARED_FOR) {
+        let _ = dispatch2::DispatchQueue::main().after(later, move || {
+            crate::util::DISK.run(move || remove_share_folder(&folder));
+        });
+    }
+}
+
+fn remove_share_folder(folder: &Path) {
+    if let Err(error) = std::fs::remove_dir_all(folder)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        crate::diag::report("removing a shared file failed", error);
+    }
+}
+
+/// Removes the shared files of this run, as it ends, or those of runs that are gone, as it starts.
+pub fn discard_share_files(ending: bool) {
+    for folder in share_runs_to_remove(&share_root(), std::process::id(), ending, process_exists) {
+        remove_share_folder(&folder);
+    }
+}
+
+fn share_runs_to_remove(root: &Path, own: u32, ending: bool, lives: impl Fn(u32) -> bool) -> Vec<PathBuf> {
+    let Ok(runs) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    runs.flatten()
+        .filter(|run| {
+            let pid = run.file_name().to_str().and_then(|name| name.parse::<u32>().ok());
+            match pid {
+                Some(pid) if pid == own => ending,
+                Some(pid) => !lives(pid),
+                None => true,
+            }
+        })
+        .map(|run| run.path())
+        .collect()
 }
 
 /// Removes the copies of this run, when it ends normally or the panic hook has saved the texts.
@@ -236,6 +302,30 @@ pub fn discard_copies() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn share_files_go_with_their_run() {
+        let root = std::env::temp_dir().join(format!("splat-share-{}", std::process::id()));
+        for run in ["11", "22", "33", "alt"] {
+            std::fs::create_dir_all(root.join(run)).unwrap();
+        }
+        let removed = |ending| {
+            let mut names: Vec<String> = share_runs_to_remove(&root, 11, ending, |pid| pid == 22)
+                .iter()
+                .filter_map(|p| p.file_name()?.to_str().map(str::to_string))
+                .collect();
+            names.sort();
+            names
+        };
+        assert_eq!(
+            removed(false),
+            ["33", "alt"],
+            "neither this run's nor another that lives"
+        );
+        assert_eq!(removed(true), ["11", "33", "alt"]);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(share_runs_to_remove(&root, 11, true, |_| true).is_empty());
+    }
 
     #[test]
     fn copies_of_ended_runs_move_to_the_recovery_folder() {

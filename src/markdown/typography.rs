@@ -3,6 +3,8 @@
 
 use std::ops::Range;
 
+use super::text::Byte;
+
 /// Quotation marks of a language: double opening and closing, single opening and closing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Quotes {
@@ -109,9 +111,9 @@ fn is_cjk(c: char) -> bool {
 
 /// The character in front of running text at `at`, past the formatting around it: a quote behind `**` or `<b>` opens or
 /// closes by what stands before those.
-pub fn before_text(text: &str, at: usize) -> Option<char> {
+pub fn before_text(text: &str, at: Byte) -> Option<char> {
     const MOST_TAGS: usize = 200;
-    let mut rest = &text[..text.floor_char_boundary(at)];
+    let mut rest = &text[..text.floor_char_boundary(at.get())];
     loop {
         rest = rest.trim_end_matches(['*', '_', '~', '=', '^', '`']);
         let window = rest.floor_char_boundary(rest.len().saturating_sub(MOST_TAGS));
@@ -241,11 +243,11 @@ mod tests {
     #[test]
     fn formatting_does_not_count_as_the_character_before_a_quote() {
         let text = "x **\"Hallo\"** y";
-        assert_eq!(before_text(text, 4), Some(' '));
-        assert_eq!(before_text("<b>x", 3), None);
-        assert_eq!(before_text("a <b title=\"t\">x", 15), Some(' '));
-        assert_eq!(before_text("a>x", 2), Some('>'));
-        assert_eq!(before_text("ä", 1), None);
+        assert_eq!(before_text(text, Byte::new(4)), Some(' '));
+        assert_eq!(before_text("<b>x", Byte::new(3)), None);
+        assert_eq!(before_text("a <b title=\"t\">x", Byte::new(15)), Some(' '));
+        assert_eq!(before_text("a>x", Byte::new(2)), Some('>'));
+        assert_eq!(before_text("ä", Byte::new(1)), None);
     }
 
     #[test]

@@ -41,6 +41,7 @@ fn main() -> ExitCode {
         Some("bundle") => bundle(release, selftest).map(|p| println!("{}", p.display())),
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
         Some("universal") => universal_program().map(|p| println!("{}", p.display())),
+        Some("check-library") => check_library(),
         Some("icon") => icon(),
         Some("vendor") => match args.get(1).map(String::as_str) {
             None | Some("check") => vendor(false),
@@ -63,7 +64,7 @@ fn main() -> ExitCode {
 const FLAGS: [&str; 5] = ["--release", "--selftest", "--stop-after", "--scenarios", "--library"];
 
 pub(crate) const USAGE: &str =
-    "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | icon | vendor [check|fetch]
+    "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | check-library | icon | vendor [check|fetch]
        cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] | resize | bench <file.md>
        cargo xtask coverage [--library]";
 

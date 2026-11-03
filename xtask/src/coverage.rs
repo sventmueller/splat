@@ -7,9 +7,23 @@ use std::process::Command;
 use crate::*;
 
 /// Line coverage every module must reach, and all modules together.
-pub(crate) const MODULE_FLOOR: f64 = 80.0;
+#[derive(Clone, Copy)]
+pub(crate) struct Floors {
+    module: f64,
+    total: f64,
+}
 
-pub(crate) const TOTAL_FLOOR: f64 = 85.0;
+/// `make coverage`, with the window code and the self-tests.
+pub(crate) const FULL: Floors = Floors {
+    module: 84.0,
+    total: 96.0,
+};
+
+/// `make coverage-library`, for the modules without a window, by `cargo test` alone.
+pub(crate) const LIBRARY_ONLY: Floors = Floors {
+    module: 90.0,
+    total: 97.0,
+};
 
 /// Measured along with the app, but held to no floor.
 pub(crate) const TEST_CODE: [&str; 4] = ["src/editor/selftest", "src/fuzz.rs", "tests/", "xtask/"];
@@ -125,6 +139,7 @@ pub(crate) fn measured_lines(lcov: &str, root_prefix: &str) -> Vec<(String, u64,
 
 /// The report, lowest coverage first, and what falls below a floor.
 pub(crate) fn judge(files: &[(String, u64, u64)], library: bool) -> (String, Vec<String>) {
+    let floors = if library { LIBRARY_ONLY } else { FULL };
     let percent = |found: u64, hit: u64| {
         if found == 0 {
             100.0
@@ -145,9 +160,9 @@ pub(crate) fn judge(files: &[(String, u64, u64)], library: bool) -> (String, Vec
         let exempt = NO_FLOOR.iter().find(|(m, _)| m == path);
         let mark = match exempt {
             Some((_, why)) => format!("  no floor: {why}"),
-            None if p < MODULE_FLOOR => {
+            None if p < floors.module => {
                 shortfalls.push(format!("{path} {p:.1} %"));
-                format!("  below {MODULE_FLOOR} %")
+                format!("  below {} %", floors.module)
             }
             None => String::new(),
         };
@@ -160,8 +175,8 @@ pub(crate) fn judge(files: &[(String, u64, u64)], library: bool) -> (String, Vec
     }
     let total = percent(found, hit);
     report.push_str(&format!("{total:6.1} %  {found:5}  all modules\n"));
-    if total < TOTAL_FLOOR {
-        shortfalls.push(format!("all modules {total:.1} % (floor {TOTAL_FLOOR} %)"));
+    if total < floors.total {
+        shortfalls.push(format!("all modules {total:.1} % (floor {} %)", floors.total));
     }
     (report, shortfalls)
 }
@@ -189,13 +204,33 @@ mod tests {
         let (report, shortfalls) = judge(&files, false);
         assert_eq!(
             shortfalls,
-            ["src/editor/b.rs 70.0 %", "all modules 56.7 % (floor 85 %)"]
+            ["src/editor/b.rs 70.0 %", "all modules 56.7 % (floor 96 %)"]
         );
         assert!(report.contains("no floor") && !report.contains("selftest"), "{report}");
-        let (_, library) = judge(
-            &measured_lines("SF:/r/src/markdown/x.rs\nLF:4\nLH:4\nend_of_record\n", "/r/"),
-            true,
+    }
+
+    #[test]
+    fn the_library_alone_is_held_to_higher_floors() {
+        let judged = |lcov: &str, library: bool| judge(&measured_lines(lcov, "/r/"), library).1;
+        let full_marks = "SF:/r/src/markdown/x.rs\nLF:4\nLH:4\nend_of_record\n";
+        assert!(judged(full_marks, true).is_empty());
+        let weak_module = "SF:/r/src/markdown/x.rs\nLF:100\nLH:89\nend_of_record\n\
+                           SF:/r/src/preview/y.rs\nLF:900\nLH:900\nend_of_record\n";
+        assert_eq!(judged(weak_module, true), ["src/markdown/x.rs 89.0 %"]);
+        assert!(
+            judged(weak_module, false).is_empty(),
+            "the full measurement keeps its floors"
         );
-        assert!(library.is_empty());
+        let weak_total = "SF:/r/src/markdown/x.rs\nLF:100\nLH:96\nend_of_record\n";
+        assert_eq!(judged(weak_total, true), ["all modules 96.0 % (floor 97 %)"]);
+        let at_the_floors = "SF:/r/src/markdown/x.rs\nLF:100\nLH:90\nend_of_record\n\
+                             SF:/r/src/preview/y.rs\nLF:900\nLH:880\nend_of_record\n";
+        assert!(judged(at_the_floors, true).is_empty());
+        let window_code = "SF:/r/src/editor/w.rs\nLF:100\nLH:0\nend_of_record\n";
+        assert_eq!(
+            judged(window_code, true),
+            ["no measured line in any module"],
+            "the library measurement looks at nothing else"
+        );
     }
 }

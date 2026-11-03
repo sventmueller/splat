@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::code::{self, CodeToken};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, walk_blocks};
-use super::text::{LineStarts, right_to_left, shifted};
+use super::text::{Byte, LineStarts, TextAt, right_to_left, shifted};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Token {
@@ -58,25 +58,25 @@ impl Style {
 }
 
 /// Styled, non-overlapping byte ranges for the source view. Unstyled text is omitted.
-pub fn highlight(text: &str, doc: &Doc) -> Vec<(Range<usize>, Style)> {
-    highlight_blocks(text, &doc.blocks)
+pub fn highlight(doc: &Doc) -> Vec<(Range<Byte>, Style)> {
+    highlight_blocks(doc.text(), &doc.blocks)
 }
 
-fn highlight_blocks(text: &str, blocks: &[Block]) -> Vec<(Range<usize>, Style)> {
-    let mut spans: Vec<(Range<usize>, Style)> = Vec::new();
+pub(super) fn highlight_blocks(text: &str, blocks: &[Block]) -> Vec<(Range<Byte>, Style)> {
+    let mut spans: Vec<(Range<Byte>, Style)> = Vec::new();
     let lines = LineStarts::new(text);
     walk_blocks(blocks, &mut |b| block_spans(text, &lines, b, &mut spans));
     flatten(spans)
 }
 
-/// The colors of `text` after `splice` changed `doc`: those of the re-parsed blocks are computed anew, the others
-/// taken from `old`.
+/// The colors of `doc` after `splice` changed it: those of the re-parsed blocks are computed anew, the others taken
+/// from `old`.
 pub fn rehighlight(
-    old: &[(Range<usize>, Style)],
-    text: &str,
+    old: &[(Range<Byte>, Style)],
     doc: &Doc,
     splice: &super::incremental::Splice,
-) -> Vec<(Range<usize>, Style)> {
+) -> Vec<(Range<Byte>, Style)> {
+    let text = doc.text();
     let window = &splice.window;
     let old_end = shifted(window.end, -splice.delta);
     let head = old.partition_point(|(r, _)| r.start < window.start);
@@ -88,23 +88,23 @@ pub fn rehighlight(
         || old[..tail].last().is_some_and(|(r, _)| r.end > old_end)
         || fresh.iter().any(|(r, _)| r.start < window.start || r.end > window.end);
     if crosses {
-        return highlight(text, doc);
+        return highlight(doc);
     }
     let mut out = Vec::with_capacity(head + fresh.len() + old.len() - tail);
     out.extend_from_slice(&old[..head]);
     out.extend(fresh);
-    let at = |o: usize| shifted(o, splice.delta);
+    let at = |o: Byte| shifted(o, splice.delta);
     out.extend(old[tail..].iter().map(|(r, s)| (at(r.start)..at(r.end), *s)));
     out
 }
 
-fn push(spans: &mut Vec<(Range<usize>, Style)>, range: Range<usize>, paint: Style) {
+fn push(spans: &mut Vec<(Range<Byte>, Style)>, range: Range<Byte>, paint: Style) {
     if range.start < range.end {
         spans.push((range, paint));
     }
 }
 
-fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
+fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<Byte>, Style)>) {
     match &b.kind {
         BlockKind::Heading { attrs, .. } => {
             spans.push((
@@ -122,17 +122,17 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
         }
         BlockKind::Comment => push(spans, b.range.clone(), Style::color(Token::Comment)),
         BlockKind::DefinitionDetails => {
-            if text[b.range.clone()].starts_with(':') {
+            if text.at(b.range.clone()).starts_with(':') {
                 push(spans, b.range.start..b.range.start + 1, Style::color(Token::ListMarker));
             }
         }
         BlockKind::Item { task, marker } => {
             push(spans, marker.clone(), Style::color(Token::ListMarker));
             if let Some(t) = task {
-                let start = text[..t.symbol].rfind('[').unwrap_or(t.symbol);
+                let start = text.upto(t.symbol).rfind('[').map_or(t.symbol, Byte::new);
                 push(
                     spans,
-                    start..(t.symbol + 2).min(text.len()),
+                    start..(t.symbol + 2).min(text.end()),
                     Style::color(Token::ListMarker),
                 );
             }
@@ -160,7 +160,7 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
             if super::doc::is_math_fence(info) {
                 push(spans, content.clone(), Style::color(Token::Math));
             } else if code::known(info) {
-                for (r, t) in code::tokens(info, &text[content.clone()]) {
+                for (r, t) in code::tokens(info, text.at(content.clone())) {
                     push(
                         spans,
                         content.start + r.start..content.start + r.end,
@@ -187,10 +187,10 @@ fn block_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
     }
 }
 
-fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
-    for line in lines.line_of(b.range.start)..=lines.line_of(b.range.end.saturating_sub(1)) {
+fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<Byte>, Style)>) {
+    for line in lines.line_of(b.range.start)..=lines.line_of(shifted(b.range.end, -1)) {
         let lr = lines.line_range(text, line);
-        let s = &text[lr.clone()];
+        let s = text.at(lr.clone());
         let mut end = 0;
         for (i, c) in s.char_indices() {
             match c {
@@ -203,16 +203,16 @@ fn quote_markers(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Ran
     }
 }
 
-fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<usize>, Style)>) {
+fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range<Byte>, Style)>) {
     let first = lines.line_of(b.range.start);
-    let last = lines.line_of(b.range.end.saturating_sub(1));
+    let last = lines.line_of(shifted(b.range.end, -1));
     for line in first..=last {
         let lr = lines.line_range(text, line);
         if line == first + 1 {
             push(spans, lr, Style::color(Token::Punctuation));
             continue;
         }
-        for pipe in unescaped_pipes(&text[lr.clone()]) {
+        for pipe in unescaped_pipes(text.at(lr.clone())) {
             push(
                 spans,
                 lr.start + pipe..lr.start + pipe + 1,
@@ -275,13 +275,13 @@ pub fn unescaped_pipes(line: &str) -> Vec<usize> {
     out
 }
 
-fn delimiters(i: &Inline, spans: &mut Vec<(Range<usize>, Style)>, token: Token) {
+fn delimiters(i: &Inline, spans: &mut Vec<(Range<Byte>, Style)>, token: Token) {
     let content = i.content_range();
     push(spans, i.range.start..content.start, Style::color(token));
     push(spans, content.end..i.range.end, Style::color(token));
 }
 
-fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) {
+fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<Byte>, Style)>) {
     match &i.kind {
         InlineKind::Strong => {
             spans.push((i.range.clone(), Style::flags(true, false, false)));
@@ -296,7 +296,7 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) 
             delimiters(i, spans, Token::Punctuation);
         }
         InlineKind::Underline | InlineKind::Highlight | InlineKind::Superscript | InlineKind::Subscript => {
-            let tag = text[i.range.clone()].starts_with('<');
+            let tag = text.at(i.range.clone()).starts_with('<');
             delimiters(i, spans, if tag { Token::Html } else { Token::Punctuation })
         }
         InlineKind::Spoiler => delimiters(i, spans, Token::Punctuation),
@@ -307,7 +307,7 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) 
         InlineKind::Emoji(_) => push(spans, i.range.clone(), Style::color(Token::Punctuation)),
         InlineKind::Kbd | InlineKind::Span => delimiters(i, spans, Token::Html),
         InlineKind::HtmlImage { .. } => push(spans, i.range.clone(), Style::color(Token::Html)),
-        InlineKind::Link { .. } if text[i.range.clone()].starts_with('<') => {
+        InlineKind::Link { .. } if text.at(i.range.clone()).starts_with('<') => {
             delimiters(i, spans, Token::Html);
             push(spans, i.content_range(), Style::color(Token::LinkText));
         }
@@ -317,14 +317,14 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) 
         InlineKind::Math { .. } => push(spans, i.range.clone(), Style::color(Token::Math)),
         InlineKind::FootnoteRef { .. } => push(spans, i.range.clone(), Style::color(Token::LinkText)),
         InlineKind::Link { .. } | InlineKind::Image { .. } => {
-            let src = &text[i.range.clone()];
+            let src = text.at(i.range.clone());
             if !src.starts_with('[') && !src.starts_with("![") {
                 push(spans, i.range.clone(), Style::color(Token::Url));
             } else {
                 let content = i.content_range();
                 push(spans, i.range.start..content.start, Style::color(Token::Punctuation));
                 push(spans, content.clone(), Style::color(Token::LinkText));
-                let tail = &text[content.end..i.range.end];
+                let tail = text.at(content.end..i.range.end);
                 match (tail.find('('), tail.rfind(')')) {
                     (Some(open), Some(close)) if open < close => {
                         push(
@@ -348,7 +348,7 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) 
             }
         }
         InlineKind::Text(t) => {
-            let src = &text[i.range.clone()];
+            let src = text.at(i.range.clone());
             if src.len() != t.len() {
                 let mut prev_backslash = false;
                 for (pos, c) in src.char_indices() {
@@ -372,16 +372,16 @@ fn inline_spans(text: &str, i: &Inline, spans: &mut Vec<(Range<usize>, Style)>) 
     }
 }
 
-fn flatten(spans: Vec<(Range<usize>, Style)>) -> Vec<(Range<usize>, Style)> {
-    let mut events: Vec<(usize, bool, usize)> = Vec::with_capacity(spans.len() * 2);
+fn flatten(spans: Vec<(Range<Byte>, Style)>) -> Vec<(Range<Byte>, Style)> {
+    let mut events: Vec<(Byte, bool, usize)> = Vec::with_capacity(spans.len() * 2);
     for (idx, (r, _)) in spans.iter().enumerate() {
         events.push((r.start, true, idx));
         events.push((r.end, false, idx));
     }
     events.sort_by_key(|&(pos, is_start, idx)| (pos, is_start, idx));
     let mut active: Vec<usize> = Vec::new();
-    let mut out: Vec<(Range<usize>, Style)> = Vec::new();
-    let mut last = 0;
+    let mut out: Vec<(Range<Byte>, Style)> = Vec::new();
+    let mut last = Byte::default();
     for (pos, is_start, idx) in events {
         if pos > last && !active.is_empty() {
             let mut style = Style::default();
@@ -414,17 +414,17 @@ fn flatten(spans: Vec<(Range<usize>, Style)>) -> Vec<(Range<usize>, Style)> {
 /// every span that changed apart from moving with the edit.
 pub fn changed_region(
     old_text: &str,
-    old: &[(Range<usize>, Style)],
+    old: &[(Range<Byte>, Style)],
     text: &str,
-    spans: &[(Range<usize>, Style)],
-) -> Range<usize> {
+    spans: &[(Range<Byte>, Style)],
+) -> Range<Byte> {
     let (old_edit, edit) = super::incremental::changed(old_text, text);
     let (prefix, old_edit_end, edit_end) = (old_edit.start, old_edit.end, edit.end);
-    let shift = |o: usize| {
+    let shift = |o: Byte| {
         if o <= prefix {
             o
         } else if o >= old_edit_end {
-            o - old_edit_end + edit_end
+            edit_end + (o - old_edit_end)
         } else {
             edit_end
         }
@@ -448,24 +448,25 @@ pub fn changed_region(
         .iter()
         .map(|s| s.0.start)
         .chain(changed_old.iter().map(|s| s.0.start.min(prefix)))
-        .fold(prefix, usize::min);
+        .fold(prefix, Byte::min);
     let end = changed_new
         .iter()
         .map(|s| s.0.end)
         .chain(changed_old.iter().map(|s| shift(s.0.end)))
-        .fold(edit_end, usize::max)
-        .min(text.len());
+        .fold(edit_end, Byte::max)
+        .min(text.end());
     start..end.max(start)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::doc::parse;
+    use crate::markdown::reader::parse;
+    use crate::markdown::text::bytes;
 
     fn styled(t: &str) -> Vec<(&str, Style)> {
         let d = parse(t);
-        highlight(t, &d).into_iter().map(|(r, s)| (&t[r], s)).collect()
+        highlight(&d).into_iter().map(|(r, s)| (t.at(r), s)).collect()
     }
 
     #[test]
@@ -532,11 +533,14 @@ mod tests {
     fn only_the_changed_region_is_recolored() {
         let a = "Text **fett** und\n\n```\ncode\n";
         let b = "Text **fetter** und\n\n```\ncode\n";
-        let r = changed_region(a, &highlight(a, &parse(a)), b, &highlight(b, &parse(b)));
-        assert_eq!(r, 7..15);
+        let r = changed_region(a, &highlight(&parse(a)), b, &highlight(&parse(b)));
+        assert_eq!(r, bytes(7..15));
         let c = "Text **fetter** und\n\n```\ncode\n```\nnach\n";
-        let r = changed_region(b, &highlight(b, &parse(b)), c, &highlight(c, &parse(c)));
-        assert!(r.start >= 21 && r.start <= b.len() && r.end == c.len(), "{r:?}");
+        let r = changed_region(b, &highlight(&parse(b)), c, &highlight(&parse(c)));
+        assert!(
+            r.start >= Byte::new(21) && r.start <= Byte::new(b.len()) && r.end == Byte::new(c.len()),
+            "{r:?}"
+        );
     }
 
     #[test]
@@ -653,7 +657,10 @@ mod tests {
     #[test]
     fn neighbouring_spans_of_one_style_become_one() {
         let bold = Style::flags(true, false, false);
-        assert_eq!(flatten(vec![(0..2, bold), (2..4, bold)]), [(0..4, bold)]);
+        assert_eq!(
+            flatten(vec![(bytes(0..2), bold), (bytes(2..4), bold)]),
+            [(bytes(0..4), bold)]
+        );
     }
 
     #[test]
@@ -673,15 +680,15 @@ mod tests {
     #[test]
     fn a_changed_region_starts_and_ends_at_whole_letters() {
         let region = |a: &str, b: &str| changed_region(a, &[], b, &[]);
-        assert_eq!(region("x é y", "x è y"), 2..4, "the letters begin alike");
-        assert_eq!(region("x éy", "x ĩy"), 2..4, "the letters end alike");
+        assert_eq!(region("x é y", "x è y"), bytes(2..4), "the letters begin alike");
+        assert_eq!(region("x éy", "x ĩy"), bytes(2..4), "the letters end alike");
     }
 
     #[test]
     fn spans_behind_the_edit_only_move() {
         let a = "*a* *b* *c* X *d* *e* *f* *g*\n";
         let b = "*a* *b* *c* Y *d* *e* *f* *g*\n";
-        let r = changed_region(a, &highlight(a, &parse(a)), b, &highlight(b, &parse(b)));
-        assert_eq!(r, 12..13);
+        let r = changed_region(a, &highlight(&parse(a)), b, &highlight(&parse(b)));
+        assert_eq!(r, bytes(12..13));
     }
 }

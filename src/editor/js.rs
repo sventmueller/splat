@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use dispatch2::{DispatchQueue, DispatchTime};
 use objc2::rc::{Retained, Weak};
-use objc2::runtime::NSObject;
+use objc2::runtime::{AnyObject, NSObject};
 use objc2::{MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{NSBackingStoreType, NSImage, NSPanel, NSWindowStyleMask};
 use objc2_foundation::{NSDictionary, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
@@ -103,7 +103,7 @@ fn web_view(window: &NSPanel, delegate: &NavDelegate) -> Retained<WKWebView> {
 }
 
 /// A render that has not answered by then counts as failed, and a new web view takes over.
-const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub(super) const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 fn renderer_if_started() -> Option<Rc<Renderer>> {
     RENDERER.with(|r| r.get().cloned())
@@ -334,7 +334,7 @@ impl Renderer {
         if self.idle() {
             let listeners: Vec<_> = self.listeners.borrow().iter().filter_map(Weak::load).collect();
             for l in listeners {
-                l.renders_arrived();
+                l.updater().renders_arrived();
             }
         }
     }
@@ -345,9 +345,15 @@ impl Renderer {
         }
     }
 
-    fn call(&self, body: &str, args: &[(&str, ScriptValue)], done: impl Fn(Option<&NSDictionary>) + 'static) {
+    fn call<T: 'static>(
+        &self,
+        body: &str,
+        args: &[(&str, ScriptValue)],
+        fields: fn(&NSDictionary) -> Option<T>,
+        done: impl Fn(Answer<T>) + 'static,
+    ) {
         webkit::call_script(&self.web.borrow(), body, args, move |result| {
-            done(result.and_then(|o| o.downcast_ref::<NSDictionary>()));
+            done(Answer::read(result, fields));
         });
     }
 
@@ -359,18 +365,15 @@ impl Renderer {
             ("color", ScriptValue::Text(color)),
         ];
         let label = tex.to_string();
-        self.call("return await renderMath(tex, display, color);", &args, move |dict| {
+        let call = "return await renderMath(tex, display, color);";
+        self.call(call, &args, MathAnswer::read, move |answer| {
             let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) else {
                 return;
             };
-            if let Some(message) = dict.and_then(|d| string(d, "error")).filter(|m| !m.is_empty()) {
+            if let Some(message) = answer.error {
                 r.queue.borrow_mut().note_error(key.clone(), message);
             }
-            let answer = dict.and_then(|d| {
-                let svg = string(d, "svg")?;
-                Some((svg, number(d, "w")?, number(d, "h")?, number(d, "va").unwrap_or(0.0)))
-            });
-            let Some((svg, w, h, va)) = answer else {
+            let Some(MathAnswer { svg, w, h, va }) = answer.value else {
                 r.finish(key.clone(), None);
                 return;
             };
@@ -387,9 +390,7 @@ impl Renderer {
             let label = label.clone();
             background(move || {
                 // The answer must arrive whatever happens, or the renderer never counts as idle again.
-                let pixels = std::panic::catch_unwind(|| super::decoder::svg_to_pixels(&svg))
-                    .ok()
-                    .flatten();
+                let pixels = crate::util::contained(|| super::decoder::svg_to_pixels(&svg)).flatten();
                 DispatchQueue::main().exec_async(move || {
                     let Some(r) = renderer_if_started() else { return };
                     r.queue.borrow_mut().conversion_ended();
@@ -427,16 +428,15 @@ impl Renderer {
         self.call(
             "return await renderDiagram(language, code, dark);",
             &args,
-            move |dict| {
+            PlacedPicture::read,
+            move |answer| {
                 let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) else {
                     return;
                 };
-                if let Some(message) = dict.and_then(|d| string(d, "error")) {
+                if let Some(message) = answer.error {
                     r.queue.borrow_mut().note_error(key.clone(), message);
                 }
-                let rect =
-                    dict.and_then(|d| Some((number(d, "x")?, number(d, "y")?, number(d, "w")?, number(d, "h")?)));
-                let (Some((x, y, w, h)), Some(web)) = (rect.filter(|r| r.2 > 0.0 && r.3 > 0.0), web.load()) else {
+                let (Some(PlacedPicture { x, y, w, h }), Some(web)) = (answer.value, web.load()) else {
                     r.finish(key.clone(), None);
                     return;
                 };
@@ -448,10 +448,8 @@ impl Renderer {
                     let label = label.clone();
                     background(move || {
                         // The answer must arrive whatever happens, or the renderer never counts as idle again.
-                        let pixels =
-                            std::panic::catch_unwind(|| pdf.and_then(|pdf| super::decoder::pdf_to_pixels(&pdf)))
-                                .ok()
-                                .flatten();
+                        let pixels = crate::util::contained(|| pdf.and_then(|pdf| super::decoder::pdf_to_pixels(&pdf)))
+                            .flatten();
                         DispatchQueue::main().exec_async(move || {
                             let rendered = pixels
                                 .and_then(|pixels| labeled_image(pixels, &crate::i18n::tf("Diagramm: {}", &[&label])))
@@ -478,6 +476,72 @@ pub fn background(job: impl FnOnce() + Send + 'static) {
     crate::util::BACKGROUND.run(job);
 }
 
+/// What a function of render.js answered: the reason it gives or threw for a failure, and what it rendered.
+#[derive(Debug, PartialEq)]
+struct Answer<T> {
+    error: Option<String>,
+    value: Option<T>,
+}
+
+impl<T> Answer<T> {
+    fn read(result: Result<Option<&AnyObject>, String>, fields: fn(&NSDictionary) -> Option<T>) -> Answer<T> {
+        let answer = match result {
+            Ok(answer) => answer.and_then(|o| o.downcast_ref::<NSDictionary>()),
+            Err(thrown) => {
+                return Answer {
+                    error: Some(thrown),
+                    value: None,
+                };
+            }
+        };
+        Answer {
+            error: answer.and_then(|d| string(d, "error")).filter(|m| !m.is_empty()),
+            value: answer.and_then(fields),
+        }
+    }
+}
+
+/// What `renderMath` draws.
+#[derive(Debug, PartialEq)]
+struct MathAnswer {
+    svg: String,
+    w: f64,
+    h: f64,
+    va: f64,
+}
+
+impl MathAnswer {
+    fn read(d: &NSDictionary) -> Option<MathAnswer> {
+        Some(MathAnswer {
+            svg: string(d, "svg")?,
+            w: number(d, "w")?,
+            h: number(d, "h")?,
+            va: number(d, "va").unwrap_or(0.0),
+        })
+    }
+}
+
+/// Where `renderDiagram` placed its picture on the page.
+#[derive(Debug, PartialEq)]
+struct PlacedPicture {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
+
+impl PlacedPicture {
+    fn read(d: &NSDictionary) -> Option<PlacedPicture> {
+        let placed = PlacedPicture {
+            x: number(d, "x")?,
+            y: number(d, "y")?,
+            w: number(d, "w")?,
+            h: number(d, "h")?,
+        };
+        (placed.w > 0.0 && placed.h > 0.0).then_some(placed)
+    }
+}
+
 fn string(d: &NSDictionary, key: &str) -> Option<String> {
     let k = ns(key);
     let v = d.objectForKey(&k)?;
@@ -499,6 +563,62 @@ fn labeled_image(pixels: Decoded, description: &str) -> Option<Retained<NSImage>
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::util::ns;
+
+    fn answer(fields: &[(&str, &AnyObject)]) -> Retained<NSDictionary> {
+        let keys: Vec<Retained<NSString>> = fields.iter().map(|(k, _)| ns(k)).collect();
+        let key_refs: Vec<&NSString> = keys.iter().map(|k| &**k).collect();
+        let values: Vec<&AnyObject> = fields.iter().map(|(_, v)| *v).collect();
+        let typed = NSDictionary::from_slices(&key_refs, &values);
+        // SAFETY: Only the type of the keys is forgotten, which readers ask for again.
+        unsafe { Retained::cast_unchecked(typed) }
+    }
+
+    fn num(n: f64) -> Retained<NSNumber> {
+        NSNumber::new_f64(n)
+    }
+
+    #[test]
+    fn an_answer_is_read_into_its_fields() {
+        let (svg, w, h) = (ns("<svg/>"), num(4.0), num(2.0));
+        let d = answer(&[("svg", &svg), ("w", &w), ("h", &h)]);
+        let read = Answer::read(Ok(Some(&d)), MathAnswer::read);
+        assert_eq!(
+            read,
+            Answer {
+                error: None,
+                value: Some(MathAnswer {
+                    svg: "<svg/>".to_string(),
+                    w: 4.0,
+                    h: 2.0,
+                    va: 0.0,
+                }),
+            }
+        );
+    }
+
+    #[test]
+    fn a_failure_is_a_reason_whether_returned_or_thrown() {
+        let reason = ns("bad formula");
+        let d = answer(&[("error", &reason)]);
+        let returned = Answer::read(Ok(Some(&d)), MathAnswer::read);
+        assert_eq!(returned.error.as_deref(), Some("bad formula"));
+        assert!(returned.value.is_none());
+        let thrown = Answer::read(Err("Type error".to_string()), MathAnswer::read);
+        assert_eq!(thrown.error.as_deref(), Some("Type error"));
+        assert!(thrown.value.is_none());
+    }
+
+    #[test]
+    fn a_picture_without_a_size_is_none() {
+        let (zero, one) = (num(0.0), num(1.0));
+        let flat = answer(&[("x", &one), ("y", &one), ("w", &one), ("h", &zero)]);
+        assert_eq!(Answer::read(Ok(Some(&flat)), PlacedPicture::read).value, None);
+        let found = answer(&[("x", &one), ("y", &one), ("w", &one), ("h", &one)]);
+        assert!(Answer::read(Ok(Some(&found)), PlacedPicture::read).value.is_some());
+    }
+
     #[test]
     fn mathjax_like_svg_converts() {
         let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 -750 1000 1000" color="#1D1D1F"><defs><path id="g" d="M10 10L500 10L500 -500Z"/></defs><g fill="currentColor"><use xlink:href="#g"/></g></svg>"##;

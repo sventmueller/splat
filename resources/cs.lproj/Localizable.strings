@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Nejprve uložte dokument";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Vložené obrázky se ukládají jako soubory vedle dokumentu. Uložte ho a pak obrázek vložte znovu.";
 "Export fehlgeschlagen" = "Export se nezdařil";
+"Das Dokument ließ sich nicht umwandeln." = "Dokument se nepodařilo převést.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokument je pro soubor Word příliš velký.";
 "Gliederung ausblenden" = "Skrýt osnovu";
 "Gliederung einblenden" = "Zobrazit osnovu";
 "Metadaten" = "Metadata";

@@ -4,28 +4,21 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use objc2_foundation::{NSBundle, NSString};
-
 static TEXTS: OnceLock<HashMap<String, &'static str>> = OnceLock::new();
 
-fn texts() -> &'static HashMap<String, &'static str> {
+/// Makes the entries of a `.strings` file the interface texts; only the first call counts.
+pub fn install(strings_file: &str) {
     TEXTS.get_or_init(|| {
-        let bundle = NSBundle::mainBundle();
-        let path = bundle.pathForResource_ofType(
-            Some(&NSString::from_str("Localizable")),
-            Some(&NSString::from_str("strings")),
-        );
-        let content = path.and_then(|p| std::fs::read_to_string(p.to_string()).ok());
-        parse(content.as_deref().unwrap_or(""))
+        parse(strings_file)
             .into_iter()
             .map(|(k, v)| (k, &*Box::leak(v.into_boxed_str())))
             .collect()
-    })
+    });
 }
 
-/// The text for `key` in the interface language.
+/// The text for `key` in the interface language; the key itself before `install`.
 pub fn t(key: &'static str) -> &'static str {
-    texts().get(key).copied().unwrap_or(key)
+    TEXTS.get().and_then(|texts| texts.get(key).copied()).unwrap_or(key)
 }
 
 /// Like `t`, with each `{}` replaced by the next of `args`.
@@ -188,7 +181,8 @@ mod tests {
 
     #[test]
     fn every_quick_reference_keeps_the_structure_of_the_german_one() {
-        use crate::markdown::doc::{Block, BlockKind, parse as parse_markdown};
+        use crate::markdown::doc::{Block, BlockKind};
+        use crate::markdown::reader::parse as parse_markdown;
         fn shape(blocks: &[Block], out: &mut Vec<String>) {
             for b in blocks {
                 out.push(match &b.kind {

@@ -566,6 +566,7 @@ Splat 是一个 Rust 应用，通过 [objc2](https://github.com/madsmtm/objc2) �
 
 - 安装了命令行工具的 macOS（`xcode-select --install`）。不需要 Xcode；Splat 的构建不依赖 `actool`、`ibtool` 和 `metal`。
 - Rust 1.99（`brew install rust`）。[rust-toolchain.toml](../../../rust-toolchain.toml) 写明了 CI 所用的确切版本；rustup 会自动安装它，而 Homebrew 的 Rust 会忽略该文件。在那里提高版本号，新的编译器和 clippy 警告就会由此进入项目。
+- rustup，用于 `make lint`、`make check` 和 `make universal`：`cargo xtask check-library` 为 Linux 构建该库，以证明它不需要 macOS，而 Homebrew 的 Rust 没有其他目标平台。
 
 [Makefile](../../../Makefile) 提供简短的入口；`make help` 会列出全部：
 
@@ -620,21 +621,24 @@ cargo xtask vendor fetch       # 修改 vendor.lock 中的版本后重新下载
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | 更长的随机搜索；`SPLAT_FUZZ_SEED` 用于改变输入 |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | 只测一种语言，适用于其他语言尚不完整时 |
 | `cargo clippy --release --all-targets [--features selftest]` | 代码检查，包括每个 `unsafe` 块的理由说明、函数长度，以及在库中的数值转换 |
+| `cargo xtask check-library` | 该库可为 Linux 构建，因此其中没有任何东西需要 macOS |
 | `cargo xtask vendor check` | JavaScript 库与 `vendor.lock` 逐字节一致 |
-| `cargo xtask selftest probe` | 无窗口，各自带有预期结果：公式、图表、对照进程内服务器的网络图像、被阻止的地址、网页视图的防护 |
+| `cargo xtask selftest probe` | 无窗口，各自带有预期结果：公式、图表、对照进程内服务器的网络图像、被阻止的地址、每条命令写出的文本、每种图像格式经过两种导出、一个不再响应的页面，以及网页视图对没有防护的页面的防护。大约需要半分钟。需要 App 位于前台的部分在锁屏时会被跳过 |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | 运行中的 App，逐次点按。它会打开窗口并向其中输入；Mac 会被占用约四分钟。`--scenarios` 只运行第二部分，约一分半钟 |
 | `cargo xtask selftest resize` | 拖移分隔线后加宽窗口：调整窗口大小时，源文本会重新换行。约需十秒 |
 | `cargo xtask selftest bench <file.md>` | 打开、输入和滚动大文件的耗时 |
-| `cargo test --release -- --ignored partial_updates` | 10 MB 文稿中的一次按键：局部更新与完整更新的对比，结果与时间上限 |
-| `cargo test --release --test hostile` | 专门构造来溢出栈或耗费二次方时间的文稿，经过解析、排版、两种导出、按键和命令 |
+| `cargo test --release -- --ignored partial_updates` | 10 MB 文稿中的一次按键：局部更新与完整更新的对比，结果相同，耗时至多四分之一 |
+| `cargo test --release --test hostile` | 专门构造来溢出栈或耗费二次方时间的文稿，每份有两种大小，其耗时必须随文本同比增长，经过解析、排版、两种导出、按键和命令 |
 | `make mutants` | 通过 [cargo-mutants](https://mutants.rs)（`cargo install cargo-mutants`）逐个向 `src/markdown/` 和 `src/preview/` 植入故障；指出哪些故障没有任何测试察觉。需要数小时；`FILE=src/preview/bridge.rs` 可缩小范围 |
 | `cargo test --release --test decoder` | 解码器进程解码图像，既无法访问文件，也无法访问网络 |
 | `make coverage` | 通过 [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)（`brew install cargo-llvm-cov llvm`）统计 `cargo test` 和所有自测的行覆盖率；低于下限则失败。会占用 Mac 约五分钟 |
-| `make coverage-library` | `src/markdown/`、`src/preview/` 和 `i18n.rs` 的下限，仅由 `cargo test` 测得 |
+| `make coverage-library` | `src/markdown/`、`src/preview/` 和 `i18n.rs` 对照其更高的下限，仅由 `cargo test` 测得 |
 
-单元测试紧挨着被测代码。`tests/` 存放从外部访问库的测试：`robustness.rs` 中的随机测试（与 `sync.rs` 的测试共用 `src/fuzz.rs` 中的生成器）、`hostile.rs` 中专门用来刁难程序的文稿，以及启动已构建程序的解码器测试。`src/editor/` 中不需要窗口的决策放在带有各自测试的独立函数里：控制器所知道的一切及其变化方式在 `state.rs`，渲染规则在 `render_queue.rs`，文本拷贝在 `sync.rs`。窗口自测中若有某一步白白等待，整次运行即告失败。窗口自测在主要的点按流程之后还会运行第二部分，位于 `src/editor/selftest/scenarios.rs`：每个格式命令和表格命令、各种对话框、链接点按、粘贴、拖放、导出、大幅更改、磁盘上变化的图像、内存压力、超大文稿，以及崩溃后的恢复。
+单元测试紧挨着被测代码。`tests/` 存放从外部访问库的测试：`robustness.rs` 中的随机测试（与 `sync.rs` 的测试共用 `src/fuzz.rs` 中的生成器）、`hostile.rs` 中专门用来刁难程序的文稿，以及启动已构建程序的解码器测试。`src/editor/` 中不需要窗口的决策放在带有各自测试的独立函数里：控制器所知道的一切及其变化方式在 `state.rs`，渲染规则在 `render_queue.rs`，文本拷贝在 `sync.rs`，段落样式、字体和颜色作为值在 `render.rs`，工具栏标识符的含义在 `toolbar.rs`，点按链接的含义在 `navigation.rs`。
 
-覆盖率有两条下限：每个模块至少覆盖 80 % 的行，所有模块合计至少 85 %。`make coverage` 把 `cargo test` 与自测合并测量，低于任一下限都会失败；这些下限以及少数例外（如 `main.rs` 中只在崩溃时运行的 panic 钩子）连同理由都写在 [xtask](../../../xtask/src/coverage.rs) 中。测量用的构建会放进 `target/coverage/`，所以用于测量的代码绝不会进入 `target/release/` 或磁盘映像。解码器辅助进程在把自己锁起来之前就打开了它的测量文件，因此它也被计入。
+窗口自测中的一步等待的是具名条件，而不是时间；只有不给出信号的情形（例如某物不存在）才保留带理由的停顿。白白等待是一项失败的检查，并会指明始终没有出现的东西，某一步 panic 同样是一项失败的检查，两种情况下运行都会继续。在本次运行中无从判断的检查会报告 `SELFTEST SKIP`：xtask 会列出它，它既不通过也不失败。xtask 要求每种模式，以及单独的 `--scenarios`，约达到其检查数的九成。窗口自测在主要的点按流程之后还会运行第二部分，位于 `src/editor/selftest/scenarios.rs`：每个格式命令和表格命令、各种对话框、链接点按、粘贴、拖放、导出、大幅更改、磁盘上变化的图像、内存压力、超大文稿，以及崩溃后的恢复。
+
+覆盖率有两条下限：每个模块至少覆盖 84 % 的行，所有模块合计至少 96 %。`make coverage` 把 `cargo test` 与自测合并测量，低于任一下限都会失败；`make coverage-library` 要求不需要窗口的部分达到 90 % 和 97 %。这些下限以及少数例外（如 `main.rs` 中只在崩溃时运行的 panic 钩子）连同理由都写在 [xtask](../../../xtask/src/coverage.rs) 中。测量用的构建会放进 `target/coverage/`，所以用于测量的代码绝不会进入 `target/release/` 或磁盘映像。解码器辅助进程在把自己锁起来之前就打开了它的测量文件，因此它也被计入。
 
 CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每次推送到 `main` 和每个拉取请求时，在 Apple 芯片上运行 `make check`、`make coverage-library` 和通用构建，在 Intel 上运行 `cargo test`。每天夜里，[.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) 会用新的随机输入运行 `make test-long`。自测和磁盘映像只在开发者自己的 Mac 上进行：它们需要屏幕和钥匙串中的签名证书。
 
@@ -642,36 +646,39 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 ### 项目结构
 
-`src/lib.rs` 把所有不需要窗口的部分做成一个独立的库 `splat`：`markdown/`、`preview/`、`i18n.rs` 和测试生成器 `fuzz.rs`。`src/main.rs` 中的 App 构建于其上。
+`src/lib.rs` 把所有不需要窗口的部分做成一个独立的库 `splat`：`markdown/`、`preview/`、`i18n.rs` 和测试生成器 `fuzz.rs`。它的构建不需要 macOS。`src/main.rs` 中的 App 构建于其上。
 
-- `src/markdown/`：解析器绑定（comrak）、语法着色，以及所有作为纯文本编辑（`Edit`）的命令。还包括编辑后的重新解析（`incremental.rs`）、嵌入 HTML 的读取器（`markup.rs`）、排版、正文中的标签、引用和引文（`typography.rs`）、文本的外观以及由哪些 Markdown 和 HTML 实现该外观（`style.rs`）、地址可以是什么（`url.rs`），以及 HTML 和 Word 导出（`html.rs`、`docx.rs`，附带 `docx/html.rs` 和 `docx/xml.rs`）。预览和两种导出读取的是同一棵树 `Doc`。不涉及 AppKit。
-- `src/preview/`：预览的排版、其中嵌入的 HTML（`layout/html.rs`），以及预览与源文本之间的映射（`Bridge`、`Index`）。不涉及 AppKit。
-- `src/editor/`：窗口。一个 `EditorController` 对象作为两个视图的代理为 AppKit 服务；其工作按职责拆分：
+- `src/markdown/`：所有使用方读取的树，即 `doc/` 中的 `Doc`，它拥有自己的文本，以及 `reader/` 中与解析器唯一的绑定：comrak 在其他地方都不出现，`reader/assumptions.rs` 记录了代码对它的假设。语法着色，以及 `commands/` 中所有作为纯文本编辑（`Edit`）的命令。还包括编辑后的重新解析（`incremental.rs`）、嵌入 HTML 的读取器（`markup.rs`）、排版、正文中的标签、引用和引文（`typography.rs`）、文本的外观以及由哪些 Markdown 和 HTML 实现该外观（`style.rs`）、地址可以是什么（`url.rs`），以及 HTML 和 Word 导出（`html.rs`、`docx.rs`，附带 `docx/html.rs` 和 `docx/xml.rs`）。位置有自己的类型：源文本中是 `Byte`，源视图中是 `U16`，预览视图中是 `Shown`（`text.rs`）。不涉及 AppKit。
+- `src/preview/`：`layout/` 中预览的排版、`layout/html.rs` 中嵌入的 HTML，以及预览与源文本之间的映射（`Bridge`、`Index`）。`Bridge` 会拒绝另一个版本的 `Doc` 的排版。不涉及 AppKit。
+- `src/editor/`：窗口。一个 `EditorController` 对象作为两个视图的代理为 AppKit 服务，并转发给各组件；组件是建立在控制器及其所拥有状态之上的小型结构体，其字段其他模块无法触及：
 
 | 模块 | 职责 |
 |---|---|
-| `mod.rs` | 类、代理方法、`invalidate` |
+| `mod.rs` | 类、转发的代理方法、`invalidate` |
+| `panes.rs` | `Panes`：文本视图、大纲、窗格的显示与隐藏，以及提供视图访问权的部分 |
 | `state.rs` | 控制器对文稿所知道的一切，以及改变它的所有途径；其字段是私有的，并且不接触任何视图 |
+| `model.rs` | 把状态和文本拷贝借给无法触及视图的闭包 |
 | `actions.rs` | 命令注册表：选择器、标题、快捷键、符号、命令何时适用 |
-| `editing.rs` | 运行和验证命令，在预览中输入 |
-| `update.rs` | 解析、着色、更新预览；编辑之后只处理受影响的段落 |
+| `editing.rs` | `Editing`：运行和验证命令，在预览中输入 |
+| `update.rs` | `Updater`：解析、着色、更新预览；编辑之后只处理受影响的段落 |
 | `sync.rs` | 文本拷贝和区块记录，不涉及 AppKit，并带有随机测试 |
-| `progressive.rs` | 分步渲染大型预览 |
-| `selection.rs`、`scroll.rs` | 两个窗格的选择和滚动位置保持同步 |
-| `atom.rs`、`atom_edit.rs` | 公式和图表编辑器 |
-| `navigation.rs`、`links.rs` | 链接、维基链接、标签、任务复选框、折叠、脚注 |
+| `progressive.rs` | `Progressive`：分步渲染大型预览 |
+| `selection.rs`、`scroll.rs` | `Selection`, `ScrollSync`：两个窗格的选择和滚动位置保持同步 |
+| `atom.rs`、`atom/edit.rs` | `AtomEditor`：公式和图表编辑器 |
+| `navigation.rs`、`links.rs` | `Links`：链接、维基链接、标签、任务复选框、折叠、脚注 |
 | `env.rs` | 预览从文本之外读取的内容：排版标点、`@name` 和 `#12` 所对应的仓库、BibTeX 文件、嵌入的笔记 |
-| `render.rs`、`images.rs`、`remote.rs`、`safe_image.rs` | 预览文本、本地和远程图像 |
+| `render.rs`、`images.rs`、`remote.rs`、`safe_image.rs` | 预览文本、本地和远程图像；`Pictures` 位于 `images.rs` |
 | `attributes.rs` | 文本属性；每个键只能得到它所期望类型的值 |
 | `shadow.rs` | 用于崩溃后恢复的未存储文本拷贝 |
 | `decoder.rs` | 解码图像和图形的沙盒化辅助进程 |
-| `export.rs`、`outline.rs` | HTML 和 Word 导出；大纲边栏 |
+| `export.rs`、`outline.rs` | `Sharing`：HTML 和 Word 导出；大纲边栏 |
 | `js.rs`、`mathfield.rs`、`render_queue.rs` | 用于 MathJax、Mermaid、Graphviz、PlantUML 和可视化公式编辑器的 WebKit；与 WebKit 无关的、关于何时渲染什么的规则 |
 | `webkit.rs` | 对 WebKit 的调用；只有导航代理的生命周期仍由 `js.rs` 和 `mathfield.rs` 负责 |
-| `window.rs`、`toolbar.rs`、`views.rs`、`dialogs.rs`、`style.rs` | 窗口、工具栏、文本视图、对话框、颜色 |
+| `window.rs`、`toolbar.rs`、`views.rs`、`dialogs.rs`、`style.rs` | 构建窗口、工具栏、文本视图、对话框、颜色 |
 
 - `src/menu.rs`、`src/app.rs`、`src/document.rs`：菜单栏、App 代理、文稿（`MDDocument`，一个 `NSDocument` 子类）。
-- `src/i18n.rs` 与 `resources/*.lproj`：35 种语言；键是德语文本。
+- `src/i18n.rs` 与 `resources/*.lproj`：35 种语言；键是德语文本，App 启动时会安装界面语言的表。
+- `src/util/`：工作线程（`lanes.rs`）、可能停止响应的卷（`volumes.rs`）、AppKit 辅助工具、文件和进程。`src/diag.rs`：用户看不到的出错情况会写入系统日志，且不含任何文稿文本。
 - `src/large_alloc.rs`：大块分配直接来自内核，释放时直接还给内核，因此大幅编辑之后内存会回落。
 - `resources/js/`：网页和库；版本和校验和见 [vendor.lock](../../../vendor.lock)。
 - `xtask/`：打包、签名、磁盘映像、图标、内置库、自测运行器和覆盖率下限。
@@ -682,21 +689,21 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 1. 那里的每次字符更改，都会就地更新文本拷贝（`Snapshot`），而无需再次读取文本。
 2. 一次更新会解析该拷贝，只在颜色有变化的地方为源文本重新着色，并对预览排版，只替换内容有变化的区块。
-3. 编辑之后，只要相邻段落保持不变，就只会重新解析、着色和排版受影响的段落；它们何时会变化，由 `reparse_part_and_color` 判断。含有 `%%` 注释块的文稿、对前置元数据的更改以及对链接引用定义附近的更改，会被完整处理。comrak 只有在同一次解析中找到脚注的定义时才会识别脚注引用，并把定义移到文本后面，所以该部分会用每个标签一个替身定义来解析，并从旧的树中取得编号；对该部分中的引用或定义的更改，或对行内脚注旁边的更改，会被完整处理。
+3. 编辑之后，只要相邻段落保持不变，就只会重新解析、着色和排版受影响的段落；它们何时会变化，由 `reparse_part_and_color` 判断。含有 `%%` 注释块的文稿、对前置元数据的更改以及在含有链接引用定义的文稿中，对含有方括号的部分的更改，会被完整处理。comrak 只有在同一次解析中找到脚注的定义时才会识别脚注引用，并把定义移到文本后面，所以该部分会用每个标签一个替身定义来解析，并从旧的树中取得编号；对该部分中的引用或定义的更改，或对行内脚注旁边的更改，会被完整处理。
 4. 以 `<details>` 或 `<div align>` 开头、之后才闭合的 HTML 块，会影响它们之间的 Markdown 块；被复用的块必须有相同的上下文。
 5. 在最大 2 MB 的文稿的源文本中输入时，局部更新会立即运行；若不适用，或文稿更大，解析和排版会在后台运行。在预览中输入时，它们会立即运行，因为预览的插入点取决于结果。
 6. 预览中的输入由 `Bridge` 转换为对源文本的编辑，此后走同一条路径。Markdown 把文本变成语法的方式太多，仅靠规则应付不了，所以 `preview/verify.rs` 会再次解析更改的部分，并把它显示的内容与输入的内容比较；站不住脚的编辑会被进一步转义或被拒绝。
-7. comrak 的行内位置在少数地方会出错，例如在链接引用定义后面。`markdown/positions.rs` 在读取块时会对照源文本检查它们，对不吻合之处再从源文本重新读取。
+7. comrak 的行内位置在少数地方会出错，例如在链接引用定义后面。`markdown/reader/positions.rs` 在读取块时会对照源文本检查它们，对不吻合之处再从源文本重新读取。
 
 ### 控制器中的规则
 
-1. 控制器自己对视图的更改在 `silently()` 内运行；代理回调会忽略它们。
-2. 只在读取和计算时借用 `state`，绝不在会改变、排版或滚动视图的调用期间借用。它只通过自己的方法改变，这些方法的测试不需要窗口。
+1. 控制器自己对视图的更改在 `Panes::silently` 内运行；代理回调会忽略它们。其他地方视图只能读取，因此由编译器来检查这一点。回调应当听到的更改，或把视图交给 AppKit 的操作，要通过 `Panes::for_appkit` 来表明。
+2. 只在读取和计算时借用状态，绝不在会改变、排版或滚动视图的调用期间借用：`Model` 把它借给 `Send` 闭包，而没有任何视图是 `Send`，因此由编译器来检查这一点。它只通过自己的方法改变，这些方法的测试不需要窗口。
 3. 来自外部的消息（图像已载入、公式已渲染）通过 `renders_arrived` 和 `image_arrived` 延迟到达，绝不会在更新进行到一半时到达。
 4. 没有文本更改的重绘只通过 `invalidate(reason)` 进行。
-5. 不要在源文本更改期间持有 `Rc<Snapshot>`，否则该更改会拷贝整份文本。
-6. 新命令需要在 `actions.rs` 中添加一项，在 `mod.rs` 中添加一个方法，在 `editing::perform` 中添加一个分支。
-7. 每个 `unsafe` 块都以 `// SAFETY:` 注释的形式附上它的理由。字节只能通过 `decoder::system_image` 进入 App 中的系统图像解码器。
+5. 文本拷贝不会跨越源文本的更改而被持有，否则该更改会复制整个文本：`with_text` 只在一个 `Send` 闭包的存续期间把它借出。
+6. 新命令需要在 `actions.rs` 中添加一项，在 `mod.rs` 中添加一个方法，在 `Editing::perform` 中添加一个分支。
+7. 每个 `unsafe` 块都以 `// SAFETY:` 注释的形式附上它的理由。字节只能在辅助进程中通过 `decoder::decode_native` 进入系统图像解码器；有一项测试会扫描源码中的其他调用。
 8. 主线程上的任何操作都不会等待用户的文件夹，因为网络卷可能停止响应：文件在线程 `DISK` 上查看，预览通过 `Env::known` 读取结果。只有用户正在等待的操作，如导出或存储，才可以直接访问磁盘。
 
 ### 添加命令
@@ -705,7 +712,7 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 1. `Action` 的一个变体及其 `Spec`：选择器、标题、工具栏标签、提示（以动词开头，最多 75 个字符）、快捷键、SF Symbol 以及适用时机
 2. `src/editor/mod.rs` 中的方法
-3. `editing::perform` 中的一个分支
+3. `Editing::perform` 中的一个分支
 4. 每个 `Localizable.strings` 中它的文本
 
 测试 `every_command_has_a_method_and_every_method_a_command` 会检查注册表与方法是否一一对应。Apple 的标准快捷键，如 ⌘E、⌘J、⌘T、⌘;、⇧⌘C、⌥⌘C、⌥⌘V、⇧⌘P、⌥⌘T、⌃⌘F 和 ⌘,，保持不动。

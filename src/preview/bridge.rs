@@ -1,12 +1,14 @@
 use std::ops::Range;
 
-use crate::markdown::commands::{self, Edit, LinePrefix, Pending, leaf_at};
+use crate::markdown::commands::{self, Edit, LinePrefix, Pending, leaf_at, line_span};
 use crate::markdown::doc::{
     Block, BlockKind, Doc, Inline, InlineKind, ListKind, block_path, inline_path, walk_blocks, walk_inlines,
 };
 use crate::markdown::incremental::changed;
 use crate::markdown::table;
-use crate::markdown::text::{decode_entity, line_end, line_start};
+use crate::markdown::text::{
+    Byte, TextAt, decode_entity, line_end, line_start, lines_with_ends, shifted, signed, units,
+};
 
 use super::layout::{Layout, Marker, ParaKind, RunMap};
 use super::map::{Index, InsertPoint, Shown, deletion_ranges, insert_point, normalize};
@@ -14,10 +16,23 @@ use super::verify::{Expected, shows_as_expected, visible_chars};
 
 /// Translates edits made in the rendered preview into edits of the Markdown source.
 pub struct Bridge<'a> {
-    pub text: &'a str,
-    pub doc: &'a Doc,
-    pub layout: &'a Layout,
-    pub index: &'a Index,
+    text: &'a str,
+    doc: &'a Doc,
+    layout: &'a Layout,
+    index: &'a Index,
+}
+
+impl<'a> Bridge<'a> {
+    /// `None` when `layout` was made from another version of `doc`: what one says about a position means nothing in the
+    /// other.
+    pub fn new(doc: &'a Doc, layout: &'a Layout, index: &'a Index) -> Option<Bridge<'a>> {
+        (layout.doc_version == doc.version()).then_some(Bridge {
+            text: doc.text(),
+            doc,
+            layout,
+            index,
+        })
+    }
 }
 
 impl Bridge<'_> {
@@ -26,8 +41,8 @@ impl Bridge<'_> {
     }
 
     /// Source range for a preview selection: the start snaps into the first selected character.
-    pub fn source_selection(&self, range: Range<Shown>) -> Range<usize> {
-        let end = self.point(range.end).map_or(0, |p| p.src);
+    pub fn source_selection(&self, range: Range<Shown>) -> Range<Byte> {
+        let end = self.point(range.end).map_or(Byte::default(), |p| p.src);
         if range.is_empty() {
             return end..end;
         }
@@ -39,37 +54,32 @@ impl Bridge<'_> {
     }
 
     /// Where the character behind preview offset `p` stands in the source.
-    fn source_of_char_at(&self, p: Shown) -> Option<usize> {
+    fn source_of_char_at(&self, p: Shown) -> Option<Byte> {
         let para_index = self.index.para_at(p)?;
-        let off = p - self.index.paras[para_index].start;
-        let mut unit = 0;
-        for run in &self.index.para(self.layout, para_index).runs {
-            let len = run.text.encode_utf16().count();
-            if (unit..unit + len).contains(&off) {
-                return Some(match &run.map {
-                    RunMap::Atom { src, .. } => src.start,
-                    RunMap::Text { chars, end } => {
-                        let mut before = unit;
-                        let k = run
-                            .text
-                            .chars()
-                            .take_while(|c| {
-                                let behind = before < off;
-                                before += c.len_utf16();
-                                behind
-                            })
-                            .count();
-                        chars.get(&run.text, k).unwrap_or(*end)
-                    }
-                });
+        let para = self.index.para(self.layout, para_index);
+        let (at, run) = para
+            .runs_at(self.index.paras[para_index].start)
+            .find(|(at, _)| at.contains(&p))?;
+        Some(match &run.map {
+            RunMap::Atom { src, .. } => src.start,
+            RunMap::Text { chars, end } => {
+                let mut before = at.start;
+                let k = run
+                    .text
+                    .chars()
+                    .take_while(|c| {
+                        let behind = before < p;
+                        before += c.len_utf16();
+                        behind
+                    })
+                    .count();
+                chars.get(&run.text, k).unwrap_or(*end)
             }
-            unit += len;
-        }
-        None
+        })
     }
 
-    /// Source offset that text typed at preview offset `p` goes to.
-    pub fn source_at(&self, p: Shown) -> Option<usize> {
+    /// Source position that text typed at preview offset `p` goes to.
+    pub fn source_at(&self, p: Shown) -> Option<Byte> {
         self.point(p).map(|point| point.src)
     }
 
@@ -79,7 +89,7 @@ impl Bridge<'_> {
         if typed.is_empty() || typed.contains('\n') || self.source_at(p)? != pending.at {
             return None;
         }
-        let plan = commands::typing_plan(self.text, self.doc, pending)?;
+        let plan = commands::typing_plan(self.doc, pending)?;
         let typed = self.escaped(p, typed, plan.code())?;
         let placed = commands::place(&plan, &typed);
         let caret = placed.at + placed.caret;
@@ -108,13 +118,13 @@ impl Bridge<'_> {
         let plain = self.plain_replace(range.clone(), typed, false)?;
         let (first, last) = (self.index.para_at(range.start)?, self.index.para_at(range.end)?);
         let para = self.index.para(self.layout, first);
-        let visible = range.end.0.saturating_sub(range.start.0) < self.index.paras[first].len;
+        let visible = range.end.get().saturating_sub(range.start.get()) < self.index.paras[first].len;
         let expected = Expected {
             typed,
             removed: visible_chars(self.layout, self.index, &range),
             same_paragraphs: first == last && !typed.contains('\n') && !para.runs.is_empty() && visible,
         };
-        let holds = |edit: &Edit| shows_as_expected(self.text, self.doc, edit, &expected);
+        let holds = |edit: &Edit| shows_as_expected(self.doc, edit, &expected);
         if holds(&plain) {
             return Some(plain);
         }
@@ -139,11 +149,11 @@ impl Bridge<'_> {
     }
 
     /// The edit from this text to `new`, with the caret at `caret` there.
-    fn edit_to(&self, new: &str, caret: usize) -> Edit {
+    fn edit_to(&self, new: &str, caret: Byte) -> Edit {
         let (old_range, new_range) = changed(self.text, new);
         Edit {
             range: old_range,
-            replacement: new[new_range].to_string(),
+            replacement: new.at(new_range).to_string(),
             selection: caret..caret,
         }
     }
@@ -161,7 +171,7 @@ impl Bridge<'_> {
         let next = left_span
             .then(|| {
                 let point = self.point(range.start)?;
-                let styles = commands::styles_at(self.text, self.doc, point.src);
+                let styles = commands::styles_at(self.doc, point.src);
                 (!styles.is_empty()).then_some(Pending {
                     at: edit.selection.end,
                     styles,
@@ -197,7 +207,7 @@ impl Bridge<'_> {
     }
 
     /// Text with backticks replacing `start..end` of a code span, whose delimiters must then be longer than any of them.
-    fn backticks_in_code_span(&self, start: usize, end: usize, typed: &str) -> Option<Edit> {
+    fn backticks_in_code_span(&self, start: Byte, end: Byte, typed: &str) -> Option<Edit> {
         let mut span = None;
         walk_inlines(leaf_at(self.doc, start)?.inlines(), &mut |i: &Inline| {
             if matches!(i.kind, InlineKind::Code(_)) && i.range.start <= start && end <= i.range.end {
@@ -211,8 +221,8 @@ impl Bridge<'_> {
         }
         let content = format!(
             "{}{typed}{}",
-            &self.text[inner.start..start],
-            &self.text[end..inner.end]
+            self.text.at(inner.start..start),
+            self.text.at(end..inner.end)
         );
         let (open, close) = commands::code_markers(&content);
         let caret = span.range.start + open.len() + (start - inner.start) + typed.len();
@@ -225,8 +235,8 @@ impl Bridge<'_> {
 
     /// Adds the full range of every inline container whose content would be deleted completely. `deletions` come sorted
     /// and apart, and may run into the tens of thousands when a whole document is replaced.
-    fn drop_empty_containers(&self, mut deletions: Vec<Range<usize>>) -> Vec<Range<usize>> {
-        let covered = |r: &Range<usize>, dels: &[Range<usize>]| {
+    fn drop_empty_containers(&self, mut deletions: Vec<Range<Byte>>) -> Vec<Range<Byte>> {
+        let covered = |r: &Range<Byte>, dels: &[Range<Byte>]| {
             let after = dels.partition_point(|d| d.start <= r.start);
             after > 0 && r.end <= dels[after - 1].end
         };
@@ -273,7 +283,7 @@ impl Bridge<'_> {
             return Some(compose(self.text, &[], block.range.end, "\n\n"));
         }
         if let ParaKind::TableCell { .. } = point.para_kind {
-            return table::move_down(self.text, self.doc, at);
+            return table::move_down(self.doc, at);
         }
         let prefix = continuation_prefix(self.text, at);
         if let ParaKind::Code { .. } = point.para_kind {
@@ -288,7 +298,7 @@ impl Bridge<'_> {
             if para_empty {
                 let line_begin = line_start(self.text, marker.start);
                 let line_end = line_end(self.text, at);
-                let keep = &self.text[line_begin..marker.start];
+                let keep = self.text.at(line_begin..marker.start);
                 let keep = keep.trim_end_matches(' ');
                 let replacement = keep.to_string();
                 let caret = line_begin + replacement.len();
@@ -299,7 +309,7 @@ impl Bridge<'_> {
                 });
             }
             let list = path.iter().rev().find(|b| matches!(b.kind, BlockKind::List { .. }));
-            let src_marker = &self.text[marker.clone()];
+            let src_marker = self.text.at(marker.clone());
             let new_marker = match list.map(|l| &l.kind) {
                 Some(BlockKind::List {
                     kind: ListKind::Ordered { delim, .. },
@@ -312,7 +322,7 @@ impl Bridge<'_> {
             };
             let task_box = if task.is_some() { " [ ]" } else { "" };
             let line_begin = line_start(self.text, marker.start);
-            let indent = &self.text[line_begin..marker.start];
+            let indent = self.text.at(line_begin..marker.start);
             let (at, close, open) = self.split_inlines(at);
             let insert = format!("{close}\n{indent}{new_marker}{task_box} {open}");
             return Some(compose(self.text, &[], at, &insert).with_caret_before(open.len()));
@@ -357,7 +367,7 @@ impl Bridge<'_> {
     /// Where a paragraph splits at `at`, with the delimiters that close and reopen the containers around it, so a split
     /// keeps formatting. At the very start or end of a container it splits outside of it: inside, one side would hold
     /// nothing but its delimiters.
-    fn split_inlines(&self, at: usize) -> (usize, String, String) {
+    fn split_inlines(&self, at: Byte) -> (Byte, String, String) {
         let mut at = at;
         let Some(leaf) = leaf_at(self.doc, at) else {
             return (at, String::new(), String::new());
@@ -379,8 +389,8 @@ impl Bridge<'_> {
             } else if at >= content.end {
                 at = span.range.end;
             } else {
-                open.push_str(&self.text[span.range.start..content.start]);
-                close.push_str(&self.text[content.end..span.range.end]);
+                open.push_str(self.text.at(span.range.start..content.start));
+                close.push_str(self.text.at(content.end..span.range.end));
             }
         }
         for i in path.iter().rev() {
@@ -393,8 +403,8 @@ impl Bridge<'_> {
             } else if at >= content.end {
                 at = i.range.end;
             } else {
-                open.insert_str(0, &self.text[i.range.start..content.start]);
-                close.push_str(&self.text[content.end..i.range.end]);
+                open.insert_str(0, self.text.at(i.range.start..content.start));
+                close.push_str(self.text.at(content.end..i.range.end));
             }
         }
         (at, close, open)
@@ -420,7 +430,7 @@ impl Bridge<'_> {
     pub fn tab(&self, p: Shown, backwards: bool) -> Option<Edit> {
         let point = self.point(p)?;
         if let ParaKind::TableCell { .. } = point.para_kind {
-            return table::navigate(self.text, self.doc, point.src, backwards);
+            return table::navigate(self.doc, point.src, backwards);
         }
         let path = block_path(&self.doc.blocks, point.src);
         let item_pos = path.iter().rposition(|b| matches!(b.kind, BlockKind::Item { .. }))?;
@@ -428,29 +438,37 @@ impl Bridge<'_> {
             return None;
         };
         // Indentation counts from behind the marks of a quote.
-        let content_start = |at: usize| {
+        let content_start = |at: Byte| {
             let line = line_start(self.text, at);
-            line + LinePrefix::parse(&self.text[line..]).quote_end
+            line + LinePrefix::parse(self.text.from(line)).quote_end
         };
         let line_begin = content_start(marker.start);
         // In front of this marker may stand another list's, as in `- - a`, or a byte order mark.
-        if !self.text[line_begin..marker.start]
+        if !self
+            .text
+            .at(line_begin..marker.start)
             .chars()
             .all(|c| matches!(c, ' ' | '\t'))
         {
             return None;
         }
         let current_indent = marker.start - line_begin;
+        // What belongs to the item moves with it, or a nested list would end up beside it.
+        let item_lines = line_span(self.text, &(marker.start..path[item_pos].range.end));
+        let several_lines = self.text.at(item_lines.clone()).contains(['\n', '\r']);
         if backwards {
             let parent = path[..item_pos].iter().rev().find_map(|b| match &b.kind {
                 BlockKind::Item { marker, .. } => Some(marker.start - content_start(marker.start)),
                 _ => None,
             })?;
             let remove = current_indent - parent.min(current_indent);
+            if several_lines {
+                return Some(self.moved_lines(item_lines, point.src, -signed(remove)));
+            }
             let edit = Edit {
                 range: line_begin..line_begin + remove,
                 replacement: String::new(),
-                selection: 0..0,
+                selection: point.src..point.src,
             };
             let caret = point.src - remove;
             return Some(Edit {
@@ -473,6 +491,9 @@ impl Bridge<'_> {
         let prev_line = content_start(prev_marker.start);
         let content_col = prev_marker.end + 1 - prev_line;
         let add = content_col.saturating_sub(current_indent).max(1);
+        if several_lines {
+            return Some(self.moved_lines(item_lines, point.src, signed(add)));
+        }
         let spaces = " ".repeat(add);
         let caret = point.src + add;
         Some(Edit {
@@ -480,6 +501,41 @@ impl Bridge<'_> {
             replacement: spaces,
             selection: caret..caret,
         })
+    }
+
+    /// `lines` moved right by `columns` behind the marks of a quote, or left as far as their indentation allows; blank
+    /// lines stay as they are and the caret goes along.
+    fn moved_lines(&self, lines: Range<Byte>, caret: Byte, columns: isize) -> Edit {
+        let mut out = String::with_capacity(units(&lines));
+        let mut at = lines.start;
+        let mut moved_caret = caret;
+        for (line, ending) in lines_with_ends(self.text.at(lines.clone())) {
+            let quote = LinePrefix::parse(line).quote_end;
+            let content = &line[quote..];
+            out.push_str(&line[..quote]);
+            let content_start = at + quote;
+            if content.trim().is_empty() {
+                out.push_str(content);
+            } else if columns > 0 {
+                out.extend(std::iter::repeat_n(' ', columns.unsigned_abs()));
+                out.push_str(content);
+                if caret >= content_start {
+                    moved_caret += columns.unsigned_abs();
+                }
+            } else {
+                let indent = content.len() - content.trim_start_matches([' ', '\t']).len();
+                let removed = columns.unsigned_abs().min(indent);
+                out.push_str(&content[removed..]);
+                moved_caret -= removed.min(caret.get().saturating_sub(content_start.get()));
+            }
+            out.push_str(ending);
+            at += line.len() + ending.len();
+        }
+        Edit {
+            range: lines,
+            replacement: out,
+            selection: moved_caret..moved_caret,
+        }
     }
 
     /// Backspace at the start of a block removes the block formatting instead of joining paragraphs.
@@ -500,7 +556,7 @@ impl Bridge<'_> {
             }
             _ => {}
         }
-        if para.runs.is_empty() && para.src.is_empty() && self.text[..point.src].ends_with("\n\n") {
+        if para.runs.is_empty() && para.src.is_empty() && self.text.upto(point.src).ends_with("\n\n") {
             let at = point.src - 2;
             return Some(Edit {
                 range: at..point.src,
@@ -517,7 +573,7 @@ impl Bridge<'_> {
                 .find(|k| matches!(k, BlockKind::Item { .. }))
             {
                 let end = task.as_ref().map_or(marker.end, |t| t.symbol + 2);
-                let end = end + usize::from(self.text[end..].starts_with(' '));
+                let end = end + usize::from(self.text.from(end).starts_with(' '));
                 let caret = marker.start;
                 return Some(Edit {
                     range: marker.start..end.max(marker.start),
@@ -527,7 +583,7 @@ impl Bridge<'_> {
             }
         }
         let line_begin = line_start(self.text, point.src);
-        let prefix = LinePrefix::parse(&self.text[line_begin..]);
+        let prefix = LinePrefix::parse(self.text.from(line_begin));
         if let Some((r, _)) = prefix.heading {
             let range = line_begin + r.start..line_begin + r.end;
             let caret = range.start;
@@ -538,10 +594,10 @@ impl Bridge<'_> {
             });
         }
         if prefix.quote_end > 0 && para.style.quote_depth > 0 {
-            let line = &self.text[line_begin..];
+            let line = self.text.from(line_begin);
             let gt = line.find('>')?;
             let end = gt + 1 + usize::from(line[gt + 1..].starts_with(' '));
-            let caret = point.src.saturating_sub(end).max(line_begin);
+            let caret = shifted(point.src, -signed(end)).max(line_begin);
             return Some(Edit {
                 range: line_begin..line_begin + end,
                 replacement: String::new(),
@@ -554,43 +610,34 @@ impl Bridge<'_> {
     /// A click on a callout's chevron flips its `-` and `+`, which folds or unfolds it.
     pub fn toggle_fold(&self, p: Shown) -> Option<Edit> {
         let para_index = self.index.para_at(p)?;
-        let offset = p.0.checked_sub(self.index.paras[para_index].start.0)?;
-        let mut at = 0;
-        for run in &self.index.para(self.layout, para_index).runs {
-            let len = run.text.encode_utf16().count();
-            if !(at..at + len).contains(&offset) {
-                at += len;
-                continue;
+        let para = self.index.para(self.layout, para_index);
+        let (_, run) = para
+            .runs_at(self.index.paras[para_index].start)
+            .find(|(at, _)| at.contains(&p))?;
+        match &run.map {
+            RunMap::Atom {
+                atom: super::layout::Atom::Fold { open },
+                src,
+            } => Some(Edit {
+                range: src.clone(),
+                replacement: if *open { "-" } else { "+" }.to_string(),
+                selection: src.end..src.end,
+            }),
+            RunMap::Atom {
+                atom: super::layout::Atom::Details { open },
+                src,
+            } => {
+                let (range, replacement) = toggle_open(self.text.at(src.clone()), *open)?;
+                let range = src.start + range.start..src.start + range.end;
+                let caret = range.start + replacement.len();
+                Some(Edit {
+                    range,
+                    replacement,
+                    selection: caret..caret,
+                })
             }
-            match &run.map {
-                RunMap::Atom {
-                    atom: super::layout::Atom::Fold { open },
-                    src,
-                } => {
-                    return Some(Edit {
-                        range: src.clone(),
-                        replacement: if *open { "-" } else { "+" }.to_string(),
-                        selection: src.end..src.end,
-                    });
-                }
-                RunMap::Atom {
-                    atom: super::layout::Atom::Details { open },
-                    src,
-                } => {
-                    let (range, replacement) = toggle_open(&self.text[src.clone()], *open)?;
-                    let range = src.start + range.start..src.start + range.end;
-                    let caret = range.start + replacement.len();
-                    return Some(Edit {
-                        range,
-                        replacement,
-                        selection: caret..caret,
-                    });
-                }
-                _ => {}
-            }
-            at += len;
+            _ => None,
         }
-        None
     }
 
     /// Toggles the checkbox of the task item whose marker sits in the paragraph at `p`.
@@ -603,7 +650,7 @@ impl Bridge<'_> {
         else {
             return None;
         };
-        if symbol >= self.text.len() {
+        if symbol >= self.text.end() {
             return None;
         }
         let replacement = if checked { " " } else { "x" }.to_string();
@@ -619,9 +666,9 @@ impl Edit {
     fn applied_to(&self, text: &str) -> String {
         format!(
             "{}{}{}",
-            &text[..self.range.start],
+            text.upto(self.range.start),
             self.replacement,
-            &text[self.range.end..]
+            text.from(self.range.end)
         )
     }
 
@@ -633,9 +680,9 @@ impl Edit {
 }
 
 /// Container prefix a continuation line needs: quote markers and list-item indentation.
-pub fn continuation_prefix(text: &str, at: usize) -> String {
+pub fn continuation_prefix(text: &str, at: Byte) -> String {
     let line_begin = line_start(text, at);
-    let line = &text[line_begin..];
+    let line = text.from(line_begin);
     let p = LinePrefix::parse(line);
     let prefix_end = match &p.list {
         Some((r, _)) => r.end,
@@ -645,7 +692,7 @@ pub fn continuation_prefix(text: &str, at: usize) -> String {
 }
 
 /// Builds one edit that removes `deletions` and inserts `insert` at `at`, so undo sees a single step.
-fn compose(text: &str, deletions: &[Range<usize>], at: usize, insert: &str) -> Edit {
+fn compose(text: &str, deletions: &[Range<Byte>], at: Byte, insert: &str) -> Edit {
     let at = deletions
         .iter()
         .find(|d| d.start < at && at < d.end)
@@ -658,23 +705,23 @@ fn compose(text: &str, deletions: &[Range<usize>], at: usize, insert: &str) -> E
     let mut inserted = false;
     for d in deletions {
         if !inserted && at <= d.start {
-            out.push_str(&text[pos..at]);
+            out.push_str(text.at(pos..at));
             out.push_str(insert);
             caret = start + out.len();
             pos = at;
             inserted = true;
         }
-        out.push_str(&text[pos..d.start]);
+        out.push_str(text.at(pos..d.start));
         pos = d.end;
     }
     if !inserted {
         let at = at.max(pos);
-        out.push_str(&text[pos..at]);
+        out.push_str(text.at(pos..at));
         out.push_str(insert);
         caret = start + out.len();
         pos = at;
     }
-    out.push_str(&text[pos..end]);
+    out.push_str(text.at(pos..end));
     Edit {
         range: start..end,
         replacement: out,
@@ -713,7 +760,8 @@ fn escape_every_mark(typed: &str) -> String {
 const SPAN_MARKERS: [&str; 8] = ["**", "__", "~~", "==", "||", "*", "_", "~"];
 
 /// `new` with whitespace at the inner edge of a span's markers moved out, as `**ab **` to `**ab** `.
-fn spaces_out_of_markers(new: &str, caret: usize) -> Option<(String, usize)> {
+fn spaces_out_of_markers(new: &str, caret: Byte) -> Option<(String, Byte)> {
+    let caret = caret.get();
     let is_space = |c: char| c == ' ' || c == '\t';
     let kept = new[..caret].trim_end_matches(is_space).len();
     if kept < caret {
@@ -726,7 +774,7 @@ fn spaces_out_of_markers(new: &str, caret: usize) -> Option<(String, usize)> {
             let marks = &new[caret..caret + closers];
             return Some((
                 format!("{}{marks}{spaces}{}", &new[..kept], &new[caret + closers..]),
-                caret + closers,
+                Byte::new(caret + closers),
             ));
         }
     }
@@ -741,23 +789,23 @@ fn spaces_out_of_markers(new: &str, caret: usize) -> Option<(String, usize)> {
                 &new[caret..caret + spaces],
                 &new[caret + spaces..]
             ),
-            caret + spaces,
+            Byte::new(caret + spaces),
         )
     })
 }
 
 /// `new` with a backslash before the mark behind the caret.
-fn escaped_behind(new: &str, caret: usize) -> Option<(String, usize)> {
-    new[caret..]
+fn escaped_behind(new: &str, caret: Byte) -> Option<(String, Byte)> {
+    new.from(caret)
         .chars()
         .next()
         .filter(|c| c.is_ascii_punctuation() && *c != '\\')
-        .map(|_| (format!("{}\\{}", &new[..caret], &new[caret..]), caret))
+        .map(|_| (format!("{}\\{}", new.upto(caret), new.from(caret)), caret))
 }
 
 /// `new` with a backslash before the mark in front of the caret, spaces aside: the space behind `3.` is what makes a list.
-fn escaped_before(new: &str, caret: usize) -> Option<(String, usize)> {
-    let behind = new[..caret].trim_end_matches([' ', '\t']);
+fn escaped_before(new: &str, caret: Byte) -> Option<(String, Byte)> {
+    let behind = new.upto(caret).trim_end_matches([' ', '\t']);
     let mark = behind.chars().next_back().filter(char::is_ascii_punctuation)?;
     let at = behind.len() - mark.len_utf8();
     (!new[..at].ends_with('\\')).then(|| (format!("{}\\{}", &new[..at], &new[at..]), caret + 1))
@@ -765,17 +813,20 @@ fn escaped_before(new: &str, caret: usize) -> Option<(String, usize)> {
 
 /// `new` without the line the caret is on, if a deletion left nothing but a container's prefix there: an empty line would
 /// end the paragraph.
-fn without_blank_line(new: &str, caret: usize, typed: &str) -> Option<(String, usize)> {
+fn without_blank_line(new: &str, caret: Byte, typed: &str) -> Option<(String, Byte)> {
     if !typed.is_empty() {
         return None;
     }
     let start = line_start(new, caret);
-    let end = new[caret..].find(['\n', '\r']).map_or(new.len(), |i| caret + i);
-    if !new[start..end].chars().all(|c| matches!(c, ' ' | '\t' | '>')) || start == 0 || end == new.len() {
+    let end = line_end(new, caret);
+    if !new.at(start..end).chars().all(|c| matches!(c, ' ' | '\t' | '>'))
+        || start == Byte::default()
+        || end == new.end()
+    {
         return None;
     }
-    let at = start - if new[..start].ends_with("\r\n") { 2 } else { 1 };
-    Some((format!("{}{}", &new[..at], &new[end..]), at))
+    let at = start - if new.upto(start).ends_with("\r\n") { 2 } else { 1 };
+    Some((format!("{}{}", new.upto(at), new.from(end)), at))
 }
 
 /// Escapes characters typed into the preview so they stay literal text in Markdown.
@@ -793,8 +844,8 @@ fn escape_typed(typed: &str, point: &InsertPoint, text: &str) -> String {
         return typed.replace('&', "&amp;").replace('<', "&lt;");
     }
     let chars: Vec<char> = typed.chars().collect();
-    let before = text[..point.src].chars().next_back();
-    let after = text[point.src..].chars().next();
+    let before = text.upto(point.src).chars().next_back();
+    let after = text.from(point.src).chars().next();
     let mut out = String::new();
     for (n, &c) in chars.iter().enumerate() {
         let prev = if n == 0 { before } else { Some(chars[n - 1]) };
@@ -844,7 +895,7 @@ fn escape_typed(typed: &str, point: &InsertPoint, text: &str) -> String {
             _ => out.push(c),
         }
     }
-    let prefix = &text[line_start(text, point.src)..point.src];
+    let prefix = text.at(line_start(text, point.src)..point.src);
     if point.at_para_start || prefix.chars().all(|c| matches!(c, ' ' | '\t' | '>')) {
         if out.starts_with(['#', '>', '-', '+', '=', ':']) {
             out.insert(0, '\\');
@@ -867,8 +918,8 @@ fn tail(s: &str, bytes: usize) -> &str {
     &s[s.floor_char_boundary(s.len().saturating_sub(bytes))..]
 }
 
-fn context(text: &str, end: usize, bytes: usize) -> String {
-    tail(&text[..end], bytes).to_string()
+fn context(text: &str, end: Byte, bytes: usize) -> String {
+    tail(text.upto(end), bytes).to_string()
 }
 
 /// Whether a `;` behind `before` and `typed` ends a character reference.
@@ -888,58 +939,16 @@ fn toggle_open(tag: &str, open: bool) -> Option<(Range<usize>, String)> {
     if !is_details {
         return None;
     }
-    let lower = tag.to_ascii_lowercase();
     if !open {
-        let end = if lower.ends_with("/>") {
+        let end = if tag.ends_with("/>") {
             tag.len() - 2
         } else {
             tag.len().checked_sub(1)?
         };
         return Some((end..end, " open".to_string()));
     }
-    let bytes = lower.as_bytes();
-    let is_space = |at: usize| bytes.get(at).is_some_and(u8::is_ascii_whitespace);
-    // From attribute to attribute: `open` in the value of another one is not it.
-    let mut at = "<details".len();
-    while at < bytes.len() && !matches!(bytes[at], b'>' | b'/') {
-        if is_space(at) {
-            at += 1;
-            continue;
-        }
-        let start = at;
-        while at < bytes.len() && !is_space(at) && !matches!(bytes[at], b'=' | b'>' | b'/') {
-            at += 1;
-        }
-        let name = &lower[start..at];
-        let behind_name = at;
-        let mut probe = at;
-        while is_space(probe) {
-            probe += 1;
-        }
-        if bytes.get(probe) == Some(&b'=') {
-            probe += 1;
-            while is_space(probe) {
-                probe += 1;
-            }
-            at = match bytes.get(probe) {
-                Some(&q @ (b'"' | b'\'')) => lower[probe + 1..]
-                    .find(q as char)
-                    .map_or(lower.len(), |e| probe + e + 2),
-                _ => {
-                    probe
-                        + lower[probe..]
-                            .find(|c: char| c.is_ascii_whitespace() || c == '>')
-                            .unwrap_or(lower.len() - probe)
-                }
-            };
-        }
-        if name == "open" {
-            let end = if at > behind_name { at } else { behind_name };
-            let space = lower[..start].trim_end().len();
-            return Some((space..end, String::new()));
-        }
-    }
-    None
+    let attribute = crate::markdown::markup::attribute_range(tag, "open")?;
+    Some((tag[..attribute.start].trim_end().len()..attribute.end, String::new()))
 }
 
 /// Whether a `:` typed after `before` and `typed` would end an emoji shortcode such as `:smile:`.
@@ -959,17 +968,27 @@ fn closes_shortcode(before: &str, typed: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_layout_of_another_parse_opens_no_bridge() {
+        let t = "Text\n";
+        let doc = crate::markdown::reader::parse(t);
+        let laid_out = super::super::layout::layout(&doc, &super::super::layout::NoImages, None);
+        let index = Index::new(&laid_out);
+        assert!(Bridge::new(&doc, &laid_out, &index).is_some());
+        let same_text = crate::markdown::reader::parse(t);
+        assert!(Bridge::new(&same_text, &laid_out, &index).is_none());
+        let nothing = Layout::nothing_of(&same_text);
+        assert!(Bridge::new(&same_text, &nothing, &Index::new(&nothing)).is_some());
+        assert!(Bridge::new(&doc, &Layout::default(), &Index::default()).is_none());
+    }
+    use crate::markdown::text::bytes;
+
     /// The source after `edit` of the preview of `t`.
     fn edited(t: &str, edit: impl Fn(&Bridge) -> Option<Edit>) -> String {
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let bridge = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
+        let bridge = Bridge::new(&d, &l, &index).unwrap();
         let mut out = t.to_string();
         edit(&bridge).expect("an edit").apply_to(&mut out);
         out
@@ -977,8 +996,8 @@ mod tests {
 
     /// What the preview shows of `t`, its paragraphs in lines.
     fn shown_of(t: &str) -> String {
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         l.blocks
             .iter()
             .flat_map(|b| &b.paras)
@@ -996,24 +1015,19 @@ mod tests {
         let mut caret = None;
         let mut pending: Option<Pending> = None;
         for key in keys.chars() {
-            let d = crate::markdown::doc::parse(&text);
-            let l = super::super::layout::layout(&text, &d, &super::super::layout::NoImages, caret);
+            let d = crate::markdown::reader::parse(&text);
+            let l = super::super::layout::layout(&d, &super::super::layout::NoImages, caret);
             let index = Index::new(&l);
-            let p = caret.map_or(start, |at| super::super::map::preview_offset(&l, &index, at).0);
-            let bridge = Bridge {
-                text: &text,
-                doc: &d,
-                layout: &l,
-                index: &index,
-            };
+            let p = caret.map_or(start, |at| super::super::map::preview_offset(&l, &index, at).get());
+            let bridge = Bridge::new(&d, &l, &index).unwrap();
             let key_text = key.to_string();
             let waiting = pending
                 .as_ref()
-                .and_then(|w| bridge.type_with_pending(w, Shown(p), &key_text));
+                .and_then(|w| bridge.type_with_pending(w, Shown::new(p), &key_text));
             let (edit, next) = match waiting {
                 Some(typed) => typed,
                 None => bridge
-                    .replace_keeping_styles(Shown(p)..Shown(p), &key_text)
+                    .replace_keeping_styles(Shown::new(p)..Shown::new(p), &key_text)
                     .unwrap_or_else(|| panic!("{key:?} refused at {p} of {text:?}")),
             };
             pending = next;
@@ -1076,7 +1090,7 @@ mod tests {
             let at = shown.find(what).unwrap();
             let from = shown[..at].encode_utf16().count();
             let to = from + what.encode_utf16().count();
-            edited(t, |b| b.replace(Shown(from)..Shown(to), ""))
+            edited(t, |b| b.replace(Shown::new(from)..Shown::new(to), ""))
         };
         assert_eq!(delete("😀\r\rWort zwei 😀", "Wor"), "😀\r\rt zwei 😀");
         assert_eq!(delete("[a]x(b)\n", "x"), "[a]\\(b)\n");
@@ -1094,7 +1108,9 @@ mod tests {
         assert_eq!(
             edited("> [!NOTE]\n> ab\n", |b| {
                 let shown = shown_of("> [!NOTE]\n> ab\n");
-                b.newline(Shown(shown[..shown.find("ab").unwrap()].encode_utf16().count() + 1))
+                b.newline(Shown::new(
+                    shown[..shown.find("ab").unwrap()].encode_utf16().count() + 1,
+                ))
             }),
             "> [!NOTE]\n> a\n>\n> b\n"
         );
@@ -1103,8 +1119,41 @@ mod tests {
     #[test]
     fn a_line_break_stays_in_the_one_line_of_a_cell_or_heading() {
         let table = "| a |\n|---|\n| xy |\n";
-        assert_eq!(edited(table, |b| b.line_break(Shown(3))), "| a |\n|---|\n| x<br>y |\n");
-        assert_eq!(edited("# ab\n", |b| b.line_break(Shown(1))), "# a<br>b\n");
+        assert_eq!(
+            edited(table, |b| b.line_break(Shown::new(3))),
+            "| a |\n|---|\n| x<br>y |\n"
+        );
+        assert_eq!(edited("# ab\n", |b| b.line_break(Shown::new(1))), "# a<br>b\n");
+    }
+
+    #[test]
+    fn tab_moves_a_list_item_with_what_belongs_to_it() {
+        let t = "- a\n- b\n  - c\n\n    d\n- e\n";
+        let shown = shown_of(t);
+        let at = shown[..shown.find('b').unwrap()].encode_utf16().count();
+        assert_eq!(
+            edited(t, |b| b.tab(Shown::new(at), false)),
+            "- a\n  - b\n    - c\n\n      d\n- e\n"
+        );
+    }
+
+    #[test]
+    fn shift_tab_moves_a_list_item_with_what_belongs_to_it() {
+        let t = "- a\n  - b\n    - c\n- e\n";
+        let shown = shown_of(t);
+        let at = shown[..shown.find('b').unwrap()].encode_utf16().count();
+        assert_eq!(edited(t, |b| b.tab(Shown::new(at), true)), "- a\n- b\n  - c\n- e\n");
+    }
+
+    #[test]
+    fn tab_moves_nested_lines_behind_the_marks_of_a_quote() {
+        let t = "> - a\n> - b\n>   - c\n";
+        let shown = shown_of(t);
+        let at = shown[..shown.find('b').unwrap()].encode_utf16().count();
+        assert_eq!(
+            edited(t, |b| b.tab(Shown::new(at), false)),
+            "> - a\n>   - b\n>     - c\n"
+        );
     }
 
     #[test]
@@ -1113,14 +1162,14 @@ mod tests {
         let at = shown_of(t).find('b').unwrap();
         let shown = shown_of(t);
         let at = shown[..at].encode_utf16().count();
-        assert_eq!(edited(t, |b| b.tab(Shown(at), false)), "> - a\n>   - b\n");
+        assert_eq!(edited(t, |b| b.tab(Shown::new(at), false)), "> - a\n>   - b\n");
     }
 
     #[test]
     fn several_lines_pasted_into_a_quote_stay_in_it() {
         let t = "> ```\n> x\n> ```\n";
         assert_eq!(
-            edited(t, |b| b.replace(Shown(1)..Shown(1), "a\nb")),
+            edited(t, |b| b.replace(Shown::new(1)..Shown::new(1), "a\nb")),
             "> ```\n> xa\n> b\n> ```\n"
         );
     }
@@ -1129,7 +1178,7 @@ mod tests {
     fn a_pipe_in_a_code_span_stays_inside_its_cell() {
         let t = "| a |\n|---|\n| `x` |\n";
         assert_eq!(
-            edited(t, |b| b.replace(Shown(3)..Shown(3), "|")),
+            edited(t, |b| b.replace(Shown::new(3)..Shown::new(3), "|")),
             "| a |\n|---|\n| `x\\|` |\n"
         );
     }
@@ -1152,20 +1201,23 @@ mod tests {
         let t = "| a | b |\n|---|---|\n| x | y |\n";
         let at = 2 + 2; // Behind the header cells, each followed by a paragraph break, is the cell `x`.
         assert_eq!(
-            edited(t, |b| b.replace(Shown(at)..Shown(at), "|")),
+            edited(t, |b| b.replace(Shown::new(at)..Shown::new(at), "|")),
             "| a | b |\n|---|---|\n| \\|x | y |\n"
         );
         assert_eq!(
-            edited(t, |b| b.replace(Shown(at)..Shown(at), "n\nm")),
+            edited(t, |b| b.replace(Shown::new(at)..Shown::new(at), "n\nm")),
             "| a | b |\n|---|---|\n| n mx | y |\n"
         );
     }
 
     #[test]
     fn return_in_a_code_block_adds_a_line_to_it() {
-        assert_eq!(edited("```\nab\n```\n", |b| b.newline(Shown(1))), "```\na\nb\n```\n");
         assert_eq!(
-            edited("> ```\n> ab\n> ```\n", |b| b.newline(Shown(1))),
+            edited("```\nab\n```\n", |b| b.newline(Shown::new(1))),
+            "```\na\nb\n```\n"
+        );
+        assert_eq!(
+            edited("> ```\n> ab\n> ```\n", |b| b.newline(Shown::new(1))),
             "> ```\n> a\n> b\n> ```\n"
         );
     }
@@ -1181,13 +1233,13 @@ mod tests {
             ("1 ", "1 x\n"),
         ] {
             assert_eq!(
-                edited("x\n", |b| b.replace(Shown(0)..Shown(0), typed)),
+                edited("x\n", |b| b.replace(Shown::new(0)..Shown::new(0), typed)),
                 source,
                 "{typed:?}"
             );
         }
         assert_eq!(
-            edited("x\n", |b| b.replace(Shown(1)..Shown(1), "1. ")),
+            edited("x\n", |b| b.replace(Shown::new(1)..Shown::new(1), "1. ")),
             "x1. \n",
             "only at the start"
         );
@@ -1195,18 +1247,18 @@ mod tests {
 
     #[test]
     fn tab_indents_a_list_item_under_the_one_before_and_back() {
-        assert_eq!(edited("- a\n- b\n", |b| b.tab(Shown(6), false)), "- a\n  - b\n");
+        assert_eq!(edited("- a\n- b\n", |b| b.tab(Shown::new(6), false)), "- a\n  - b\n");
         assert_eq!(
-            edited("x\n\n1. a\n2. b\n", |b| b.tab(Shown(8), false)),
+            edited("x\n\n1. a\n2. b\n", |b| b.tab(Shown::new(8), false)),
             "x\n\n1. a\n   2. b\n"
         );
-        assert_eq!(edited("- a\n  - b\n", |b| b.tab(Shown(6), true)), "- a\n- b\n");
+        assert_eq!(edited("- a\n  - b\n", |b| b.tab(Shown::new(6), true)), "- a\n- b\n");
         assert_eq!(
-            edited("x\n\n- a\n  - b\n", |b| b.tab(Shown(8), true)),
+            edited("x\n\n- a\n  - b\n", |b| b.tab(Shown::new(8), true)),
             "x\n\n- a\n- b\n"
         );
         assert_eq!(
-            edited("- a\n  - b\n    - c\n", |b| b.tab(Shown(10), true)),
+            edited("- a\n  - b\n    - c\n", |b| b.tab(Shown::new(10), true)),
             "- a\n  - b\n  - c\n"
         );
     }
@@ -1214,21 +1266,16 @@ mod tests {
     #[test]
     fn tab_keeps_the_caret_on_its_character_and_leaves_what_cannot_move() {
         let caret = |t: &str, p: usize, back: bool| {
-            let d = crate::markdown::doc::parse(t);
-            let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+            let d = crate::markdown::reader::parse(t);
+            let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
             let index = Index::new(&l);
-            let b = Bridge {
-                text: t,
-                doc: &d,
-                layout: &l,
-                index: &index,
-            };
-            b.tab(Shown(p), back).map(|edit| {
+            let b = Bridge::new(&d, &l, &index).unwrap();
+            b.tab(Shown::new(p), back).map(|edit| {
                 let at = edit.selection.start;
                 assert_eq!(edit.selection.end, at);
                 let mut out = t.to_string();
                 edit.apply_to(&mut out);
-                out[at..].chars().next()
+                out.from(at).chars().next()
             })
         };
         assert_eq!(caret("- a\n- bc\n", 7, false), Some(Some('c')));
@@ -1240,7 +1287,7 @@ mod tests {
 
     #[test]
     fn backspace_at_the_start_of_a_block_takes_its_formatting_away() {
-        let backspace = |t: &str, p: usize| edited(t, |b| b.delete_at_block_start(Shown(p)));
+        let backspace = |t: &str, p: usize| edited(t, |b| b.delete_at_block_start(Shown::new(p)));
         assert_eq!(backspace("x\n\n# Titel\n", 2), "x\n\nTitel\n");
         assert_eq!(backspace("x\n\n> Zitat\n", 2), "x\n\nZitat\n");
         assert_eq!(backspace("x\n\n>Zitat\n", 2), "x\n\nZitat\n");
@@ -1255,18 +1302,13 @@ mod tests {
     #[test]
     fn backspace_inside_a_block_or_in_plain_text_is_left_to_the_ordinary_deletion() {
         let t = "x\n\n# Titel\n\nText\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        assert_eq!(b.delete_at_block_start(Shown(3)), None, "inside the heading");
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        assert_eq!(b.delete_at_block_start(Shown::new(3)), None, "inside the heading");
         assert_eq!(
-            b.delete_at_block_start(Shown(8)),
+            b.delete_at_block_start(Shown::new(8)),
             None,
             "at the start of a plain paragraph"
         );
@@ -1275,17 +1317,23 @@ mod tests {
     #[test]
     fn checkboxes_and_chevrons_find_their_own_place_further_down() {
         let t = "Text\n\n- [ ] a\n- [x] b\n";
-        assert_eq!(edited(t, |b| b.toggle_task(Shown(5))), "Text\n\n- [x] a\n- [x] b\n");
-        assert_eq!(edited(t, |b| b.toggle_task(Shown(9))), "Text\n\n- [ ] a\n- [ ] b\n");
+        assert_eq!(
+            edited(t, |b| b.toggle_task(Shown::new(5))),
+            "Text\n\n- [x] a\n- [x] b\n"
+        );
+        assert_eq!(
+            edited(t, |b| b.toggle_task(Shown::new(9))),
+            "Text\n\n- [ ] a\n- [ ] b\n"
+        );
         let t = "x\n\n> [!note]- Titel\n> Inhalt\n\ny\n";
         let chevron = 2 + 1 + " Titel".len();
         assert_eq!(
-            edited(t, |b| b.toggle_fold(Shown(chevron))),
+            edited(t, |b| b.toggle_fold(Shown::new(chevron))),
             "x\n\n> [!note]+ Titel\n> Inhalt\n\ny\n"
         );
         let t = "x\n\n> [!note]+ Titel\n> Inhalt\n\ny\n";
         assert_eq!(
-            edited(t, |b| b.toggle_fold(Shown(chevron))),
+            edited(t, |b| b.toggle_fold(Shown::new(chevron))),
             "x\n\n> [!note]- Titel\n> Inhalt\n\ny\n"
         );
     }
@@ -1293,35 +1341,25 @@ mod tests {
     #[test]
     fn nothing_but_the_chevron_folds_and_nothing_but_a_checkbox_toggles() {
         let t = "x\n\n> [!note]- Titel\n> Inhalt\n\n- [ ] y\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        assert_eq!(b.toggle_fold(Shown(0)), None);
-        assert_eq!(b.toggle_fold(Shown(3)), None, "the title itself");
-        assert_eq!(b.toggle_task(Shown(0)), None);
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        assert_eq!(b.toggle_fold(Shown::new(0)), None);
+        assert_eq!(b.toggle_fold(Shown::new(3)), None, "the title itself");
+        assert_eq!(b.toggle_task(Shown::new(0)), None);
     }
 
     #[test]
     fn the_caret_stays_behind_what_a_click_changed() {
         let t = "- [ ] a\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        let edit = b.toggle_task(Shown(0)).unwrap();
-        assert_eq!(edit.range, 3..4);
-        assert_eq!(edit.selection, 4..4);
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        let edit = b.toggle_task(Shown::new(0)).unwrap();
+        assert_eq!(edit.range, bytes(3..4));
+        assert_eq!(edit.selection, bytes(4..4));
     }
 
     #[test]
@@ -1352,29 +1390,41 @@ mod tests {
 
     #[test]
     fn a_shift_return_breaks_the_line_and_keeps_the_prefix() {
-        assert_eq!(edited("ab\n", |b| b.line_break(Shown(1))), "a\\\nb\n");
-        assert_eq!(edited("- ab\n", |b| b.line_break(Shown(3))), "- a\\\n  b\n");
-        assert_eq!(edited("> ab\n", |b| b.line_break(Shown(1))), "> a\\\n> b\n");
-        assert_eq!(edited("```\nab\n```\n", |b| b.line_break(Shown(1))), "```\na\nb\n```\n");
-        assert_eq!(edited("x\n\n  ab\n", |b| b.line_break(Shown(3))), "x\n\n  a\\\n  b\n");
+        assert_eq!(edited("ab\n", |b| b.line_break(Shown::new(1))), "a\\\nb\n");
+        assert_eq!(edited("- ab\n", |b| b.line_break(Shown::new(3))), "- a\\\n  b\n");
+        assert_eq!(edited("> ab\n", |b| b.line_break(Shown::new(1))), "> a\\\n> b\n");
+        assert_eq!(
+            edited("```\nab\n```\n", |b| b.line_break(Shown::new(1))),
+            "```\na\nb\n```\n"
+        );
+        assert_eq!(
+            edited("x\n\n  ab\n", |b| b.line_break(Shown::new(3))),
+            "x\n\n  a\\\n  b\n"
+        );
     }
 
     #[test]
     fn return_splits_a_paragraph_and_keeps_formatting_on_both_sides() {
-        assert_eq!(edited("ab\n", |b| b.newline(Shown(1))), "a\n\nb\n");
-        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown(1))), "**a**\n\n**b** c\n");
-        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown(0))), "\n\n**ab** c\n");
-        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown(2))), "**ab**\n\n c\n");
-        assert_eq!(edited("[ab](c) d\n", |b| b.newline(Shown(1))), "[a](c)\n\n[b](c) d\n");
-        assert_eq!(edited("`ab` c\n", |b| b.newline(Shown(1))), "`a`\n\n`b` c\n");
-        assert_eq!(edited("> ab\n", |b| b.newline(Shown(1))), "> a\n>\n> b\n");
-        assert_eq!(edited("x\n\n> ab\n", |b| b.newline(Shown(3))), "x\n\n> a\n>\n> b\n");
-        assert_eq!(edited("- [ ] ab\n", |b| b.newline(Shown(3))), "- [ ] a\n- [ ] b\n");
+        assert_eq!(edited("ab\n", |b| b.newline(Shown::new(1))), "a\n\nb\n");
+        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown::new(1))), "**a**\n\n**b** c\n");
+        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown::new(0))), "\n\n**ab** c\n");
+        assert_eq!(edited("**ab** c\n", |b| b.newline(Shown::new(2))), "**ab**\n\n c\n");
+        assert_eq!(
+            edited("[ab](c) d\n", |b| b.newline(Shown::new(1))),
+            "[a](c)\n\n[b](c) d\n"
+        );
+        assert_eq!(edited("`ab` c\n", |b| b.newline(Shown::new(1))), "`a`\n\n`b` c\n");
+        assert_eq!(edited("> ab\n", |b| b.newline(Shown::new(1))), "> a\n>\n> b\n");
+        assert_eq!(
+            edited("x\n\n> ab\n", |b| b.newline(Shown::new(3))),
+            "x\n\n> a\n>\n> b\n"
+        );
+        assert_eq!(edited("- [ ] ab\n", |b| b.newline(Shown::new(3))), "- [ ] a\n- [ ] b\n");
     }
 
     #[test]
     fn typed_text_is_escaped_only_where_it_would_mean_something() {
-        let typed = |t: &str, p: usize, typed: &str| edited(t, |b| b.replace(Shown(p)..Shown(p), typed));
+        let typed = |t: &str, p: usize, typed: &str| edited(t, |b| b.replace(Shown::new(p)..Shown::new(p), typed));
         assert_eq!(typed("ab\n", 1, "_"), "a_b\n", "inside a word");
         assert_eq!(typed("a b\n", 1, "_"), "a\\_ b\n", "at the end of a word");
         assert_eq!(typed("a b\n", 2, "_"), "a \\_b\n", "at the start of a word");
@@ -1403,50 +1453,54 @@ mod tests {
     #[test]
     fn return_inside_nested_formatting_closes_and_reopens_it_inside_out() {
         assert_eq!(
-            edited("***ab*** c\n", |b| b.newline(Shown(1))),
+            edited("***ab*** c\n", |b| b.newline(Shown::new(1))),
             "***a***\n\n***b*** c\n"
         );
         assert_eq!(
-            edited("**a *bc* d**\n", |b| b.newline(Shown(3))),
+            edited("**a *bc* d**\n", |b| b.newline(Shown::new(3))),
             "**a *b***\n\n***c* d**\n"
         );
         assert_eq!(
-            edited("**a *b* c**\n", |b| b.newline(Shown(2))),
+            edited("**a *b* c**\n", |b| b.newline(Shown::new(2))),
             "**a **\n\n***b* c**\n"
         );
-        assert_eq!(edited("x **ab**\n", |b| b.newline(Shown(2))), "x \n\n**ab**\n");
-        assert_eq!(edited("x **ab**\n", |b| b.newline(Shown(4))), "x **ab**\n\n\n");
-        assert_eq!(edited("- **ab**\n", |b| b.newline(Shown(3))), "- **a**\n- **b**\n");
+        assert_eq!(edited("x **ab**\n", |b| b.newline(Shown::new(2))), "x \n\n**ab**\n");
+        assert_eq!(edited("x **ab**\n", |b| b.newline(Shown::new(4))), "x **ab**\n\n\n");
+        assert_eq!(edited("- **ab**\n", |b| b.newline(Shown::new(3))), "- **a**\n- **b**\n");
     }
 
     #[test]
     fn a_split_list_item_and_a_quote_keep_what_stands_before_them() {
-        assert_eq!(edited("x\n\n  - ab\n", |b| b.newline(Shown(5))), "x\n\n  - a\n  - b\n");
         assert_eq!(
-            edited("x\n\n- ab\n\ny\n", |b| b.newline(Shown(5))),
+            edited("x\n\n  - ab\n", |b| b.newline(Shown::new(5))),
+            "x\n\n  - a\n  - b\n"
+        );
+        assert_eq!(
+            edited("x\n\n- ab\n\ny\n", |b| b.newline(Shown::new(5))),
             "x\n\n- a\n- b\n\ny\n"
         );
         assert_eq!(
-            edited("x\n\n```\nab\n```\n", |b| b.newline(Shown(3))),
+            edited("x\n\n```\nab\n```\n", |b| b.newline(Shown::new(3))),
             "x\n\n```\na\nb\n```\n"
         );
-        assert_eq!(edited("x\n\n> \n", |b| b.newline(Shown(2))), "x\n\n\n");
+        assert_eq!(edited("x\n\n> \n", |b| b.newline(Shown::new(2))), "x\n\n\n");
     }
 
     #[test]
     fn return_on_what_cannot_be_split_goes_behind_it() {
-        assert_eq!(edited("---\n\nx\n", |b| b.newline(Shown(0))), "---\n\n\n\nx\n");
+        assert_eq!(edited("---\n\nx\n", |b| b.newline(Shown::new(0))), "---\n\n\n\nx\n");
         assert_eq!(
-            edited("<div>a</div>\n\nx\n", |b| b.newline(Shown(0))),
+            edited("<div>a</div>\n\nx\n", |b| b.newline(Shown::new(0))),
             "<div>a</div>\n\n\n\nx\n"
         );
-        assert_eq!(edited("$$x$$\n\ny\n", |b| b.newline(Shown(0))), "$$x$$\n\n\n\ny\n");
+        assert_eq!(edited("$$x$$\n\ny\n", |b| b.newline(Shown::new(0))), "$$x$$\n\n\n\ny\n");
     }
 
     #[test]
     fn typing_over_formatting_goes_where_the_selection_starts() {
         // A replacement: the text stays one edit, so it is undone in one step.
-        let replaced = |t: &str, from: usize, to: usize| edited(t, |b| b.replace(Shown(from)..Shown(to), "X"));
+        let replaced =
+            |t: &str, from: usize, to: usize| edited(t, |b| b.replace(Shown::new(from)..Shown::new(to), "X"));
         assert_eq!(replaced("a **bc** d\n", 3, 4), "a **bX** d\n");
         assert_eq!(
             replaced("a **bc** d\n", 2, 4),
@@ -1466,39 +1520,29 @@ mod tests {
     #[test]
     fn the_caret_ends_behind_what_was_typed_over() {
         let t = "a **bc** d\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        let edit = b.replace(Shown(1)..Shown(3), "XY").unwrap();
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        let edit = b.replace(Shown::new(1)..Shown::new(3), "XY").unwrap();
         let caret = edit.selection.start;
         let mut out = t.to_string();
         edit.apply_to(&mut out);
-        assert_eq!(&out[..caret], "aXY");
-        let edit = b.replace(Shown(3)..Shown(3), "Z").unwrap();
+        assert_eq!(out.upto(caret), "aXY");
+        let edit = b.replace(Shown::new(3)..Shown::new(3), "Z").unwrap();
         let caret = edit.selection.start;
         let mut out = t.to_string();
         edit.apply_to(&mut out);
-        assert_eq!(&out[..caret], "a **bZ");
+        assert_eq!(out.upto(caret), "a **bZ");
     }
 
     /// The source range of a selection of the preview of `t`.
     fn selected(t: &str, from: usize, to: usize) -> String {
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        t[b.source_selection(Shown(from)..Shown(to))].to_string()
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        t.at(b.source_selection(Shown::new(from)..Shown::new(to))).to_string()
     }
 
     #[test]
@@ -1515,48 +1559,42 @@ mod tests {
 
     #[test]
     fn what_is_typed_in_code_stays_as_it_is() {
-        let d = crate::markdown::doc::parse("```\nab\n```\n\ncd\n");
-        let l = super::super::layout::layout("```\nab\n```\n\ncd\n", &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse("```\nab\n```\n\ncd\n");
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: "```\nab\n```\n\ncd\n",
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        assert_eq!(b.escaped(Shown(1), "*", false).unwrap(), "*", "in a code block");
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        assert_eq!(b.escaped(Shown::new(1), "*", false).unwrap(), "*", "in a code block");
         assert_eq!(
-            b.escaped(Shown(4), "*", true).unwrap(),
+            b.escaped(Shown::new(4), "*", true).unwrap(),
             "*",
             "when the caller knows it is code"
         );
-        assert_eq!(b.escaped(Shown(4), "*", false).unwrap(), "\\*", "in running text");
+        assert_eq!(b.escaped(Shown::new(4), "*", false).unwrap(), "\\*", "in running text");
     }
 
     #[test]
     fn the_caret_stays_behind_a_backtick_typed_in_a_code_span() {
         let t = "a `bc` d\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
-        let edit = b.replace(Shown(3)..Shown(3), "`").unwrap();
+        let b = Bridge::new(&d, &l, &index).unwrap();
+        let edit = b.replace(Shown::new(3)..Shown::new(3), "`").unwrap();
         let mut out = t.to_string();
         let caret = edit.selection.start;
         edit.apply_to(&mut out);
-        assert_eq!(&out[..caret], "a ``b`");
-        let at_edge = b.replace(Shown(2)..Shown(2), "`").unwrap();
+        assert_eq!(out.upto(caret), "a ``b`");
+        let at_edge = b.replace(Shown::new(2)..Shown::new(2), "`").unwrap();
         let mut out = t.to_string();
         at_edge.apply_to(&mut out);
         assert!(out.contains('`'), "{out}");
-        assert_eq!(b.backticks_in_code_span(0, 0, "`"), None, "outside the span");
         assert_eq!(
-            b.backticks_in_code_span(t.find('`').unwrap(), 4, "`"),
+            b.backticks_in_code_span(Byte::new(0), Byte::new(0), "`"),
+            None,
+            "outside the span"
+        );
+        assert_eq!(
+            b.backticks_in_code_span(Byte::new(t.find('`').unwrap()), Byte::new(4), "`"),
             None,
             "on its delimiter"
         );
@@ -1564,13 +1602,16 @@ mod tests {
 
     #[test]
     fn return_numbers_the_next_item_and_ends_a_list_on_an_empty_one() {
-        assert_eq!(edited("1. a\n", |b| b.newline(Shown(4))), "1. a\n2. \n");
-        assert_eq!(edited("7) a\n", |b| b.newline(Shown(4))), "7) a\n8) \n");
-        assert_eq!(edited("x\n\n3. a\n", |b| b.newline(Shown(6))), "x\n\n3. a\n4. \n");
-        assert_eq!(edited("- a\n- \n", |b| b.newline(Shown(6))), "- a\n\n");
-        assert_eq!(edited("x\n\n  - a\n  - \n", |b| b.newline(Shown(8))), "x\n\n  - a\n\n");
+        assert_eq!(edited("1. a\n", |b| b.newline(Shown::new(4))), "1. a\n2. \n");
+        assert_eq!(edited("7) a\n", |b| b.newline(Shown::new(4))), "7) a\n8) \n");
+        assert_eq!(edited("x\n\n3. a\n", |b| b.newline(Shown::new(6))), "x\n\n3. a\n4. \n");
+        assert_eq!(edited("- a\n- \n", |b| b.newline(Shown::new(6))), "- a\n\n");
         assert_eq!(
-            edited("> a\n>\n> \n", |b| b.replace(Shown(1)..Shown(1), "")),
+            edited("x\n\n  - a\n  - \n", |b| b.newline(Shown::new(8))),
+            "x\n\n  - a\n\n"
+        );
+        assert_eq!(
+            edited("> a\n>\n> \n", |b| b.replace(Shown::new(1)..Shown::new(1), "")),
             "> a\n>\n> \n"
         );
     }
@@ -1578,42 +1619,52 @@ mod tests {
     #[test]
     fn a_container_goes_with_its_content_only_when_all_of_it_is_deleted() {
         assert_eq!(
-            edited("a **b** **c** d\n", |b| b.replace(Shown(2)..Shown(3), "")),
+            edited("a **b** **c** d\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
             "a  **c** d\n"
         );
-        assert_eq!(edited("a [b](c) d\n", |b| b.replace(Shown(2)..Shown(3), "")), "a  d\n");
         assert_eq!(
-            edited("x **a** y\n\nz **b** w\n", |b| b.replace(Shown(2)..Shown(3), "")),
+            edited("a [b](c) d\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
+            "a  d\n"
+        );
+        assert_eq!(
+            edited("x **a** y\n\nz **b** w\n", |b| b
+                .replace(Shown::new(2)..Shown::new(3), "")),
             "x  y\n\nz **b** w\n"
         );
-        assert_eq!(edited("# **a**\n", |b| b.replace(Shown(0)..Shown(1), "x")), "# x\n");
+        assert_eq!(
+            edited("# **a**\n", |b| b.replace(Shown::new(0)..Shown::new(1), "x")),
+            "# x\n"
+        );
     }
 
     #[test]
     fn a_backtick_typed_in_a_code_span_lengthens_its_delimiters() {
         assert_eq!(
-            edited("a `bc` d\n", |b| b.replace(Shown(3)..Shown(3), "`")),
+            edited("a `bc` d\n", |b| b.replace(Shown::new(3)..Shown::new(3), "`")),
             "a ``b`c`` d\n"
         );
         assert_eq!(
-            edited("a ``b`c`` d\n", |b| b.replace(Shown(4)..Shown(4), "`")),
+            edited("a ``b`c`` d\n", |b| b.replace(Shown::new(4)..Shown::new(4), "`")),
             "a ```b``c``` d\n"
         );
         assert_eq!(
-            edited("a `bc` d\n", |b| b.replace(Shown(3)..Shown(4), "`")),
+            edited("a `bc` d\n", |b| b.replace(Shown::new(3)..Shown::new(4), "`")),
             "a `` b` `` d\n"
         );
     }
 
     #[test]
     fn typed_character_references_stay_text() {
-        assert_eq!(edited("x\n", |b| b.replace(Shown(1)..Shown(1), "&amp;")), "x\\&amp;\n");
         assert_eq!(
-            edited("x &amp\n", |b| b.replace(Shown(6)..Shown(6), ";")),
+            edited("x\n", |b| b.replace(Shown::new(1)..Shown::new(1), "&amp;")),
+            "x\\&amp;\n"
+        );
+        assert_eq!(
+            edited("x &amp\n", |b| b.replace(Shown::new(6)..Shown::new(6), ";")),
             "x &amp\\;\n"
         );
         assert_eq!(
-            edited("x\n", |b| b.replace(Shown(1)..Shown(1), "& b; &keins;")),
+            edited("x\n", |b| b.replace(Shown::new(1)..Shown::new(1), "& b; &keins;")),
             "x& b; &keins;\n"
         );
     }
@@ -1626,36 +1677,48 @@ mod tests {
             "Eins\n\n---\n\nZwei\n",
             "Eins\n\n$$x$$\n",
         ] {
-            let d = crate::markdown::doc::parse(t);
-            let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+            let d = crate::markdown::reader::parse(t);
+            let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
             let shown: usize = l.blocks.iter().map(|b| b.len_u16).sum();
-            let out = edited(t, |b| b.replace(Shown(0)..Shown(shown), "neu"));
+            let out = edited(t, |b| b.replace(Shown::new(0)..Shown::new(shown), "neu"));
             assert_eq!(out.trim_end(), "neu", "{t:?}");
         }
     }
 
     #[test]
     fn a_task_checkbox_toggles_both_ways() {
-        assert_eq!(edited("- [ ] a\n", |b| b.toggle_task(Shown(0))), "- [x] a\n");
-        assert_eq!(edited("- [x] a\n", |b| b.toggle_task(Shown(0))), "- [ ] a\n");
+        assert_eq!(edited("- [ ] a\n", |b| b.toggle_task(Shown::new(0))), "- [x] a\n");
+        assert_eq!(edited("- [x] a\n", |b| b.toggle_task(Shown::new(0))), "- [ ] a\n");
     }
 
     #[test]
     fn deleting_a_picture_or_formula_removes_its_whole_source() {
         assert_eq!(
-            edited("a ![b](c.png) d\n", |b| b.replace(Shown(2)..Shown(3), "")),
+            edited("a ![b](c.png) d\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
             "a  d\n"
         );
-        assert_eq!(edited("a $x^2$ d\n", |b| b.replace(Shown(2)..Shown(7), "")), "a  d\n");
+        assert_eq!(
+            edited("a $x^2$ d\n", |b| b.replace(Shown::new(2)..Shown::new(7), "")),
+            "a  d\n"
+        );
     }
 
     #[test]
     fn deleting_all_of_a_container_takes_its_markup_along() {
-        assert_eq!(edited("a **b** c\n", |b| b.replace(Shown(2)..Shown(3), "")), "a  c\n");
-        assert_eq!(edited("a ***b*** c\n", |b| b.replace(Shown(2)..Shown(3), "")), "a  c\n");
-        assert_eq!(edited("a `b` c\n", |b| b.replace(Shown(2)..Shown(3), "")), "a  c\n");
         assert_eq!(
-            edited("a **bc** d\n", |b| b.replace(Shown(2)..Shown(3), "")),
+            edited("a **b** c\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
+            "a  c\n"
+        );
+        assert_eq!(
+            edited("a ***b*** c\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
+            "a  c\n"
+        );
+        assert_eq!(
+            edited("a `b` c\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
+            "a  c\n"
+        );
+        assert_eq!(
+            edited("a **bc** d\n", |b| b.replace(Shown::new(2)..Shown::new(3), "")),
             "a **c** d\n"
         );
     }
@@ -1672,17 +1735,12 @@ mod tests {
                 " <details open>\n<summary>Mehr</summary>\n\nInhalt\n</details>\n",
             ),
         ] {
-            let d = crate::markdown::doc::parse(t);
-            let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+            let d = crate::markdown::reader::parse(t);
+            let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
             let index = Index::new(&l);
-            let b = Bridge {
-                text: t,
-                doc: &d,
-                layout: &l,
-                index: &index,
-            };
+            let b = Bridge::new(&d, &l, &index).unwrap();
             let mut out = t.to_string();
-            b.toggle_fold(Shown(0)).unwrap().apply_to(&mut out);
+            b.toggle_fold(Shown::new(0)).unwrap().apply_to(&mut out);
             assert_eq!(out, want);
         }
     }
@@ -1698,43 +1756,35 @@ mod tests {
     #[test]
     fn typing_after_a_named_entity_lands_behind_it() {
         let t = "Caf&eacute; au lait\n";
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
+        let b = Bridge::new(&d, &l, &index).unwrap();
         let mut out = t.to_string();
-        b.replace(Shown(5)..Shown(7), "X").unwrap().apply_to(&mut out);
+        b.replace(Shown::new(5)..Shown::new(7), "X").unwrap().apply_to(&mut out);
         assert_eq!(out, "Caf&eacute; X lait\n");
     }
 
     #[test]
     fn replacing_many_formatted_pieces_stays_one_edit_and_drops_their_markup() {
         let t: String = (0..3000).map(|i| format!("w{i} **b{i}** ")).collect::<String>() + "\n";
-        let d = crate::markdown::doc::parse(&t);
-        let l = super::super::layout::layout(&t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(&t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        let b = Bridge {
-            text: &t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        };
+        let b = Bridge::new(&d, &l, &index).unwrap();
         let shown: usize = l.blocks[0].paras[0]
             .runs
             .iter()
             .map(|r| r.text.encode_utf16().count())
             .sum();
         let mut out = t.clone();
-        b.replace(Shown(0)..Shown(shown), "x").unwrap().apply_to(&mut out);
+        b.replace(Shown::new(0)..Shown::new(shown), "x")
+            .unwrap()
+            .apply_to(&mut out);
         assert!(!out.contains("**"), "{}", &out[..out.len().min(80)]);
         assert!(out.starts_with('x'));
     }
-    use crate::markdown::doc::parse;
+    use crate::markdown::reader::parse;
 
     #[test]
     fn details_open_and_close_in_their_tag() {
@@ -1756,57 +1806,47 @@ mod tests {
 
     fn edit(t: &str, f: impl Fn(&Bridge) -> Option<Edit>) -> (String, usize) {
         let d = parse(t);
-        let l = layout(t, &d, &NoImages, None);
+        let l = layout(&d, &NoImages, None);
         let i = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &i,
-        };
+        let b = Bridge::new(&d, &l, &i).unwrap();
         let e = f(&b).expect("edit");
         let mut s = t.to_string();
         e.apply_to(&mut s);
-        (s, e.selection.start)
+        (s, e.selection.start.get())
     }
 
     #[test]
     fn typing_in_the_preview_at_pending_styles_wraps_the_word() {
         let pending = Pending {
-            at: 8,
+            at: Byte::new(8),
             styles: vec![commands::InlineStyle::Bold],
         };
         let typed = |p: usize, typed: &str| {
             let t = "ein Wort\n";
             let d = parse(t);
-            let l = layout(t, &d, &NoImages, None);
+            let l = layout(&d, &NoImages, None);
             let i = Index::new(&l);
-            let b = Bridge {
-                text: t,
-                doc: &d,
-                layout: &l,
-                index: &i,
-            };
-            b.type_with_pending(&pending, Shown(p), typed).map(|(e, next)| {
+            let b = Bridge::new(&d, &l, &i).unwrap();
+            b.type_with_pending(&pending, Shown::new(p), typed).map(|(e, next)| {
                 let mut s = t.to_string();
                 e.apply_to(&mut s);
                 (s, next.map(|n| n.at))
             })
         };
         assert_eq!(typed(8, "x"), Some(("ein Wort**x**\n".into(), None)));
-        assert_eq!(typed(8, " "), Some(("ein Wort \n".into(), Some(9))));
+        assert_eq!(typed(8, " "), Some(("ein Wort \n".into(), Some(Byte::new(9)))));
         assert_eq!(typed(8, "\n"), None);
         assert_eq!(typed(3, "x"), None);
     }
 
     #[test]
     fn typing_escapes_markdown_characters() {
-        let (s, caret) = edit("ab\n", |b| b.replace(Shown(1)..Shown(1), "*"));
+        let (s, caret) = edit("ab\n", |b| b.replace(Shown::new(1)..Shown::new(1), "*"));
         assert_eq!(s, "a\\*b\n");
         assert_eq!(caret, 3);
-        let (s, _) = edit("x\n", |b| b.replace(Shown(0)..Shown(0), "# "));
+        let (s, _) = edit("x\n", |b| b.replace(Shown::new(0)..Shown::new(0), "# "));
         assert_eq!(s, "\\# x\n");
-        let (s, _) = edit("snake\n", |b| b.replace(Shown(5)..Shown(5), "_case"));
+        let (s, _) = edit("snake\n", |b| b.replace(Shown::new(5)..Shown::new(5), "_case"));
         assert_eq!(s, "snake_case\n");
         // Typed in the preview, none of the newer markup may take effect.
         for (typed, stored) in [
@@ -1816,14 +1856,14 @@ mod tests {
             ("%%c%% 5%", "\\%\\%c\\%\\% 5%"),
             (":smile: 12:30", ":smile\\: 12:30"),
         ] {
-            let (s, _) = edit("A\n", |b| b.replace(Shown(1)..Shown(1), typed));
+            let (s, _) = edit("A\n", |b| b.replace(Shown::new(1)..Shown::new(1), typed));
             assert_eq!(s, format!("A{stored}\n"));
             let parsed = parse(&s);
-            let l = layout(&s, &parsed, &NoImages, None);
+            let l = layout(&parsed, &NoImages, None);
             let shown: String = l.blocks[0].paras[0].runs.iter().map(|r| r.text.as_str()).collect();
             assert_eq!(shown, format!("A{typed}"), "{s}");
         }
-        let (s, _) = edit("# Titel\n", |b| b.replace(Shown(5)..Shown(5), " {#x}"));
+        let (s, _) = edit("# Titel\n", |b| b.replace(Shown::new(5)..Shown::new(5), " {#x}"));
         assert_eq!(s, "# Titel \\{#x}\n");
     }
 
@@ -1831,80 +1871,77 @@ mod tests {
     fn typing_after_a_space_at_the_paragraph_end_keeps_the_space() {
         let t = "Wort \n";
         let d = parse(t);
-        let l = layout(t, &d, &NoImages, Some(5));
+        let l = layout(&d, &NoImages, Some(Byte::new(5)));
         let i = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &i,
-        };
+        let b = Bridge::new(&d, &l, &i).unwrap();
         let mut s = t.to_string();
-        b.replace(Shown(5)..Shown(5), "z").expect("edit").apply_to(&mut s);
+        b.replace(Shown::new(5)..Shown::new(5), "z")
+            .expect("edit")
+            .apply_to(&mut s);
         assert_eq!(s, "Wort z\n");
     }
 
     #[test]
     fn deleting_whole_bold_content_removes_delimiters() {
-        let (s, _) = edit("a **b** c\n", |b| b.replace(Shown(2)..Shown(3), ""));
+        let (s, _) = edit("a **b** c\n", |b| b.replace(Shown::new(2)..Shown::new(3), ""));
         assert_eq!(s, "a  c\n");
     }
 
     #[test]
     fn enter_continues_lists_and_splits_bold() {
-        let (s, caret) = edit("- eins\n", |b| b.newline(Shown(6)));
+        let (s, caret) = edit("- eins\n", |b| b.newline(Shown::new(6)));
         assert_eq!(s, "- eins\n- \n");
         assert_eq!(caret, 9);
-        let (s, _) = edit("1. a\n", |b| b.newline(Shown(4)));
+        let (s, _) = edit("1. a\n", |b| b.newline(Shown::new(4)));
         assert_eq!(s, "1. a\n2. \n");
-        let (s, _) = edit("x **fett**\n", |b| b.newline(Shown(4)));
+        let (s, _) = edit("x **fett**\n", |b| b.newline(Shown::new(4)));
         assert_eq!(s, "x **fe**\n\n**tt**\n");
-        let (s, _) = edit("- [x] a\n", |b| b.newline(Shown(3)));
+        let (s, _) = edit("- [x] a\n", |b| b.newline(Shown::new(3)));
         assert_eq!(s, "- [x] a\n- [ ] \n");
     }
 
     #[test]
     fn return_adds_visible_empty_lines_and_backspace_removes_them() {
-        let (s, caret) = edit("A\n\nB\n", |b| b.newline(Shown(1)));
+        let (s, caret) = edit("A\n\nB\n", |b| b.newline(Shown::new(1)));
         assert_eq!((s.as_str(), caret), ("A\n\n\n\nB\n", 3));
-        let (s, caret) = edit(&s, |b| b.newline(Shown(2)));
+        let (s, caret) = edit(&s, |b| b.newline(Shown::new(2)));
         assert_eq!((s.as_str(), caret), ("A\n\n\n\n\n\nB\n", 5));
-        let (s, caret) = edit(&s, |b| b.delete_at_block_start(Shown(3)));
+        let (s, caret) = edit(&s, |b| b.delete_at_block_start(Shown::new(3)));
         assert_eq!((s.as_str(), caret), ("A\n\n\n\nB\n", 3));
-        let (s, _) = edit(&s, |b| b.replace(Shown(2)..Shown(2), "neu"));
+        let (s, _) = edit(&s, |b| b.replace(Shown::new(2)..Shown::new(2), "neu"));
         assert_eq!(s, "A\n\nneu\n\nB\n");
     }
 
     #[test]
     fn enter_on_empty_item_leaves_list() {
-        let (s, _) = edit("- a\n- \n", |b| b.newline(Shown(6)));
+        let (s, _) = edit("- a\n- \n", |b| b.newline(Shown::new(6)));
         assert_eq!(s, "- a\n\n");
     }
 
     #[test]
     fn enter_in_quote_and_table() {
-        let (s, _) = edit("> ab\n", |b| b.newline(Shown(1)));
+        let (s, _) = edit("> ab\n", |b| b.newline(Shown::new(1)));
         assert_eq!(s, "> a\n>\n> b\n");
-        let (s, caret) = edit("| a | b |\n|---|---|\n| 1 | 2 |\n", |b| b.newline(Shown(5)));
+        let (s, caret) = edit("| a | b |\n|---|---|\n| 1 | 2 |\n", |b| b.newline(Shown::new(5)));
         assert_eq!(s.lines().count(), 4);
         assert!(caret > s.find("| 1").unwrap());
     }
 
     #[test]
     fn backspace_at_start_removes_block_prefix() {
-        let (s, _) = edit("## Titel\n", |b| b.delete_at_block_start(Shown(0)));
+        let (s, _) = edit("## Titel\n", |b| b.delete_at_block_start(Shown::new(0)));
         assert_eq!(s, "Titel\n");
-        let (s, _) = edit("- a\n", |b| b.delete_at_block_start(Shown(2)));
+        let (s, _) = edit("- a\n", |b| b.delete_at_block_start(Shown::new(2)));
         assert_eq!(s, "a\n");
     }
 
     #[test]
     fn task_toggle_and_tab_indent() {
-        let (s, _) = edit("- [ ] a\n", |b| b.toggle_task(Shown(0)));
+        let (s, _) = edit("- [ ] a\n", |b| b.toggle_task(Shown::new(0)));
         assert_eq!(s, "- [x] a\n");
-        let (s, _) = edit("- a\n- b\n", |b| b.tab(Shown(6), false));
+        let (s, _) = edit("- a\n- b\n", |b| b.tab(Shown::new(6), false));
         assert_eq!(s, "- a\n  - b\n");
-        let (s, _) = edit("- a\n  - b\n", |b| b.tab(Shown(6), true));
+        let (s, _) = edit("- a\n  - b\n", |b| b.tab(Shown::new(6), true));
         assert_eq!(s, "- a\n- b\n");
     }
 
@@ -1912,28 +1949,18 @@ mod tests {
     fn selection_maps_to_source() {
         let t = "a **fett** b\n";
         let d = parse(t);
-        let l = layout(t, &d, &NoImages, None);
+        let l = layout(&d, &NoImages, None);
         let i = Index::new(&l);
-        let b = Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &i,
-        };
-        let r = b.source_selection(Shown(2)..Shown(6));
-        assert_eq!(&t[r], "fett");
+        let b = Bridge::new(&d, &l, &i).unwrap();
+        let r = b.source_selection(Shown::new(2)..Shown::new(6));
+        assert_eq!(t.at(r), "fett");
     }
 
     fn edit_of(t: &str, edit: impl Fn(&Bridge) -> Option<Edit>) -> Option<Edit> {
-        let d = crate::markdown::doc::parse(t);
-        let l = super::super::layout::layout(t, &d, &super::super::layout::NoImages, None);
+        let d = crate::markdown::reader::parse(t);
+        let l = super::super::layout::layout(&d, &super::super::layout::NoImages, None);
         let index = Index::new(&l);
-        edit(&Bridge {
-            text: t,
-            doc: &d,
-            layout: &l,
-            index: &index,
-        })
+        edit(&Bridge::new(&d, &l, &index).unwrap())
     }
 
     /// The source after `edit` of the preview of `t`, with `|` for the caret.
@@ -1941,13 +1968,13 @@ mod tests {
         let edit = edit_of(t, edit).expect("an edit");
         let mut out = t.to_string();
         edit.apply_to(&mut out);
-        out.insert(edit.selection.start, '|');
+        out.insert(edit.selection.start.get(), '|');
         out
     }
 
     #[test]
     fn a_backtick_typed_in_a_code_span_lengthens_the_span_it_is_in() {
-        let typed = |t: &str, p: usize| with_caret(t, |b| b.replace(Shown(p)..Shown(p), "`"));
+        let typed = |t: &str, p: usize| with_caret(t, |b| b.replace(Shown::new(p)..Shown::new(p), "`"));
         assert_eq!(typed("`ab` c", 0), "`` `|ab `` c", "at its start");
         assert_eq!(typed("xx `ab` yy", 4), "xx ``a`|b`` yy", "inside");
         assert_eq!(typed("`a` `b`", 1), "`` a`| `` `b`", "not the next one");
@@ -1955,7 +1982,7 @@ mod tests {
 
     #[test]
     fn return_in_an_empty_item_or_quote_clears_the_whole_line() {
-        let enter = |t: &str, p: usize| with_caret(t, |b| b.newline(Shown(p)));
+        let enter = |t: &str, p: usize| with_caret(t, |b| b.newline(Shown::new(p)));
         assert_eq!(
             enter("x\n\n-   \n\nnext\n", 4),
             "x\n\n|\n\nnext\n",
@@ -1967,17 +1994,20 @@ mod tests {
 
     #[test]
     fn return_inside_bold_in_a_list_leaves_the_caret_before_the_new_markers() {
-        assert_eq!(with_caret("- **ab**\n", |b| b.newline(Shown(3))), "- **a**\n- |**b**\n");
+        assert_eq!(
+            with_caret("- **ab**\n", |b| b.newline(Shown::new(3))),
+            "- **a**\n- |**b**\n"
+        );
     }
 
     #[test]
     fn backspace_takes_a_quoted_heading_marker_and_leaves_quote_marks_in_code() {
         assert_eq!(
-            with_caret("x\n\n> # Titel\n", |b| b.delete_at_block_start(Shown(2))),
+            with_caret("x\n\n> # Titel\n", |b| b.delete_at_block_start(Shown::new(2))),
             "x\n\n> |Titel\n"
         );
         assert_eq!(
-            edited("```\n> a\n```\n", |b| b.delete_at_block_start(Shown(0))),
+            edited("```\n> a\n```\n", |b| b.delete_at_block_start(Shown::new(0))),
             "```\n> a\n```\n"
         );
     }
@@ -1987,7 +2017,7 @@ mod tests {
         let t = "x\n\n<details>\n<summary>Mehr</summary>\n\nInhalt\n\n</details>\n";
         let chevron = 2;
         assert_eq!(
-            with_caret(t, |b| b.toggle_fold(Shown(chevron))),
+            with_caret(t, |b| b.toggle_fold(Shown::new(chevron))),
             "x\n\n<details open|>\n<summary>Mehr</summary>\n\nInhalt\n\n</details>\n"
         );
     }
@@ -1996,9 +2026,9 @@ mod tests {
     fn a_click_before_a_chevron_folds_nothing() {
         let t = "x\n\n> [!note]- Titel\n> Inhalt\n";
         let chevron = 2 + 1 + " Titel".len();
-        assert_eq!(edit_of(t, |b| b.toggle_fold(Shown(2))), None, "the icon");
+        assert_eq!(edit_of(t, |b| b.toggle_fold(Shown::new(2))), None, "the icon");
         assert_eq!(
-            edit_of(t, |b| b.toggle_fold(Shown(chevron - 1))),
+            edit_of(t, |b| b.toggle_fold(Shown::new(chevron - 1))),
             None,
             "the title's end"
         );
@@ -2008,10 +2038,11 @@ mod tests {
     #[expect(clippy::single_range_in_vec_init, reason = "lists of one deletion")]
     fn an_insertion_inside_a_deletion_lands_at_its_start_and_later_ones_stay_where_they_are() {
         let composed = |deletions: &[Range<usize>], at: usize| {
-            let edit = compose("abcdefgh", deletions, at, "X");
+            let deletions: Vec<Range<Byte>> = deletions.iter().cloned().map(bytes).collect();
+            let edit = compose("abcdefgh", &deletions, Byte::new(at), "X");
             let mut out = "abcdefgh".to_string();
             edit.apply_to(&mut out);
-            out.insert(edit.selection.start, '|');
+            out.insert(edit.selection.start.get(), '|');
             out
         };
         assert_eq!(composed(&[1..3, 5..6], 2), "aX|degh", "in the first of two");
@@ -2021,8 +2052,8 @@ mod tests {
 
     #[test]
     fn typed_punctuation_alone_at_the_start_of_a_paragraph_needs_no_backslash() {
-        assert_eq!(edited("x\n", |b| b.replace(Shown(0)..Shown(0), ".")), ".x\n");
-        assert_eq!(edited("x\n", |b| b.replace(Shown(0)..Shown(0), ")")), ")x\n");
+        assert_eq!(edited("x\n", |b| b.replace(Shown::new(0)..Shown::new(0), ".")), ".x\n");
+        assert_eq!(edited("x\n", |b| b.replace(Shown::new(0)..Shown::new(0), ")")), ")x\n");
     }
 
     #[test]
@@ -2033,18 +2064,21 @@ mod tests {
 
     #[test]
     fn typing_and_deleting_at_the_end_of_code_stays_inside_the_block() {
-        let typed = |t: &str, p: usize| edited(t, |b| b.replace(Shown(p)..Shown(p), "c"));
+        let typed = |t: &str, p: usize| edited(t, |b| b.replace(Shown::new(p)..Shown::new(p), "c"));
         assert_eq!(typed("```\nab\n```\n", 2), "```\nabc\n```\n");
         assert_eq!(typed("~~~\nab\n~~~\n", 2), "~~~\nabc\n~~~\n");
         assert_eq!(typed("> ```\n> ab\n> ```\n", 2), "> ```\n> abc\n> ```\n");
         assert_eq!(typed("- ```\n  ab\n  ```\n", 2 + 2), "- ```\n  abc\n  ```\n");
         assert_eq!(typed("    ab\n", 2), "    abc\n");
         assert_eq!(typed("```\nab\n", 2), "```\nabc\n", "without a closing fence");
-        let deleted = |t: &str, r: Range<usize>| edited(t, |b| b.replace(Shown(r.start)..Shown(r.end), ""));
+        let deleted = |t: &str, r: Range<usize>| edited(t, |b| b.replace(Shown::new(r.start)..Shown::new(r.end), ""));
         assert_eq!(deleted("```\nab\n```\n", 1..2), "```\na\n```\n");
         assert_eq!(deleted("```\nab\ncd\n```\n", 4..5), "```\nab\nc\n```\n");
         assert_eq!(deleted("x\n\n```\nab\n```\n\ny\n", 3..4), "x\n\n```\na\n```\n\ny\n");
         assert_eq!(deleted("> ```\n> ab\n> ```\n", 1..2), "> ```\n> a\n> ```\n");
-        assert_eq!(edited("```\nab\n```\n", |b| b.newline(Shown(2))), "```\nab\n\n```\n");
+        assert_eq!(
+            edited("```\nab\n```\n", |b| b.newline(Shown::new(2))),
+            "```\nab\n\n```\n"
+        );
     }
 }

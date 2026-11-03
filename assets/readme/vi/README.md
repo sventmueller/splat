@@ -565,6 +565,7 @@ Splat là một ứng dụng Rust giao tiếp trực tiếp với AppKit và Web
 
 - macOS với Command Line Tools (`xcode-select --install`). Không cần Xcode; Splat build mà không cần `actool`, `ibtool` và `metal`.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) ghi đúng phiên bản mà CI dùng; rustup tự cài nó, còn Rust của Homebrew bỏ qua tệp này. Nâng phiên bản ở đó là cách để các cảnh báo mới của trình biên dịch và clippy đến được dự án.
+- rustup, cho `make lint`, `make check` và `make universal`: `cargo xtask check-library` biên dịch thư viện cho Linux để cho thấy nó không cần macOS, còn Rust của Homebrew không có target nào khác.
 
 [Makefile](../../../Makefile) chứa các điểm vào ngắn gọn; `make help` liệt kê tất cả:
 
@@ -621,21 +622,24 @@ Chỉ ảnh đĩa mang trình cập nhật, [Sparkle](https://sparkle-project.or
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | tìm kiếm ngẫu nhiên lâu hơn; `SPLAT_FUZZ_SEED` làm đầu vào thay đổi |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | một ngôn ngữ, khi các ngôn ngữ khác chưa đầy đủ |
 | `cargo clippy --release --all-targets [--features selftest]` | lint, gồm lời biện minh cho mọi khối `unsafe`, độ dài hàm và, trong thư viện, các phép chuyển đổi số |
+| `cargo xtask check-library` | thư viện được biên dịch cho Linux, nên không có gì trong đó cần macOS |
 | `cargo xtask vendor check` | các thư viện JavaScript khớp với `vendor.lock` từng byte một |
-| `cargo xtask selftest probe` | không cửa sổ, mỗi mục với kết quả mong đợi của nó: công thức, sơ đồ, hình ảnh web với một máy chủ ngay trong tiến trình, địa chỉ bị chặn, các lớp phòng vệ của web view |
+| `cargo xtask selftest probe` | không cần cửa sổ, mỗi mục với kết quả mong đợi của nó: công thức, sơ đồ, hình ảnh web so với một máy chủ bên trong tiến trình, địa chỉ bị chặn, văn bản mà mỗi lệnh ghi ra, từng định dạng hình ảnh qua cả hai bản xuất, một trang ngừng phản hồi, và các biện pháp phòng vệ của web view so với một trang không có chúng. Mất khoảng nửa phút. Những gì cần ứng dụng ở phía trước bị bỏ qua khi màn hình bị khóa |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | ứng dụng đang chạy, từng cú bấm một. Mở một cửa sổ và gõ vào đó; máy Mac bận khoảng bốn phút. `--scenarios` chỉ chạy phần thứ hai, trong khoảng một phút rưỡi |
 | `cargo xtask selftest resize` | nới rộng cửa sổ sau khi di chuyển thanh phân cách: mã nguồn xuống dòng lại trong lúc cửa sổ đổi kích thước. Mất khoảng mười giây |
 | `cargo xtask selftest bench <file.md>` | thời gian mở, gõ và cuộn một tệp lớn |
-| `cargo test --release -- --ignored partial_updates` | một lần gõ phím trong 10 MB: cập nhật một phần so với cập nhật toàn bộ, kết quả và giới hạn thời gian |
-| `cargo test --release --test hostile` | tài liệu được tạo ra để làm tràn stack hoặc tốn thời gian bậc hai, qua phân tích, dàn trang, cả hai bản xuất, lần gõ phím và lệnh |
+| `cargo test --release -- --ignored partial_updates` | một lần gõ phím trong 10 MB: cập nhật một phần so với cập nhật toàn bộ, cùng kết quả trong tối đa một phần tư thời gian |
+| `cargo test --release --test hostile` | tài liệu được tạo ra để làm tràn stack hoặc tốn thời gian bậc hai, mỗi tài liệu ở hai kích thước mà thời gian phải tăng theo văn bản, qua phân tích, dàn trang, cả hai bản xuất, lần gõ phím và lệnh |
 | `make mutants` | các lỗi được cài vào `src/markdown/` và `src/preview/` từng cái một, qua [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); cho biết lỗi nào không bài kiểm thử nào phát hiện. Mất hàng giờ; `FILE=src/preview/bridge.rs` thu hẹp phạm vi |
 | `cargo test --release --test decoder` | tiến trình giải mã giải mã hình ảnh và không truy cập được tệp lẫn mạng |
 | `make coverage` | độ phủ dòng của `cargo test` và mọi bài tự kiểm tra, qua [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); thất bại nếu dưới mức sàn. Chiếm máy Mac khoảng năm phút |
-| `make coverage-library` | các mức sàn cho `src/markdown/`, `src/preview/` và `i18n.rs`, chỉ đo bằng `cargo test` |
+| `make coverage-library` | `src/markdown/`, `src/preview/` và `i18n.rs` so với các mức sàn cao hơn của chúng, chỉ đo bằng `cargo test` |
 
-Kiểm thử đơn vị nằm cạnh mã mà chúng kiểm thử. `tests/` chứa những gì tác động vào thư viện từ bên ngoài: các bài kiểm thử ngẫu nhiên trong `robustness.rs`, dùng chung bộ sinh trong `src/fuzz.rs` với của `sync.rs`, các tài liệu được tạo ra để gây hại trong `hostile.rs`, và bài kiểm thử bộ giải mã, vốn khởi động chương trình đã build. Các quyết định trong `src/editor/` không cần cửa sổ nằm trong các hàm tự do có bài kiểm thử riêng: mọi thứ controller biết và cách nó thay đổi trong `state.rs`, quy tắc hiển thị trong `render_queue.rs`, bản sao văn bản trong `sync.rs`. Một bước của bài tự kiểm tra cửa sổ mà chờ vô ích sẽ làm lần chạy thất bại. Bài tự kiểm tra cửa sổ chạy phần thứ hai sau phần bấm chuột chính, trong `src/editor/selftest/scenarios.rs`: mọi lệnh định dạng và bảng, các hộp thoại, cú bấm liên kết, dán, thả, xuất, một thay đổi lớn, hình ảnh thay đổi trên đĩa, áp lực bộ nhớ, một tài liệu khổng lồ và việc khôi phục sau khi bị sập.
+Kiểm thử đơn vị nằm cạnh mã mà chúng kiểm thử. `tests/` chứa những gì tác động vào thư viện từ bên ngoài: các bài kiểm thử ngẫu nhiên trong `robustness.rs`, dùng chung bộ sinh trong `src/fuzz.rs` với của `sync.rs`, các tài liệu được tạo ra để gây hại trong `hostile.rs`, và bài kiểm thử bộ giải mã, vốn khởi động chương trình đã build. Các quyết định trong `src/editor/` không cần cửa sổ nằm trong các hàm tự do có bài kiểm thử riêng: mọi thứ controller biết và cách nó thay đổi trong `state.rs`, quy tắc hiển thị trong `render_queue.rs`, bản sao văn bản trong `sync.rs`, kiểu đoạn văn, phông chữ và màu sắc dưới dạng giá trị trong `render.rs`, ý nghĩa của các định danh thanh công cụ trong `toolbar.rs`, ý nghĩa của một cú bấm liên kết trong `navigation.rs`.
 
-Độ phủ có hai mức sàn: mỗi module ít nhất 80 % số dòng, tất cả module cộng lại ít nhất 85 %. `make coverage` đo `cargo test` cùng các bài tự kiểm tra và thất bại nếu dưới một trong hai mức; các mức sàn và vài ngoại lệ, như panic hook trong `main.rs` chỉ chạy khi bị sập, nằm trong [xtask](../../../xtask/src/coverage.rs) cạnh lý do của chúng. Các bản build đo đạc đi vào `target/coverage/`, nên mã đo không bao giờ lọt vào `target/release/` hay một ảnh đĩa. Tiến trình giải mã mở tệp đo của nó trước khi tự khóa mình, nên nó cũng được đo.
+Một bước của bài tự kiểm tra cửa sổ chờ một điều kiện có tên chứ không chờ theo thời gian; chỉ những gì không phát tín hiệu, như sự vắng mặt của điều gì đó, mới giữ một khoảng dừng kèm lý do. Chờ vô ích là một kiểm tra thất bại nêu tên điều không bao giờ đến, một bước bị panic cũng là một kiểm tra thất bại, và lần chạy tiếp tục trong cả hai trường hợp. Một kiểm tra không thể nói gì trong lần chạy này báo `SELFTEST SKIP`: xtask liệt kê nó, và nó không đạt cũng không thất bại. xtask giữ mỗi chế độ, và `--scenarios` riêng, ở khoảng chín phần mười số kiểm tra của nó. Bài tự kiểm tra cửa sổ chạy phần thứ hai sau phần bấm chuột chính, trong `src/editor/selftest/scenarios.rs`: mọi lệnh định dạng và bảng, các hộp thoại, cú bấm liên kết, dán, thả, xuất, một thay đổi lớn, hình ảnh thay đổi trên đĩa, áp lực bộ nhớ, một tài liệu khổng lồ và việc khôi phục sau khi bị sập.
+
+Độ phủ có hai mức sàn: mỗi module ít nhất 84 % số dòng, tất cả module cộng lại ít nhất 96 %. `make coverage` đo `cargo test` cùng các bài tự kiểm tra và thất bại nếu dưới một trong hai mức; `make coverage-library` giữ phần không cần cửa sổ ở mức 90 % và 97 %. Các mức sàn và vài ngoại lệ, như panic hook trong `main.rs` chỉ chạy khi bị sập, nằm trong [xtask](../../../xtask/src/coverage.rs) cạnh lý do của chúng. Các bản build đo đạc đi vào `target/coverage/`, nên mã đo không bao giờ lọt vào `target/release/` hay một ảnh đĩa. Tiến trình giải mã mở tệp đo của nó trước khi tự khóa mình, nên nó cũng được đo.
 
 CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) chạy `make check`, `make coverage-library` và bản build universal trên Apple Silicon cùng `cargo test` trên Intel cho mỗi lần push lên `main` và mỗi pull request. Mỗi đêm, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) chạy `make test-long` với đầu vào ngẫu nhiên mới. Các bài tự kiểm tra và ảnh đĩa ở lại máy Mac của nhà phát triển: chúng cần một màn hình và các chứng chỉ ký trong chuỗi khóa.
 
@@ -643,36 +647,39 @@ Kết quả tự kiểm tra đi vào `target/selftest/`. Bài tự kiểm tra bu
 
 ### Cấu trúc dự án
 
-`src/lib.rs` biến mọi thứ không cần cửa sổ thành một thư viện riêng, `splat`: `markdown/`, `preview/`, `i18n.rs` và bộ sinh kiểm thử `fuzz.rs`. Ứng dụng trong `src/main.rs` xây dựng trên nó.
+`src/lib.rs` biến mọi thứ không cần cửa sổ thành một thư viện riêng, `splat`: `markdown/`, `preview/`, `i18n.rs` và bộ sinh kiểm thử `fuzz.rs`. Nó biên dịch được mà không cần macOS. Ứng dụng trong `src/main.rs` xây dựng trên nó.
 
-- `src/markdown/`: phần nối với trình phân tích (comrak), màu cú pháp, và mọi lệnh dưới dạng chỉnh sửa văn bản thuần (`Edit`). Cũng gồm phân tích lại sau khi sửa (`incremental.rs`), trình đọc HTML nhúng (`markup.rs`), kiểu chữ in, thẻ, tham chiếu và trích dẫn trong văn bản liền mạch (`typography.rs`), văn bản trông ra sao và Markdown cùng HTML nào tạo nên điều đó (`style.rs`), một địa chỉ được phép là gì (`url.rs`), và bản xuất HTML và Word (`html.rs`, `docx.rs` cùng `docx/html.rs` và `docx/xml.rs`). Bản xem trước và cả hai bản xuất đều đọc cùng một cây, `Doc`. Không có AppKit.
-- `src/preview/`: bố cục bản xem trước, HTML nhúng trong đó (`layout/html.rs`), và ánh xạ giữa bản xem trước và mã nguồn (`Bridge`, `Index`). Không có AppKit.
-- `src/editor/`: cửa sổ. Một đối tượng `EditorController` phục vụ AppKit làm delegate của cả hai view; công việc của nó được chia theo trách nhiệm:
+- `src/markdown/`: cây mà mọi bên dùng đều đọc, `Doc` trong `doc/`, sở hữu văn bản của nó, và chỗ gắn kết duy nhất với bộ phân tích cú pháp trong `reader/`: comrak không được nhắc đến ở nơi nào khác, và `reader/assumptions.rs` giữ những gì mã giả định về nó. Màu cú pháp và mọi lệnh dưới dạng chỉnh sửa văn bản thuần (`Edit`) trong `commands/`. Cũng gồm phân tích lại sau khi chỉnh sửa (`incremental.rs`), bộ đọc HTML nhúng (`markup.rs`), kiểu chữ, thẻ, tham chiếu và trích dẫn trong văn bản (`typography.rs`), văn bản trông ra sao và Markdown và HTML nào làm nên điều đó (`style.rs`), địa chỉ có thể là gì (`url.rs`), và xuất HTML và Word (`html.rs`, `docx.rs` với `docx/html.rs` và `docx/xml.rs`). Một vị trí có kiểu riêng: `Byte` trong văn bản nguồn, `U16` trong view nguồn, `Shown` trong view xem trước (`text.rs`). Không có AppKit.
+- `src/preview/`: bố cục bản xem trước trong `layout/`, với HTML nhúng trong `layout/html.rs`, và ánh xạ giữa bản xem trước và nguồn (`Bridge`, `Index`). `Bridge` từ chối bố cục của một phiên bản `Doc` khác. Không có AppKit.
+- `src/editor/`: cửa sổ. Một đối tượng `EditorController` phục vụ AppKit như delegate của cả hai view và chuyển tiếp cho các thành phần, những struct nhỏ phủ lên controller và trạng thái mà chúng sở hữu, mà các module khác không chạm tới được các trường của chúng:
 
 | Module | Trách nhiệm |
 |---|---|
-| `mod.rs` | lớp, các phương thức delegate, `invalidate` |
+| `mod.rs` | lớp, các phương thức delegate chuyển tiếp, `invalidate` |
+| `panes.rs` | `Panes`: các text view, dàn ý, hiện và ẩn các ngăn, và thứ cấp quyền truy cập vào các view |
 | `state.rs` | những gì controller biết về tài liệu và mọi cách nó thay đổi; các trường của nó là private, và nó không đụng tới view nào |
+| `model.rs` | cho closure mượn trạng thái và bản sao văn bản, những closure không với tới được view |
 | `actions.rs` | sổ đăng ký lệnh: selector, tiêu đề, phím tắt, ký hiệu, khi nào lệnh áp dụng |
-| `editing.rs` | chạy và kiểm tra lệnh, gõ trong bản xem trước |
-| `update.rs` | phân tích, tô màu, cập nhật bản xem trước; sau khi sửa chỉ các đoạn văn bị ảnh hưởng |
+| `editing.rs` | `Editing`: chạy và kiểm tra lệnh, gõ trong bản xem trước |
+| `update.rs` | `Updater`: phân tích, tô màu, cập nhật bản xem trước; sau khi sửa chỉ các đoạn văn bị ảnh hưởng |
 | `sync.rs` | bản sao văn bản và sổ sách khối, không có AppKit và có kiểm thử ngẫu nhiên |
-| `progressive.rs` | hiển thị bản xem trước lớn từng bước |
-| `selection.rs`, `scroll.rs` | vùng chọn và vị trí cuộn của cả hai ngăn đồng bộ với nhau |
-| `atom.rs`, `atom_edit.rs` | trình soạn công thức và sơ đồ |
-| `navigation.rs`, `links.rs` | liên kết, liên kết wiki, thẻ, hộp kiểm công việc, thu gọn, chú thích cuối trang |
+| `progressive.rs` | `Progressive`: hiển thị bản xem trước lớn từng bước |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: vùng chọn và vị trí cuộn của cả hai ngăn đồng bộ với nhau |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: trình soạn công thức và sơ đồ |
+| `navigation.rs`, `links.rs` | `Links`: liên kết, liên kết wiki, thẻ, hộp kiểm công việc, thu gọn, chú thích cuối trang |
 | `env.rs` | những gì bản xem trước đọc từ bên ngoài văn bản: dấu câu kiểu chữ in, kho cho `@name` và `#12`, tệp BibTeX, ghi chú nhúng |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | văn bản xem trước, hình ảnh cục bộ và từ xa |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | văn bản xem trước, hình ảnh cục bộ và từ xa; `Pictures` trong `images.rs` |
 | `attributes.rs` | thuộc tính văn bản; mỗi khóa chỉ nhận giá trị thuộc kiểu nó mong đợi |
 | `shadow.rs` | bản sao của văn bản chưa lưu để khôi phục sau khi bị sập |
 | `decoder.rs` | các tiến trình phụ trợ có sandbox giải mã hình ảnh và đồ họa |
-| `export.rs`, `outline.rs` | xuất HTML và Word; thanh bên dàn ý |
+| `export.rs`, `outline.rs` | `Sharing`: xuất HTML và Word; thanh bên dàn ý |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit cho MathJax, Mermaid, Graphviz, PlantUML và trình soạn công thức trực quan; quy tắc về thứ gì được hiển thị khi nào, tách khỏi WebKit |
 | `webkit.rs` | các lời gọi vào WebKit; chỉ vòng đời của navigation delegate ở lại với `js.rs` và `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | cửa sổ, thanh công cụ, text view, hộp thoại, màu sắc |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | dựng cửa sổ, thanh công cụ, text view, hộp thoại, màu sắc |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: thanh menu, app delegate, tài liệu (`MDDocument`, một lớp con của `NSDocument`).
-- `src/i18n.rs` với `resources/*.lproj`: 35 ngôn ngữ; các khóa là văn bản tiếng Đức.
+- `src/i18n.rs` với `resources/*.lproj`: 35 ngôn ngữ; các khóa là văn bản tiếng Đức, và ứng dụng cài bảng của ngôn ngữ giao diện khi khởi động.
+- `src/util/`: các luồng làm việc (`lanes.rs`), các ổ đĩa có thể ngừng phản hồi (`volumes.rs`), trình trợ giúp AppKit, tệp và tiến trình. `src/diag.rs`: điều gì sai ngoài tầm nhìn của người dùng sẽ vào nhật ký hệ thống, không kèm bất kỳ văn bản nào của tài liệu.
 - `src/large_alloc.rs`: các cấp phát lớn đến thẳng từ nhân và trả lại cho nhân khi giải phóng, nên bộ nhớ được trả về sau những lần sửa lớn.
 - `resources/js/`: trang web và thư viện; phiên bản và giá trị kiểm tra trong [vendor.lock](../../../vendor.lock).
 - `xtask/`: đóng gói, ký, ảnh đĩa, biểu tượng, vendoring, trình chạy tự kiểm tra và các mức sàn độ phủ.
@@ -682,21 +689,21 @@ Văn bản nguồn trong text view bên trái là nguồn sự thật duy nhất
 
 1. Mỗi thay đổi ký tự ở đó cập nhật bản sao văn bản (`Snapshot`) tại chỗ, không đọc lại văn bản.
 2. Một lần cập nhật phân tích bản sao, chỉ tô lại màu mã nguồn ở nơi màu thay đổi, dàn trang bản xem trước và chỉ thay những khối có nội dung đã đổi.
-3. Sau một lần sửa, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại, miễn là các đoạn lân cận vẫn như cũ; `reparse_part_and_color` cho biết khi nào chúng không như cũ. Tài liệu có khối chú thích `%%`, thay đổi ở front matter và thay đổi gần các định nghĩa tham chiếu liên kết được xử lý toàn bộ. comrak chỉ nhận ra tham chiếu chú thích cuối trang cùng với định nghĩa của nó trong cùng một lần phân tích và dời các định nghĩa ra sau văn bản, nên phần đó được phân tích với một định nghĩa giả cho mỗi nhãn và lấy số thứ tự từ cây cũ; thay đổi ở các tham chiếu hoặc định nghĩa trong phần đó, hoặc cạnh một chú thích cuối trang trong dòng, được xử lý toàn bộ.
+3. Sau một lần sửa, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại, miễn là các đoạn lân cận vẫn như cũ; `reparse_part_and_color` cho biết khi nào chúng không như cũ. Tài liệu có khối chú thích `%%`, thay đổi ở front matter và, trong tài liệu có định nghĩa tham chiếu liên kết, thay đổi ở phần chứa dấu ngoặc vuông được xử lý toàn bộ. comrak chỉ nhận ra tham chiếu chú thích cuối trang cùng với định nghĩa của nó trong cùng một lần phân tích và dời các định nghĩa ra sau văn bản, nên phần đó được phân tích với một định nghĩa giả cho mỗi nhãn và lấy số thứ tự từ cây cũ; thay đổi ở các tham chiếu hoặc định nghĩa trong phần đó, hoặc cạnh một chú thích cuối trang trong dòng, được xử lý toàn bộ.
 4. Các khối HTML mở `<details>` hoặc `<div align>` và đóng nó ở sau ảnh hưởng đến các khối Markdown ở giữa; một khối được dùng lại phải có cùng môi trường xung quanh.
 5. Khi bạn gõ trong mã nguồn của tài liệu tới 2 MB, cập nhật một phần chạy ngay lập tức; khi nó không áp dụng được, hoặc trong tài liệu lớn hơn, việc phân tích và dàn trang chạy ở chế độ nền. Khi bạn gõ trong bản xem trước, chúng chạy ngay lập tức, vì con trỏ của bản xem trước phụ thuộc vào kết quả.
 6. Đầu vào trong bản xem trước được `Bridge` chuyển thành một chỉnh sửa của mã nguồn và từ đó đi theo cùng đường. Markdown có quá nhiều cách biến văn bản thành cú pháp để chỉ dùng quy tắc, nên `preview/verify.rs` phân tích lại phần đã thay đổi và so sánh những gì nó hiển thị với những gì đã gõ; một chỉnh sửa không đứng vững sẽ bị thoát thêm hoặc bị từ chối.
-7. Vị trí trong dòng của comrak sai ở một vài chỗ, chẳng hạn sau một định nghĩa tham chiếu liên kết. `markdown/positions.rs` kiểm tra chúng với mã nguồn khi đọc một khối và đọc lại từ mã nguồn ở nơi chúng không khớp.
+7. Vị trí trong dòng của comrak sai ở một vài chỗ, chẳng hạn sau một định nghĩa tham chiếu liên kết. `markdown/reader/positions.rs` kiểm tra chúng với mã nguồn khi đọc một khối và đọc lại từ mã nguồn ở nơi chúng không khớp.
 
 ### Quy tắc trong controller
 
-1. Các thay đổi của chính controller lên view chạy bên trong `silently()`; các callback của delegate bỏ qua chúng.
-2. `state` chỉ được mượn để đọc và tính toán, không bao giờ qua một lời gọi thay đổi, dàn trang hoặc cuộn một view. Nó chỉ thay đổi qua các phương thức của chính nó, mà các bài kiểm thử không cần cửa sổ.
+1. Các thay đổi của chính controller lên view chạy bên trong `Panes::silently`; các callback của delegate bỏ qua chúng. Ở mọi nơi khác các view chỉ đọc được, nên trình biên dịch kiểm tra điều này. Những gì callback cần nghe, hoặc những gì đưa một view cho AppKit, nói lên điều đó bằng cách đi qua `Panes::for_appkit`.
+2. Trạng thái chỉ được mượn để đọc và tính toán, không bao giờ qua một lời gọi thay đổi, dàn trang hoặc cuộn một view: `Model` cho closure `Send` mượn nó, và không view nào là `Send`, nên trình biên dịch kiểm tra điều này. Nó chỉ thay đổi qua các phương thức của chính nó, mà các bài kiểm thử không cần cửa sổ.
 3. Thông điệp từ bên ngoài (một hình ảnh đã tải, một công thức đã hiển thị) đến trễ qua `renders_arrived` và `image_arrived`, không bao giờ giữa chừng một lần cập nhật.
 4. Vẽ lại mà không có thay đổi văn bản chỉ đi qua `invalidate(reason)`.
-5. Một `Rc<Snapshot>` không được giữ qua một thay đổi của mã nguồn, nếu không thay đổi đó sao chép toàn bộ văn bản.
-6. Một lệnh mới cần một mục trong `actions.rs`, một phương thức trong `mod.rs` và một nhánh trong `editing::perform`.
-7. Mỗi khối `unsafe` mang lời biện minh của nó dưới dạng chú thích `// SAFETY:`. Byte chỉ đến được bộ giải mã hình ảnh của hệ thống trong ứng dụng qua `decoder::system_image`.
+5. Bản sao văn bản không được giữ qua một thay đổi của nguồn, nếu không thay đổi đó sao chép toàn bộ văn bản: `with_text` chỉ cho mượn trong suốt thời gian của một closure `Send`.
+6. Một lệnh mới cần một mục trong `actions.rs`, một phương thức trong `mod.rs` và một nhánh trong `Editing::perform`.
+7. Mỗi khối `unsafe` mang lời biện minh của nó dưới dạng chú thích `// SAFETY:`. Byte chỉ đến được bộ giải mã hình ảnh của hệ thống trong tiến trình trợ giúp, qua `decoder::decode_native`; một bài kiểm thử quét mã nguồn tìm các lời gọi khác.
 8. Không có gì trên luồng chính chờ các thư mục của người dùng, vì một ổ đĩa mạng có thể ngừng trả lời: tệp được xem xét trên luồng `DISK`, và bản xem trước đọc câu trả lời qua `Env::known`. Chỉ một hành động mà người dùng đang chờ, như xuất hoặc lưu, mới được đụng thẳng vào đĩa.
 
 ### Thêm một lệnh
@@ -705,7 +712,7 @@ Thanh menu, thanh công cụ và menu ngữ cảnh đều dựng các mục củ
 
 1. một biến thể của `Action` cùng `Spec` của nó: selector, tiêu đề, nhãn thanh công cụ, chú giải (bắt đầu bằng một động từ, tối đa 75 ký tự), phím tắt, SF Symbol và khi nào áp dụng
 2. phương thức trong `src/editor/mod.rs`
-3. một nhánh trong `editing::perform`
+3. một nhánh trong `Editing::perform`
 4. văn bản của nó trong mọi `Localizable.strings`
 
 Bài kiểm thử `every_command_has_a_method_and_every_method_a_command` kiểm tra rằng sổ đăng ký và các phương thức khớp nhau. Các phím tắt chuẩn của Apple như ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F và ⌘, được để nguyên.

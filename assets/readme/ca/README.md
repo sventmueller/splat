@@ -565,6 +565,7 @@ Requisits previs:
 
 - macOS amb les Command Line Tools (`xcode-select --install`). No cal Xcode; el Splat es compila sense `actool`, `ibtool` ni `metal`.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) indica la versió exacta que fa servir la CI; rustup l’instal·la sol, el Rust de Homebrew ignora el fitxer. Pujar-la allà és com arriben al projecte els nous avisos del compilador i de clippy.
+- rustup, per a `make lint`, `make check` i `make universal`: `cargo xtask check-library` compila la biblioteca per a Linux per demostrar que no necessita macOS, i el Rust de Homebrew no té cap altre objectiu de compilació.
 
 El [Makefile](../../../Makefile) conté punts d’entrada curts; `make help` els llista tots:
 
@@ -619,21 +620,24 @@ La imatge de disc és un binari universal per a Apple Silicon i Intel; les altre
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | una cerca aleatòria més llarga; `SPLAT_FUZZ_SEED` varia les entrades |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | un sol idioma, mentre els altres són incomplets |
 | `cargo clippy --release --all-targets [--features selftest]` | lints, inclosa la justificació de cada bloc `unsafe`, la longitud de les funcions i, a la biblioteca, les conversions de nombres |
+| `cargo xtask check-library` | la biblioteca es compila per a Linux, així que res no necessita macOS |
 | `cargo xtask vendor check` | les biblioteques de JavaScript coincideixen amb `vendor.lock` byte per byte |
-| `cargo xtask selftest probe` | sense finestra, cadascun amb el seu resultat esperat: fórmules, diagrames, imatges d’internet contra un servidor dins del procés, adreces bloquejades, les defenses de les vistes web |
+| `cargo xtask selftest probe` | sense finestra, cadascun amb el seu resultat esperat: fórmules, diagrames, imatges web contra un servidor dins del procés, adreces bloquejades, el text que escriu cada ordre, cada format d’imatge a través de les dues exportacions, una pàgina que deixa de respondre i les defenses de les vistes web contra una pàgina sense elles. Triga uns trenta segons. El que necessita l’app al davant se salta amb la pantalla bloquejada |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | l’app en execució, clic a clic. Obre una finestra i hi escriu; el Mac queda ocupat durant uns quatre minuts. `--scenarios` només executa la segona part, en aproximadament un minut i mig |
 | `cargo xtask selftest resize` | eixampla la finestra després de moure el separador: el codi font es torna a ajustar mentre es canvia la mida de la finestra. Triga uns deu segons |
 | `cargo xtask selftest bench <file.md>` | temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran |
-| `cargo test --release -- --ignored partial_updates` | una pulsació de tecla en 10 MB: actualització parcial contra actualització completa, resultat i límit de temps |
-| `cargo test --release --test hostile` | documents fets per desbordar la pila o trigar un temps quadràtic, a través de l’anàlisi, la disposició, les dues exportacions, les pulsacions de tecla i les ordres |
+| `cargo test --release -- --ignored partial_updates` | una pulsació de tecla en 10 MB: actualització parcial contra completa, el mateix resultat en una quarta part del temps com a màxim |
+| `cargo test --release --test hostile` | documents fets per desbordar la pila o trigar un temps quadràtic, cadascun en dues mides els temps de les quals han de créixer com el text, a través de l’anàlisi, la disposició, les dues exportacions, les pulsacions de tecla i les ordres |
 | `make mutants` | errors introduïts un per un a `src/markdown/` i `src/preview/`, mitjançant [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diu quins no els detecta cap test. Triga hores; `FILE=src/preview/bridge.rs` l’acota |
 | `cargo test --release --test decoder` | el procés descodificador descodifica imatges i no arriba ni als fitxers ni a la xarxa |
 | `make coverage` | cobertura de línies de `cargo test` i de tots els autotests, mitjançant [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); falla per sota dels mínims. Ocupa el Mac durant uns cinc minuts |
-| `make coverage-library` | els mínims per a `src/markdown/`, `src/preview/` i `i18n.rs`, mesurats només amb `cargo test` |
+| `make coverage-library` | `src/markdown/`, `src/preview/` i `i18n.rs` contra els seus mínims més alts, mesurats només per `cargo test` |
 
-Els tests unitaris són al costat del codi que proven. `tests/` conté el que arriba a la biblioteca des de fora: els tests aleatoris a `robustness.rs`, que comparteixen el generador de `src/fuzz.rs` amb els de `sync.rs`, els documents fets per fer mal a `hostile.rs`, i el test del descodificador, que inicia el programa compilat. Les decisions de `src/editor/` que no necessiten finestra viuen en funcions lliures amb tests propis: tot el que sap el controlador i com canvia a `state.rs`, les regles de renderització a `render_queue.rs`, la còpia del text a `sync.rs`. Un pas de l’autotest de finestra que espera en va fa fallar l’execució. L’autotest de finestra executa una segona part després del seu recorregut principal de clics, a `src/editor/selftest/scenarios.rs`: totes les ordres de format i de taula, els diàlegs, els clics en enllaços, enganxar, deixar anar, les exportacions, un canvi gran, imatges que canvien al disc, la pressió de memòria, un document enorme i la recuperació després d’una fallada.
+Els tests unitaris són al costat del codi que proven. `tests/` conté el que arriba a la biblioteca des de fora: els tests aleatoris a `robustness.rs`, que comparteixen el generador de `src/fuzz.rs` amb els de `sync.rs`, els documents fets per fer mal a `hostile.rs`, i el test del descodificador, que inicia el programa compilat. Les decisions de `src/editor/` que no necessiten finestra viuen en funcions lliures amb tests propis: tot el que sap el controlador i com canvia a `state.rs`, les regles de renderització a `render_queue.rs`, la còpia del text a `sync.rs`, els estils de paràgraf, els tipus de lletra i els colors com a valors a `render.rs`, què signifiquen els identificadors de la barra d’eines a `toolbar.rs`, què vol dir un clic en un enllaç a `navigation.rs`.
 
-La cobertura té dos mínims: cada mòdul almenys el 80 % de les seves línies, tots els mòduls junts almenys el 85 %. `make coverage` mesura `cargo test` juntament amb els autotests i falla per sota de qualsevol dels dos; els mínims i les poques excepcions, com el panic hook de `main.rs` que només s’executa en una fallada, són a [xtask](../../../xtask/src/coverage.rs) al costat dels seus motius. Les compilacions mesurades van a `target/coverage/`, de manera que el codi de mesura no arriba mai a `target/release/` ni a una imatge de disc. El procés auxiliar descodificador obre el seu fitxer de mesura abans d’aïllar-se, així que també es mesura.
+Un pas de l’autotest de finestra espera una condició amb nom, no un temps; només el que no dóna cap senyal, com l’absència d’alguna cosa, conserva una pausa amb el seu motiu. Esperar en va és una comprovació fallida que diu què no va arribar mai, un pas que entra en pànic també és una comprovació fallida, i l’execució continua en tots dos casos. Una comprovació que en aquesta execució no pot dir res informa `SELFTEST SKIP`: xtask la llista, i ni passa ni falla. xtask exigeix a cada mode, i a `--scenarios` pel seu compte, uns nou dècims de les seves comprovacions. L’autotest de finestra executa una segona part després del seu recorregut principal de clics, a `src/editor/selftest/scenarios.rs`: totes les ordres de format i de taula, els diàlegs, els clics en enllaços, enganxar, deixar anar, les exportacions, un canvi gran, imatges que canvien al disc, la pressió de memòria, un document enorme i la recuperació després d’una fallada.
+
+La cobertura té dos mínims: cada mòdul almenys el 84 % de les seves línies, tots els mòduls junts almenys el 96 %. `make coverage` mesura `cargo test` juntament amb els autotests i falla per sota de qualsevol dels dos; `make coverage-library` exigeix el 90 % i el 97 % al que no necessita finestra. Els mínims i les poques excepcions, com el panic hook de `main.rs` que només s’executa en una fallada, són a [xtask](../../../xtask/src/coverage.rs) al costat dels seus motius. Les compilacions mesurades van a `target/coverage/`, de manera que el codi de mesura no arriba mai a `target/release/` ni a una imatge de disc. El procés auxiliar descodificador obre el seu fitxer de mesura abans d’aïllar-se, així que també es mesura.
 
 La CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) executa `make check`, `make coverage-library` i la compilació universal en Apple Silicon i `cargo test` en Intel a cada push a `main` i a cada pull request. Cada nit, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) executa `make test-long` amb entrades aleatòries noves. Els autotests i la imatge de disc es queden al Mac del desenvolupador: necessiten una pantalla i els certificats de signatura al clauer.
 
@@ -641,36 +645,39 @@ La sortida dels autotests va a `target/selftest/`. L’autotest compila una app 
 
 ### Estructura del projecte
 
-`src/lib.rs` fa de tot el que no necessita finestra una biblioteca pròpia, `splat`: `markdown/`, `preview/`, `i18n.rs` i el generador de proves `fuzz.rs`. L’app de `src/main.rs` s’hi recolza.
+`src/lib.rs` fa de tot el que no necessita finestra una biblioteca pròpia, `splat`: `markdown/`, `preview/`, `i18n.rs` i el generador de proves `fuzz.rs`. Es compila sense macOS. L’app de `src/main.rs` s’hi recolza.
 
-- `src/markdown/`: l’enllaç amb l’analitzador (comrak), els colors de sintaxi i totes les ordres com a edicions pures de text (`Edit`). També la nova anàlisi després d’una edició (`incremental.rs`), el lector de l’HTML incrustat (`markup.rs`), la tipografia, les etiquetes, les referències i les cites en el text corregut (`typography.rs`), com es veu el text i quin Markdown i HTML ho aconsegueixen (`style.rs`), què pot ser una adreça (`url.rs`), i l’exportació a HTML i a Word (`html.rs`, `docx.rs` amb `docx/html.rs` i `docx/xml.rs`). La previsualització i les dues exportacions llegeixen el mateix arbre, `Doc`. Sense AppKit.
-- `src/preview/`: la disposició de la previsualització, l’HTML incrustat que conté (`layout/html.rs`), i la correspondència entre la previsualització i el codi font (`Bridge`, `Index`). Sense AppKit.
-- `src/editor/`: la finestra. Un objecte `EditorController` serveix AppKit com a delegat de les dues vistes; la seva feina es reparteix per responsabilitat:
+- `src/markdown/`: l’arbre que llegeix tothom, `Doc` a `doc/`, que és propietari del seu text, i l’única connexió amb l’analitzador a `reader/`: comrak no es nomena enlloc més, i `reader/assumptions.rs` recull el que el codi suposa d’ell. Els colors de sintaxi, i totes les ordres com a edicions de text pures (`Edit`) a `commands/`. També la reanàlisi després d’una edició (`incremental.rs`), el lector de l’HTML incrustat (`markup.rs`), la tipografia, les etiquetes, les referències i les cites dins del text corregut (`typography.rs`), com es veu el text i quin Markdown i HTML el fan així (`style.rs`), què pot ser una adreça (`url.rs`), i l’exportació a HTML i a Word (`html.rs`, `docx.rs` amb `docx/html.rs` i `docx/xml.rs`). Una posició té el seu tipus: `Byte` al text font, `U16` a la vista del codi font, `Shown` a la vista de previsualització (`text.rs`). Sense AppKit.
+- `src/preview/`: la disposició de la previsualització a `layout/`, amb l’HTML incrustat a `layout/html.rs`, i la correspondència entre previsualització i codi font (`Bridge`, `Index`). Un `Bridge` rebutja una disposició d’una altra versió del `Doc`. Sense AppKit.
+- `src/editor/`: la finestra. Un únic objecte `EditorController` serveix AppKit com a delegat de totes dues vistes i reenvia a components, estructures petites sobre el controlador i l’estat que posseeixen, els camps de les quals els altres mòduls no poden tocar:
 
 | Mòdul | Responsabilitat |
 |---|---|
-| `mod.rs` | classe, mètodes del delegat, `invalidate` |
+| `mod.rs` | classe, mètodes del delegat que reenvien, `invalidate` |
+| `panes.rs` | `Panes`: les vistes de text, l’esquema, mostrar i amagar panells, i el que dóna accés a les vistes |
 | `state.rs` | el que el controlador sap del document i totes les maneres com canvia; els seus camps són privats i no toca cap vista |
+| `model.rs` | presta l’estat i la còpia del text a closures que no poden arribar a cap vista |
 | `actions.rs` | registre d’ordres: selector, títol, drecera, símbol, quan s’aplica l’ordre |
-| `editing.rs` | execució i validació d’ordres, escriptura a la previsualització |
-| `update.rs` | anàlisi, coloració, actualització de la previsualització; després d’una edició, només els paràgrafs afectats |
+| `editing.rs` | `Editing`: execució i validació d’ordres, escriptura a la previsualització |
+| `update.rs` | `Updater`: anàlisi, coloració, actualització de la previsualització; després d’una edició, només els paràgrafs afectats |
 | `sync.rs` | còpia del text i comptabilitat de blocs, sense AppKit i amb tests aleatoris |
-| `progressive.rs` | renderització de previsualitzacions grans pas a pas |
-| `selection.rs`, `scroll.rs` | selecció i posició de desplaçament dels dos panells, sincronitzades |
-| `atom.rs`, `atom_edit.rs` | l’editor de fórmules i de diagrames |
-| `navigation.rs`, `links.rs` | enllaços, enllaços wiki, etiquetes, caselles de tasca, plegat, notes a peu de pàgina |
+| `progressive.rs` | `Progressive`: renderització de previsualitzacions grans pas a pas |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selecció i posició de desplaçament dels dos panells, sincronitzades |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: l’editor de fórmules i de diagrames |
+| `navigation.rs`, `links.rs` | `Links`: enllaços, enllaços wiki, etiquetes, caselles de tasca, plegat, notes a peu de pàgina |
 | `env.rs` | el que la previsualització llegeix de fora del text: la puntuació tipogràfica, el dipòsit per a `@name` i `#12`, el fitxer BibTeX, les notes incrustades |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | text de la previsualització, imatges locals i remotes |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | text de la previsualització, imatges locals i remotes; `Pictures` a `images.rs` |
 | `attributes.rs` | atributs de text; cada clau només rep un valor del tipus que espera |
 | `shadow.rs` | còpies del text sense desar per a la recuperació després d’una fallada |
 | `decoder.rs` | processos auxiliars aïllats que descodifiquen imatges i gràfics |
-| `export.rs`, `outline.rs` | exportació a HTML i a Word; la barra lateral d’esquema |
+| `export.rs`, `outline.rs` | `Sharing`: exportació a HTML i a Word, el fitxer de compartició, la impressió; la barra lateral d’esquema |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit per a MathJax, Mermaid, Graphviz, PlantUML i l’editor visual de fórmules; les regles de què es renderitza quan, al marge de WebKit |
 | `webkit.rs` | crides a WebKit; només la vida del delegat de navegació es queda amb `js.rs` i `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | finestra, barra d’eines, vistes de text, diàlegs, colors |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construcció de la finestra, barra d’eines, vistes de text, diàlegs, colors |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: barra de menús, delegat de l’app, document (`MDDocument`, una subclasse de `NSDocument`).
-- `src/i18n.rs` amb `resources/*.lproj`: 35 idiomes; les claus són els textos en alemany.
+- `src/i18n.rs` amb `resources/*.lproj`: 35 idiomes; les claus són els textos en alemany, i l’app instal·la la taula de l’idioma de la interfície en iniciar-se.
+- `src/util/`: fils de treball (`lanes.rs`), volums que poden deixar de respondre (`volumes.rs`), ajudes d’AppKit, fitxers i processos. `src/diag.rs`: el que va malament fora de la vista de l’usuari va al registre del sistema, sense cap text d’un document.
 - `src/large_alloc.rs`: les assignacions grans vénen directament del nucli i hi tornen quan s’alliberen, de manera que la memòria torna després de grans edicions.
 - `resources/js/`: pàgines web i biblioteques; versions i sumes de verificació a [vendor.lock](../../../vendor.lock).
 - `xtask/`: empaquetat, signatura, la imatge de disc, la icona, la incorporació de biblioteques, l’executor d’autotests i els mínims de cobertura.
@@ -681,21 +688,21 @@ El text del codi font a la vista de text de l’esquerra és l’única font de 
 
 1. Cada canvi de caràcter hi actualitza al mateix lloc la còpia del text (`Snapshot`), sense tornar a llegir el text.
 2. Una actualització analitza la còpia, torna a acolorir el codi font només on els colors han canviat, disposa la previsualització i substitueix només els blocs el contingut dels quals ha canviat.
-3. Després d’una edició, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats, mentre els veïns es mantinguin iguals; `reparse_part_and_color` diu quan no és així. Els documents amb blocs de comentaris `%%`, els canvis al front matter i els canvis a prop de definicions de referències d’enllaços es processen sencers. comrak només reconeix una referència de nota a peu de pàgina amb la seva definició en la mateixa anàlisi i mou les definicions darrere del text, de manera que la part s’analitza amb una definició substituta per etiqueta i pren els seus números de l’arbre antic; un canvi a les referències o a les definicions de la part, o al costat d’una nota en línia, es processa sencer.
+3. Després d’una edició, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats, mentre els veïns es mantinguin iguals; `reparse_part_and_color` diu quan no és així. Els documents amb blocs de comentaris `%%`, els canvis al front matter i, en un document amb definicions de referències d’enllaços, els canvis en una part que conté un claudàtor es processen sencers. comrak només reconeix una referència de nota a peu de pàgina amb la seva definició en la mateixa anàlisi i mou les definicions darrere del text, de manera que la part s’analitza amb una definició substituta per etiqueta i pren els seus números de l’arbre antic; un canvi a les referències o a les definicions de la part, o al costat d’una nota en línia, es processa sencer.
 4. Els blocs HTML que obren `<details>` o `<div align>` i el tanquen més tard afecten els blocs Markdown d’entremig; un bloc reutilitzat ha de tenir el mateix entorn.
 5. Mentre escrius al codi font d’un document de fins a 2 MB, l’actualització parcial s’executa a l’instant; quan no es pot aplicar, o en un document més gran, l’anàlisi i la disposició s’executen en segon pla. Mentre escrius a la previsualització, s’executen a l’instant, perquè el cursor de la previsualització depèn del resultat.
 6. L’entrada a la previsualització la tradueix `Bridge` en una edició del codi font i d’allà segueix el mateix camí. Markdown té massa maneres de convertir text en sintaxi per bastar-hi només regles, així que `preview/verify.rs` torna a analitzar la part canviada i compara el que mostra amb el que s’ha escrit; una edició que no se sosté s’escapa més o es rebutja.
-7. Les posicions en línia de comrak fallen en uns pocs llocs, per exemple darrere d’una definició de referència d’enllaç. `markdown/positions.rs` les comprova amb el codi font en llegir un bloc i les torna a llegir del codi font on no encaixen.
+7. Les posicions en línia de comrak fallen en uns pocs llocs, per exemple darrere d’una definició de referència d’enllaç. `markdown/reader/positions.rs` les comprova amb el codi font en llegir un bloc i les torna a llegir del codi font on no encaixen.
 
 ### Regles al controlador
 
-1. Els canvis propis del controlador a les vistes s’executen dins de `silently()`; les crides de retorn del delegat els ignoren.
-2. `state` només es pren prestat per llegir i calcular, mai durant una crida que canvia, disposa o desplaça una vista. Només canvia amb els seus propis mètodes, els tests dels quals no necessiten finestra.
+1. Els canvis propis del controlador a les vistes s’executen dins de `Panes::silently`; les crides de retorn del delegat els ignoren. A tota la resta les vistes només es poden llegir, de manera que el compilador ho comprova. El que les crides de retorn han d’escoltar, o el que lliura una vista a AppKit, ho diu passant per `Panes::for_appkit`.
+2. L’estat només es pren prestat per llegir i calcular, mai durant una crida que canvia, disposa o desplaça una vista: `Model` el presta a closures `Send`, i cap vista no és `Send`, de manera que el compilador ho comprova. Només canvia amb els seus propis mètodes, els tests dels quals no necessiten finestra.
 3. Els missatges de fora (una imatge carregada, una fórmula renderitzada) arriben diferits mitjançant `renders_arrived` i `image_arrived`, mai enmig d’una actualització.
 4. Tornar a dibuixar sense un canvi de text passa només per `invalidate(reason)`.
-5. Un `Rc<Snapshot>` no es reté durant un canvi del codi font, o aquest canvi copia el text sencer.
-6. Una ordre nova necessita una entrada a `actions.rs`, un mètode a `mod.rs` i una branca a `editing::perform`.
-7. Cada bloc `unsafe` porta la seva justificació com a comentari `// SAFETY:`. Els bytes arriben als descodificadors d’imatge del sistema a l’app només mitjançant `decoder::system_image`.
+5. La còpia del text no es reté durant un canvi del codi font, o aquest canvi copia el text sencer: `with_text` la presta només mentre dura un closure `Send`.
+6. Una ordre nova necessita una entrada a `actions.rs`, un mètode a `mod.rs` i una branca a `Editing::perform`.
+7. Cada bloc `unsafe` porta la seva justificació com a comentari `// SAFETY:`. Els bytes arriben als descodificadors d’imatge del sistema només al procés auxiliar, mitjançant `decoder::decode_native`; un test escaneja les fonts a la cerca d’altres crides.
 8. Res al fil principal espera les carpetes de l’usuari, ja que un volum de xarxa pot deixar de respondre: els fitxers es consulten al fil `DISK`, i la previsualització llegeix les respostes mitjançant `Env::known`. Només una acció que l’usuari espera, com una exportació o desar, pot tocar el disc directament.
 
 ### Afegir una ordre
@@ -704,7 +711,7 @@ La barra de menús, la barra d’eines i el menú contextual construeixen els se
 
 1. una variant d’`Action` amb el seu `Spec`: selector, títol, etiqueta de la barra d’eines, indicador (que comenci amb un verb, de 75 caràcters com a màxim), drecera, SF Symbol i quan s’aplica
 2. el mètode a `src/editor/mod.rs`
-3. una branca a `editing::perform`
+3. una branca a `Editing::perform`
 4. els seus textos a cada `Localizable.strings`
 
 El test `every_command_has_a_method_and_every_method_a_command` comprova que el registre i els mètodes coincideixin. Les dreceres estàndard d’Apple com ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F i ⌘, es deixen intactes.

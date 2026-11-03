@@ -566,6 +566,7 @@ Esivaatimukset:
 
 - macOS ja Command Line Tools (`xcode-select --install`). Xcodea ei tarvita; Splat rakentuu ilman `actool`-, `ibtool`- ja `metal`-työkaluja.
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) nimeää tarkan version, jota CI käyttää; rustup asentaa sen itse, Homebrew'n Rust ohittaa tiedoston. Sen nostaminen siellä on tapa, jolla uudet kääntäjän ja clippyn varoitukset pääsevät projektiin.
+- rustup, komentoja `make lint`, `make check` ja `make universal` varten: `cargo xtask check-library` rakentaa kirjaston Linuxille osoittaakseen, ettei se tarvitse macOS:ää, eikä Homebrew'n Rustissa ole muita kohteita.
 
 [Makefile](../../../Makefile) sisältää lyhyet sisääntulokohdat; `make help` luettelee ne kaikki:
 
@@ -622,21 +623,24 @@ Sen sisältämällä apilla on eri allekirjoitus kuin paikallisella rakennuksell
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | pidempi satunnaishaku; `SPLAT_FUZZ_SEED` vaihtelee syötteitä |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | yksi kieli, kun muut ovat keskeneräisiä |
 | `cargo clippy --release --all-targets [--features selftest]` | lint-tarkistukset, mukaan lukien jokaisen `unsafe`-lohkon perustelu, funktioiden pituus ja kirjastossa lukumuunnokset |
+| `cargo xtask check-library` | kirjasto rakentuu Linuxille, joten mikään siinä ei tarvitse macOS:ää |
 | `cargo xtask vendor check` | JavaScript-kirjastot vastaavat tiedostoa `vendor.lock` tavu tavulta |
-| `cargo xtask selftest probe` | ilman ikkunaa, kullakin odotettu tulos: kaavat, kaaviot, verkon kuvat prosessin sisäistä palvelinta vasten, estetyt osoitteet, verkkonäkymien puolustukset |
+| `cargo xtask selftest probe` | ilman ikkunaa, kukin odotetun tuloksensa kanssa: kaavat, kaaviot, verkkokuvat prosessin sisäistä palvelinta vasten, estetyt osoitteet, teksti, jonka jokainen komento kirjoittaa, jokainen kuvamuoto kummankin viennin läpi, sivu, joka lakkaa vastaamasta, ja verkkonäkymien puolustukset sivua vastaan, jolla niitä ei ole. Kestää noin puoli minuuttia. Mikä tarvitsee sovelluksen edessään, ohitetaan lukitulla näytöllä |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | käynnissä oleva appi, napsautus napsautukselta. Avaa ikkunan ja kirjoittaa siihen; Mac on varattu noin neljäksi minuutiksi. `--scenarios` ajaa vain toisen osan, noin puolessatoista minuutissa |
 | `cargo xtask selftest resize` | leventää ikkunaa jakajan siirtämisen jälkeen: lähdeteksti taittuu uudelleen ikkunan koon muuttuessa. Kestää noin kymmenen sekuntia |
 | `cargo xtask selftest bench <file.md>` | ajoitukset suuren tiedoston avaamiselle, kirjoittamiselle ja vierittämiselle |
-| `cargo test --release -- --ignored partial_updates` | näppäinpainallus 10 Mt:ssa: osittainen päivitys kokonaista vasten, tulos ja aikaraja |
-| `cargo test --release --test hostile` | dokumentit, jotka on tehty ylivuodattamaan pino tai vaatimaan neliöllistä aikaa, jäsennyksen, taiton, molempien vientien, näppäinpainallusten ja komentojen läpi |
+| `cargo test --release -- --ignored partial_updates` | näppäinpainallus 10 Mt:ssa: osittainen päivitys kokonaista vastaan, sama tulos enintään neljänneksessä ajasta |
+| `cargo test --release --test hostile` | dokumentit, jotka on tehty ylittämään pino tai vievät neliöllisen ajan, kukin kahdessa koossa, joiden aikojen on kasvettava tekstin mukana, jäsennyksen, taiton, molempien vientien, näppäinpainallusten ja komentojen läpi |
 | `make mutants` | `src/markdown/`- ja `src/preview/`-hakemistoihin rakennetut viat yksi kerrallaan [cargo-mutantsin](https://mutants.rs) kautta (`cargo install cargo-mutants`); kertoo, mitkä niistä mikään testi ei huomaa. Kestää tunteja; `FILE=src/preview/bridge.rs` rajaa |
 | `cargo test --release --test decoder` | dekooderiprosessi purkaa kuvia eikä tavoita tiedostoja eikä verkkoa |
 | `make coverage` | `cargo test`in ja kaikkien itsetestien rivikattavuus [cargo-llvm-covin](https://github.com/taiki-e/cargo-llvm-cov) kautta (`brew install cargo-llvm-cov llvm`); epäonnistuu alarajojen alapuolella. Varaa Macin noin viideksi minuutiksi |
-| `make coverage-library` | alarajat hakemistoille `src/markdown/`, `src/preview/` ja tiedostolle `i18n.rs`, mitattuna pelkällä `cargo test`illä |
+| `make coverage-library` | `src/markdown/`, `src/preview/` ja `i18n.rs` korkeampia alarajojaan vasten, mitattuna pelkällä `cargo test`illä |
 
-Yksikkötestit sijaitsevat testaamansa koodin vieressä. Hakemisto `tests/` sisältää sen, mikä tavoittaa kirjaston ulkopuolelta: satunnaistestit tiedostossa `robustness.rs`, jotka jakavat tiedoston `src/fuzz.rs` generaattorin tiedoston `sync.rs` testien kanssa, vahingoittamaan tehdyt dokumentit tiedostossa `hostile.rs` ja dekooderitesti, joka käynnistää rakennetun ohjelman. Päätökset hakemistossa `src/editor/`, jotka eivät tarvitse ikkunaa, ovat vapaissa funktioissa omine testeineen: kaikki, mitä controller tietää ja miten se muuttuu, tiedostossa `state.rs`, renderöinnin säännöt tiedostossa `render_queue.rs`, tekstikopio tiedostossa `sync.rs`. Ikkunan itsetestin vaihe, joka odottaa turhaan, kaataa ajon. Ikkunan itsetesti ajaa pääläpikäyntinsä jälkeen toisen osan tiedostossa `src/editor/selftest/scenarios.rs`: jokaisen muotoilu- ja taulukkokomennon, dialogit, linkkien napsautukset, sijoittamisen, pudottamisen, viennit, suuren muutoksen, levyllä muuttuvat kuvat, muistipaineen, valtavan dokumentin ja palautumisen kaatumisen jälkeen.
+Yksikkötestit sijaitsevat testaamansa koodin vieressä. Hakemisto `tests/` sisältää sen, mikä tavoittaa kirjaston ulkopuolelta: satunnaistestit tiedostossa `robustness.rs`, jotka jakavat tiedoston `src/fuzz.rs` generaattorin tiedoston `sync.rs` testien kanssa, vahingoittamaan tehdyt dokumentit tiedostossa `hostile.rs` ja dekooderitesti, joka käynnistää rakennetun ohjelman. Päätökset hakemistossa `src/editor/`, jotka eivät tarvitse ikkunaa, ovat vapaissa funktioissa omine testeineen: kaikki, mitä controller tietää ja miten se muuttuu, tiedostossa `state.rs`, renderöinnin säännöt tiedostossa `render_queue.rs`, tekstikopio tiedostossa `sync.rs`, kappaletyylit, fontit ja värit arvoina tiedostossa `render.rs`, mitä työkalupalkin tunnisteet tarkoittavat, tiedostossa `toolbar.rs`, mitä linkin napsautus tarkoittaa, tiedostossa `navigation.rs`.
 
-Kattavuudella on kaksi alarajaa: jokaisen moduulin vähintään 80 % riveistä ja kaikkien moduulien yhteensä vähintään 85 %. `make coverage` mittaa `cargo test`in yhdessä itsetestien kanssa ja epäonnistuu kummankin alapuolella; alarajat ja harvat poikkeukset, kuten tiedoston `main.rs` paniikkikoukku, joka ajetaan vain kaatumisessa, ovat paketissa [xtask](../../../xtask/src/coverage.rs) perusteineen. Mitatut rakennukset menevät hakemistoon `target/coverage/`, joten mittauskoodi ei koskaan päädy hakemistoon `target/release/` eikä levykuvaan. Dekooderin apuprosessi avaa mittaustiedostonsa ennen kuin se lukitsee itsensä, joten sekin mitataan.
+Ikkunan itsetestin vaihe odottaa nimettyä ehtoa eikä aikaa; vain se, mikä ei anna mitään signaalia, kuten jonkin asian puuttuminen, säilyttää tauon perusteluineen. Turha odotus on epäonnistunut tarkistus, joka nimeää sen, mikä ei koskaan tullut, vaihe, joka panikoi, on myös epäonnistunut tarkistus, ja ajo jatkuu kummassakin tapauksessa. Tarkistus, joka ei tässä ajossa voi sanoa mitään, ilmoittaa `SELFTEST SKIP`: xtask listaa sen, eikä se läpäise eikä epäonnistu. xtask vaatii jokaiselta tilalta, ja `--scenarios`ilta erikseen, noin yhdeksän kymmenesosaa sen tarkistuksista. Ikkunan itsetesti ajaa pääläpikäyntinsä jälkeen toisen osan tiedostossa `src/editor/selftest/scenarios.rs`: jokaisen muotoilu- ja taulukkokomennon, dialogit, linkkien napsautukset, sijoittamisen, pudottamisen, viennit, suuren muutoksen, levyllä muuttuvat kuvat, muistipaineen, valtavan dokumentin ja palautumisen kaatumisen jälkeen.
+
+Kattavuudella on kaksi alarajaa: jokaisen moduulin vähintään 84 % riveistä ja kaikkien moduulien yhteensä vähintään 96 %. `make coverage` mittaa `cargo test`in yhdessä itsetestien kanssa ja epäonnistuu kummankin alapuolella; `make coverage-library` pitää sen, mikä ei tarvitse ikkunaa, 90 prosentissa ja 97 prosentissa. Alarajat ja harvat poikkeukset, kuten tiedoston `main.rs` paniikkikoukku, joka ajetaan vain kaatumisessa, ovat paketissa [xtask](../../../xtask/src/coverage.rs) perusteineen. Mitatut rakennukset menevät hakemistoon `target/coverage/`, joten mittauskoodi ei koskaan päädy hakemistoon `target/release/` eikä levykuvaan. Dekooderin apuprosessi avaa mittaustiedostonsa ennen kuin se lukitsee itsensä, joten sekin mitataan.
 
 CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) ajaa `make check`in, `make coverage-library`n ja universal-rakennuksen Apple Siliconilla sekä `cargo test`in Intelillä jokaiselle pushille haaraan `main` ja jokaiselle pull requestille. Joka yö [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) ajaa `make test-long`in uusilla satunnaisilla syötteillä. Itsetestit ja levykuva pysyvät kehittäjän Macilla: ne tarvitsevat näytön ja allekirjoitusvarmenteet avainnipussa.
 
@@ -644,36 +648,39 @@ Itsetestin tuloste menee hakemistoon `target/selftest/`. Itsetesti rakentaa eril
 
 ### Projektin rakenne
 
-`src/lib.rs` tekee kaikesta, mikä ei tarvitse ikkunaa, oman kirjastonsa `splat`: `markdown/`, `preview/`, `i18n.rs` ja testigeneraattori `fuzz.rs`. Sovellus tiedostossa `src/main.rs` rakentuu sen päälle.
+`src/lib.rs` tekee kaikesta, mikä ei tarvitse ikkunaa, oman kirjastonsa `splat`: `markdown/`, `preview/`, `i18n.rs` ja testigeneraattori `fuzz.rs`. Se rakentuu ilman macOS:ää. Sovellus tiedostossa `src/main.rs` rakentuu sen päälle.
 
-- `src/markdown/`: jäsennyssidos (comrak), syntaksivärit ja kaikki komennot puhtaina tekstimuokkauksina (`Edit`). Myös uudelleenjäsennys muokkauksen jälkeen (`incremental.rs`), upotetun HTML:n lukija (`markup.rs`), typografia, tunnisteet, viittaukset ja lähdeviitteet juoksevassa tekstissä (`typography.rs`), miltä teksti näyttää ja mikä Markdown ja HTML sen tekee (`style.rs`), mikä osoite voi olla (`url.rs`) sekä HTML- ja Word-vienti (`html.rs`, `docx.rs` ja `docx/html.rs` sekä `docx/xml.rs`). Esikatselu ja molemmat viennit lukevat saman puun, `Doc`. Ei AppKitia.
-- `src/preview/`: esikatselun taitto, siinä oleva upotettu HTML (`layout/html.rs`) sekä esikatselun ja lähdetekstin välinen vastaavuus (`Bridge`, `Index`). Ei AppKitia.
-- `src/editor/`: ikkuna. Yksi `EditorController`-olio palvelee AppKitia molempien näkymien delegaattina; sen työ on jaettu vastuualueittain:
+- `src/markdown/`: puu, jota jokainen käyttäjä lukee, `Doc` hakemistossa `doc/`, joka omistaa tekstinsä, ja ainoa sidos jäsentimeen hakemistossa `reader/`: comrakia ei nimetä missään muualla, ja `reader/assumptions.rs` pitää sisällään sen, mitä koodi siitä olettaa. Syntaksivärit ja kaikki komennot puhtaina tekstimuokkauksina (`Edit`) hakemistossa `commands/`. Myös uudelleenjäsennys muokkauksen jälkeen (`incremental.rs`), upotetun HTML:n lukija (`markup.rs`), typografia, tunnisteet, viittaukset ja lähdeviitteet juoksevassa tekstissä (`typography.rs`), miltä teksti näyttää ja mikä Markdown ja HTML sen tekee (`style.rs`), mikä osoite voi olla (`url.rs`) sekä HTML- ja Word-vienti (`html.rs`, `docx.rs` ja `docx/html.rs` sekä `docx/xml.rs`). Sijainnilla on oma tyyppinsä: `Byte` lähdetekstissä, `U16` lähdenäkymässä, `Shown` esikatselunäkymässä (`text.rs`). Ei AppKitia.
+- `src/preview/`: esikatselun taitto hakemistossa `layout/`, siinä oleva upotettu HTML tiedostossa `layout/html.rs` sekä esikatselun ja lähdetekstin välinen vastaavuus (`Bridge`, `Index`). `Bridge` hylkää `Doc`in toisen version taiton. Ei AppKitia.
+- `src/editor/`: ikkuna. Yksi `EditorController`-olio palvelee AppKitia molempien näkymien delegaattina ja välittää komponenteille, pienille structeille controllerin ja niiden omistaman tilan päällä, joiden kenttiin muut moduulit eivät yllä:
 
 | Moduuli | Vastuu |
 |---|---|
-| `mod.rs` | luokka, delegaattimetodit, `invalidate` |
+| `mod.rs` | luokka, delegaattimetodit, jotka välittävät eteenpäin, `invalidate` |
+| `panes.rs` | `Panes`: tekstinäkymät, jäsennys, ruutujen näyttäminen ja piilottaminen sekä se, mikä antaa pääsyn näkymiin |
 | `state.rs` | mitä controller tietää dokumentista ja kaikki tavat, joilla se muuttuu; sen kentät ovat yksityisiä, eikä se koske mihinkään näkymään |
+| `model.rs` | lainaa tilan ja tekstikopion closureille, jotka eivät yllä mihinkään näkymään |
 | `actions.rs` | komentorekisteri: selektori, otsikko, pikanäppäin, symboli, milloin komento on käytettävissä |
-| `editing.rs` | komentojen ajaminen ja validointi, kirjoittaminen esikatselussa |
-| `update.rs` | jäsennys, väritys, esikatselun päivitys; muokkauksen jälkeen vain muuttuneet kappaleet |
+| `editing.rs` | `Editing`: komentojen ajaminen ja validointi, kirjoittaminen esikatselussa |
+| `update.rs` | `Updater`: jäsennys, väritys, esikatselun päivitys; muokkauksen jälkeen vain muuttuneet kappaleet |
 | `sync.rs` | tekstikopio ja lohkokirjanpito, ilman AppKitia ja satunnaistestein |
-| `progressive.rs` | suurten esikatselujen renderöinti vaihe vaiheelta |
-| `selection.rs`, `scroll.rs` | molempien ruutujen valinta ja vierityskohta samassa tahdissa |
-| `atom.rs`, `atom_edit.rs` | kaava- ja kaavioeditori |
-| `navigation.rs`, `links.rs` | linkit, wikilinkit, tunnisteet, tehtävien valintaruudut, taittaminen, alaviitteet |
+| `progressive.rs` | `Progressive`: suurten esikatselujen renderöinti vaihe vaiheelta |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: molempien ruutujen valinta ja vierityskohta samassa tahdissa |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: kaava- ja kaavioeditori |
+| `navigation.rs`, `links.rs` | `Links`: linkit, wikilinkit, tunnisteet, tehtävien valintaruudut, taittaminen, alaviitteet |
 | `env.rs` | mitä esikatselu lukee tekstin ulkopuolelta: typografiset välimerkit, repositorio merkinnöille `@name` ja `#12`, BibTeX-tiedosto, upotetut muistiinpanot |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | esikatselun teksti, paikalliset ja etäkuvat |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | esikatselun teksti, paikalliset ja etäkuvat; `Pictures` tiedostossa `images.rs` |
 | `attributes.rs` | tekstiattribuutit; kukin avain saa vain odottamansa tyyppisen arvon |
 | `shadow.rs` | tallentamattoman tekstin kopiot kaatumisen jälkeistä palautusta varten |
 | `decoder.rs` | hiekkalaatikossa toimivat apuprosessit, jotka purkavat kuvia ja grafiikkaa |
-| `export.rs`, `outline.rs` | HTML- ja Word-vienti; jäsennyssivupalkki |
+| `export.rs`, `outline.rs` | `Sharing`: HTML- ja Word-vienti, jakotiedosto, tulostus; jäsennyssivupalkki |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit MathJaxille, Mermaidille, Graphvizille, PlantUML:lle ja visuaaliselle kaavaeditorille; säännöt siitä, mikä renderöidään milloin, erillään WebKitistä |
 | `webkit.rs` | kutsut WebKitiin; vain navigointidelegaatin elinikä jää tiedostoille `js.rs` ja `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | ikkuna, työkalupalkki, tekstinäkymät, dialogit, värit |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | ikkunan rakentaminen, työkalupalkki, tekstinäkymät, dialogit, värit |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: valikkorivi, apin delegaatti, dokumentti (`MDDocument`, `NSDocument`-aliluokka).
-- `src/i18n.rs` ja `resources/*.lproj`: 35 kieltä; avaimet ovat saksankieliset tekstit.
+- `src/i18n.rs` ja `resources/*.lproj`: 35 kieltä; avaimet ovat saksankieliset tekstit, ja sovellus asentaa käyttöliittymän kielen taulukon käynnistyessään.
+- `src/util/`: työsäikeet (`lanes.rs`), taltiot, jotka voivat lakata vastaamasta (`volumes.rs`), AppKit-apuohjelmat, tiedostot ja prosessit. `src/diag.rs`: se, mikä menee pieleen käyttäjän näkymättömissä, menee järjestelmälokiin ilman minkään dokumentin tekstiä.
 - `src/large_alloc.rs`: suuret varaukset tulevat suoraan ytimeltä ja palaavat sille vapautettaessa, joten muisti palautuu suurten muokkausten jälkeen.
 - `resources/js/`: verkkosivut ja kirjastot; versiot ja tarkistussummat tiedostossa [vendor.lock](../../../vendor.lock).
 - `xtask/`: paketointi, allekirjoitus, levykuva, kuvake, vendorointi, itsetestien ajaja ja kattavuuden alarajat.
@@ -684,21 +691,21 @@ Vasemman tekstinäkymän lähdeteksti on ainoa totuuden lähde.
 
 1. Jokainen siellä tehty merkin muutos päivittää tekstikopion (`Snapshot`) paikallaan lukematta tekstiä uudelleen.
 2. Päivitys jäsentää kopion, värittää lähdetekstin uudelleen vain siltä osin kuin värit muuttuivat, taittaa esikatselun ja korvaa vain ne lohkot, joiden sisältö muuttui.
-3. Muokkauksen jälkeen vain muuttuneet kappaleet jäsennetään, väritetään ja taitetaan uudelleen, kunhan niiden naapurit pysyvät samoina; `reparse_part_and_color` kertoo, milloin eivät. Dokumentit, joissa on `%%`-kommenttilohkoja, front matterin muutokset ja linkkiviitemääritelmien lähellä tehdyt muutokset käsitellään kokonaan. comrak tunnistaa alaviiteviittauksen vain, kun sen määritelmä on samassa jäsennyksessä, ja siirtää määritelmät tekstin taakse, joten osa jäsennetään yhdellä sijaismääritelmällä per tunniste ja sen numerot otetaan vanhasta puusta; osan viittausten tai määritelmien muutos tai muutos tekstinsisäisen alaviitteen vieressä käsitellään kokonaan.
+3. Muokkauksen jälkeen vain muuttuneet kappaleet jäsennetään, väritetään ja taitetaan uudelleen, kunhan niiden naapurit pysyvät samoina; `reparse_part_and_color` kertoo, milloin eivät. Dokumentit, joissa on `%%`-kommenttilohkoja, front matterin muutokset ja, dokumentissa, jossa on linkkiviitemääritelmiä, hakasulkeen sisältävän osan muutokset käsitellään kokonaan. comrak tunnistaa alaviiteviittauksen vain, kun sen määritelmä on samassa jäsennyksessä, ja siirtää määritelmät tekstin taakse, joten osa jäsennetään yhdellä sijaismääritelmällä per tunniste ja sen numerot otetaan vanhasta puusta; osan viittausten tai määritelmien muutos tai muutos tekstinsisäisen alaviitteen vieressä käsitellään kokonaan.
 4. HTML-lohkot, jotka avaavat `<details>`- tai `<div align>`-elementin ja sulkevat sen myöhemmin, vaikuttavat niiden välisiin Markdown-lohkoihin; uudelleenkäytetyllä lohkolla on oltava samat ympäristöt.
 5. Kun kirjoitat enintään 2 Mt:n dokumentin lähdetekstiin, osittainen päivitys ajetaan heti; kun se ei sovellu tai dokumentti on suurempi, jäsennys ja taitto ajetaan taustalla. Kun kirjoitat esikatseluun, ne ajetaan heti, koska esikatselun kohdistin riippuu tuloksesta.
 6. `Bridge` kääntää esikatseluun tehdyn syötteen lähdetekstin muokkaukseksi, ja siitä eteenpäin se kulkee samaa polkua. Markdownissa on liian monta tapaa muuttaa teksti syntaksiksi pelkille säännöille, joten `preview/verify.rs` jäsentää muuttuneen osan uudelleen ja vertaa sitä, mitä se näyttää, siihen, mitä kirjoitettiin; muokkaus, joka ei pidä, suojataan lisää tai hylätään.
-7. comrakin tekstinsisäiset sijainnit menevät muutamassa kohdassa väärin, esimerkiksi linkkiviitemääritelmän jälkeen. `markdown/positions.rs` tarkistaa ne lähdetekstiä vasten lohkoa luettaessa ja lukee ne uudelleen lähdetekstistä, missä ne eivät täsmää.
+7. comrakin tekstinsisäiset sijainnit menevät muutamassa kohdassa väärin, esimerkiksi linkkiviitemääritelmän jälkeen. `markdown/reader/positions.rs` tarkistaa ne lähdetekstiä vasten lohkoa luettaessa ja lukee ne uudelleen lähdetekstistä, missä ne eivät täsmää.
 
 ### Säännöt controllerissa
 
-1. Controllerin omat muutokset näkymiin ajetaan `silently()`-kutsun sisällä; delegaattien takaisinkutsut ohittavat ne.
-2. `state` lainataan vain lukemista ja laskemista varten, ei koskaan sellaisen kutsun yli, joka muuttaa, taittaa tai vierittää näkymää. Se muuttuu vain omien metodiensa kautta, joiden testit eivät tarvitse ikkunaa.
+1. Controllerin omat muutokset näkymiin ajetaan `Panes::silently`-kutsun sisällä; delegaattien takaisinkutsut ohittavat ne. Kaikkialla muualla näkymiä voi vain lukea, joten kääntäjä tarkistaa tämän. Se, minkä takaisinkutsujen on tarkoitus kuulla, tai se, mikä antaa näkymän AppKitille, kertoo sen kulkemalla kutsun `Panes::for_appkit` kautta.
+2. Tila lainataan vain lukemista ja laskemista varten, ei koskaan sellaisen kutsun yli, joka muuttaa, taittaa tai vierittää näkymää: `Model` lainaa sen `Send`-closureille, eikä mikään näkymä ole `Send`, joten kääntäjä tarkistaa tämän. Se muuttuu vain omien metodiensa kautta, joiden testit eivät tarvitse ikkunaa.
 3. Viestit ulkopuolelta (kuva latautui, kaava renderöitiin) saapuvat viiveellä kutsujen `renders_arrived` ja `image_arrived` kautta, eivät koskaan päivityksen keskellä.
 4. Uudelleenpiirto ilman tekstin muutosta kulkee vain kutsun `invalidate(reason)` kautta.
-5. `Rc<Snapshot>`ia ei pidetä lähdetekstin muutoksen yli, tai muutos kopioi koko tekstin.
-6. Uusi komento tarvitsee merkinnän tiedostoon `actions.rs`, metodin tiedostoon `mod.rs` ja haaran kohtaan `editing::perform`.
-7. Jokaisella `unsafe`-lohkolla on perustelunsa `// SAFETY:`-kommenttina. Tavut pääsevät järjestelmän kuvanpurkajille appissa vain kutsun `decoder::system_image` kautta.
+5. Tekstikopiota ei pidetä lähdetekstin muutoksen yli, tai muutos kopioi koko tekstin: `with_text` lainaa sen vain `Send`-closuren keston ajaksi.
+6. Uusi komento tarvitsee merkinnän tiedostoon `actions.rs`, metodin tiedostoon `mod.rs` ja haaran kohtaan `Editing::perform`.
+7. Jokaisella `unsafe`-lohkolla on perustelunsa `// SAFETY:`-kommenttina. Tavut pääsevät järjestelmän kuvanpurkajille vain apuprosessissa, kutsun `decoder::decode_native` kautta; testi läpikäy lähdekoodin muiden kutsujen varalta.
 8. Mikään pääsäikeessä ei odota käyttäjän kansioita, koska verkkolevy voi lakata vastaamasta: tiedostoja tarkastellaan säikeellä `DISK`, ja esikatselu lukee vastaukset kutsulla `Env::known`. Vain toiminto, jota käyttäjä odottaa, kuten vienti tai tallennus, saa koskea levyyn suoraan.
 
 ### Komennon lisääminen
@@ -707,7 +714,7 @@ Valikkorivi, työkalupalkki ja kontekstivalikko rakentavat kaikki kohtansa rekis
 
 1. `Action`-variantin ja sen `Spec`: selektori, otsikko, työkalupalkin nimiö, työkaluvihje (alkaa verbillä, enintään 75 merkkiä), pikanäppäin, SF Symbol ja milloin se on käytettävissä
 2. metodin tiedostoon `src/editor/mod.rs`
-3. haaran kohtaan `editing::perform`
+3. haaran kohtaan `Editing::perform`
 4. tekstinsä jokaiseen `Localizable.strings`-tiedostoon
 
 Testi `every_command_has_a_method_and_every_method_a_command` tarkistaa, että rekisteri ja metodit täsmäävät. Applen vakiopikanäppäimet kuten ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F ja ⌘, jäävät koskematta.

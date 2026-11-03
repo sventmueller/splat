@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Simpan Dokumen Dahulu";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Imej yang ditampal disimpan sebagai fail di sebelah dokumen. Simpan dokumen, kemudian tampal imej sekali lagi.";
 "Export fehlgeschlagen" = "Eksport Gagal";
+"Das Dokument ließ sich nicht umwandeln." = "Dokumen tidak dapat ditukar.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokumen terlalu besar untuk fail Word.";
 "Gliederung ausblenden" = "Sembunyikan Rangka";
 "Gliederung einblenden" = "Tunjukkan Rangka";
 "Metadaten" = "Metadata";

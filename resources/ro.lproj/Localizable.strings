@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Salvați mai întâi documentul";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Imaginile lipite sunt salvate ca fișiere lângă document. Salvați-l, apoi lipiți din nou imaginea.";
 "Export fehlgeschlagen" = "Exportul a eșuat";
+"Das Dokument ließ sich nicht umwandeln." = "Documentul nu a putut fi convertit.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Documentul este prea mare pentru un fișier Word.";
 "Gliederung ausblenden" = "Ascundeți structura";
 "Gliederung einblenden" = "Afișați structura";
 "Metadaten" = "Metadate";

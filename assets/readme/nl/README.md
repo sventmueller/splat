@@ -738,6 +738,7 @@ Vereisten:
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) noemt de exacte versie die CI gebruikt;
   rustup installeert die zelf, de Rust van Homebrew negeert het bestand. Door die versie daar te verhogen, bereiken
   nieuwe waarschuwingen van compiler en clippy het project.
+- rustup, voor `make lint`, `make check` en `make universal`: `cargo xtask check-library` bouwt de bibliotheek voor Linux om te laten zien dat ze geen macOS nodig heeft, en de Rust van Homebrew heeft geen andere targets.
 
 De [Makefile](../../../Makefile) bevat korte ingangen; `make help` toont ze allemaal:
 
@@ -826,28 +827,31 @@ maptoestemmingen bij.
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | een langer willekeurig zoekproces; `SPLAT_FUZZ_SEED` varieert de invoer |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | één taal, terwijl andere onvolledig zijn |
 | `cargo clippy --release --all-targets [--features selftest]` | lints, inclusief de verantwoording van elk `unsafe`-blok, de lengte van functies en, in de bibliotheek, getalconversies |
+| `cargo xtask check-library` | de bibliotheek bouwt voor Linux, dus niets erin heeft macOS nodig |
 | `cargo xtask vendor check` | de JavaScript-bibliotheken komen byte voor byte overeen met `vendor.lock` |
-| `cargo xtask selftest probe` | zonder venster, elk met zijn verwachte resultaat: formules, diagrammen, webafbeeldingen tegen een server binnen het proces, geblokkeerde adressen, de verdediging van de webweergaven |
+| `cargo xtask selftest probe` | zonder venster, elk met zijn verwachte resultaat: formules, diagrammen, webafbeeldingen tegen een server binnen het proces, geblokkeerde adressen, de tekst die elke opdracht schrijft, elk afbeeldingsformaat via beide exports, een pagina die niet meer antwoordt en de verdediging van de webweergaven tegen een pagina zonder die verdediging. Duurt ongeveer een halve minuut. Wat de app op het scherm nodig heeft, wordt bij een vergrendeld scherm overgeslagen |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | de draaiende app, klik voor klik. Opent een venster en typt erin; de Mac is ongeveer vier minuten bezet. `--scenarios` draait alleen het tweede deel, in ongeveer anderhalve minuut |
 | `cargo xtask selftest resize` | maakt het venster breder na het verplaatsen van de scheiding: de bron breekt opnieuw af terwijl het venster van grootte verandert. Duurt ongeveer tien seconden |
 | `cargo xtask selftest bench <file.md>` | tijden voor openen, typen en scrollen in een groot bestand |
-| `cargo test --release -- --ignored partial_updates` | een toetsaanslag in 10 MB: gedeeltelijke tegen volledige update, resultaat en tijdslimiet |
-| `cargo test --release --test hostile` | documenten die een stackoverflow of kwadratische rekentijd uitlokken, via parseren, opmaak, beide exports, toetsaanslagen en opdrachten |
+| `cargo test --release -- --ignored partial_updates` | een toetsaanslag in 10 MB: gedeeltelijke tegen volledige update, hetzelfde resultaat in hooguit een kwart van de tijd |
+| `cargo test --release --test hostile` | documenten die een stackoverflow of kwadratische rekentijd uitlokken, elk in twee groottes waarvan de tijden net zo moeten groeien als de tekst, via parseren, opmaak, beide exports, toetsaanslagen en opdrachten |
 | `make mutants` | fouten die één voor één in `src/markdown/` en `src/preview/` worden ingebouwd, via [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); zegt welke geen enkele test opmerkt. Duurt uren; `FILE=src/preview/bridge.rs` beperkt het |
 | `cargo test --release --test decoder` | het decoderproces decodeert afbeeldingen en bereikt noch bestanden noch het netwerk |
 | `make coverage` | regeldekking van `cargo test` en alle zelftests, via [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); mislukt onder de ondergrenzen. Houdt de Mac ongeveer vijf minuten bezet |
-| `make coverage-library` | de ondergrenzen voor `src/markdown/`, `src/preview/` en `i18n.rs`, alleen gemeten door `cargo test` |
+| `make coverage-library` | `src/markdown/`, `src/preview/` en `i18n.rs` tegen hun hogere ondergrenzen, alleen gemeten door `cargo test` |
 
 Unittests staan naast de code die ze testen. `tests/` bevat wat de bibliotheek van buitenaf bereikt: de willekeurige tests
 in `robustness.rs`, die de generator in `src/fuzz.rs` delen met die van `sync.rs`, de documenten die schade moeten aanrichten in
 `hostile.rs` en de decodertest, die het gebouwde programma start. Beslissingen in `src/editor/` die geen venster nodig hebben, staan in losse functies met eigen
-tests: alles wat de controller weet en hoe dat verandert in `state.rs`, de regels van het weergeven in `render_queue.rs`, de tekstkopie in `sync.rs`. Een stap van de venster-zelftest die vergeefs wacht, laat de run mislukken. De venster-zelftest
+tests: alles wat de controller weet en hoe dat verandert in `state.rs`, de regels van het weergeven in `render_queue.rs`, de tekstkopie in `sync.rs`, alinea-stijlen, lettertypen en kleuren als waarden in `render.rs`, waar de ID's van de knoppenbalk voor staan in `toolbar.rs`, wat een linkklik betekent in `navigation.rs`.
+
+Een stap van de venster-zelftest wacht op een benoemde voorwaarde, niet op een tijd; alleen wat geen signaal geeft, zoals de afwezigheid van iets, houdt een pauze met haar reden. Vergeefs wachten is een mislukte controle die benoemt wat nooit kwam, een stap die panic veroorzaakt is ook een mislukte controle, en de run gaat in beide gevallen door. Een controle die in deze run niets kan zeggen, meldt `SELFTEST SKIP`: xtask somt ze op, en ze slaagt noch mislukt. xtask houdt elke modus, en `--scenarios` apart, aan ongeveer negen tiende van zijn controles. De venster-zelftest
 draait na zijn hoofdklikreeks een tweede deel, in `src/editor/selftest/scenarios.rs`: elke opmaak- en
 tabelopdracht, de dialogen, linkklikken, plakken, neerzetten, exports, een grote wijziging, afbeeldingen die op schijf
 veranderen, geheugendruk, een enorm document en het herstel na een crash.
 
-Dekking kent twee ondergrenzen: elke module minstens 80 % van zijn regels, alle modules samen minstens 85 %. `make coverage`
-meet `cargo test` samen met de zelftests en mislukt onder een van beide; de ondergrenzen en de weinige uitzonderingen, zoals
+Dekking kent twee ondergrenzen: elke module minstens 84 % van zijn regels, alle modules samen minstens 96 %. `make coverage`
+meet `cargo test` samen met de zelftests en mislukt onder een van beide; `make coverage-library` houdt wat geen venster nodig heeft aan 90 % en 97 %. De ondergrenzen en de weinige uitzonderingen, zoals
 de panic-hook in `main.rs` die alleen bij een crash draait, staan in [xtask](../../../xtask/src/coverage.rs) naast hun redenen.
 Gemeten builds komen in `target/coverage/`, zodat metende code nooit in `target/release/` of een schijfkopie terechtkomt. Het
 decoderhulpproces opent zijn meetbestand voordat het zichzelf opsluit, dus het wordt ook gemeten.
@@ -864,43 +868,44 @@ ongemoeid.
 ### Projectindeling
 
 `src/lib.rs` maakt van alles wat geen venster nodig heeft een eigen bibliotheek, `splat`: `markdown/`, `preview/`,
-`i18n.rs` en de testgenerator `fuzz.rs`. De app in `src/main.rs` bouwt erop voort.
+`i18n.rs` en de testgenerator `fuzz.rs`. Ze bouwt zonder macOS. De app in `src/main.rs` bouwt erop voort.
 
-- `src/markdown/`: de parserkoppeling (comrak), syntaxiskleuren en alle opdrachten als zuivere tekstbewerkingen (`Edit`). Ook
+- `src/markdown/`: de boom die elke afnemer leest, `Doc` in `doc/`, die zijn eigen tekst bezit, en de enige koppeling met de parser in `reader/`: comrak wordt nergens anders genoemd, en `reader/assumptions.rs` bevat wat de code over comrak aanneemt. Syntaxiskleuren, en alle opdrachten als zuivere tekstbewerkingen (`Edit`) in `commands/`. Ook
   het opnieuw parseren na een bewerking (`incremental.rs`), de lezer voor ingebedde HTML (`markup.rs`), typografie, tags,
   verwijzingen en citaten in lopende tekst (`typography.rs`), hoe tekst eruitziet en welke Markdown en HTML dat bewerkstelligen
   (`style.rs`), wat een adres mag zijn (`url.rs`) en de HTML- en Word-export (`html.rs`, `docx.rs` met `docx/html.rs`
-  en `docx/xml.rs`). De voorvertoning en beide exports lezen dezelfde boom, `Doc`. Geen AppKit.
-- `src/preview/`: de opmaak van de voorvertoning, ingebedde HTML erin (`layout/html.rs`) en de afbeelding tussen voorvertoning en
-  bron (`Bridge`, `Index`). Geen AppKit.
-- `src/editor/`: het venster. Eén `EditorController`-object bedient AppKit als delegate van beide weergaven; het werk is
-  verdeeld naar verantwoordelijkheid:
+  en `docx/xml.rs`). Een positie heeft een eigen type: `Byte` in de brontekst, `U16` in de bronweergave, `Shown` in de voorvertoningsweergave (`text.rs`). Geen AppKit.
+- `src/preview/`: de opmaak van de voorvertoning in `layout/`, met ingebedde HTML in `layout/html.rs`, en de afbeelding tussen voorvertoning en bron (`Bridge`, `Index`). Een `Bridge` weigert een opmaak van een andere versie van de `Doc`. Geen AppKit.
+- `src/editor/`: het venster. Eén `EditorController`-object bedient AppKit als delegate van beide weergaven en stuurt door naar componenten, kleine structs boven de controller en de toestand die ze bezitten, waarvan de andere modules de velden niet kunnen bereiken:
 
 | Module | Verantwoordelijkheid |
 |---|---|
-| `mod.rs` | klasse, delegate-methoden, `invalidate` |
+| `mod.rs` | klasse, delegate-methoden die doorsturen, `invalidate` |
+| `panes.rs` | `Panes`: de tekstweergaven, de structuur, deelvensters tonen en verbergen, en wat toegang tot de weergaven geeft |
 | `state.rs` | wat de controller over het document weet en elke manier waarop dat verandert; de velden zijn privé en het raakt geen weergave aan |
+| `model.rs` | leent de toestand en de tekstkopie uit aan closures die geen weergave kunnen bereiken |
 | `actions.rs` | opdrachtenregister: selector, titel, toetscombinatie, symbool, wanneer de opdracht geldt |
-| `editing.rs` | opdrachten uitvoeren en valideren, typen in de voorvertoning |
-| `update.rs` | parseren, kleuren, de voorvertoning bijwerken; na een bewerking alleen de betrokken alinea's |
+| `editing.rs` | `Editing`: opdrachten uitvoeren en valideren, typen in de voorvertoning |
+| `update.rs` | `Updater`: parseren, kleuren, de voorvertoning bijwerken; na een bewerking alleen de betrokken alinea's |
 | `sync.rs` | tekstkopie en blokadministratie, zonder AppKit en met willekeurige tests |
-| `progressive.rs` | grote voorvertoningen stap voor stap weergeven |
-| `selection.rs`, `scroll.rs` | selectie en scrollpositie van beide deelvensters gelijk houden |
-| `atom.rs`, `atom_edit.rs` | de formule- en diagrameditor |
-| `navigation.rs`, `links.rs` | links, wikilinks, tags, takenvakjes, vouwen, voetnoten |
+| `progressive.rs` | `Progressive`: grote voorvertoningen stap voor stap weergeven |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selectie en scrollpositie van beide deelvensters gelijk houden |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: de formule- en diagrameditor |
+| `navigation.rs`, `links.rs` | `Links`: links, wikilinks, tags, takenvakjes, vouwen, voetnoten |
 | `env.rs` | wat de voorvertoning van buiten de tekst leest: typografische leestekens, de repository voor `@name` en `#12`, het BibTeX-bestand, ingesloten notities |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | voorvertoningstekst, lokale en externe afbeeldingen |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | voorvertoningstekst, lokale en externe afbeeldingen; `Pictures` in `images.rs` |
 | `attributes.rs` | tekstattributen; elke sleutel krijgt alleen een waarde van het type dat hij verwacht |
 | `shadow.rs` | kopieën van niet-bewaarde tekst voor het herstel na een crash |
 | `decoder.rs` | hulpprocessen in een sandbox die afbeeldingen en grafische data decoderen |
-| `export.rs`, `outline.rs` | HTML- en Word-export; de structuurzijbalk |
+| `export.rs`, `outline.rs` | `Sharing`: HTML- en Word-export, het deelbestand, afdrukken; de structuurzijbalk |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit voor MathJax, Mermaid, Graphviz, PlantUML en de visuele formule-editor; de regels van wat wanneer wordt weergegeven, los van WebKit |
 | `webkit.rs` | aanroepen naar WebKit; alleen de levensduur van de navigatiedelegate blijft bij `js.rs` en `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | venster, knoppenbalk, tekstweergaven, dialogen, kleuren |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | het venster opbouwen, knoppenbalk, tekstweergaven, dialogen, kleuren |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menubalk, app-delegate, document (`MDDocument`, een subklasse van
   `NSDocument`).
-- `src/i18n.rs` met `resources/*.lproj`: 35 talen; de sleutels zijn de Duitse teksten.
+- `src/i18n.rs` met `resources/*.lproj`: 35 talen; de sleutels zijn de Duitse teksten, en de app installeert bij het starten de tabel van de interfacetaal.
+- `src/util/`: werkthreads (`lanes.rs`), volumes die kunnen ophouden te antwoorden (`volumes.rs`), AppKit-hulpjes, bestanden en processen. `src/diag.rs`: wat buiten het zicht van de gebruiker misgaat, gaat naar het systeemlogboek, zonder enige tekst van een document.
 - `src/large_alloc.rs`: grote toewijzingen komen rechtstreeks van de kernel en gaan er bij vrijgave naar terug, zodat het geheugen
   na grote bewerkingen terugkeert.
 - `resources/js/`: webpagina's en bibliotheken; versies en controlesommen in [vendor.lock](../../../vendor.lock).
@@ -914,8 +919,7 @@ De brontekst in de tekstweergave links is de enige bron van waarheid.
 2. Een update parseert de kopie, kleurt de bron alleen opnieuw waar kleuren zijn veranderd, maakt de voorvertoning op en
    vervangt alleen de blokken waarvan de inhoud is veranderd.
 3. Na een bewerking worden alleen de betrokken alinea's opnieuw geparseerd, gekleurd en opgemaakt, zolang hun buren
-   gelijk blijven; `reparse_part_and_color` zegt wanneer dat niet zo is. Documenten met `%%`-opmerkingsblokken, wijzigingen aan de
-   front matter en wijzigingen vlak bij definities van linkverwijzingen worden volledig verwerkt. comrak herkent een voetnootverwijzing
+   gelijk blijven; `reparse_part_and_color` zegt wanneer dat niet zo is. Documenten met `%%`-opmerkingsblokken, wijzigingen aan de front matter en, in een document met definities van linkverwijzingen, wijzigingen aan een deel met een vierkante haak worden volledig verwerkt. comrak herkent een voetnootverwijzing
    alleen met haar definitie in dezelfde parse en verplaatst definities achter de tekst, dus het deel wordt geparseerd
    met een vervangende definitie per label en neemt zijn nummers uit de oude boom; een wijziging aan de verwijzingen of
    definities in het deel, of naast een inline voetnoot, wordt volledig verwerkt.
@@ -927,21 +931,19 @@ De brontekst in de tekstweergave links is de enige bron van waarheid.
 6. Invoer in de voorvertoning wordt door `Bridge` vertaald naar een bewerking van de bron en volgt vanaf daar hetzelfde pad.
    Markdown kent te veel manieren om tekst in syntaxis te veranderen voor regels alleen, dus `preview/verify.rs` parseert het gewijzigde deel
    opnieuw en vergelijkt wat het toont met wat is getypt; een bewerking die niet standhoudt, wordt verder ge-escaped of geweigerd.
-7. De inline posities van comrak kloppen op een paar plekken niet, bijvoorbeeld achter een definitie van een linkverwijzing. `markdown/positions.rs`
+7. De inline posities van comrak kloppen op een paar plekken niet, bijvoorbeeld achter een definitie van een linkverwijzing. `markdown/reader/positions.rs`
    controleert ze bij het lezen van een blok tegen de bron en leest ze opnieuw uit de bron waar ze niet passen.
 
 ### Regels in de controller
 
-1. De eigen wijzigingen van de controller aan de weergaven lopen binnen `silently()`; de delegate-callbacks negeren ze.
-2. `state` wordt alleen geleend om te lezen en te rekenen, nooit over een aanroep heen die een weergave wijzigt, opmaakt of laat scrollen. Het
-   verandert alleen via zijn eigen methoden, waarvan de tests geen venster nodig hebben.
+1. De eigen wijzigingen van de controller aan de weergaven lopen binnen `Panes::silently`; de delegate-callbacks negeren ze. Overal elders zijn de weergaven alleen te lezen, dus de compiler controleert dit. Wat de callbacks wel moeten horen, of wat een weergave aan AppKit geeft, zegt dat door via `Panes::for_appkit` te lopen.
+2. De toestand wordt alleen geleend om te lezen en te rekenen, nooit over een aanroep heen die een weergave wijzigt, opmaakt of laat scrollen: `Model` leent haar uit aan `Send`-closures, en geen enkele weergave is `Send`, dus de compiler controleert dit. Ze verandert alleen via haar eigen methoden, waarvan de tests geen venster nodig hebben.
 3. Berichten van buiten (een afbeelding geladen, een formule weergegeven) komen vertraagd binnen via `renders_arrived` en `image_arrived`, nooit
    midden in een update.
 4. Opnieuw tekenen zonder tekstwijziging loopt alleen via `invalidate(reason)`.
-5. Een `Rc<Snapshot>` wordt niet vastgehouden over een wijziging van de bron heen, anders kopieert die wijziging de hele tekst.
-6. Een nieuwe opdracht vraagt een item in `actions.rs`, een methode in `mod.rs` en een tak in `editing::perform`.
-7. Elk `unsafe`-blok draagt zijn verantwoording als `// SAFETY:`-commentaar. Bytes bereiken de afbeeldingsdecoders van het systeem in
-   de app alleen via `decoder::system_image`.
+5. De tekstkopie wordt niet vastgehouden over een wijziging van de bron heen, anders kopieert die wijziging de hele tekst: `with_text` leent haar alleen uit voor de duur van een `Send`-closure.
+6. Een nieuwe opdracht vraagt een item in `actions.rs`, een methode in `mod.rs` en een tak in `Editing::perform`.
+7. Elk `unsafe`-blok draagt zijn verantwoording als `// SAFETY:`-commentaar. Bytes bereiken de afbeeldingsdecoders van het systeem alleen in het hulpproces, via `decoder::decode_native`; een test doorzoekt de bronnen op andere aanroepen.
 8. Niets op de hoofdthread wacht op de mappen van de gebruiker, omdat een netwerkvolume kan ophouden te antwoorden: bestanden worden
    bekeken op de thread `DISK` en de voorvertoning leest de antwoorden via `Env::known`. Alleen een actie waarop de gebruiker
    wacht, zoals een export of bewaren, mag de schijf rechtstreeks aanraken.
@@ -955,7 +957,7 @@ een vinkje toont. Een nieuwe opdracht vraagt:
 1. een variant van `Action` met zijn `Spec`: selector, titel, label voor de knoppenbalk, tooltip (beginnend met een werkwoord, hooguit 75
    tekens), toetscombinatie, SF Symbol en wanneer ze geldt
 2. de methode in `src/editor/mod.rs`
-3. een tak in `editing::perform`
+3. een tak in `Editing::perform`
 4. de teksten ervan in elke `Localizable.strings`
 
 De test `every_command_has_a_method_and_every_method_a_command` controleert of register en methoden overeenkomen. De

@@ -5,10 +5,11 @@
 use std::ops::Range;
 
 use crate::markdown::commands::Edit;
-use crate::markdown::doc::{Doc, parse_part};
-use crate::markdown::text::{line_end, line_start};
+use crate::markdown::doc::Doc;
+use crate::markdown::reader::parse_part;
+use crate::markdown::text::{Byte, TextAt, line_end, line_start};
 
-use super::layout::{Atom, Layout, NoImages, ParaKind, RunMap, layout};
+use super::layout::{Atom, Layout, NoImages, ParaKind, Run, RunMap, layout};
 use super::map::{Index, Shown};
 
 /// A larger stretch is not read twice per keystroke; such an edit goes unchecked.
@@ -31,10 +32,8 @@ struct Shows {
 }
 
 fn shows(markdown: &str, at_start: bool) -> Shows {
-    let doc = Doc {
-        blocks: parse_part(markdown, at_start),
-    };
-    let laid_out = layout(markdown, &doc, &NoImages, None);
+    let doc = Doc::new(markdown.into(), parse_part(markdown, at_start));
+    let laid_out = layout(&doc, &NoImages, None);
     let mut chars = Vec::new();
     let mut paragraphs = Vec::new();
     for para in laid_out.blocks.iter().flat_map(|b| &b.paras) {
@@ -51,9 +50,10 @@ fn shows(markdown: &str, at_start: bool) -> Shows {
 
 /// The top-level blocks an edit touches and one on each side, which it may join or come apart from; line starts and ends
 /// included. `None` if that is too much to parse for an edit.
-fn stretch(text: &str, doc: &Doc, edit: &Range<usize>) -> Option<Range<usize>> {
+fn stretch(doc: &Doc, edit: &Range<Byte>) -> Option<Range<Byte>> {
+    let text = doc.text();
     let (mut start, mut end) = (edit.start, edit.end);
-    let (mut before, mut after) = (None::<usize>, None::<usize>);
+    let (mut before, mut after) = (None::<Byte>, None::<Byte>);
     for block in &doc.blocks {
         let r = &block.range;
         if r.end < edit.start {
@@ -70,19 +70,21 @@ fn stretch(text: &str, doc: &Doc, edit: &Range<usize>) -> Option<Range<usize>> {
     (end - start <= MAX_CHECKED).then_some(start..end)
 }
 
-/// Whether `edit` of `text` shows what `expected` says.
-pub(super) fn shows_as_expected(text: &str, doc: &Doc, edit: &Edit, expected: &Expected) -> bool {
-    let Some(part) = stretch(text, doc, &edit.range) else {
+/// Whether `edit` of the text of `doc` shows what `expected` says.
+pub(super) fn shows_as_expected(doc: &Doc, edit: &Edit, expected: &Expected) -> bool {
+    let Some(part) = stretch(doc, &edit.range) else {
         return true;
     };
-    let old = shows(&text[part.clone()], part.start == 0);
+    let text = doc.text();
+    let at_start = part.start == Byte::default();
+    let old = shows(text.at(part.clone()), at_start);
     let new_text = format!(
         "{}{}{}",
-        &text[part.start..edit.range.start],
+        text.at(part.start..edit.range.start),
         edit.replacement,
-        &text[edit.range.end..part.end]
+        text.at(edit.range.end..part.end)
     );
-    let new = shows(&new_text, part.start == 0);
+    let new = shows(&new_text, at_start);
     if expected.same_paragraphs && old.paragraphs != new.paragraphs {
         return false;
     }
@@ -108,51 +110,40 @@ fn replaces_one_stretch(old: &[char], new: &[char], typed: &[char], removed: Opt
     (kept_behind.saturating_sub(suffix)..=prefix.min(kept_behind)).any(|at| new[at..at + typed.len()] == *typed)
 }
 
+/// Punctuation the typography settings may have made of something else in the source.
+const TYPOGRAPHIC: [char; 13] = ['“', '”', '„', '‚', '‘', '’', '«', '»', '‹', '›', '–', '—', '…'];
+
 /// The visible characters of a stretch of the preview, unless what it shows may differ from what a check sees: rendered
 /// formulas and pictures, and punctuation the typography settings changed.
 pub(super) fn visible_chars(layout: &Layout, index: &Index, range: &Range<Shown>) -> Option<usize> {
     let (first, last) = (index.para_at(range.start)?, index.para_at(range.end)?);
     let mut count = 0;
     for pi in first..=last {
-        let pp = index.paras[pi];
-        let mut at = pp.start.0;
-        for run in &index.para(layout, pi).runs {
-            let len = run.text.encode_utf16().count();
-            let (from, to) = (range.start.0.max(at), range.end.0.min(at + len));
-            if from < to {
-                match run.map {
-                    RunMap::Atom { atom: Atom::Marker, .. } => {}
-                    RunMap::Atom { atom: Atom::Text, .. } | RunMap::Text { .. } => {
-                        let mut u = at;
-                        for c in run.text.chars() {
-                            if u >= from && u < to && !c.is_whitespace() {
-                                if matches!(
-                                    c,
-                                    '“' | '”'
-                                        | '„'
-                                        | '‚'
-                                        | '‘'
-                                        | '’'
-                                        | '«'
-                                        | '»'
-                                        | '‹'
-                                        | '›'
-                                        | '–'
-                                        | '—'
-                                        | '…'
-                                ) {
-                                    return None;
-                                }
-                                count += 1;
-                            }
-                            u += c.len_utf16();
-                        }
-                    }
-                    RunMap::Atom { .. } => return None,
-                }
+        for (at, run) in index.para(layout, pi).runs_at(index.paras[pi].start) {
+            if range.start.max(at.start) < range.end.min(at.end) {
+                count += visible_in_run(run, at.start, range)?;
             }
-            at += len;
         }
+    }
+    Some(count)
+}
+
+/// The visible characters of `range` in a run that starts at `at`.
+fn visible_in_run(run: &Run, mut at: Shown, range: &Range<Shown>) -> Option<usize> {
+    match run.map {
+        RunMap::Atom { atom: Atom::Marker, .. } => return Some(0),
+        RunMap::Atom { atom: Atom::Text, .. } | RunMap::Text { .. } => {}
+        RunMap::Atom { .. } => return None,
+    }
+    let mut count = 0;
+    for c in run.text.chars() {
+        if range.contains(&at) && !c.is_whitespace() {
+            if TYPOGRAPHIC.contains(&c) {
+                return None;
+            }
+            count += 1;
+        }
+        at += c.len_utf16();
     }
     Some(count)
 }
@@ -160,6 +151,7 @@ pub(super) fn visible_chars(layout: &Layout, index: &Index, range: &Range<Shown>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::markdown::text::bytes;
 
     fn stretch_of(old: &str, new: &str, typed: &str, removed: Option<usize>) -> bool {
         let chars = |s: &str| s.chars().collect::<Vec<_>>();
@@ -167,8 +159,8 @@ mod tests {
     }
 
     fn laid_out(t: &str) -> (Doc, Layout) {
-        let doc = crate::markdown::doc::parse(t);
-        let l = layout(t, &doc, &NoImages, None);
+        let doc = crate::markdown::reader::parse(t);
+        let l = layout(&doc, &NoImages, None);
         (doc, l)
     }
 
@@ -176,26 +168,26 @@ mod tests {
     fn only_what_shows_as_plain_text_can_be_counted() {
         let (_, l) = laid_out("**ab** cd\n");
         let index = Index::new(&l);
-        assert_eq!(visible_chars(&l, &index, &(Shown(0)..Shown(0))), Some(0));
-        assert_eq!(visible_chars(&l, &index, &(Shown(0)..Shown(1))), Some(1));
+        assert_eq!(visible_chars(&l, &index, &(Shown::new(0)..Shown::new(0))), Some(0));
+        assert_eq!(visible_chars(&l, &index, &(Shown::new(0)..Shown::new(1))), Some(1));
         assert_eq!(
-            visible_chars(&l, &index, &(Shown(0)..Shown(5))),
+            visible_chars(&l, &index, &(Shown::new(0)..Shown::new(5))),
             Some(4),
             "the space does not count"
         );
-        assert_eq!(visible_chars(&l, &index, &(Shown(1)..Shown(3))), Some(1));
+        assert_eq!(visible_chars(&l, &index, &(Shown::new(1)..Shown::new(3))), Some(1));
         let (_, l) = laid_out("a ![b](c.png) d\n");
         let index = Index::new(&l);
-        assert_eq!(visible_chars(&l, &index, &(Shown(0)..Shown(1))), Some(1));
+        assert_eq!(visible_chars(&l, &index, &(Shown::new(0)..Shown::new(1))), Some(1));
         assert_eq!(
-            visible_chars(&l, &index, &(Shown(1)..Shown(4))),
+            visible_chars(&l, &index, &(Shown::new(1)..Shown::new(4))),
             None,
             "a picture counts differently"
         );
         let (_, l) = laid_out("a – b\n");
         let index = Index::new(&l);
         assert_eq!(
-            visible_chars(&l, &index, &(Shown(0)..Shown(5))),
+            visible_chars(&l, &index, &(Shown::new(0)..Shown::new(5))),
             None,
             "a dash the settings may have made"
         );
@@ -203,7 +195,7 @@ mod tests {
         let index = Index::new(&l);
         let whole: usize = l.blocks.iter().map(|b| b.len_u16).sum();
         assert_eq!(
-            visible_chars(&l, &index, &(Shown(0)..Shown(whole))),
+            visible_chars(&l, &index, &(Shown::new(0)..Shown::new(whole))),
             Some(4),
             "list markers do not count"
         );
@@ -217,13 +209,13 @@ mod tests {
             same_paragraphs,
         };
         let edit = |range: Range<usize>, replacement: &str| Edit {
-            range,
+            range: bytes(range),
             replacement: replacement.to_string(),
-            selection: 0..0,
+            selection: bytes(0..0),
         };
         let holds = |t: &str, e: Edit, x: &Expected| {
             let (doc, _) = laid_out(t);
-            shows_as_expected(t, &doc, &e, x)
+            shows_as_expected(&doc, &e, x)
         };
         assert!(holds("abc\n", edit(1..1, "x"), &expected("x", Some(0), true)));
         assert!(
@@ -254,16 +246,16 @@ mod tests {
         let (doc, _) = laid_out(t);
         let at = t.find('c').unwrap();
         assert_eq!(
-            stretch(t, &doc, &(at..at)),
-            Some(3..10),
+            stretch(&doc, &bytes(at..at)),
+            Some(bytes(3..10)),
             "the blocks on each side as well"
         );
         let (doc, _) = laid_out("a\n");
-        assert_eq!(stretch("a\n", &doc, &(1..1)), Some(0..1));
-        assert_eq!(stretch("a\n", &doc, &(0..0)), Some(0..1));
+        assert_eq!(stretch(&doc, &bytes(1..1)), Some(bytes(0..1)));
+        assert_eq!(stretch(&doc, &bytes(0..0)), Some(bytes(0..1)));
         let long = "a\n\n".to_string() + &"b ".repeat(MAX_CHECKED);
         let (doc, _) = laid_out(&long);
-        assert_eq!(stretch(&long, &doc, &(0..0)), None, "too much to read for an edit");
+        assert_eq!(stretch(&doc, &bytes(0..0)), None, "too much to read for an edit");
     }
 
     #[test]

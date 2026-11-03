@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
@@ -8,15 +8,42 @@ use block2::RcBlock;
 use dispatch2::{DispatchObject, DispatchRetained, DispatchSource};
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::Bool;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message};
-use objc2_app_kit::{NSCompositingOperation, NSImage};
-use objc2_foundation::{NSRect, NSSize};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
+use objc2_app_kit::{NSAutoresizingMaskOptions, NSCompositingOperation, NSImage, NSView};
+use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSUserDefaults};
 
 use super::safe_image::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
 use super::{EditorController, OPEN_EDITORS};
-use crate::util::{BusyVolumes, Lane, Stamp, answer_from, lane_of_volume, stamp, volume_of};
+use crate::i18n::t;
+use crate::util::{BusyVolumes, Lane, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
 
-#[derive(Clone, Copy)]
+/// Height of the bar above the preview that offers to load images from the web.
+const BANNER_HEIGHT: f64 = 48.0;
+/// User defaults key listing the documents whose images from the web load without asking.
+pub(super) const ALLOWED_KEY: &str = "RemoteImagesAllowed";
+const MAX_ALLOWED_DOCUMENTS: usize = 500;
+
+pub(super) fn allowed_documents() -> Vec<String> {
+    NSUserDefaults::standardUserDefaults()
+        .stringArrayForKey(&ns(ALLOWED_KEY))
+        .map(|a| a.iter().map(|s| s.to_string()).collect())
+        .unwrap_or_default()
+}
+
+/// The list of allowed documents once `path` is one of them: the last, once, and only the newest are kept.
+fn allowing(mut paths: Vec<String>, path: String) -> Vec<String> {
+    paths.retain(|p| *p != path);
+    paths.push(path);
+    let keep = paths.len().saturating_sub(MAX_ALLOWED_DOCUMENTS);
+    paths.split_off(keep)
+}
+
+/// A document without a file cannot have been allowed.
+fn is_allowed(paths: &[String], path: Option<&str>) -> bool {
+    path.is_some_and(|path| paths.iter().any(|p| p == path))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Sizing {
     /// Fixed size in points; `descent` is how far the image reaches below the baseline.
     Points { size: NSSize, descent: f64 },
@@ -69,6 +96,18 @@ pub struct ImageFile {
     file: PathBuf,
     seen: Stamp,
     side: u32,
+}
+
+impl ImageFile {
+    /// What a load that ended in a panic leaves: nothing to show, and no reason to wait for it any longer.
+    fn failed(file: PathBuf) -> ImageFile {
+        ImageFile {
+            loaded: None,
+            file,
+            seen: None,
+            side: allowed_side(),
+        }
+    }
 }
 
 /// Decoded pixels held by all open documents; attachments in the previews keep them alive as well.
@@ -320,23 +359,27 @@ fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorControlle
     let me = dispatch2::MainThreadBound::new(Weak::from(requester), requester.mtm());
     let doc_dir = doc_dir.map(Path::to_path_buf);
     let volume = volume_of(&path);
-    let job = move || {
-        let file = load(&path, doc_dir.as_deref(), allowed_side());
-        dispatch2::DispatchQueue::main().exec_async(move || {
-            let Some(mtm) = MainThreadMarker::new() else {
-                return;
-            };
-            if let Some(c) = me.get(mtm).load() {
-                c.image_loaded(path, file);
-            }
-        });
-    };
     // An image on a volume that may stop answering must not take up a place that other images wait for.
-    if volume == "/" {
-        load_in_background(job);
+    let lane = if volume == "/" {
+        &LOADERS
     } else {
-        lane_of_volume(&volume).run(job);
-    }
+        lane_of_volume(&volume)
+    };
+    let asked = path.clone();
+    lane.ask(
+        move || load(&asked, doc_dir.as_deref(), allowed_side()),
+        move |file| {
+            let file = file.unwrap_or_else(|| ImageFile::failed(path.clone()));
+            dispatch2::DispatchQueue::main().exec_async(move || {
+                let Some(mtm) = MainThreadMarker::new() else {
+                    return;
+                };
+                if let Some(c) = me.get(mtm).load() {
+                    c.pictures().image_loaded(path, file);
+                }
+            });
+        },
+    );
 }
 
 /// Every this many looks at the images, one that is missing is searched for again.
@@ -355,10 +398,8 @@ pub fn look_at_images(mtm: MainThreadMarker) {
     let editors: Vec<Retained<EditorController>> =
         OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
     let mut by_volume: BTreeMap<String, Vec<LookAtEditor>> = BTreeMap::new();
-    for e in editors.iter().filter(|e| e.preview_visible()) {
-        let Ok(mut store) = e.ivars().images.try_borrow_mut() else {
-            continue;
-        };
+    for e in editors.iter().filter(|e| e.panes().preview_visible()) {
+        let mut store = e.pictures().store().borrow_mut();
         let retry = if look % LOOKS_PER_TRY == LOOKS_PER_TRY - 1 {
             store.missing_in_turn()
         } else {
@@ -402,7 +443,7 @@ pub fn look_at_images(mtm: MainThreadMarker) {
                 };
                 for (editor, changed) in changed {
                     if let Some(editor) = editor.get(mtm).load() {
-                        editor.read_images_again(changed);
+                        editor.pictures().read_images_again(changed);
                     }
                 }
             });
@@ -417,15 +458,167 @@ struct LookAtEditor {
     retry: Option<PathBuf>,
 }
 
+#[derive(Default)]
+pub(super) struct PictureState {
+    images: RefCell<ImageStore>,
+    remote_allowed: Cell<bool>,
+    /// The bar above the preview offering to load images from the web.
+    remote_banner: OnceCell<Retained<NSView>>,
+}
+
+pub(super) struct Pictures<'a> {
+    host: &'a EditorController,
+    state: &'a PictureState,
+}
+
 impl EditorController {
-    fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
-        let doc_dir = self.doc_dir();
-        for (path, now) in changed {
-            if let Ok(mut store) = self.ivars().images.try_borrow_mut() {
-                store.note_seen(&path, now);
-            }
-            read_again(path, doc_dir.as_deref(), self);
+    pub(super) fn pictures(&self) -> Pictures<'_> {
+        Pictures {
+            host: self,
+            state: &self.ivars().pictures,
         }
+    }
+}
+
+#[cfg(feature = "selftest")]
+impl Pictures<'_> {
+    pub(super) fn banner_shown(&self) -> Option<bool> {
+        self.state.remote_banner.get().map(|b| !b.isHidden())
+    }
+}
+
+impl<'a> Pictures<'a> {
+    pub(super) fn store(&self) -> &'a RefCell<ImageStore> {
+        &self.state.images
+    }
+
+    pub(super) fn remote_allowed(&self) -> bool {
+        self.state.remote_allowed.get()
+    }
+
+    /// The bar is in the view hierarchy now; a document allowed earlier keeps its permission from here on.
+    pub(super) fn install_banner(&self, banner: Retained<NSView>) {
+        let _ = self.state.remote_banner.set(banner);
+        let allowed = is_allowed(&allowed_documents(), self.document_path().as_deref());
+        self.state.remote_allowed.set(allowed);
+    }
+
+    fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
+        let doc_dir = self.host.doc_dir();
+        for (path, now) in changed {
+            self.state.images.borrow_mut().note_seen(&path, now);
+            read_again(path, doc_dir.as_deref(), self.host);
+        }
+    }
+
+    pub(super) fn image_loaded(&self, path: PathBuf, file: ImageFile) {
+        let key = path.to_string_lossy().into_owned();
+        self.state.images.borrow_mut().finish(path, file);
+        self.host.updater().image_arrived(key);
+    }
+
+    pub(super) fn build_banner(&self, size: NSSize) -> Retained<NSView> {
+        let mtm = self.host.mtm();
+        let frame = NSRect::new(
+            NSPoint::new(0.0, size.height - BANNER_HEIGHT),
+            NSSize::new(size.width, BANNER_HEIGHT),
+        );
+        let banner = objc2_app_kit::NSBox::initWithFrame(objc2_app_kit::NSBox::alloc(mtm), frame);
+        banner.setBoxType(objc2_app_kit::NSBoxType::Custom);
+        banner.setTitlePosition(objc2_app_kit::NSTitlePosition::NoTitle);
+        banner.setBorderWidth(0.0);
+        banner.setContentViewMargins(NSSize::new(0.0, 0.0));
+        banner.setFillColor(&objc2_app_kit::NSColor::controlBackgroundColor());
+        banner.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewMinYMargin,
+        );
+        banner.setHidden(true);
+        let content = banner.contentView().expect("box content view");
+        // SAFETY: the target is this controller, which owns the window the button sits in.
+        let button = unsafe {
+            objc2_app_kit::NSButton::buttonWithTitle_target_action(
+                &ns(t("Bilder laden")),
+                Some(self.host),
+                Some(sel!(mdLoadRemoteImages:)),
+                mtm,
+            )
+        };
+        button.setControlSize(objc2_app_kit::NSControlSize::Small);
+        button.setFont(Some(&objc2_app_kit::NSFont::systemFontOfSize(
+            objc2_app_kit::NSFont::smallSystemFontSize(),
+        )));
+        button.sizeToFit();
+        let b = button.frame().size;
+        button.setFrameOrigin(NSPoint::new(
+            size.width - b.width - 12.0,
+            (BANNER_HEIGHT - b.height) / 2.0,
+        ));
+        button.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
+        content.addSubview(&button);
+        let label = objc2_app_kit::NSTextField::wrappingLabelWithString(
+            &ns(t(
+                "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest.",
+            )),
+            mtm,
+        );
+        label.setFont(Some(&objc2_app_kit::NSFont::systemFontOfSize(
+            objc2_app_kit::NSFont::smallSystemFontSize(),
+        )));
+        label.setTextColor(Some(&objc2_app_kit::NSColor::secondaryLabelColor()));
+        label.setMaximumNumberOfLines(2);
+        label.setFrame(NSRect::new(
+            NSPoint::new(12.0, 4.0),
+            NSSize::new((size.width - b.width - 36.0).max(40.0), BANNER_HEIGHT - 8.0),
+        ));
+        label.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        content.addSubview(&label);
+        let line = objc2_app_kit::NSBox::initWithFrame(
+            objc2_app_kit::NSBox::alloc(mtm),
+            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(size.width, 1.0)),
+        );
+        line.setBoxType(objc2_app_kit::NSBoxType::Separator);
+        line.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
+        content.addSubview(&line);
+        Retained::into_super(banner)
+    }
+
+    /// Shows or hides the bar for images from the web and gives the preview the room that is left.
+    pub(super) fn show_remote_banner(&self, show: bool) {
+        let Some(banner) = self.state.remote_banner.get() else {
+            return;
+        };
+        if banner.isHidden() != show {
+            return;
+        }
+        banner.setHidden(!show);
+        // SAFETY: the banner sits in the preview pane for the window's lifetime, so its superview is alive.
+        let container = unsafe { banner.superview() };
+        let (Some(container), Some(scroll)) = (container, self.host.panes().preview().enclosing_scroll_view()) else {
+            return;
+        };
+        let bounds = container.bounds();
+        let height = bounds.size.height - if show { BANNER_HEIGHT } else { 0.0 };
+        scroll.setFrame(NSRect::new(
+            bounds.origin,
+            NSSize::new(bounds.size.width, height.max(0.0)),
+        ));
+    }
+
+    /// The user allowed images from the web for this document; it is remembered for the file.
+    pub(super) fn allow_remote_images(&self) {
+        self.state.remote_allowed.set(true);
+        self.show_remote_banner(false);
+        if let Some(path) = self.document_path() {
+            let paths = allowing(allowed_documents(), path);
+            let list = NSArray::from_retained_slice(&paths.iter().map(|p| ns(p)).collect::<Vec<_>>());
+            // SAFETY: an array of strings is a property list value, as user defaults require.
+            unsafe { NSUserDefaults::standardUserDefaults().setObject_forKey(Some(&list), &ns(ALLOWED_KEY)) };
+        }
+        self.host.invalidate(super::Invalidate::RemoteAllowed);
+    }
+
+    fn document_path(&self) -> Option<String> {
+        Some(self.host.document()?.fileURL()?.path()?.to_string())
     }
 }
 
@@ -507,6 +700,33 @@ pub(super) fn native_only(path: &Path, bytes: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn web_images_load_only_for_a_document_that_was_allowed() {
+        let allowed = vec!["/a.md".to_string()];
+        assert!(is_allowed(&allowed, Some("/a.md")));
+        assert!(!is_allowed(&allowed, Some("/b.md")));
+        assert!(
+            !is_allowed(&allowed, None),
+            "a document without a file has no permission to remember"
+        );
+        assert!(
+            !PictureState::default().remote_allowed.get(),
+            "and nothing is allowed before asking"
+        );
+    }
+
+    #[test]
+    fn the_list_of_allowed_documents_keeps_each_once_and_only_the_newest() {
+        let list = allowing(vec!["/a.md".into(), "/b.md".into()], "/a.md".into());
+        assert_eq!(list, ["/b.md", "/a.md"]);
+
+        let full: Vec<String> = (0..MAX_ALLOWED_DOCUMENTS).map(|n| format!("/{n}.md")).collect();
+        let list = allowing(full, "/neu.md".into());
+        assert_eq!(list.len(), MAX_ALLOWED_DOCUMENTS);
+        assert_eq!(list[0], "/1.md");
+        assert_eq!(list[MAX_ALLOWED_DOCUMENTS - 1], "/neu.md");
+    }
 
     #[test]
     fn a_picture_url_may_carry_what_github_adds_to_it() {

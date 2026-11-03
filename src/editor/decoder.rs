@@ -10,8 +10,10 @@ use std::time::Duration;
 
 use objc2::AnyThread;
 use objc2::rc::{Retained, autoreleasepool};
-use objc2_app_kit::{NSBitmapFormat, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage};
-use objc2_foundation::{NSData, NSPoint, NSRect, NSSize};
+use objc2_app_kit::{
+    NSBitmapFormat, NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage,
+};
+use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSSize};
 use svg2pdf::usvg::fontdb;
 
 use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES, MAX_SIDE, SHOWN_SIDE};
@@ -32,10 +34,15 @@ const IMAGE: u8 = 1;
 const FORMULA_SVG: u8 = 2;
 const SELF_CHECK: u8 = 3;
 const NATIVE_IMAGE: u8 = 4;
+const PASTED_TIFF: u8 = 5;
 
 const NOTHING: u8 = 0;
 const PDF: u8 = 1;
 const RGBA: u8 = 2;
+const PNG: u8 = 3;
+
+/// A screenshot of a large display can come as an uncompressed TIFF far beyond any image file a document holds.
+const MAX_PASTED_BYTES: usize = 1 << 30;
 
 /// Everything the helper may do once it runs untrusted data: compute, and use the pipes it was started with.
 const PROFILE: &str = "(version 1)\n(deny default)\n";
@@ -92,11 +99,13 @@ pub fn serve_native() -> ! {
     for sample in WARM_UP {
         native_pixels(sample, 64);
     }
+    png_of_tiff(WARM_UP[0]);
     lock(NATIVE_PROFILE);
     answer_requests(holds_nothing, |kind, payload| match kind {
         NATIVE_IMAGE => payload
             .split_first_chunk::<4>()
             .and_then(|(side, image)| native_pixels(image, u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))),
+        PASTED_TIFF => png_of_tiff(payload).map(Decoded::Png),
         _ => None,
     })
 }
@@ -149,6 +158,16 @@ fn raster_size(pixels: (isize, isize), points: (f64, f64), side: u32) -> Option<
     )]
     let fit = |v: f64| ((v * scale).round() as u32).clamp(1, side);
     Some((fit(w), fit(h)))
+}
+
+/// A TIFF as a PNG at its full size and with its color profile, which pixels drawn for the preview would lose.
+fn png_of_tiff(bytes: &[u8]) -> Option<Vec<u8>> {
+    autoreleasepool(|_| {
+        let rep = NSBitmapImageRep::imageRepWithData(&NSData::with_bytes(bytes))?;
+        // SAFETY: An empty property dictionary, which every file type accepts.
+        let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
+        Some(png.to_vec())
+    })
 }
 
 /// What the system's decoders make of `bytes`, drawn into pixels with straight alpha.
@@ -335,7 +354,12 @@ fn read_request(input: &mut impl Read) -> std::io::Result<(u8, Vec<u8>)> {
     let mut head = [0u8; 9];
     input.read_exact(&mut head)?;
     let len = usize::try_from(u64::from_le_bytes(head[1..].try_into().expect("8 bytes"))).unwrap_or(usize::MAX);
-    if len > MAX_FILE_BYTES + 4 {
+    let most = if head[0] == PASTED_TIFF {
+        MAX_PASTED_BYTES
+    } else {
+        MAX_FILE_BYTES + 4
+    };
+    if len > most {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     let mut payload = vec![0; len];
@@ -350,6 +374,11 @@ fn write_answer(output: &mut impl Write, answer: Option<Decoded>) -> std::io::Re
             output.write_all(&[PDF])?;
             output.write_all(&(pdf.len() as u64).to_le_bytes())?;
             output.write_all(&pdf)
+        }
+        Some(Decoded::Png(png)) => {
+            output.write_all(&[PNG])?;
+            output.write_all(&(png.len() as u64).to_le_bytes())?;
+            output.write_all(&png)
         }
         Some(Decoded::Rgba {
             width,
@@ -424,6 +453,17 @@ fn read_answer(input: &mut impl Read, side: Option<u32>) -> std::io::Result<Opti
             input.read_exact(&mut pdf)?;
             Ok(pdf.starts_with(b"%PDF").then_some(Decoded::Pdf(pdf)))
         }
+        PNG => {
+            let mut len = [0u8; 8];
+            input.read_exact(&mut len)?;
+            let len = usize::try_from(u64::from_le_bytes(len)).map_err(|_| invalid())?;
+            if len > MAX_PASTED_BYTES {
+                return Err(invalid());
+            }
+            let mut png = vec![0; len];
+            input.read_exact(&mut png)?;
+            Ok(png.starts_with(b"\x89PNG").then_some(Decoded::Png(png)))
+        }
         RGBA => {
             let width = u32_from(input)?;
             let height = u32_from(input)?;
@@ -484,10 +524,10 @@ pub fn release_idle() {
 }
 
 fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
-    if payload.len() > MAX_FILE_BYTES {
+    if payload.len() > MAX_FILE_BYTES && kind != PASTED_TIFF || payload.len() > MAX_PASTED_BYTES {
         return None;
     }
-    let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if kind == NATIVE_IMAGE {
+    let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if matches!(kind, NATIVE_IMAGE | PASTED_TIFF) {
         (&NATIVE_HELPERS, NATIVE_ARG)
     } else {
         (&HELPERS, ARG)
@@ -530,6 +570,7 @@ fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
 pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
     match request(IMAGE, Some(side), bytes)? {
         Decoded::Pdf(pdf) => decode_native(&pdf, side),
+        Decoded::Png(_) => None,
         pixels => Some(pixels),
     }
 }
@@ -537,6 +578,14 @@ pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
 /// What only the system's decoders read, as pixels no wider or higher than `side`.
 pub fn decode_native(bytes: &[u8], side: u32) -> Option<Decoded> {
     request(NATIVE_IMAGE, Some(side), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
+}
+
+/// A TIFF from the pasteboard as a PNG file.
+pub fn png_of_pasted_tiff(tiff: &[u8]) -> Option<Vec<u8>> {
+    match request(PASTED_TIFF, None, tiff)? {
+        Decoded::Png(png) => Some(png),
+        _ => None,
+    }
 }
 
 /// A diagram as WebKit drew it.
@@ -548,7 +597,7 @@ pub fn pdf_to_pixels(pdf: &[u8]) -> Option<Decoded> {
 pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
     match request(FORMULA_SVG, None, svg.as_bytes())? {
         Decoded::Pdf(pdf) => Some(pdf),
-        Decoded::Rgba { .. } => None,
+        Decoded::Png(_) | Decoded::Rgba { .. } => None,
     }
 }
 
@@ -573,7 +622,7 @@ pub fn self_check(arg: &str, path: &str) -> Option<bool> {
 /// An image from decoded pixels. A PDF stays out: it has to pass the other helper first.
 pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
     match decoded {
-        Decoded::Pdf(_) => None,
+        Decoded::Pdf(_) | Decoded::Png(_) => None,
         Decoded::Rgba {
             width,
             height,
@@ -716,6 +765,43 @@ mod tests {
     #[test]
     fn without_a_limit_of_its_own_an_answer_stays_within_the_export_size() {
         assert!(read(&rgba(EXPORT_SIDE + 1, 1, (1, 1), 0), None).is_err());
+    }
+
+    /// Every Rust file under `dir`.
+    fn sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                found.extend(sources(&path));
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                found.push(path);
+            }
+        }
+        found
+    }
+
+    #[test]
+    fn only_the_helper_hands_bytes_to_the_systems_decoders() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let calls = [
+            "imageRepWithData",
+            "imageRepsWithData",
+            "initWithData(",
+            "CGImageSource",
+        ];
+        let here = std::path::Path::new(file!()).file_name().unwrap();
+        for file in sources(&src)
+            .iter()
+            .filter(|f| !f.to_string_lossy().contains("selftest"))
+        {
+            let text = std::fs::read_to_string(file).unwrap();
+            let product = text.split("#[cfg(test)]").next().unwrap_or("");
+            for call in &calls {
+                let allowed = file.file_name() == Some(here) && matches!(*call, "initWithData(" | "imageRepWithData");
+                assert!(allowed || !product.contains(call), "{} calls {call}", file.display());
+            }
+        }
     }
 
     #[test]

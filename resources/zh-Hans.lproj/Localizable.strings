@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "请先保存文稿";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "粘贴的图像会以文件形式存放在文稿旁边。请先保存文稿，然后再次粘贴图像。";
 "Export fehlgeschlagen" = "导出失败";
+"Das Dokument ließ sich nicht umwandeln." = "无法转换文稿。";
+"Das Dokument ist zu groß für eine Word-Datei." = "文稿太大，无法存为 Word 文件。";
 "Gliederung ausblenden" = "隐藏大纲";
 "Gliederung einblenden" = "显示大纲";
 "Metadaten" = "元数据";

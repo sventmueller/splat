@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "บันทึกเอกสารก่อน";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "ภาพที่วางจะถูกจัดเก็บเป็นไฟล์ไว้ข้างเอกสาร ให้บันทึกเอกสารก่อน แล้ววางภาพอีกครั้ง";
 "Export fehlgeschlagen" = "ส่งออกไม่สำเร็จ";
+"Das Dokument ließ sich nicht umwandeln." = "ไม่สามารถแปลงเอกสารได้";
+"Das Dokument ist zu groß für eine Word-Datei." = "เอกสารมีขนาดใหญ่เกินไปสำหรับไฟล์ Word";
 "Gliederung ausblenden" = "ซ่อนโครงร่าง";
 "Gliederung einblenden" = "แสดงโครงร่าง";
 "Metadaten" = "ข้อมูลเมตา";

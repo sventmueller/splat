@@ -1,26 +1,30 @@
 //! Exporting the document as HTML page or Word document, with its images embedded.
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use objc2::rc::{Retained, Weak};
 use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message};
 use objc2_app_kit::{
-    NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSSavePanel,
+    NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSBitmapImageFileType, NSBitmapImageRep,
+    NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSPrintInfo, NSPrintOperation, NSPrintingPaginationMode,
+    NSSavePanel, NSSharingService,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSMutableAttributedString, NSPoint, NSRect, NSSize};
+use objc2_foundation::{NSArray, NSDictionary, NSError, NSMutableAttributedString, NSPoint, NSRect, NSSize, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 
 use super::images::{Sizing, native_only, resolve_path};
 use super::render::RenderCtx;
 use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
-use super::{EditorController, decoder, js, links, remote};
+use super::{EditorController, decoder, js, links, remote, views};
 use crate::i18n::t;
-use crate::markdown::doc::{Figure, parse};
-use crate::markdown::docx::{Picture, WordExport, to_docx};
+use crate::markdown::doc::Figure;
+use crate::markdown::docx::{Picture, TooLarge, WordExport, to_docx};
 use crate::markdown::html::{Export, data_url, escape, to_html, web_image_type};
+use crate::markdown::reader::parse;
 use crate::preview::layout::layout;
-use crate::util::{contained, ns, on_main};
+use crate::util::{constant, contained, ns, on_main, storage};
 
 /// Paper shows the preview the way browsers print a page: a screen point, and so an image pixel, becomes 0.75 pt.
 const PRINT_SCALE: f64 = 0.75;
@@ -40,28 +44,81 @@ impl ExportKind {
     }
 }
 
+#[derive(Default)]
+pub(super) struct ShareState {
+    path: RefCell<Option<PathBuf>>,
+}
+
+impl Drop for ShareState {
+    fn drop(&mut self) {
+        if let Some(file) = self.path.get_mut() {
+            super::shadow::discard_share_file_later(file);
+        }
+    }
+}
+
+/// The share file to use again: the folder is only worth keeping while the document keeps its name.
+fn reusable(previous: Option<PathBuf>, name: &str) -> Option<PathBuf> {
+    previous.filter(|p| p.file_name().is_some_and(|n| *n == *name))
+}
+
+pub(super) struct Sharing<'a> {
+    host: &'a EditorController,
+    state: &'a ShareState,
+}
+
 impl EditorController {
+    pub(super) fn sharing(&self) -> Sharing<'_> {
+        Sharing {
+            host: self,
+            state: &self.ivars().sharing,
+        }
+    }
+}
+
+impl Sharing<'_> {
+    /// The picker opens: the file gets the current text, and the exports stand behind what the system proposes.
+    pub(super) fn services_with(&self, proposed: &NSArray<NSSharingService>) -> Retained<NSArray<NSSharingService>> {
+        self.share_file(true);
+        let mut services = proposed.to_vec();
+        services.extend(self.export_sharing_services());
+        NSArray::from_retained_slice(&services)
+    }
+
+    pub(super) fn service_chosen(&self, service: Option<&NSSharingService>) {
+        if service.is_some() {
+            self.share_file(true);
+        }
+    }
+
+    pub(super) fn items(&self) -> Retained<NSArray> {
+        match self.share_file(false) {
+            Some(url) => NSArray::from_retained_slice(&[crate::util::obj(url)]),
+            None => NSArray::new(),
+        }
+    }
+
     /// The document as printed: light appearance, smaller type, images no wider than `width`.
     pub(super) fn printable(&self, width: f64) -> Retained<NSMutableAttributedString> {
-        let snap = self.snapshot();
-        // Printing runs on the main thread, and what the disk thread knows does not wait for a volume.
-        let env = super::env::Env::known(self.doc_dir(), &snap.text);
-        let Some(print_layout) = contained(|| {
-            let doc = parse(&snap.text);
-            layout(&snap.text, &doc, &Images { dark: false, env }, None)
-        }) else {
-            return NSMutableAttributedString::from_nsstring(&ns(&snap.text));
+        let doc_dir = self.host.doc_dir();
+        let dir = doc_dir.clone();
+        let print_layout = self.host.on_source_text(|text| {
+            // Printing runs on the main thread, and what the disk thread knows does not wait for a volume.
+            let env = super::env::Env::known(dir, text);
+            contained(|| layout(&parse(text), &Images { dark: false, env }, None))
+        });
+        let Some(print_layout) = print_layout else {
+            return NSMutableAttributedString::from_nsstring(&ns(&self.host.source_text()));
         };
-        let doc_dir = self.doc_dir();
         let ctx = RenderCtx {
-            mtm: self.mtm(),
+            mtm: self.host.mtm(),
             zoom: PRINT_SCALE,
             doc_dir: doc_dir.as_deref(),
-            images: &self.ivars().images,
+            images: self.host.pictures().store(),
             max_image_width: width - 20.0,
             dark: false,
             controller: None,
-            remote_images: self.ivars().remote_allowed.get(),
+            remote_images: self.host.pictures().remote_allowed(),
         };
         let out = NSMutableAttributedString::new();
         for block in &print_layout.blocks {
@@ -71,17 +128,17 @@ impl EditorController {
     }
 
     pub(super) fn export(&self, format: ExportKind) {
-        let (Some(window), Some(doc)) = (self.window(), self.document()) else {
+        let (Some(window), Some(doc)) = (self.host.window(), self.host.document()) else {
             return;
         };
-        let panel = NSSavePanel::savePanel(self.mtm());
+        let panel = NSSavePanel::savePanel(self.host.mtm());
         if let Some(kind) = UTType::typeWithFilenameExtension(&ns(format.extension())) {
             panel.setAllowedContentTypes(&NSArray::from_retained_slice(&[kind]));
         }
         let stem = doc.displayName().to_string();
         let stem = stem.rsplit_once('.').map_or(stem.as_str(), |(s, _)| s).to_string();
         panel.setNameFieldStringValue(&ns(&format!("{stem}.{}", format.extension())));
-        let this = self.retain();
+        let this = self.host.retain();
         let chosen = panel.clone();
         let handler = block2::RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
             if response != objc2_app_kit::NSModalResponseOK {
@@ -92,7 +149,7 @@ impl EditorController {
             };
             let path = std::path::PathBuf::from(path.to_string());
             chosen.orderOut(None);
-            let (source, title) = (this.export_source(), stem.clone());
+            let (source, title) = (this.sharing().export_source(), stem.clone());
             let me = dispatch2::MainThreadBound::new(Weak::from(&*this), this.mtm());
             // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
             std::thread::spawn(move || {
@@ -102,7 +159,7 @@ impl EditorController {
                 dispatch2::DispatchQueue::main().exec_async(move || {
                     let Some(mtm) = MainThreadMarker::new() else { return };
                     if let Some(c) = me.get(mtm).load() {
-                        c.report_export_failure(&reason);
+                        c.sharing().report_export_failure(&reason);
                     }
                 });
             });
@@ -112,18 +169,108 @@ impl EditorController {
 
     pub(super) fn export_source(&self) -> ExportSource {
         ExportSource {
-            text: self.source_text(),
-            doc_dir: self.doc_dir(),
-            remote: self.ivars().remote_allowed.get(),
+            text: self.host.source_text(),
+            doc_dir: self.host.doc_dir(),
+            remote: self.host.pictures().remote_allowed(),
         }
     }
 
     pub(super) fn report_export_failure(&self, reason: &str) {
-        let Some(window) = self.window() else { return };
-        let alert = objc2_app_kit::NSAlert::new(self.mtm());
+        let Some(window) = self.host.window() else { return };
+        let alert = objc2_app_kit::NSAlert::new(self.host.mtm());
         alert.setMessageText(&ns(t("Export fehlgeschlagen")));
         alert.setInformativeText(&ns(reason));
         alert.beginSheetModalForWindow_completionHandler(&window, None);
+    }
+
+    /// The exports as entries of the share menu: PDF through the document's own export, HTML and Word like their
+    /// menu commands.
+    pub(super) fn export_sharing_services(&self) -> Vec<Retained<NSSharingService>> {
+        let Some(image) = objc2_app_kit::NSImage::imageWithSystemSymbolName_accessibilityDescription(
+            &ns("arrow.down.document"),
+            None,
+        ) else {
+            return Vec::new();
+        };
+        let service = |title: &str, handler: block2::RcBlock<dyn Fn()>| {
+            NSSharingService::initWithTitle_image_alternateImage_handler(
+                <NSSharingService as objc2::AnyThread>::alloc(),
+                &ns(title),
+                &image,
+                None,
+                &handler,
+            )
+        };
+        let document = self.host.ivars().document.clone();
+        let mut services = vec![service(
+            t("Als PDF exportieren …"),
+            block2::RcBlock::new(move || {
+                if let Some(doc) = document.load() {
+                    // SAFETY: The export action accepts a missing sender.
+                    unsafe { doc.saveDocumentToPDF(None) };
+                }
+            }),
+        )];
+        for action in [super::Action::ExportHtml, super::Action::ExportWord] {
+            let me = Weak::from(self.host);
+            services.push(service(
+                t(action.spec().title),
+                block2::RcBlock::new(move || {
+                    if let Some(c) = me.load() {
+                        c.editing().perform(action, None);
+                    }
+                }),
+            ));
+        }
+        services
+    }
+
+    /// Temporary Markdown file the share menu hands out, so unsaved changes go along; `write_text` puts the current
+    /// text into it. Until then the file stays empty, since AppKit offers no service for a file that does not exist.
+    pub(super) fn share_file(&self, write_text: bool) -> Option<Retained<NSURL>> {
+        if !self.host.panes().is_built() {
+            return None;
+        }
+        let doc = self.host.document()?;
+        let name = crate::util::file_name_of(&match doc.fileURL().and_then(|u| u.lastPathComponent()) {
+            Some(name) => name.to_string(),
+            None => format!("{}.md", doc.displayName()),
+        });
+        let previous = self.state.path.borrow().clone();
+        let path = match reusable(previous, &name) {
+            Some(path) => path,
+            None => super::shadow::new_share_folder()?.join(name),
+        };
+        if write_text {
+            self.host.on_source_text(|text| std::fs::write(&path, text)).ok()?;
+        } else if !path.exists() {
+            std::fs::File::create(&path).ok()?;
+        }
+        let url = NSURL::fileURLWithPath(&ns(path.to_str()?));
+        *self.state.path.borrow_mut() = Some::<PathBuf>(path);
+        Some(url)
+    }
+
+    pub(super) fn print_operation(&self, info: &NSPrintInfo) -> Retained<NSPrintOperation> {
+        let mtm = self.host.mtm();
+        let margin = 56.0;
+        info.setLeftMargin(margin);
+        info.setRightMargin(margin);
+        info.setTopMargin(margin);
+        info.setBottomMargin(margin);
+        info.setHorizontalPagination(NSPrintingPaginationMode::Clip);
+        info.setVerticalPagination(NSPrintingPaginationMode::Automatic);
+        info.setVerticallyCentered(false);
+        info.setHorizontallyCentered(false);
+        let width = info.paperSize().width - 2.0 * margin;
+        let view = views::print_view(mtm, width);
+        if let Some(aqua) = NSAppearance::appearanceNamed(constant!(NSAppearanceNameAqua)) {
+            view.setAppearance(Some(&aqua));
+        }
+        let out = self.printable(width);
+        storage(&view).setAttributedString(&out);
+        views::fit_height(&view);
+        NSPrintOperation::printOperationWithView_printInfo(&view, info)
     }
 }
 
@@ -137,12 +284,14 @@ pub(super) struct ExportSource {
 impl ExportSource {
     /// Writes the document in `format` to `path`; the reason when that failed.
     pub(super) fn write(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), String> {
-        let failed = || "The document could not be converted.".to_string();
+        let failed = || t("Das Dokument ließ sich nicht umwandeln.").to_string();
         let data = match format {
             ExportKind::Html => contained(|| self.html(title, path)).ok_or_else(failed)?.into_bytes(),
-            ExportKind::Word => contained(|| self.word()).ok_or_else(failed)?,
+            ExportKind::Word => contained(|| self.word())
+                .ok_or_else(failed)?
+                .map_err(|TooLarge| t("Das Dokument ist zu groß für eine Word-Datei.").to_string())?,
         };
-        std::fs::write(path, data).map_err(|e| e.to_string())
+        std::fs::write(path, data).map_err(|e| described(&e))
     }
 
     pub(super) fn html(&self, title: &str, target: &Path) -> String {
@@ -168,7 +317,7 @@ impl ExportSource {
         )
     }
 
-    pub(super) fn word(&self) -> Vec<u8> {
+    pub(super) fn word(&self) -> Result<Vec<u8>, TooLarge> {
         let doc_dir = self.doc_dir.as_deref();
         let figure = |f: &Figure| {
             on_main(|| {
@@ -204,7 +353,6 @@ impl ExportSource {
         to_docx(
             &parse(&self.text),
             &WordExport {
-                source: &self.text,
                 figure: &figure,
                 image: &image,
                 quotes: env.quotes,
@@ -216,6 +364,16 @@ impl ExportSource {
 }
 
 /// A rendered formula or diagram as embedded PNG, at twice its size for sharp display.
+/// The system's wording of a failure, in the language of the app.
+fn described(e: &std::io::Error) -> String {
+    let Some(code) = e.raw_os_error().and_then(|code| isize::try_from(code).ok()) else {
+        return e.to_string();
+    };
+    // SAFETY: The domain is a constant of Foundation, and an error needs no user info.
+    let error = unsafe { NSError::errorWithDomain_code_userInfo(objc2_foundation::NSPOSIXErrorDomain, code, None) };
+    error.localizedDescription().to_string()
+}
+
 fn figure_image(figure: &Figure) -> Option<String> {
     let rendered = js::cached(&render_key(figure, false))?;
     // One ex is about half the 16 px body text of the page.
@@ -379,6 +537,25 @@ fn png_of_image(image: &NSImage, size: NSSize, scale: f64) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_share_file_is_used_again_only_under_the_documents_name() {
+        let previous = || Some(PathBuf::from("/tmp/share-1/Bericht.md"));
+        assert_eq!(reusable(previous(), "Bericht.md"), previous());
+        assert_eq!(
+            reusable(previous(), "Neu.md"),
+            None,
+            "a renamed document gets a new file"
+        );
+        assert_eq!(reusable(None, "Bericht.md"), None);
+    }
+
+    #[test]
+    fn a_failed_write_reads_like_the_system_says_it() {
+        let said = described(&std::io::Error::from_raw_os_error(13));
+        assert!(!said.is_empty() && !said.contains("os error"), "{said}");
+        assert_eq!(described(&std::io::Error::other("kaputt")), "kaputt");
+    }
 
     #[test]
     fn links_point_to_the_same_files_from_the_export_folder() {

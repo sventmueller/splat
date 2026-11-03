@@ -19,6 +19,15 @@ const MARKDOWN: &str = "net.daringfireball.markdown";
 /// The German reference, for when the bundle has none in the interface language.
 const QUICK_REFERENCE: &str = include_str!("../resources/de.lproj/QuickReference.md");
 
+/// The interface texts in the language macOS picks from the user's preferred languages, as a `.strings` file; empty
+/// outside a bundle.
+pub fn localized_strings() -> String {
+    NSBundle::mainBundle()
+        .pathForResource_ofType(Some(&ns("Localizable")), Some(&ns("strings")))
+        .and_then(|p| std::fs::read_to_string(p.to_string()).ok())
+        .unwrap_or_default()
+}
+
 /// The quick reference in the interface language, chosen by the bundle like any localized resource.
 fn quick_reference_text() -> String {
     let bundle = objc2_foundation::NSBundle::mainBundle();
@@ -44,6 +53,7 @@ define_class!(
             crate::document::watch_files(self.mtm());
             crate::editor::watch_memory(self.mtm());
             crate::editor::keep_copies(self.mtm());
+            crate::util::DISK.run(|| crate::editor::discard_share_files(false));
             // The alert would stop a self-test run; the self-test shows it itself.
             #[cfg(not(feature = "selftest"))]
             crate::editor::offer_recovered(self.mtm());
@@ -59,6 +69,7 @@ define_class!(
         #[unsafe(method(applicationWillTerminate:))]
         fn will_terminate(&self, _notification: &NSNotification) {
             crate::editor::discard_copies();
+            crate::editor::discard_share_files(true);
         }
 
         #[unsafe(method(applicationShouldTerminateAfterLastWindowClosed:))]

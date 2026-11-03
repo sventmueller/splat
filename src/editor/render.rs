@@ -21,8 +21,8 @@ use crate::markdown::code;
 use crate::markdown::doc::AlertKind;
 use crate::markdown::doc::Align;
 use crate::markdown::style::Baseline;
-use crate::markdown::text::Utf16Map;
-use crate::preview::layout::{Atom, Link, Marker, Para, ParaKind, ParaStyle, Run, RunMap, TopBlock};
+use crate::markdown::text::{Utf16Map, bytes};
+use crate::preview::layout::{Atom, Link, Marker, Para, ParaKind, ParaStyle, Run, RunMap, RunStyle, TopBlock};
 use crate::util::byte_range_to_ns;
 use crate::util::constant;
 use crate::util::ns;
@@ -46,6 +46,281 @@ struct TextBlocks {
 }
 
 const LIST_INDENT: f64 = 26.0;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum FontFace {
+    Regular,
+    Bold,
+    Mono,
+}
+
+/// A font as values, before AppKit makes it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FontPlan {
+    face: FontFace,
+    size: f64,
+}
+
+impl FontPlan {
+    fn font(self) -> Retained<NSFont> {
+        match self.face {
+            FontFace::Regular => NSFont::systemFontOfSize(self.size),
+            FontFace::Bold => NSFont::boldSystemFontOfSize(self.size),
+            FontFace::Mono => NSFont::monospacedSystemFontOfSize_weight(self.size, constant!(NSFontWeightRegular)),
+        }
+    }
+}
+
+/// The font a paragraph of `kind` starts from, at text size `s`.
+fn paragraph_font(kind: &ParaKind, s: f64) -> FontPlan {
+    let (face, factor) = match kind {
+        ParaKind::Heading(level) => (
+            FontFace::Bold,
+            [1.75, 1.45, 1.2, 1.05, 1.0, 0.9][(*level as usize).clamp(1, 6) - 1],
+        ),
+        ParaKind::Code { .. } => (FontFace::Mono, 0.87),
+        ParaKind::FootnoteDef | ParaKind::FrontMatter => (FontFace::Regular, 0.87),
+        ParaKind::AlertTitle => (FontFace::Bold, 1.0),
+        _ => (FontFace::Regular, 1.0),
+    };
+    FontPlan { face, size: s * factor }
+}
+
+/// The font of a run: what it starts from, the size a raised or lowered run shrinks to, and the traits added last.
+#[derive(Debug, PartialEq)]
+struct RunFont {
+    plan: FontPlan,
+    script_size: Option<f64>,
+    bold: bool,
+    italic: bool,
+}
+
+fn run_font(kind: &ParaKind, s: f64, style: &RunStyle) -> RunFont {
+    let base = paragraph_font(kind, s);
+    let plan = if style.text.code || style.html {
+        FontPlan {
+            face: FontFace::Mono,
+            size: base.size * 0.9,
+        }
+    } else {
+        base
+    };
+    RunFont {
+        plan,
+        script_size: (style.text.baseline != Baseline::Normal).then_some(plan.size * 0.72),
+        bold: style.text.bold,
+        italic: style.text.italic,
+    }
+}
+
+/// How far a raised or lowered run stands from the line, for a font of `point_size`.
+fn baseline_offset(point_size: f64, baseline: Baseline) -> Option<f64> {
+    match baseline {
+        Baseline::Normal => None,
+        Baseline::Super => Some(point_size * 0.55),
+        Baseline::Sub => Some(point_size * -0.25),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TextColor {
+    Spoiler,
+    Tag,
+    Reference,
+    Citation,
+    Secondary,
+    Alert(AlertKind),
+    Label,
+}
+
+impl TextColor {
+    fn of(run: &Run, para: &Para) -> TextColor {
+        if run.style.text.spoiler {
+            return TextColor::Spoiler;
+        }
+        if matches!(run.style.link, Some(Link::Tag(_))) {
+            return TextColor::Tag;
+        }
+        if matches!(run.style.link, Some(Link::Reference(_))) {
+            return TextColor::Reference;
+        }
+        if run.style.citation {
+            return TextColor::Citation;
+        }
+        if matches!(run.map, RunMap::Atom { atom: Atom::Marker, .. }) {
+            return TextColor::Secondary;
+        }
+        if run.style.html || matches!(para.style.kind, ParaKind::FrontMatter) {
+            return TextColor::Secondary;
+        }
+        if let Some(kind) = para.style.alert {
+            return if matches!(para.style.kind, ParaKind::AlertTitle) {
+                TextColor::Alert(kind)
+            } else {
+                TextColor::Label
+            };
+        }
+        if para.style.quote_depth > 0 || matches!(para.style.kind, ParaKind::FootnoteDef) {
+            return TextColor::Secondary;
+        }
+        TextColor::Label
+    }
+
+    fn color(self) -> Retained<NSColor> {
+        match self {
+            TextColor::Spoiler => spoiler_color(),
+            TextColor::Tag => NSColor::controlAccentColor(),
+            TextColor::Reference => NSColor::linkColor(),
+            TextColor::Citation => NSColor::systemBrownColor(),
+            TextColor::Secondary => NSColor::secondaryLabelColor(),
+            TextColor::Alert(kind) => alert_color(kind),
+            TextColor::Label => NSColor::labelColor(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TextBackground {
+    Spoiler,
+    Highlight,
+    Code,
+}
+
+/// A code block has a background of its own, around all of its text.
+fn text_background(style: &RunStyle, kind: &ParaKind) -> Option<TextBackground> {
+    if style.text.spoiler {
+        Some(TextBackground::Spoiler)
+    } else if style.text.highlight {
+        Some(TextBackground::Highlight)
+    } else if style.text.code && !matches!(kind, ParaKind::Code { .. }) {
+        Some(TextBackground::Code)
+    } else {
+        None
+    }
+}
+
+/// The text block around a paragraph.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Frame {
+    None,
+    HeadingRule,
+    Code,
+    TableCell,
+    Rule,
+    Quote,
+}
+
+/// A paragraph style as values, before AppKit gets it.
+#[derive(Clone, Debug, PartialEq)]
+struct ParaLook {
+    direction: NSWritingDirection,
+    head: f64,
+    first_line: f64,
+    tab_stop: Option<f64>,
+    line_height: f64,
+    spacing: f64,
+    spacing_before: Option<f64>,
+    alignment: Option<NSTextAlignment>,
+    frame: Frame,
+}
+
+fn para_look(style: &ParaStyle, s: f64, continues_group: bool) -> ParaLook {
+    let list_indent = style.list_depth as f64 * LIST_INDENT;
+    let framed_alone = matches!(style.kind, ParaKind::Code { .. } | ParaKind::TableCell { .. });
+    let quote_indent = if framed_alone {
+        0.0
+    } else {
+        style.quote_depth as f64 * QUOTE_INDENT
+    };
+    let head = list_indent + quote_indent;
+    let mut look = ParaLook {
+        // TextKit 1 aligns a paragraph without an explicit direction by the interface language, not by its text.
+        direction: match style.rtl {
+            Some(true) => NSWritingDirection::RightToLeft,
+            Some(false) => NSWritingDirection::LeftToRight,
+            None => NSWritingDirection::Natural,
+        },
+        head,
+        first_line: if style.marker.is_some() {
+            head - LIST_INDENT * 0.85
+        } else {
+            head
+        },
+        tab_stop: style.marker.is_some().then_some(head),
+        line_height: 1.15,
+        spacing: if style.tight && style.list_depth > 0 {
+            s * 0.25
+        } else {
+            s * 0.7
+        },
+        spacing_before: style.space_before.then_some(s * 0.9),
+        alignment: None,
+        frame: Frame::None,
+    };
+    match &style.kind {
+        ParaKind::Heading(level) => {
+            look.spacing_before = Some(s * if *level <= 2 { 1.1 } else { 0.8 });
+            look.spacing = s * 0.45;
+            if *level <= 2 {
+                look.frame = Frame::HeadingRule;
+            }
+        }
+        ParaKind::Code { .. } => {
+            look.frame = Frame::Code;
+            look.spacing = 0.0;
+            look.line_height = 1.05;
+            look.first_line = head;
+        }
+        ParaKind::TableCell { align, .. } => {
+            look.frame = Frame::TableCell;
+            look.alignment = Some(match align {
+                Align::Left | Align::None => NSTextAlignment::Natural,
+                Align::Center => NSTextAlignment::Center,
+                Align::Right => NSTextAlignment::Right,
+            });
+            look.spacing = 0.0;
+            look.head = 0.0;
+            look.first_line = 0.0;
+        }
+        ParaKind::Rule => {
+            look.frame = Frame::Rule;
+            look.line_height = 0.5;
+        }
+        ParaKind::MathBlock | ParaKind::Diagram => look.alignment = Some(NSTextAlignment::Center),
+        _ => {}
+    }
+    if !matches!(style.kind, ParaKind::TableCell { .. }) {
+        match style.align {
+            Align::Center => look.alignment = Some(NSTextAlignment::Center),
+            Align::Right => look.alignment = Some(NSTextAlignment::Right),
+            Align::Left => look.alignment = Some(NSTextAlignment::Left),
+            Align::None => {}
+        }
+    }
+    if style.quote_depth > 0 && !framed_alone {
+        look.frame = Frame::Quote;
+        look.head = list_indent;
+        look.first_line = if style.marker.is_some() {
+            list_indent - LIST_INDENT * 0.85
+        } else {
+            list_indent
+        }
+        .max(0.0);
+        look.spacing = if continues_group { s * 0.5 } else { 0.0 };
+    }
+    look
+}
+
+/// The first column and the span of a table cell, from the side its table reads from.
+fn cell_columns(mirrored: bool, columns: u32, col: u32, span: u32) -> (u32, u32) {
+    let span = span.max(1);
+    let column = if mirrored {
+        columns.saturating_sub(col + span)
+    } else {
+        col
+    };
+    (column, span)
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct FontKey {
@@ -75,19 +350,7 @@ impl RenderCtx<'_> {
     }
 
     fn base_font(&self, kind: &ParaKind) -> Retained<NSFont> {
-        let s = self.size();
-        match kind {
-            ParaKind::Heading(level) => {
-                let factor = [1.75, 1.45, 1.2, 1.05, 1.0, 0.9][(*level as usize).clamp(1, 6) - 1];
-                NSFont::boldSystemFontOfSize(s * factor)
-            }
-            ParaKind::Code { .. } => {
-                NSFont::monospacedSystemFontOfSize_weight(s * 0.87, constant!(NSFontWeightRegular))
-            }
-            ParaKind::FootnoteDef | ParaKind::FrontMatter => NSFont::systemFontOfSize(s * 0.87),
-            ParaKind::AlertTitle => NSFont::boldSystemFontOfSize(s),
-            _ => NSFont::systemFontOfSize(s),
-        }
+        paragraph_font(kind, self.size()).font()
     }
 
     pub fn render_block(&self, block: &TopBlock) -> Retained<NSMutableAttributedString> {
@@ -113,7 +376,7 @@ impl RenderCtx<'_> {
             ];
             // A newline shows no color, but with one it joins the run before it, and every run slows down edits of the text.
             if let Some(last) = para.runs.last() {
-                nl.push(Attribute::foreground(&self.color_for(last, para)));
+                nl.push(Attribute::foreground(&TextColor::of(last, para).color()));
             }
             out.appendAttributedString(&attributed("\n", Some(&Attributes::new(&nl))));
         }
@@ -148,93 +411,74 @@ impl RenderCtx<'_> {
     ) -> Retained<NSMutableParagraphStyle> {
         let s = self.size();
         let style = &para.style;
-        let (st, head, list_indent) = base_paragraph_style(style, s);
-        match &style.kind {
-            ParaKind::Heading(level) => heading_style(&st, s, *level),
-            ParaKind::Code { .. } => {
+        let look = para_look(style, s, continues_group);
+        let st = NSMutableParagraphStyle::new();
+        st.setBaseWritingDirection(look.direction);
+        st.setHeadIndent(look.head);
+        st.setFirstLineHeadIndent(look.first_line);
+        if let Some(location) = look.tab_stop {
+            // SAFETY: Empty options, which NSTextTab accepts.
+            let tab = unsafe {
+                NSTextTab::initWithTextAlignment_location_options(
+                    NSTextTab::alloc(),
+                    NSTextAlignment::Natural,
+                    location,
+                    &NSDictionary::new(),
+                )
+            };
+            st.setTabStops(Some(&NSArray::from_slice(&[&*tab])));
+        }
+        st.setLineHeightMultiple(look.line_height);
+        st.setParagraphSpacing(look.spacing);
+        if let Some(before) = look.spacing_before {
+            st.setParagraphSpacingBefore(before);
+        }
+        if let Some(alignment) = look.alignment {
+            st.setAlignment(alignment);
+        }
+        match look.frame {
+            Frame::None => {}
+            Frame::HeadingRule => st.setTextBlocks(&NSArray::from_slice(&[&*heading_rule_frame(s)])),
+            Frame::Code => {
                 let b = blocks.groups.entry(style.group).or_insert_with(|| code_block_frame(s));
                 st.setTextBlocks(&NSArray::from_slice(&[&**b]));
-                st.setParagraphSpacing(0.0);
-                st.setLineHeightMultiple(1.05);
-                st.setHeadIndent(head);
-                st.setFirstLineHeadIndent(head);
             }
-            ParaKind::TableCell {
-                table,
-                row,
-                col,
-                header,
-                align,
-                columns,
-                span,
-            } => {
-                let t = blocks
-                    .tables
-                    .entry(*table as usize)
-                    .or_insert_with(|| text_table(s, *columns as usize));
-                let span = (*span).max(1);
-                let column = if style.mirrored {
-                    columns.saturating_sub(col + span)
-                } else {
-                    *col
-                };
-                let cell = table_cell(
-                    t,
-                    s,
-                    (
-                        crate::util::to_isize(*row as usize),
-                        crate::util::to_isize(column as usize),
-                        crate::util::to_isize(span as usize),
-                    ),
-                    *header,
-                );
-                st.setTextBlocks(&NSArray::from_slice(&[&*cell as &NSTextBlock]));
-                st.setAlignment(match align {
-                    Align::Left | Align::None => NSTextAlignment::Natural,
-                    Align::Center => NSTextAlignment::Center,
-                    Align::Right => NSTextAlignment::Right,
-                });
-                st.setParagraphSpacing(0.0);
-                st.setHeadIndent(0.0);
-                st.setFirstLineHeadIndent(0.0);
+            Frame::Rule => st.setTextBlocks(&NSArray::from_slice(&[&*rule_frame(s)])),
+            Frame::Quote => {
+                let b = blocks
+                    .groups
+                    .entry(style.group)
+                    .or_insert_with(|| quote_frame(style, s));
+                st.setTextBlocks(&NSArray::from_slice(&[&**b]));
             }
-            ParaKind::Rule => {
-                let b = rule_frame(s);
-                st.setTextBlocks(&NSArray::from_slice(&[&*b]));
-                st.setLineHeightMultiple(0.5);
-            }
-            ParaKind::MathBlock | ParaKind::Diagram => {
-                st.setAlignment(NSTextAlignment::Center);
-            }
-            _ => {}
-        }
-        if !matches!(style.kind, ParaKind::TableCell { .. }) {
-            match style.align {
-                Align::Center => st.setAlignment(NSTextAlignment::Center),
-                Align::Right => st.setAlignment(NSTextAlignment::Right),
-                Align::Left => st.setAlignment(NSTextAlignment::Left),
-                Align::None => {}
-            }
-        }
-        if style.quote_depth > 0 && !matches!(style.kind, ParaKind::Code { .. } | ParaKind::TableCell { .. }) {
-            let b = blocks
-                .groups
-                .entry(style.group)
-                .or_insert_with(|| quote_frame(style, s));
-            st.setTextBlocks(&NSArray::from_slice(&[&**b]));
-            st.setHeadIndent(list_indent);
-            st.setFirstLineHeadIndent(
-                if style.marker.is_some() {
-                    list_indent - LIST_INDENT * 0.85
-                } else {
-                    list_indent
+            Frame::TableCell => {
+                if let ParaKind::TableCell {
+                    table,
+                    row,
+                    col,
+                    header,
+                    columns,
+                    span,
+                    ..
+                } = &style.kind
+                {
+                    let t = blocks
+                        .tables
+                        .entry(*table as usize)
+                        .or_insert_with(|| text_table(s, *columns as usize));
+                    let (column, span) = cell_columns(style.mirrored, *columns, *col, *span);
+                    let cell = table_cell(
+                        t,
+                        s,
+                        (
+                            crate::util::to_isize(*row as usize),
+                            crate::util::to_isize(column as usize),
+                            crate::util::to_isize(span as usize),
+                        ),
+                        *header,
+                    );
+                    st.setTextBlocks(&NSArray::from_slice(&[&*cell as &NSTextBlock]));
                 }
-                .max(0.0),
-            );
-            if continues_group {
-                st.setParagraphSpacing(s * 0.5);
-            } else {
-                st.setParagraphSpacing(0.0);
             }
         }
         st
@@ -265,64 +509,26 @@ impl RenderCtx<'_> {
     }
 
     fn make_font(&self, run: &Run, para: &Para) -> Retained<NSFont> {
-        let mut font = if run.style.text.code || run.style.html {
-            NSFont::monospacedSystemFontOfSize_weight(
-                self.base_font(&para.style.kind).pointSize() * 0.9,
-                constant!(NSFontWeightRegular),
-            )
-        } else {
-            self.base_font(&para.style.kind)
-        };
-        if run.style.text.baseline != Baseline::Normal {
-            font = NSFont::fontWithDescriptor_size(&font.fontDescriptor(), font.pointSize() * 0.72).unwrap_or(font);
+        let plan = run_font(&para.style.kind, self.size(), &run.style);
+        let mut font = plan.plan.font();
+        if let Some(size) = plan.script_size {
+            font = NSFont::fontWithDescriptor_size(&font.fontDescriptor(), size).unwrap_or(font);
         }
         let manager = NSFontManager::sharedFontManager(self.mtm);
-        if run.style.text.bold {
+        if plan.bold {
             font = manager.convertFont_toHaveTrait(&font, NSFontTraitMask::BoldFontMask);
         }
-        if run.style.text.italic {
+        if plan.italic {
             font = manager.convertFont_toHaveTrait(&font, NSFontTraitMask::ItalicFontMask);
         }
         font
-    }
-
-    fn color_for(&self, run: &Run, para: &Para) -> Retained<NSColor> {
-        if run.style.text.spoiler {
-            return spoiler_color();
-        }
-        if matches!(run.style.link, Some(Link::Tag(_))) {
-            return NSColor::controlAccentColor();
-        }
-        if matches!(run.style.link, Some(Link::Reference(_))) {
-            return NSColor::linkColor();
-        }
-        if run.style.citation {
-            return NSColor::systemBrownColor();
-        }
-        if matches!(run.map, RunMap::Atom { atom: Atom::Marker, .. }) {
-            return NSColor::secondaryLabelColor();
-        }
-        if run.style.html || matches!(para.style.kind, ParaKind::FrontMatter) {
-            return NSColor::secondaryLabelColor();
-        }
-        if let Some(kind) = para.style.alert {
-            return if matches!(para.style.kind, ParaKind::AlertTitle) {
-                alert_color(kind)
-            } else {
-                NSColor::labelColor()
-            };
-        }
-        if para.style.quote_depth > 0 || matches!(para.style.kind, ParaKind::FootnoteDef) {
-            return NSColor::secondaryLabelColor();
-        }
-        NSColor::labelColor()
     }
 
     fn run(&self, run: &Run, para: &Para, paragraph: &NSMutableParagraphStyle) -> Retained<NSAttributedString> {
         let font = self.font_for(run, para);
         let mut attributes = vec![
             Attribute::font(&font),
-            Attribute::foreground(&self.color_for(run, para)),
+            Attribute::foreground(&TextColor::of(run, para).color()),
             Attribute::paragraph(paragraph),
         ];
         if run.style.text.strike {
@@ -340,23 +546,18 @@ impl RenderCtx<'_> {
         if matches!(run.style.link, Some(Link::Reference(_))) {
             attributes.push(Attribute::tool_tip(crate::i18n::t("⌘-Klick öffnet den Verweis")));
         }
-        if run.style.text.spoiler {
-            attributes.push(Attribute::background(&spoiler_color()));
-            attributes.push(Attribute::tool_tip(crate::i18n::t(
-                "Verborgener Text: Zum Lesen markieren",
-            )));
-        } else if run.style.text.highlight {
-            attributes.push(Attribute::background(&highlight_background()));
-        } else if run.style.text.code && !matches!(para.style.kind, ParaKind::Code { .. }) {
-            attributes.push(Attribute::background(&code_background()));
+        match text_background(&run.style, &para.style.kind) {
+            Some(TextBackground::Spoiler) => {
+                attributes.push(Attribute::background(&spoiler_color()));
+                attributes.push(Attribute::tool_tip(crate::i18n::t(
+                    "Verborgener Text: Zum Lesen markieren",
+                )));
+            }
+            Some(TextBackground::Highlight) => attributes.push(Attribute::background(&highlight_background())),
+            Some(TextBackground::Code) => attributes.push(Attribute::background(&code_background())),
+            None => {}
         }
-        if run.style.text.baseline != Baseline::Normal {
-            let offset = font.pointSize()
-                * if run.style.text.baseline == Baseline::Super {
-                    0.55
-                } else {
-                    -0.25
-                };
+        if let Some(offset) = baseline_offset(font.pointSize(), run.style.text.baseline) {
             attributes.push(Attribute::baseline_offset(offset));
         }
         if let Some(link) = &run.style.link {
@@ -390,7 +591,7 @@ impl RenderCtx<'_> {
                 add_attribute(
                     &out,
                     &Attribute::foreground(&token_color(token.into())),
-                    byte_range_to_ns(&map, &range),
+                    byte_range_to_ns(&map, &bytes(range)),
                 );
             }
         }
@@ -431,71 +632,89 @@ impl RenderCtx<'_> {
             }
             _ => return None,
         };
-        let (mut size, descent) = match rendered.sizing {
-            Sizing::Points { size, descent } => (size, descent),
-            Sizing::Ex { width, height, valign } => {
-                let x = font.xHeight();
-                (NSSize::new(width * x, height * x), -valign * x)
-            }
-        };
-        if size.width > self.max_image_width && size.width > 0.0 {
-            let scale = self.max_image_width / size.width;
-            size = NSSize::new(size.width * scale, size.height * scale);
-        }
         let att = NSTextAttachment::new();
         att.setImage(Some(&rendered.image));
-        att.setBounds(NSRect::new(NSPoint::new(0.0, -descent), size));
+        att.setBounds(attachment_bounds(rendered.sizing, font.xHeight(), self.max_image_width));
         Some(att)
     }
 }
 
-/// The size embedded HTML asks for: one side keeps the picture's proportions, both stretch it.
-fn sized(r: Rendered, width: Option<u32>, height: Option<u32>) -> Rendered {
-    let Sizing::Points { size, descent } = r.sizing else {
-        return r;
+/// Where an attachment stands against its line and how large it is, no wider than `max_width`.
+fn attachment_bounds(sizing: Sizing, x_height: f64, max_width: f64) -> NSRect {
+    let (mut size, descent) = match sizing {
+        Sizing::Points { size, descent } => (size, descent),
+        Sizing::Ex { width, height, valign } => (NSSize::new(width * x_height, height * x_height), -valign * x_height),
     };
+    if size.width > max_width && size.width > 0.0 {
+        let scale = max_width / size.width;
+        size = NSSize::new(size.width * scale, size.height * scale);
+    }
+    NSRect::new(NSPoint::new(0.0, -descent), size)
+}
+
+/// The size embedded HTML asks for: one side keeps the picture's proportions, both stretch it.
+fn asked_size(size: NSSize, width: Option<u32>, height: Option<u32>) -> NSSize {
     if size.width <= 0.0 || size.height <= 0.0 {
-        return r;
+        return size;
     }
     let ratio = size.height / size.width;
-    let size = match (width.map(f64::from), height.map(f64::from)) {
+    match (width.map(f64::from), height.map(f64::from)) {
         (Some(w), Some(h)) => NSSize::new(w, h),
         (Some(w), None) => NSSize::new(w, w * ratio),
         (None, Some(h)) => NSSize::new(h / ratio, h),
         (None, None) => size,
+    }
+}
+
+fn sized(r: Rendered, width: Option<u32>, height: Option<u32>) -> Rendered {
+    let Sizing::Points { size, descent } = r.sizing else {
+        return r;
     };
     Rendered {
-        sizing: Sizing::Points { size, descent },
+        sizing: Sizing::Points {
+            size: asked_size(size, width, height),
+            descent,
+        },
         ..r
     }
 }
 
-/// An image pixel is one point next to text at 100 %, as in a browser, so the image follows the text's zoom.
-fn zoomed(r: Rendered, zoom: f64) -> Rendered {
-    match r.sizing {
-        Sizing::Points { size, descent } => Rendered {
-            sizing: Sizing::Points {
-                size: NSSize::new(size.width * zoom, size.height * zoom),
-                descent: descent * zoom,
-            },
-            ..r
+/// An image pixel is one point next to text at 100 %, as in a browser, so the image follows the text's zoom. A formula is
+/// measured in the height of the text and follows on its own.
+fn zoomed_sizing(sizing: Sizing, zoom: f64) -> Sizing {
+    match sizing {
+        Sizing::Points { size, descent } => Sizing::Points {
+            size: NSSize::new(size.width * zoom, size.height * zoom),
+            descent: descent * zoom,
         },
-        Sizing::Ex { .. } => r,
+        ex @ Sizing::Ex { .. } => ex,
+    }
+}
+
+fn zoomed(r: Rendered, zoom: f64) -> Rendered {
+    Rendered {
+        sizing: zoomed_sizing(r.sizing, zoom),
+        ..r
+    }
+}
+
+/// A symbol as tall as its font, standing half its font's descender below the line.
+fn symbol_sizing(symbol: NSSize, point_size: f64, descender: f64) -> Sizing {
+    let scale = if symbol.height > 0.0 {
+        point_size / symbol.height
+    } else {
+        1.0
+    };
+    Sizing::Points {
+        size: NSSize::new(symbol.width * scale, point_size),
+        descent: descender.abs() * 0.5,
     }
 }
 
 fn placeholder(symbol: &str, font: &NSFont) -> Option<Rendered> {
     let image = NSImage::imageWithSystemSymbolName_accessibilityDescription(&ns(symbol), None)?;
-    let h = font.pointSize();
-    let size = image.size();
-    let scale = if size.height > 0.0 { h / size.height } else { 1.0 };
-    Some(Rendered {
-        image,
-        sizing: Sizing::Points {
-            size: NSSize::new(size.width * scale, h),
-            descent: font.descender().abs() * 0.5,
-        },
-    })
+    let sizing = symbol_sizing(image.size(), font.pointSize(), font.descender());
+    Some(Rendered { image, sizing })
 }
 
 pub fn code_background() -> Retained<NSColor> {
@@ -522,69 +741,18 @@ pub fn alert_color(kind: AlertKind) -> Retained<NSColor> {
     }
 }
 
-/// What every kind of paragraph starts from, with the head and the list indentation it uses.
-fn base_paragraph_style(style: &ParaStyle, s: f64) -> (Retained<NSMutableParagraphStyle>, f64, f64) {
-    let st = NSMutableParagraphStyle::new();
-    // TextKit 1 aligns a paragraph without an explicit direction by the interface language, not by its text.
-    st.setBaseWritingDirection(match style.rtl {
-        Some(true) => NSWritingDirection::RightToLeft,
-        Some(false) => NSWritingDirection::LeftToRight,
-        None => NSWritingDirection::Natural,
-    });
-    let list_indent = style.list_depth as f64 * LIST_INDENT;
-    let quote_indent = if matches!(style.kind, ParaKind::Code { .. } | ParaKind::TableCell { .. }) {
-        0.0
-    } else {
-        style.quote_depth as f64 * QUOTE_INDENT
-    };
-    let head = list_indent + quote_indent;
-    st.setHeadIndent(head);
-    st.setFirstLineHeadIndent(if style.marker.is_some() {
-        head - LIST_INDENT * 0.85
-    } else {
-        head
-    });
-    if style.marker.is_some() {
-        // SAFETY: Empty options, which NSTextTab accepts.
-        let tab = unsafe {
-            NSTextTab::initWithTextAlignment_location_options(
-                NSTextTab::alloc(),
-                NSTextAlignment::Natural,
-                head,
-                &NSDictionary::new(),
-            )
-        };
-        st.setTabStops(Some(&NSArray::from_slice(&[&*tab])));
-    }
-    st.setLineHeightMultiple(1.15);
-    let spacing = if style.tight && style.list_depth > 0 {
-        s * 0.25
-    } else {
-        s * 0.7
-    };
-    st.setParagraphSpacing(spacing);
-    if style.space_before {
-        st.setParagraphSpacingBefore(s * 0.9);
-    }
-    (st, head, list_indent)
-}
-
 /// Sets a width in points on one edge of a block.
 fn set_edge(block: &NSTextBlock, width: f64, layer: NSTextBlockLayer, edge: NSRectEdge) {
     block.setWidth_type_forLayer_edge(width, NSTextBlockValueType::AbsoluteValueType, layer, edge);
 }
 
-fn heading_style(st: &NSMutableParagraphStyle, s: f64, level: u8) {
-    st.setParagraphSpacingBefore(s * if level <= 2 { 1.1 } else { 0.8 });
-    st.setParagraphSpacing(s * 0.45);
-    if level <= 2 {
-        let b = full_width_block();
-        set_edge(&b, 1.0, NSTextBlockLayer::Border, NSRectEdge::MaxY);
-        b.setBorderColor_forEdge(Some(&NSColor::separatorColor()), NSRectEdge::MaxY);
-        set_edge(&b, s * 0.3, NSTextBlockLayer::Padding, NSRectEdge::MaxY);
-        set_edge(&b, s * 0.5, NSTextBlockLayer::Margin, NSRectEdge::MaxY);
-        st.setTextBlocks(&NSArray::from_slice(&[&*b]));
-    }
+fn heading_rule_frame(s: f64) -> Retained<NSTextBlock> {
+    let b = full_width_block();
+    set_edge(&b, 1.0, NSTextBlockLayer::Border, NSRectEdge::MaxY);
+    b.setBorderColor_forEdge(Some(&NSColor::separatorColor()), NSRectEdge::MaxY);
+    set_edge(&b, s * 0.3, NSTextBlockLayer::Padding, NSRectEdge::MaxY);
+    set_edge(&b, s * 0.5, NSTextBlockLayer::Margin, NSRectEdge::MaxY);
+    b
 }
 
 fn code_block_frame(s: f64) -> Retained<NSTextBlock> {
@@ -669,5 +837,606 @@ pub fn alert_symbol(kind: AlertKind) -> &'static str {
         AlertKind::Important => "exclamationmark.bubble",
         AlertKind::Warning => "exclamationmark.triangle",
         AlertKind::Caution => "exclamationmark.octagon",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use objc2_app_kit::NSFontDescriptorSymbolicTraits;
+
+    use super::*;
+    use crate::markdown::reader::parse;
+    use crate::markdown::style::TextStyle;
+    use crate::preview::layout::{CharMap, NoImages, layout};
+
+    fn style(kind: ParaKind) -> ParaStyle {
+        ParaStyle {
+            kind,
+            quote_depth: 0,
+            list_depth: 0,
+            marker: None,
+            group: 0,
+            tight: false,
+            space_before: false,
+            alert: None,
+            align: Align::None,
+            html: false,
+            rtl: None,
+            mirrored: false,
+        }
+    }
+
+    fn cell(align: Align) -> ParaKind {
+        ParaKind::TableCell {
+            table: 0,
+            row: 0,
+            col: 0,
+            header: false,
+            align,
+            columns: 2,
+            span: 1,
+        }
+    }
+
+    fn code() -> ParaKind {
+        ParaKind::Code { info: "rs".into() }
+    }
+
+    fn text(style: TextStyle) -> RunStyle {
+        RunStyle {
+            text: style,
+            ..RunStyle::default()
+        }
+    }
+
+    fn run(style: RunStyle) -> Run {
+        Run {
+            text: "x".into(),
+            style,
+            map: RunMap::Text {
+                chars: CharMap::Verbatim(crate::markdown::text::Byte::new(0)),
+                end: crate::markdown::text::Byte::new(1),
+            },
+        }
+    }
+
+    fn para(style: ParaStyle) -> Para {
+        Para {
+            style,
+            runs: Vec::new(),
+            src: crate::markdown::text::bytes(0..0),
+            insert_at: crate::markdown::text::Byte::new(0),
+        }
+    }
+
+    fn plan(face: FontFace, size: f64) -> FontPlan {
+        FontPlan { face, size }
+    }
+
+    #[test]
+    fn a_paragraph_kind_sets_face_and_size_of_its_font_at_every_zoom() {
+        let at = |kind: ParaKind, s| paragraph_font(&kind, s);
+        assert_eq!(at(ParaKind::Heading(1), 15.0), plan(FontFace::Bold, 26.25));
+        assert_eq!(at(ParaKind::Heading(2), 15.0), plan(FontFace::Bold, 21.75));
+        assert_eq!(at(ParaKind::Heading(3), 15.0), plan(FontFace::Bold, 18.0));
+        assert_eq!(at(ParaKind::Heading(6), 20.0), plan(FontFace::Bold, 18.0));
+        assert_eq!(
+            at(ParaKind::Heading(0), 10.0),
+            plan(FontFace::Bold, 17.5),
+            "the first level"
+        );
+        assert_eq!(
+            at(ParaKind::Heading(9), 10.0),
+            plan(FontFace::Bold, 9.0),
+            "the last level"
+        );
+        assert_eq!(at(code(), 10.0), plan(FontFace::Mono, 8.7));
+        assert_eq!(at(ParaKind::FootnoteDef, 10.0), plan(FontFace::Regular, 8.7));
+        assert_eq!(at(ParaKind::FrontMatter, 10.0), plan(FontFace::Regular, 8.7));
+        assert_eq!(at(ParaKind::AlertTitle, 15.0), plan(FontFace::Bold, 15.0));
+        assert_eq!(at(ParaKind::Body, 15.0), plan(FontFace::Regular, 15.0));
+        assert_eq!(at(cell(Align::None), 30.0), plan(FontFace::Regular, 30.0));
+    }
+
+    #[test]
+    fn a_plan_makes_the_font_it_says() {
+        let traits = |font: &NSFont| font.fontDescriptor().symbolicTraits();
+        let bold = plan(FontFace::Bold, 26.25).font();
+        assert_eq!(bold.pointSize(), 26.25);
+        assert!(traits(&bold).contains(NSFontDescriptorSymbolicTraits::TraitBold));
+        let regular = plan(FontFace::Regular, 13.05).font();
+        assert_eq!(regular.pointSize(), 13.05);
+        assert!(!traits(&regular).contains(NSFontDescriptorSymbolicTraits::TraitBold));
+        let mono = plan(FontFace::Mono, 8.7).font();
+        assert_eq!(mono.pointSize(), 8.7);
+        assert!(mono.isFixedPitch());
+    }
+
+    #[test]
+    fn a_run_changes_the_font_of_its_paragraph_by_its_own_style() {
+        let plain = run_font(&ParaKind::Body, 20.0, &RunStyle::default());
+        assert_eq!(
+            plain,
+            RunFont {
+                plan: plan(FontFace::Regular, 20.0),
+                script_size: None,
+                bold: false,
+                italic: false,
+            }
+        );
+        let code_in_heading = run_font(
+            &ParaKind::Heading(1),
+            20.0,
+            &text(TextStyle {
+                code: true,
+                ..TextStyle::default()
+            }),
+        );
+        assert_eq!(code_in_heading.plan, plan(FontFace::Mono, 31.5));
+        let html = RunStyle {
+            html: true,
+            ..RunStyle::default()
+        };
+        assert_eq!(run_font(&ParaKind::Body, 20.0, &html).plan, plan(FontFace::Mono, 18.0));
+        let raised = run_font(
+            &ParaKind::Body,
+            20.0,
+            &text(TextStyle {
+                baseline: Baseline::Super,
+                bold: true,
+                ..TextStyle::default()
+            }),
+        );
+        assert_eq!(raised.script_size, Some(20.0 * 0.72));
+        assert!(raised.bold && !raised.italic);
+        let lowered_code = run_font(
+            &ParaKind::Body,
+            20.0,
+            &text(TextStyle {
+                baseline: Baseline::Sub,
+                code: true,
+                italic: true,
+                ..TextStyle::default()
+            }),
+        );
+        assert_eq!(lowered_code.script_size, Some(18.0 * 0.72));
+        assert!(lowered_code.italic && !lowered_code.bold);
+    }
+
+    #[test]
+    fn raised_text_stands_above_the_line_and_lowered_text_below_it() {
+        assert_eq!(baseline_offset(10.0, Baseline::Normal), None);
+        assert_eq!(baseline_offset(10.0, Baseline::Super), Some(5.5));
+        assert_eq!(baseline_offset(10.0, Baseline::Sub), Some(-2.5));
+    }
+
+    #[test]
+    fn the_color_of_text_goes_by_what_it_is_before_where_it_stands() {
+        let of = |style: RunStyle, para_style: ParaStyle| TextColor::of(&run(style), &para(para_style));
+        let body = style(ParaKind::Body);
+        let spoiler = text(TextStyle {
+            spoiler: true,
+            ..TextStyle::default()
+        });
+        let tag = RunStyle {
+            link: Some(Link::Tag("#a".into())),
+            ..RunStyle::default()
+        };
+        let reference = RunStyle {
+            link: Some(Link::Reference("#1".into())),
+            ..RunStyle::default()
+        };
+        let citation = RunStyle {
+            citation: true,
+            ..RunStyle::default()
+        };
+        let html = RunStyle {
+            html: true,
+            ..RunStyle::default()
+        };
+        let quoted = ParaStyle {
+            quote_depth: 1,
+            ..body.clone()
+        };
+        let alert_body = ParaStyle {
+            alert: Some(AlertKind::Warning),
+            quote_depth: 1,
+            ..body.clone()
+        };
+        let alert_title = ParaStyle {
+            kind: ParaKind::AlertTitle,
+            ..alert_body.clone()
+        };
+        assert_eq!(of(RunStyle::default(), body.clone()), TextColor::Label);
+        assert_eq!(
+            of(
+                RunStyle {
+                    link: Some(Link::Tag("#a".into())),
+                    ..spoiler.clone()
+                },
+                body.clone()
+            ),
+            TextColor::Spoiler,
+            "a spoiler hides whatever it is"
+        );
+        assert_eq!(of(tag.clone(), quoted.clone()), TextColor::Tag);
+        assert_eq!(of(reference, quoted.clone()), TextColor::Reference);
+        assert_eq!(of(citation, quoted.clone()), TextColor::Citation);
+        assert_eq!(of(html, body.clone()), TextColor::Secondary);
+        assert_eq!(
+            of(RunStyle::default(), style(ParaKind::FrontMatter)),
+            TextColor::Secondary
+        );
+        assert_eq!(
+            of(RunStyle::default(), style(ParaKind::FootnoteDef)),
+            TextColor::Secondary
+        );
+        assert_eq!(of(RunStyle::default(), quoted), TextColor::Secondary);
+        assert_eq!(
+            of(RunStyle::default(), alert_title),
+            TextColor::Alert(AlertKind::Warning)
+        );
+        assert_eq!(
+            of(RunStyle::default(), alert_body.clone()),
+            TextColor::Label,
+            "the text of a callout is not grey like a quote"
+        );
+        let marker = Run {
+            map: RunMap::Atom {
+                atom: Atom::Marker,
+                src: crate::markdown::text::bytes(0..1),
+            },
+            ..run(RunStyle::default())
+        };
+        assert_eq!(TextColor::of(&marker, &para(alert_body)), TextColor::Secondary);
+    }
+
+    #[test]
+    fn a_background_goes_by_spoiler_then_highlight_then_code_outside_code_blocks() {
+        let all = |highlight, code, spoiler| {
+            text(TextStyle {
+                highlight,
+                code,
+                spoiler,
+                ..TextStyle::default()
+            })
+        };
+        let body = ParaKind::Body;
+        assert_eq!(text_background(&RunStyle::default(), &body), None);
+        assert_eq!(
+            text_background(&all(true, true, true), &body),
+            Some(TextBackground::Spoiler)
+        );
+        assert_eq!(
+            text_background(&all(true, true, false), &body),
+            Some(TextBackground::Highlight)
+        );
+        assert_eq!(
+            text_background(&all(false, true, false), &body),
+            Some(TextBackground::Code)
+        );
+        assert_eq!(text_background(&all(false, true, false), &code()), None);
+        assert_eq!(
+            text_background(&all(true, false, false), &code()),
+            Some(TextBackground::Highlight)
+        );
+    }
+
+    #[test]
+    fn plain_paragraphs_space_and_indent_by_their_size_and_depth() {
+        let plain = para_look(&style(ParaKind::Body), 20.0, false);
+        assert_eq!(
+            plain,
+            ParaLook {
+                direction: NSWritingDirection::Natural,
+                head: 0.0,
+                first_line: 0.0,
+                tab_stop: None,
+                line_height: 1.15,
+                spacing: 14.0,
+                spacing_before: None,
+                alignment: None,
+                frame: Frame::None,
+            }
+        );
+        let item = ParaStyle {
+            list_depth: 2,
+            marker: Some(Marker::Bullet(0)),
+            tight: true,
+            ..style(ParaKind::Body)
+        };
+        let look = para_look(&item, 20.0, false);
+        assert_eq!((look.head, look.tab_stop), (52.0, Some(52.0)));
+        assert_eq!(look.first_line, 52.0 - 26.0 * 0.85);
+        assert_eq!(look.spacing, 5.0, "a tight list");
+        let tight_outside_a_list = ParaStyle {
+            tight: true,
+            ..style(ParaKind::Body)
+        };
+        assert_eq!(para_look(&tight_outside_a_list, 20.0, false).spacing, 14.0);
+        let after_table = ParaStyle {
+            space_before: true,
+            ..style(ParaKind::Body)
+        };
+        assert_eq!(para_look(&after_table, 20.0, false).spacing_before, Some(18.0));
+    }
+
+    #[test]
+    fn a_paragraph_reads_in_its_own_direction_and_keeps_an_alignment_asked_for() {
+        let with_direction = |rtl| {
+            para_look(
+                &ParaStyle {
+                    rtl,
+                    ..style(ParaKind::Body)
+                },
+                10.0,
+                false,
+            )
+            .direction
+        };
+        assert_eq!(with_direction(Some(true)), NSWritingDirection::RightToLeft);
+        assert_eq!(with_direction(Some(false)), NSWritingDirection::LeftToRight);
+        assert_eq!(with_direction(None), NSWritingDirection::Natural);
+        let aligned = |kind, align| para_look(&ParaStyle { align, ..style(kind) }, 10.0, false).alignment;
+        assert_eq!(aligned(ParaKind::Body, Align::None), None);
+        assert_eq!(aligned(ParaKind::Body, Align::Center), Some(NSTextAlignment::Center));
+        assert_eq!(aligned(ParaKind::Body, Align::Right), Some(NSTextAlignment::Right));
+        assert_eq!(aligned(ParaKind::Body, Align::Left), Some(NSTextAlignment::Left));
+        assert_eq!(aligned(ParaKind::MathBlock, Align::None), Some(NSTextAlignment::Center));
+        assert_eq!(aligned(ParaKind::Diagram, Align::Right), Some(NSTextAlignment::Right));
+        assert_eq!(
+            aligned(cell(Align::Center), Align::Right),
+            Some(NSTextAlignment::Center),
+            "a cell goes by its column"
+        );
+        assert_eq!(aligned(cell(Align::None), Align::None), Some(NSTextAlignment::Natural));
+        assert_eq!(aligned(cell(Align::Left), Align::None), Some(NSTextAlignment::Natural));
+        assert_eq!(aligned(cell(Align::Right), Align::None), Some(NSTextAlignment::Right));
+    }
+
+    #[test]
+    fn the_first_two_heading_levels_have_a_rule_and_more_space_above() {
+        let high = para_look(&style(ParaKind::Heading(2)), 10.0, false);
+        assert_eq!(high.frame, Frame::HeadingRule);
+        assert_eq!((high.spacing_before, high.spacing), (Some(11.0), 4.5));
+        let low = para_look(&style(ParaKind::Heading(3)), 10.0, false);
+        assert_eq!(low.frame, Frame::None);
+        assert_eq!((low.spacing_before, low.spacing), (Some(8.0), 4.5));
+    }
+
+    #[test]
+    fn code_cells_and_rules_are_framed_without_the_indent_of_a_quote() {
+        let in_quote = |kind| ParaStyle {
+            quote_depth: 2,
+            list_depth: 1,
+            marker: Some(Marker::Bullet(0)),
+            ..style(kind)
+        };
+        let code_look = para_look(&in_quote(code()), 10.0, false);
+        assert_eq!(code_look.frame, Frame::Code);
+        assert_eq!(
+            (code_look.head, code_look.first_line),
+            (26.0, 26.0),
+            "the list counts, the quote not"
+        );
+        assert_eq!((code_look.spacing, code_look.line_height), (0.0, 1.05));
+        let cell_look = para_look(&in_quote(cell(Align::None)), 10.0, false);
+        assert_eq!(cell_look.frame, Frame::TableCell);
+        assert_eq!(
+            (cell_look.head, cell_look.first_line, cell_look.spacing),
+            (0.0, 0.0, 0.0)
+        );
+        let rule = para_look(&style(ParaKind::Rule), 10.0, false);
+        assert_eq!((rule.frame, rule.line_height), (Frame::Rule, 0.5));
+    }
+
+    #[test]
+    fn a_quote_frames_its_paragraphs_and_spaces_them_inside_itself() {
+        let quoted = ParaStyle {
+            quote_depth: 2,
+            list_depth: 1,
+            ..style(ParaKind::Body)
+        };
+        let inside = para_look(&quoted, 10.0, true);
+        assert_eq!(inside.frame, Frame::Quote);
+        assert_eq!((inside.head, inside.first_line), (26.0, 26.0));
+        assert_eq!(inside.spacing, 5.0);
+        assert_eq!(para_look(&quoted, 10.0, false).spacing, 0.0, "the frame ends here");
+        let item = ParaStyle {
+            marker: Some(Marker::Bullet(0)),
+            ..quoted
+        };
+        let look = para_look(&item, 10.0, false);
+        assert_eq!(look.first_line, 26.0 - 26.0 * 0.85);
+        assert_eq!(
+            look.tab_stop,
+            Some(26.0 + 28.0),
+            "the marker's tab counts the quote as well"
+        );
+        let unlisted_marker = ParaStyle {
+            quote_depth: 1,
+            marker: Some(Marker::Footnote("a".into(), "1".into())),
+            ..style(ParaKind::Body)
+        };
+        assert_eq!(
+            para_look(&unlisted_marker, 10.0, false).first_line,
+            0.0,
+            "never in front of the frame"
+        );
+        let title = ParaStyle {
+            quote_depth: 1,
+            ..style(ParaKind::Heading(1))
+        };
+        assert_eq!(
+            para_look(&title, 10.0, false).frame,
+            Frame::Quote,
+            "instead of the rule"
+        );
+    }
+
+    #[test]
+    fn a_mirrored_table_counts_its_columns_from_the_other_side() {
+        assert_eq!(cell_columns(false, 4, 1, 1), (1, 1));
+        assert_eq!(cell_columns(false, 4, 1, 0), (1, 1), "a span of nothing is one column");
+        assert_eq!(cell_columns(true, 4, 0, 1), (3, 1));
+        assert_eq!(cell_columns(true, 4, 1, 2), (1, 2));
+        assert_eq!(
+            cell_columns(true, 2, 3, 1),
+            (0, 1),
+            "a cell beyond the columns stays in the table"
+        );
+    }
+
+    fn width(block: &NSTextBlock, layer: NSTextBlockLayer, edge: NSRectEdge) -> f64 {
+        block.widthForLayer_edge(layer, edge)
+    }
+
+    #[test]
+    fn frames_grow_with_the_text_and_stand_on_the_side_it_starts() {
+        let rule = heading_rule_frame(20.0);
+        assert_eq!(width(&rule, NSTextBlockLayer::Border, NSRectEdge::MaxY), 1.0);
+        assert_eq!(width(&rule, NSTextBlockLayer::Padding, NSRectEdge::MaxY), 6.0);
+        assert_eq!(width(&rule, NSTextBlockLayer::Margin, NSRectEdge::MaxY), 10.0);
+        let code_frame = code_block_frame(20.0);
+        assert_eq!(width(&code_frame, NSTextBlockLayer::Padding, NSRectEdge::MinX), 12.0);
+        assert_eq!(width(&code_frame, NSTextBlockLayer::Margin, NSRectEdge::MaxY), 14.0);
+        let left = quote_frame(&style(ParaKind::Body), 20.0);
+        assert_eq!(width(&left, NSTextBlockLayer::Border, NSRectEdge::MinX), 3.0);
+        assert_eq!(width(&left, NSTextBlockLayer::Border, NSRectEdge::MaxX), 0.0);
+        assert_eq!(width(&left, NSTextBlockLayer::Padding, NSRectEdge::MinX), 14.0);
+        let right = quote_frame(
+            &ParaStyle {
+                mirrored: true,
+                ..style(ParaKind::Body)
+            },
+            20.0,
+        );
+        assert_eq!(width(&right, NSTextBlockLayer::Border, NSRectEdge::MinX), 0.0);
+        assert_eq!(width(&right, NSTextBlockLayer::Border, NSRectEdge::MaxX), 3.0);
+        assert_eq!(width(&right, NSTextBlockLayer::Padding, NSRectEdge::MaxX), 14.0);
+    }
+
+    #[test]
+    fn a_table_cell_knows_its_place_and_only_a_header_has_a_background() {
+        let table = text_table(10.0, 3);
+        assert_eq!(table.numberOfColumns(), 3);
+        let header = table_cell(&table, 10.0, (0, 1, 2), true);
+        assert_eq!(
+            (
+                header.startingRow(),
+                header.startingColumn(),
+                header.columnSpan(),
+                header.rowSpan()
+            ),
+            (0, 1, 2, 1)
+        );
+        assert!(header.backgroundColor().is_some());
+        assert_eq!(width(&header, NSTextBlockLayer::Padding, NSRectEdge::MinX), 4.0);
+        assert!(table_cell(&table, 10.0, (1, 0, 1), false).backgroundColor().is_none());
+    }
+
+    #[test]
+    fn an_attachment_goes_by_its_points_or_by_the_text_and_never_past_the_column() {
+        let points = Sizing::Points {
+            size: NSSize::new(100.0, 50.0),
+            descent: 4.0,
+        };
+        assert_eq!(
+            attachment_bounds(points, 7.0, 400.0),
+            NSRect::new(NSPoint::new(0.0, -4.0), NSSize::new(100.0, 50.0))
+        );
+        assert_eq!(
+            attachment_bounds(points, 7.0, 40.0),
+            NSRect::new(NSPoint::new(0.0, -4.0), NSSize::new(40.0, 20.0)),
+            "both sides shrink, the descent stays"
+        );
+        let ex = Sizing::Ex {
+            width: 4.0,
+            height: 2.0,
+            valign: -0.5,
+        };
+        assert_eq!(
+            attachment_bounds(ex, 10.0, 400.0),
+            NSRect::new(NSPoint::new(0.0, -5.0), NSSize::new(40.0, 20.0))
+        );
+    }
+
+    #[test]
+    fn one_side_asked_for_keeps_the_proportions_and_two_stretch_them() {
+        let size = NSSize::new(200.0, 100.0);
+        assert_eq!(asked_size(size, None, None), size);
+        assert_eq!(asked_size(size, Some(50), None), NSSize::new(50.0, 25.0));
+        assert_eq!(asked_size(size, None, Some(50)), NSSize::new(100.0, 50.0));
+        assert_eq!(asked_size(size, Some(10), Some(70)), NSSize::new(10.0, 70.0));
+        let empty = NSSize::new(0.0, 10.0);
+        assert_eq!(asked_size(empty, Some(50), Some(50)), empty, "nothing to scale");
+    }
+
+    #[test]
+    fn images_follow_the_zoom_and_formulas_the_text() {
+        let points = Sizing::Points {
+            size: NSSize::new(10.0, 20.0),
+            descent: 2.0,
+        };
+        assert_eq!(
+            zoomed_sizing(points, 1.5),
+            Sizing::Points {
+                size: NSSize::new(15.0, 30.0),
+                descent: 3.0,
+            }
+        );
+        let ex = Sizing::Ex {
+            width: 1.0,
+            height: 2.0,
+            valign: 0.5,
+        };
+        assert_eq!(zoomed_sizing(ex, 1.5), ex);
+    }
+
+    #[test]
+    fn a_symbol_is_as_tall_as_its_font() {
+        assert_eq!(
+            symbol_sizing(NSSize::new(30.0, 20.0), 10.0, -3.0),
+            Sizing::Points {
+                size: NSSize::new(15.0, 10.0),
+                descent: 1.5,
+            }
+        );
+        assert_eq!(
+            symbol_sizing(NSSize::new(30.0, 0.0), 10.0, 3.0),
+            Sizing::Points {
+                size: NSSize::new(30.0, 10.0),
+                descent: 1.5,
+            }
+        );
+    }
+
+    #[test]
+    fn the_stand_in_of_a_block_has_the_length_of_the_block() {
+        let shown = layout(
+            &parse("Eins **zwei**\n\n- a\n- b\n\n| x | y |\n|---|---|\n| 1 | 2 |\n"),
+            &NoImages,
+            None,
+        );
+        let mut all = String::new();
+        for block in &shown.blocks {
+            let mut stand_in = String::new();
+            RenderCtx::placeholder_text(block, &mut stand_in);
+            assert_eq!(stand_in.encode_utf16().count(), block.len_u16, "{stand_in:?}");
+            all.push_str(&stand_in);
+        }
+        assert!(all.starts_with("Eins zwei\n"), "{all:?}");
+        assert!(all.ends_with("1\n2\n"), "{all:?}");
+    }
+
+    #[test]
+    fn every_alert_has_a_symbol_of_the_system() {
+        for kind in AlertKind::ALL {
+            let name = alert_symbol(kind);
+            assert!(
+                NSImage::imageWithSystemSymbolName_accessibilityDescription(&ns(name), None).is_some(),
+                "{name}"
+            );
+        }
     }
 }

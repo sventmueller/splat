@@ -718,6 +718,8 @@ Prerequisites:
 - Rust 1.99 (`brew install rust`). [rust-toolchain.toml](rust-toolchain.toml) names the exact version that CI uses;
   rustup installs it on its own, Homebrew's Rust ignores the file. Raising it there is how new compiler and clippy
   warnings reach the project.
+- rustup, for `make lint`, `make check` and `make universal`: `cargo xtask check-library` builds the library for Linux
+  to show that it needs no macOS, and Homebrew's Rust has no other targets.
 
 The [Makefile](Makefile) holds short entry points; `make help` lists them all:
 
@@ -806,28 +808,31 @@ permissions for the two.
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | a longer randomised search; `SPLAT_FUZZ_SEED` varies the inputs |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | one language, while others are incomplete |
 | `cargo clippy --release --all-targets [--features selftest]` | lints, including the justification of every `unsafe` block, the length of functions and, in the library, number conversions |
+| `cargo xtask check-library` | the library builds for Linux, so nothing in it needs macOS |
 | `cargo xtask vendor check` | the JavaScript libraries match `vendor.lock` byte for byte |
-| `cargo xtask selftest probe` | without a window, each with its expected result: formulas, diagrams, web images against a server inside the process, blocked addresses, the defences of the web views |
+| `cargo xtask selftest probe` | without a window, each with its expected result: formulas, diagrams, web images against a server inside the process, blocked addresses, the text every command writes, each image format through both exports, a page that stops answering, and the defences of the web views against a page without them. Takes about half a minute. What needs the app in front is skipped on a locked screen |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | the running app, click by click. Opens a window and types into it; the Mac is busy for about four minutes. `--scenarios` runs only the second part, in about a minute and a half |
 | `cargo xtask selftest resize` | widens the window after moving the divider: the source re-wraps while the window is resized. Takes about ten seconds |
 | `cargo xtask selftest bench <file.md>` | timings for opening, typing and scrolling a large file |
-| `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, result and time limit |
-| `cargo test --release --test hostile` | documents built to overflow the stack or take quadratic time, through parsing, layout, both exports, keystrokes and commands |
+| `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, the same result in a quarter of the time at most |
+| `cargo test --release --test hostile` | documents built to overflow the stack or take quadratic time, each at two sizes whose times must grow as the text does, through parsing, layout, both exports, keystrokes and commands |
 | `make mutants` | faults built into `src/markdown/` and `src/preview/` one by one, through [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); says which ones no test notices. Takes hours; `FILE=src/preview/bridge.rs` narrows it |
 | `cargo test --release --test decoder` | the decoder process decodes images and reaches neither files nor the network |
 | `make coverage` | line coverage of `cargo test` and all self-tests, through [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fails below the floors. Occupies the Mac for about five minutes |
-| `make coverage-library` | the floors for `src/markdown/`, `src/preview/` and `i18n.rs`, measured by `cargo test` alone |
+| `make coverage-library` | `src/markdown/`, `src/preview/` and `i18n.rs` against their higher floors, measured by `cargo test` alone |
 
 Unit tests sit next to the code they test. `tests/` holds what reaches the library from outside: the randomised tests
 in `robustness.rs`, which share the generator in `src/fuzz.rs` with those of `sync.rs`, the documents built to hurt in
 `hostile.rs`, and the decoder test, which starts the built program. Decisions in `src/editor/` that need no window live in free functions with tests of their
-own: everything the controller knows and how that changes in `state.rs`, the rules of rendering in `render_queue.rs`, the text copy in `sync.rs`. A step of the window self-test that waits in vain fails the run. The window
+own: everything the controller knows and how that changes in `state.rs`, the rules of rendering in `render_queue.rs`, the text copy in `sync.rs`, paragraph styles, fonts and colours as values in `render.rs`, what toolbar identifiers stand for in `toolbar.rs`, what a link click means in `navigation.rs`.
+
+A step of the window self-test waits for a named condition, not for a time; only what gives no signal, like the absence of something, keeps a pause with its reason. Waiting in vain is a failed check that names what never came, a step that panics is a failed check as well, and the run goes on either way. A check that cannot say anything in this run reports `SELFTEST SKIP`: xtask lists it, and it neither passes nor fails. xtask holds each mode, and `--scenarios` of its own, to about nine tenths of its checks. The window
 self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios.rs`: every formatting and
 table command, the dialogs, link clicks, pasting, dropping, exports, a large change, images changing on disk, memory
 pressure, a huge document and the recovery after a crash.
 
-Coverage has two floors: every module at least 80 % of its lines, all modules together at least 85 %. `make coverage`
-measures `cargo test` together with the self-tests and fails below either; the floors and the few exceptions, such
+Coverage has two floors: every module at least 84 % of its lines, all modules together at least 96 %. `make coverage`
+measures `cargo test` together with the self-tests and fails below either; `make coverage-library` holds what needs no window to 90 % and 97 %. The floors and the few exceptions, such
 as the panic hook in `main.rs` that runs only in a crash, are in [xtask](xtask/src/coverage.rs) next to their reasons.
 Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. The
 decoder helper opens its measurement file before it locks itself in, so it is measured as well.
@@ -844,43 +849,50 @@ untouched.
 ### Project layout
 
 `src/lib.rs` makes everything that needs no window a library of its own, `splat`: `markdown/`, `preview/`,
-`i18n.rs` and the test generator `fuzz.rs`. The app in `src/main.rs` builds on it.
+`i18n.rs` and the test generator `fuzz.rs`. It builds without macOS. The app in `src/main.rs` builds on it.
 
-- `src/markdown/`: the parser binding (comrak), syntax colours, and all commands as pure text edits (`Edit`). Also
-  re-parsing after an edit (`incremental.rs`), the reader for embedded HTML (`markup.rs`), typography, tags,
-  references and citations in running text (`typography.rs`), how text looks and which Markdown and HTML make it so
-  (`style.rs`), what an address may be (`url.rs`), and the HTML and Word export (`html.rs`, `docx.rs` with `docx/html.rs`
-  and `docx/xml.rs`). The preview and both exports all read the same tree, `Doc`. No AppKit.
-- `src/preview/`: the preview layout, embedded HTML in it (`layout/html.rs`), and the mapping between preview and
-  source (`Bridge`, `Index`). No AppKit.
-- `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views; its work is split
-  by responsibility:
+- `src/markdown/`: the tree every consumer reads, `Doc` in `doc/`, which owns its text, and the only binding to the
+  parser in `reader/`: comrak is named nowhere else, and `reader/assumptions.rs` holds what the code assumes about it.
+  Syntax colours, and all commands as pure text edits (`Edit`) in `commands/`. Also re-parsing after an edit
+  (`incremental.rs`), the reader for embedded HTML (`markup.rs`), typography, tags, references and citations in running
+  text (`typography.rs`), how text looks and which Markdown and HTML make it so (`style.rs`), what an address may be
+  (`url.rs`), and the HTML and Word export (`html.rs`, `docx.rs` with `docx/html.rs` and `docx/xml.rs`). A position has
+  its type: `Byte` in the source text, `U16` in the source view, `Shown` in the preview view (`text.rs`). No AppKit.
+- `src/preview/`: the preview layout in `layout/`, with embedded HTML in `layout/html.rs`, and the mapping between preview
+  and source (`Bridge`, `Index`). A `Bridge` refuses a layout of another version of the `Doc`. No AppKit.
+- `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views and forwards to
+  components, small structs over the controller and the state they own, whose fields the other modules cannot reach:
 
 | Module | Responsibility |
 |---|---|
-| `mod.rs` | class, delegate methods, `invalidate` |
+| `mod.rs` | class, delegate methods that forward, `invalidate` |
+| `panes.rs` | `Panes`: the text views, the outline, showing and hiding panes, and what gives access to the views |
 | `state.rs` | what the controller knows about the document and every way that changes; its fields are private, and it touches no view |
+| `model.rs` | lends the state and the text copy to closures that cannot reach a view |
 | `actions.rs` | command registry: selector, title, shortcut, symbol, when the command applies |
-| `editing.rs` | running and validating commands, typing in the preview |
-| `update.rs` | parsing, colouring, updating the preview; after an edit only the affected paragraphs |
+| `editing.rs` | `Editing`: running and validating commands, typing in the preview |
+| `update.rs` | `Updater`: parsing, colouring, updating the preview; after an edit only the affected paragraphs |
 | `sync.rs` | text copy and block bookkeeping, without AppKit and with randomised tests |
-| `progressive.rs` | rendering large previews step by step |
-| `selection.rs`, `scroll.rs` | selection and scroll position of both panes in step |
-| `atom.rs`, `atom_edit.rs` | the formula and diagram editor |
-| `navigation.rs`, `links.rs` | links, wiki links, tags, task checkboxes, folding, footnotes |
+| `progressive.rs` | `Progressive`: rendering large previews step by step |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selection and scroll position of both panes in step |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: the formula and diagram editor |
+| `navigation.rs`, `links.rs` | `Links`: links, wiki links, tags, task checkboxes, folding, footnotes |
 | `env.rs` | what the preview reads from outside the text: typographic punctuation, the repository for `@name` and `#12`, the BibTeX file, embedded notes |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | preview text, local and remote images |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | preview text, local and remote images; `Pictures` in `images.rs` |
 | `attributes.rs` | text attributes; each key only gets a value of the type it expects |
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |
 | `decoder.rs` | sandboxed helper processes that decode images and graphics |
-| `export.rs`, `outline.rs` | HTML and Word export; the outline sidebar |
+| `export.rs`, `outline.rs` | `Sharing`: HTML and Word export, the share file, printing; the outline sidebar |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor; the rules of what renders when, apart from WebKit |
 | `webkit.rs` | calls into WebKit; only the navigation delegate's lifetime stays with `js.rs` and `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | window, toolbar, text views, dialogs, colours |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
   subclass).
-- `src/i18n.rs` with `resources/*.lproj`: 35 languages; the keys are the German texts.
+- `src/i18n.rs` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table of
+  the interface language at its start.
+- `src/util/`: worker threads (`lanes.rs`), volumes that may stop answering (`volumes.rs`), AppKit helpers, files and
+  processes. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
   returns after big edits.
 - `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](vendor.lock).
@@ -895,7 +907,8 @@ The source text in the left text view is the single source of truth.
    the blocks whose content changed.
 3. After an edit, only the affected paragraphs are parsed, coloured and laid out again, as long as their neighbours
    stay the same; `reparse_part_and_color` says when they do not. Documents with `%%` comment blocks, changes to the
-   front matter and changes near link reference definitions are processed in full. comrak recognizes a footnote
+   front matter and, in a document with link reference definitions, changes to a part holding a bracket are processed
+   in full. comrak recognizes a footnote
    reference only with its definition in the same parse and moves definitions behind the text, so the part is parsed
    with a stand-in definition per label and takes its numbers from the old tree; a change to the references or
    definitions in the part, or next to an inline footnote, is processed in full.
@@ -907,21 +920,25 @@ The source text in the left text view is the single source of truth.
 6. Input in the preview is translated by `Bridge` into an edit of the source and takes the same path from there.
    Markdown has too many ways of turning text into syntax for rules alone, so `preview/verify.rs` parses the changed part
    again and compares what it shows with what was typed; an edit that does not hold is escaped further or refused.
-7. comrak's inline positions go wrong in a few places, for example behind a link reference definition. `markdown/positions.rs`
+7. comrak's inline positions go wrong in a few places, for example behind a link reference definition. `markdown/reader/positions.rs`
    checks them against the source when reading a block and reads them again from the source where they do not fit.
 
 ### Rules in the controller
 
-1. The controller's own changes to the views run inside `silently()`; the delegate callbacks ignore them.
-2. `state` is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view. It
-   changes through its own methods only, whose tests need no window.
+1. The controller's own changes to the views run inside `Panes::silently`; the delegate callbacks ignore them. Everywhere
+   else the views can only be read, so the compiler checks this. What the callbacks are meant to hear, or what hands a
+   view to AppKit, says so by going through `Panes::for_appkit`.
+2. The state is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view: `Model`
+   lends it to `Send` closures, and no view is `Send`, so the compiler checks this. It changes through its own methods
+   only, whose tests need no window.
 3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `renders_arrived` and `image_arrived`, never in the
    middle of an update.
 4. Redrawing without a text change goes through `invalidate(reason)` only.
-5. An `Rc<Snapshot>` is not held across a change of the source, or that change copies the whole text.
-6. A new command needs an entry in `actions.rs`, a method in `mod.rs` and a branch in `editing::perform`.
+5. The text copy is not held across a change of the source, or that change copies the whole text: `with_text` lends it
+   for the length of a `Send` closure only.
+6. A new command needs an entry in `actions.rs`, a method in `mod.rs` and a branch in `Editing::perform`.
 7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
-   the app through `decoder::system_image` only.
+   the helper process only, through `decoder::decode_native`; a test scans the sources for other calls.
 8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
    looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user
    waits for, like an export or saving, may touch the disk directly.
@@ -935,7 +952,7 @@ shows a checkmark. A new command needs:
 1. a variant of `Action` with its `Spec`: selector, title, toolbar label, tooltip (starting with a verb, at most 75
    characters), shortcut, SF Symbol and when it applies
 2. the method in `src/editor/mod.rs`
-3. a branch in `editing::perform`
+3. a branch in `Editing::perform`
 4. its texts in every `Localizable.strings`
 
 The test `every_command_has_a_method_and_every_method_a_command` checks that registry and methods match. Apple's

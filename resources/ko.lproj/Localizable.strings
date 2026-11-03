@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "먼저 문서를 저장하십시오";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "붙여넣은 이미지는 문서와 같은 위치에 파일로 저장됩니다. 문서를 저장한 다음 이미지를 다시 붙여넣으십시오.";
 "Export fehlgeschlagen" = "내보내기 실패";
+"Das Dokument ließ sich nicht umwandeln." = "문서를 변환할 수 없습니다.";
+"Das Dokument ist zu groß für eine Word-Datei." = "문서가 너무 커서 Word 파일로 만들 수 없습니다.";
 "Gliederung ausblenden" = "개요 가리기";
 "Gliederung einblenden" = "개요 보기";
 "Metadaten" = "메타데이터";

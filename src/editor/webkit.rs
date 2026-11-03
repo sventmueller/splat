@@ -99,7 +99,7 @@ fn send_script(
     web: &WKWebView,
     body: &str,
     args: &[(&str, ScriptValue)],
-    done: Option<&DynBlock<dyn Fn(*mut AnyObject, *mut NSError)>>,
+    done: &DynBlock<dyn Fn(*mut AnyObject, *mut NSError)>,
 ) {
     // SAFETY: `ScriptValue` only makes values that WebKit hands to the script as plain values.
     unsafe {
@@ -108,26 +108,42 @@ fn send_script(
             Some(&script_arguments(args)),
             None,
             &WKContentWorld::pageWorld(web.mtm()),
-            done,
+            Some(done),
         )
     };
 }
 
-pub(super) fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue)]) {
-    send_script(web, body, args, None);
+/// The message of an error WebKit reports, or of what a script threw and did not catch, which it may quote from a document;
+/// only its number goes to the log.
+fn failure(error: *mut NSError, what: &'static str) -> Option<String> {
+    // SAFETY: WebKit passes a valid error or null to the completion handler.
+    let error = unsafe { error.as_ref() }?;
+    crate::diag::report(what, error.code());
+    Some(error.localizedDescription().to_string())
 }
 
+pub(super) fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue)]) {
+    let block = RcBlock::new(|_: *mut AnyObject, error: *mut NSError| {
+        failure(error, "a script failed");
+    });
+    send_script(web, body, args, &block);
+}
+
+/// `done` gets what the script returned, or the message of its failure.
 pub(super) fn call_script(
     web: &WKWebView,
     body: &str,
     args: &[(&str, ScriptValue)],
-    done: impl Fn(Option<&AnyObject>) + 'static,
+    done: impl Fn(Result<Option<&AnyObject>, String>) + 'static,
 ) {
-    let block = RcBlock::new(move |result: *mut AnyObject, _error: *mut NSError| {
-        // SAFETY: WebKit passes a valid object or null to the completion handler.
-        done(unsafe { result.as_ref() });
+    let block = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
+        match failure(error, "a script failed") {
+            Some(message) => done(Err(message)),
+            // SAFETY: WebKit passes a valid object or null to the completion handler.
+            None => done(Ok(unsafe { result.as_ref() })),
+        }
     });
-    send_script(web, body, args, Some(&block));
+    send_script(web, body, args, &block);
 }
 
 /// A PDF of `rect` of the page, without a background of its own.
@@ -139,7 +155,8 @@ pub(super) fn transparent_pdf(web: &WKWebView, rect: NSRect, done: impl Fn(Optio
         config.setRect(rect);
         config.setAllowTransparentBackground(true);
     }
-    let block = RcBlock::new(move |data: *mut NSData, _error: *mut NSError| {
+    let block = RcBlock::new(move |data: *mut NSData, error: *mut NSError| {
+        failure(error, "a PDF of a diagram failed");
         // SAFETY: WebKit passes valid data or null to the completion handler.
         done(unsafe { data.as_ref() });
     });

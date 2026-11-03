@@ -10,7 +10,7 @@ use std::time::{Duration, Instant, SystemTime};
 use objc2_foundation::{NSBundle, NSLocale, NSUserDefaults};
 
 use crate::markdown::typography::Quotes;
-use crate::util::ns;
+use crate::util::{contained, ns, read_regular_file};
 
 /// User defaults key of the typographic punctuation switch in the View menu.
 pub const TYPOGRAPHY_KEY: &str = "TypographicPunctuation";
@@ -177,14 +177,15 @@ fn look_up(question: Question) -> Option<Answer> {
 
 fn send_to_look(question: Question, told: Option<Sender<()>>) {
     crate::util::lane_of(question.folder()).run(move || {
-        let answer = question.look();
+        let answer = contained(|| question.look());
         let changed = with_answers(|answers| {
             let known = answers.known.get_mut(&question)?;
             let seen = std::mem::take(&mut known.waiting);
-            let changed = known.answer != answer;
-            known.answer = answer;
             known.at = Instant::now();
             known.looking = false;
+            let answer = answer?;
+            let changed = known.answer != answer;
+            known.answer = answer;
             Some(changed && !seen)
         })
         .flatten();
@@ -317,8 +318,38 @@ pub fn remote_repository(config: &str) -> Option<Repository> {
 const KEPT_FILES: usize = 64;
 
 type Citations = Arc<HashMap<String, String>>;
-type Bibliography = (PathBuf, SystemTime, Citations);
-static BIBLIOGRAPHIES: Mutex<Vec<Bibliography>> = Mutex::new(Vec::new());
+static BIBLIOGRAPHIES: FileCache<Citations> = FileCache::new();
+
+/// A bibliography larger than this holds no citations a document needs; `bibliography:` can name any file.
+const MAX_BIBLIOGRAPHY_BYTES: u64 = 16 << 20;
+
+/// What was made of the last few files, as long as their date stays. Its lock is never held while a file is read, since a
+/// volume that stopped answering would hold up every other volume behind it.
+struct FileCache<T>(Mutex<Vec<(PathBuf, SystemTime, T)>>);
+
+impl<T: Clone> FileCache<T> {
+    const fn new() -> FileCache<T> {
+        FileCache(Mutex::new(Vec::new()))
+    }
+
+    /// What `path` holds at the date `modified`, by `read` if that is not known yet.
+    fn get(&self, path: &Path, modified: SystemTime, read: impl FnOnce() -> Option<T>) -> Option<T> {
+        {
+            let entries = self.0.lock().ok()?;
+            if let Some((_, _, value)) = entries.iter().find(|(p, m, _)| p == path && *m == modified) {
+                return Some(value.clone());
+            }
+        }
+        let value = read()?;
+        let mut entries = self.0.lock().ok()?;
+        entries.retain(|(p, _, _)| p != path);
+        if entries.len() >= KEPT_FILES {
+            entries.remove(0);
+        }
+        entries.push((path.to_path_buf(), modified, value.clone()));
+        Some(value)
+    }
+}
 
 /// How each entry of the document's BibTeX bibliography reads in a citation, such as `Doe 2020`. The file is the
 /// one front matter names as `bibliography:`, else `references.bib`, `literatur.bib` or `bibliography.bib` beside it.
@@ -344,17 +375,10 @@ fn find_citations(dir: &Path, named: Option<PathBuf>) -> Option<Citations> {
         .chain(["references.bib", "literatur.bib", "bibliography.bib"].map(|n| dir.join(n)))
         .find(|p| p.is_file())?;
     let modified = std::fs::metadata(&path).and_then(|m| m.modified()).ok()?;
-    let mut cache = BIBLIOGRAPHIES.lock().ok()?;
-    if let Some((_, _, entries)) = cache.iter().find(|(p, m, _)| *p == path && *m == modified) {
-        return Some(entries.clone());
-    }
-    let entries = Arc::new(parse_bibtex(&std::fs::read_to_string(&path).ok()?));
-    cache.retain(|(p, _, _)| *p != path);
-    if cache.len() >= KEPT_FILES {
-        cache.remove(0);
-    }
-    cache.push((path, modified, entries.clone()));
-    Some(entries)
+    BIBLIOGRAPHIES.get(&path, modified, || {
+        let bytes = read_regular_file(&path, MAX_BIBLIOGRAPHY_BYTES)?;
+        Some(Arc::new(parse_bibtex(&String::from_utf8(bytes).ok()?)))
+    })
 }
 
 /// Whether text ending in `before` is inside a braced or quoted value, where a field name is only a word.
@@ -449,26 +473,28 @@ pub fn parse_bibtex(text: &str) -> HashMap<String, String> {
 
 type Found = (PathBuf, String, Instant, Option<PathBuf>);
 static FOUND: Mutex<Vec<Found>> = Mutex::new(Vec::new());
-type Note = (PathBuf, SystemTime, Arc<str>);
-static NOTES: Mutex<Vec<Note>> = Mutex::new(Vec::new());
+static NOTES: FileCache<Arc<str>> = FileCache::new();
 
 /// Files an embed shows as note; any other file, such as a key or `.env`, stays out of the preview and its exports.
 const NOTE_EXTENSIONS: [&str; 4] = ["md", "markdown", "mdown", "mkd"];
 
 /// The text of the note `![[target]]` names and the folder it lies in; a note too large to show gives `None`.
 pub fn embedded_note(dir: &Path, target: &str) -> Option<(String, String)> {
-    let found = {
+    let known = {
         let mut cache = FOUND.lock().ok()?;
         cache.retain(|(_, _, at, _)| at.elapsed() < FOUND_FOR);
-        match cache.iter().find(|(d, t, _, _)| d == dir && t == target) {
-            Some((_, _, _, path)) => path.clone(),
-            None => {
-                let path = super::links::find_note(dir, target);
-                cache.push((dir.to_path_buf(), target.to_string(), Instant::now(), path.clone()));
-                path
-            }
+        cache
+            .iter()
+            .find(|(d, t, _, _)| d == dir && t == target)
+            .map(|(_, _, _, path)| path.clone())
+    };
+    let found = known.unwrap_or_else(|| {
+        let path = super::links::find_note(dir, target);
+        if let Ok(mut cache) = FOUND.lock() {
+            cache.push((dir.to_path_buf(), target.to_string(), Instant::now(), path.clone()));
         }
-    }?;
+        path
+    })?;
     let extension = found.extension()?.to_str()?.to_ascii_lowercase();
     if !NOTE_EXTENSIONS.contains(&extension.as_str()) {
         return None;
@@ -479,22 +505,53 @@ pub fn embedded_note(dir: &Path, target: &str) -> Option<(String, String)> {
     }
     let modified = meta.modified().ok()?;
     let folder = found.parent()?.to_string_lossy().into_owned();
-    let mut notes = NOTES.lock().ok()?;
-    if let Some((_, _, text)) = notes.iter().find(|(p, m, _)| *p == found && *m == modified) {
-        return Some((text.to_string(), folder));
-    }
-    let text: Arc<str> = std::fs::read_to_string(&found).ok()?.into();
-    notes.retain(|(p, _, _)| *p != found);
-    if notes.len() >= KEPT_FILES {
-        notes.remove(0);
-    }
-    notes.push((found, modified, text.clone()));
+    let text = NOTES.get(&found, modified, || {
+        let bytes = read_regular_file(&found, MAX_NOTE_BYTES)?;
+        Some(Arc::from(String::from_utf8(bytes).ok()?))
+    })?;
     Some((text.to_string(), folder))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_cache_stays_free_for_others_while_a_file_is_read() {
+        static CACHE: FileCache<u32> = FileCache::new();
+        let date = SystemTime::UNIX_EPOCH;
+        let (reading, started) = channel::<()>();
+        let (free, finish) = channel::<()>();
+        let slow = std::thread::spawn(move || {
+            CACHE.get(Path::new("/hangs"), date, || {
+                reading.send(()).unwrap();
+                finish.recv().unwrap();
+                Some(1)
+            })
+        });
+        started.recv().unwrap();
+        let quick = std::thread::spawn(move || CACHE.get(Path::new("/answers"), date, || Some(2)));
+        assert_eq!(quick.join().unwrap(), Some(2), "held up by the file that hangs");
+        free.send(()).unwrap();
+        assert_eq!(slow.join().unwrap(), Some(1));
+        assert_eq!(CACHE.get(Path::new("/hangs"), date, || None), Some(1), "known by now");
+        let later = date + Duration::from_secs(1);
+        assert_eq!(
+            CACHE.get(Path::new("/hangs"), later, || Some(3)),
+            Some(3),
+            "a new date reads anew"
+        );
+    }
+
+    #[test]
+    fn a_bibliography_too_large_to_be_one_is_not_read() {
+        let dir = std::env::temp_dir().join(format!("splat-bib-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = std::fs::File::create(dir.join("references.bib")).unwrap();
+        file.set_len(MAX_BIBLIOGRAPHY_BYTES + 1).unwrap();
+        assert!(citations(&dir, "").is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn remotes_lead_to_their_code_host() {

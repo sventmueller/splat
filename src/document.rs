@@ -107,15 +107,39 @@ impl FileFormat {
     }
 }
 
+/// What the saves under way write. A save that takes its text before an earlier one has ended writes the newest text in
+/// both, so the text goes with the last of them; one that fails never reports its end and leaves the text in place.
+#[derive(Default)]
+struct Saving {
+    bytes: Option<Vec<u8>>,
+    under_way: usize,
+}
+
+impl Saving {
+    fn started(&mut self, bytes: Option<Vec<u8>>) {
+        self.bytes = bytes;
+        self.under_way += 1;
+    }
+
+    fn ended(&mut self) {
+        self.under_way = self.under_way.saturating_sub(1);
+        if self.under_way == 0 {
+            self.bytes = None;
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Ivars {
-    initial_text: RefCell<String>,
+    /// The text until the editor takes it over, which from then on holds the only copy.
+    initial_text: RefCell<Option<String>>,
     format: Cell<FileFormat>,
     editor: RefCell<Option<Weak<EditorController>>>,
     /// How the file looked when its content was last compared with the text.
     seen: Cell<Stamp>,
+    failed_reads: Cell<FailedReads>,
     /// What the save under way writes; the only state `dataOfType` reads, since AppKit calls that on another thread.
-    to_write: std::sync::Mutex<Option<Vec<u8>>>,
+    saving: std::sync::Mutex<Saving>,
 }
 
 define_class!(
@@ -142,7 +166,7 @@ define_class!(
 
         #[unsafe(method(makeWindowControllers))]
         fn make_window_controllers(&self) {
-            let text = self.ivars().initial_text.borrow().clone();
+            let text = self.ivars().initial_text.take().unwrap_or_else(|| self.text());
             let controller = EditorController::new(self.mtm(), self, &text);
             *self.ivars().editor.borrow_mut() = Some(Weak::from_retained(&controller));
             self.addWindowController(&controller);
@@ -170,11 +194,21 @@ define_class!(
         // `dataOfType`, and file and token then stand for the same text, however long this save waits behind another.
         #[unsafe(method_id(changeCountTokenForSaveOperation:))]
         fn change_count_token(&self, operation: objc2_app_kit::NSSaveOperationType) -> Retained<AnyObject> {
-            if let Ok(mut to_write) = self.ivars().to_write.lock() {
-                *to_write = Some(self.encoded_text());
+            if let Ok(mut saving) = self.ivars().saving.lock() {
+                saving.started(self.encoded_text());
             }
             // SAFETY: NSDocument's implementation, with this method's signature.
             unsafe { msg_send![super(self), changeCountTokenForSaveOperation: operation] }
+        }
+
+        // AppKit calls this once a save has written its file.
+        #[unsafe(method(updateChangeCountWithToken:forSaveOperation:))]
+        fn update_change_count(&self, token: &AnyObject, operation: objc2_app_kit::NSSaveOperationType) {
+            // SAFETY: NSDocument's implementation, with this method's signature.
+            let _: () = unsafe { msg_send![super(self), updateChangeCountWithToken: token, forSaveOperation: operation] };
+            if let Ok(mut saving) = self.ivars().saving.lock() {
+                saving.ended();
+            }
         }
 
         // AppKit then writes on another thread, keeping the main thread waiting only until `dataOfType` has returned.
@@ -208,21 +242,26 @@ define_class!(
 
         #[unsafe(method_id(dataOfType:error:))]
         fn data_of_type(&self, _type_name: &NSString, error: *mut *mut NSError) -> Option<Retained<NSData>> {
-            let bytes = self.bytes_to_write();
-            if bytes.is_none() && !error.is_null() {
+            let data = self.data_to_write();
+            if data.is_none() && !error.is_null() {
                 // SAFETY: AppKit passes a valid pointer for the error, checked for null above.
                 unsafe { *error = Retained::autorelease_ptr(write_error()) };
             }
-            bytes.map(|bytes| NSData::with_bytes(&bytes))
+            data
         }
 
         #[unsafe(method_id(printOperationWithSettings:error:))]
         fn print_operation(
             &self,
             _settings: &NSDictionary<NSString, AnyObject>,
-            _error: *mut *mut NSError,
+            error: *mut *mut NSError,
         ) -> Option<Retained<NSPrintOperation>> {
-            self.editor().map(|editor| editor.print_operation(&self.printInfo()))
+            let operation = self.editor().map(|editor| editor.print_operation(&self.printInfo()));
+            if operation.is_none() && !error.is_null() {
+                // SAFETY: AppKit passes a valid pointer for the error, checked for null above.
+                unsafe { *error = Retained::autorelease_ptr(write_error()) };
+            }
+            operation
         }
     }
 );
@@ -304,6 +343,35 @@ fn reaction(edited: bool, same_content: bool, known_date: Option<f64>, file_date
     }
 }
 
+/// A file that grew beyond this while it was open is not read again behind the user's back.
+const MAX_RELOAD_BYTES: u64 = 4 << 30;
+
+/// How often a file that reads as no text is read again, as one being written may for a moment.
+const READ_TRIES: u8 = 5;
+
+/// Failed reads of one version of a file.
+#[derive(Clone, Copy, Default, PartialEq, Debug)]
+struct FailedReads {
+    version: Stamp,
+    tries: u8,
+}
+
+impl FailedReads {
+    /// Counts a failed read of the version `now`.
+    fn after_another(self, now: Stamp) -> FailedReads {
+        let tries = if self.version == now {
+            self.tries.saturating_add(1)
+        } else {
+            1
+        };
+        FailedReads { version: now, tries }
+    }
+
+    fn try_again(self) -> bool {
+        self.tries < READ_TRIES
+    }
+}
+
 /// What another thread found at a document's path.
 struct Look {
     path: String,
@@ -358,7 +426,7 @@ fn look(path: String, seen: Stamp) -> Look {
     let changed = if now == seen {
         None
     } else {
-        crate::util::read_regular_file(std::path::Path::new(&path), u64::MAX - 1).map(|bytes| {
+        crate::util::read_regular_file(std::path::Path::new(&path), MAX_RELOAD_BYTES).map(|bytes| {
             let date = NSFileManager::defaultManager()
                 .attributesOfItemAtPath_error(&ns(&path))
                 .ok()
@@ -403,7 +471,7 @@ impl MdDocument {
     pub fn text(&self) -> String {
         match self.editor() {
             Some(editor) => editor.source_text(),
-            None => self.ivars().initial_text.borrow().clone(),
+            None => self.ivars().initial_text.borrow().clone().unwrap_or_default(),
         }
     }
 
@@ -414,35 +482,58 @@ impl MdDocument {
         };
         let (format, text) = FileFormat::of(&text);
         self.ivars().format.set(FileFormat { encoding, ..format });
-        *self.ivars().initial_text.borrow_mut() = text.to_string();
-        if let Some(editor) = self.editor() {
-            editor.replace_all_text(text);
+        match self.editor() {
+            Some(editor) => editor.replace_all_text(text),
+            None => self.set_initial_text(text),
         }
         true
     }
 
     /// What saving writes now, from whichever thread AppKit saves on.
-    fn bytes_to_write(&self) -> Option<Vec<u8>> {
+    fn data_to_write(&self) -> Option<Retained<NSData>> {
         if MainThreadMarker::new().is_some() {
-            return Some(self.encoded_text());
+            return self.encoded_text().as_deref().map(NSData::with_bytes);
         }
-        self.ivars().to_write.lock().ok()?.clone()
+        self.ivars()
+            .saving
+            .lock()
+            .ok()?
+            .bytes
+            .as_deref()
+            .map(NSData::with_bytes)
     }
 
-    fn encoded_text(&self) -> Vec<u8> {
-        let text = match self.editor() {
-            Some(editor) => editor.exact_text(),
-            None => self.text(),
-        };
-        self.ivars().format.get().encode(&text)
+    /// `None` once the editor that held the text is gone: a save must then fail rather than empty the file.
+    fn encoded_text(&self) -> Option<Vec<u8>> {
+        let format = self.ivars().format.get();
+        match self.editor() {
+            Some(editor) => Some(format.encode(&editor.exact_text())),
+            None => self
+                .ivars()
+                .initial_text
+                .borrow()
+                .as_deref()
+                .map(|text| format.encode(text)),
+        }
+    }
+
+    /// Whether the document holds the text beside its editor.
+    #[cfg(feature = "selftest")]
+    pub fn keeps_a_copy_of_its_text(&self) -> bool {
+        self.ivars().initial_text.borrow().is_some() || self.ivars().saving.lock().is_ok_and(|s| s.bytes.is_some())
     }
 
     /// Whether `bytes` are what saving the document now would write.
     fn shows(&self, bytes: &[u8]) -> bool {
         let format = self.ivars().format.get();
         match self.editor() {
-            Some(editor) => format.encode(&editor.snapshot().text) == bytes,
-            None => format.encode(&self.ivars().initial_text.borrow()) == bytes,
+            Some(editor) => editor.on_source_text(|text| format.encode(text) == bytes),
+            None => self
+                .ivars()
+                .initial_text
+                .borrow()
+                .as_deref()
+                .is_some_and(|text| format.encode(text) == bytes),
         }
     }
 
@@ -473,19 +564,54 @@ impl MdDocument {
                     undo.removeAllActions();
                 }
             }
-            // The next look tries again, as a file that is being written may read wrong for a moment.
-            Reaction::Reread => self.ivars().seen.set(before),
+            Reaction::Reread => {
+                let failed = self.ivars().failed_reads.get().after_another(now);
+                self.ivars().failed_reads.set(failed);
+                if failed.try_again() {
+                    self.ivars().seen.set(before);
+                }
+            }
         }
     }
 
     pub fn set_initial_text(&self, text: &str) {
-        *self.ivars().initial_text.borrow_mut() = text.to_string();
+        *self.ivars().initial_text.borrow_mut() = Some(text.to_string());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Encoding, FileFormat, Reaction, reaction};
+    use super::{Encoding, FailedReads, FileFormat, READ_TRIES, Reaction, Saving, reaction};
+
+    #[test]
+    fn the_text_of_a_save_goes_with_the_last_save_under_way() {
+        let mut saving = Saving::default();
+        saving.started(Some(vec![1]));
+        saving.started(Some(vec![2]));
+        saving.ended();
+        assert_eq!(saving.bytes, Some(vec![2]), "the second save has yet to read it");
+        saving.ended();
+        assert_eq!(saving.bytes, None);
+        saving.ended();
+        saving.started(Some(vec![3]));
+        assert_eq!(saving.bytes, Some(vec![3]), "an end too many counts for nothing");
+    }
+
+    #[test]
+    fn a_file_that_stays_unreadable_is_not_read_forever() {
+        let version = |seconds| Some((std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds), 1));
+        let mut failed = FailedReads::default();
+        for _ in 1..READ_TRIES {
+            failed = failed.after_another(version(1));
+            assert!(failed.try_again());
+        }
+        failed = failed.after_another(version(1));
+        assert!(!failed.try_again());
+        assert!(
+            failed.after_another(version(2)).try_again(),
+            "a new version gets new tries"
+        );
+    }
 
     #[test]
     fn a_file_may_only_reread_a_document_without_changes() {

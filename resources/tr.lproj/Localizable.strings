@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Önce Belgeyi Kaydedin";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Yapıştırılan görüntüler belgenin yanına dosya olarak kaydedilir. Belgeyi kaydedin, ardından görüntüyü yeniden yapıştırın.";
 "Export fehlgeschlagen" = "Dışa Aktarma Başarısız";
+"Das Dokument ließ sich nicht umwandeln." = "Belge dönüştürülemedi.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Belge bir Word dosyası için çok büyük.";
 "Gliederung ausblenden" = "Ana Hattı Gizle";
 "Gliederung einblenden" = "Ana Hattı Göster";
 "Metadaten" = "Meta Veriler";

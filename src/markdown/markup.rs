@@ -331,6 +331,22 @@ pub enum Tag {
 
 /// The tag at `start`, which holds a `<`, and the offset after it.
 pub fn read_tag(html: &str, start: usize) -> Option<(Tag, usize)> {
+    read_tag_noting(html, start, |_, _| {})
+}
+
+/// Where the attribute `key`, in lower case, stands in `tag`, a whole tag: from its name to the end of its value.
+pub fn attribute_range(tag: &str, key: &str) -> Option<Range<usize>> {
+    let mut found = None;
+    read_tag_noting(tag, 0, |name, range| {
+        if name == key {
+            found.get_or_insert(range);
+        }
+    })?;
+    found
+}
+
+/// `read_tag` that tells `note` the name and place of every attribute it reads.
+fn read_tag_noting(html: &str, start: usize, mut note: impl FnMut(&str, Range<usize>)) -> Option<(Tag, usize)> {
     let rest = &html[start + 1..];
     let (closing, rest, offset) = match rest.strip_prefix('/') {
         Some(r) => (true, r, start + 2),
@@ -365,10 +381,16 @@ pub fn read_tag(html: &str, start: usize) -> Option<(Tag, usize)> {
             // Outside a quoted value this starts the next tag; going on would read every tag of a text without an end
             // to its end, once per tag.
             b'<' => return None,
-            _ => match read_attribute(html, &mut i) {
-                Some(attribute) => attrs.push(attribute),
-                None => i += 1,
-            },
+            _ => {
+                let from = i;
+                match read_attribute(html, &mut i) {
+                    Some(attribute) => {
+                        note(&attribute.0, from..i);
+                        attrs.push(attribute);
+                    }
+                    None => i += 1,
+                }
+            }
         }
     }
 }
@@ -390,10 +412,11 @@ fn read_attribute(html: &str, i: &mut usize) -> Option<(String, String)> {
         return None;
     }
     let key = html[*i..*i + key_len].to_ascii_lowercase();
-    *i = behind_spaces(html, *i + key_len);
+    *i += key_len;
+    let behind_key = behind_spaces(html, *i);
     let mut value = String::new();
-    if html.as_bytes().get(*i) == Some(&b'=') {
-        *i = behind_spaces(html, *i + 1);
+    if html.as_bytes().get(behind_key) == Some(&b'=') {
+        *i = behind_spaces(html, behind_key + 1);
         match html.as_bytes().get(*i) {
             Some(&q @ (b'"' | b'\'')) => {
                 let end = html[*i + 1..].find(q as char).map_or(html.len(), |e| *i + 1 + e);
@@ -544,6 +567,17 @@ pub fn stray_closes(html: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_attribute_is_found_by_its_name_and_not_in_a_value() {
+        let at = |tag: &'static str, key: &str| attribute_range(tag, key).map(|range| &tag[range]);
+        let tag = "<details title=\"open\" OPEN = 'a b' c >";
+        assert_eq!(at(tag, "open"), Some("OPEN = 'a b'"));
+        assert_eq!(at(tag, "c"), Some("c"), "without what stands behind it");
+        assert_eq!(at("<details a/b open>", "open"), Some("open"), "as `read_tag` reads it");
+        assert_eq!(at("<details>", "open"), None);
+        assert_eq!(at("<details open", "open"), None, "no whole tag");
+    }
 
     #[test]
     fn a_comment_closes_nothing() {

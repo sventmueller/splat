@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Tallenna dokumentti ensin";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Sijoitetut kuvat tallennetaan tiedostoina dokumentin viereen. Tallenna dokumentti ja sijoita kuva sitten uudelleen.";
 "Export fehlgeschlagen" = "Vienti epäonnistui";
+"Das Dokument ließ sich nicht umwandeln." = "Dokumenttia ei voitu muuntaa.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokumentti on liian suuri Word-tiedostoksi.";
 "Gliederung ausblenden" = "Kätke jäsennys";
 "Gliederung einblenden" = "Näytä jäsennys";
 "Metadaten" = "Metatiedot";

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Najpierw zachowaj dokument";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Wklejone obrazki są zapisywane jako pliki obok dokumentu. Zachowaj go, a następnie wklej obrazek ponownie.";
 "Export fehlgeschlagen" = "Eksport nie powiódł się";
+"Das Dokument ließ sich nicht umwandeln." = "Nie udało się przekonwertować dokumentu.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokument jest za duży na plik Word.";
 "Gliederung ausblenden" = "Ukryj konspekt";
 "Gliederung einblenden" = "Pokaż konspekt";
 "Metadaten" = "Metadane";

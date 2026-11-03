@@ -566,6 +566,7 @@ Splat은 [objc2](https://github.com/madsmtm/objc2)를 통해 AppKit 및 WebKit�
 
 - Command Line Tools가 설치된 macOS(`xcode-select --install`). Xcode는 필요하지 않으며, Splat은 `actool`, `ibtool`, `metal` 없이 빌드됩니다.
 - Rust 1.99(`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml)에 CI가 사용하는 정확한 버전이 지정되어 있습니다. rustup은 이를 자동으로 설치하지만 Homebrew의 Rust는 이 파일을 무시합니다. 이 파일의 버전을 올리면 새 컴파일러와 clippy 경고가 프로젝트에 반영됩니다.
+- rustup. `make lint`, `make check`, `make universal`에 필요합니다. `cargo xtask check-library`가 라이브러리를 Linux용으로 빌드해 macOS가 필요 없음을 보여 주는데, Homebrew의 Rust에는 다른 타깃이 없기 때문입니다.
 
 [Makefile](../../../Makefile)에는 짧은 진입점이 있으며, `make help`가 모두 보여 줍니다.
 
@@ -622,21 +623,24 @@ cargo xtask vendor fetch       # vendor.lock의 버전을 바꾼 뒤 다시 다�
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | 더 긴 무작위 탐색; `SPLAT_FUZZ_SEED`로 입력을 바꿈 |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | 다른 언어가 미완성일 때 한 언어만 검사 |
 | `cargo clippy --release --all-targets [--features selftest]` | 린트. 모든 `unsafe` 블록의 근거, 함수 길이, 라이브러리에서는 숫자 변환까지 검사 |
+| `cargo xtask check-library` | 라이브러리가 Linux용으로 빌드되므로, 그 안의 어떤 것도 macOS를 필요로 하지 않음 |
 | `cargo xtask vendor check` | JavaScript 라이브러리가 `vendor.lock`과 바이트 단위로 일치하는지 |
-| `cargo xtask selftest probe` | 윈도우 없이, 각각 기대 결과와 함께: 수식, 다이어그램, 프로세스 내부 서버에 대한 웹 이미지, 차단된 주소, 웹 뷰의 방어 |
+| `cargo xtask selftest probe` | 윈도우 없이, 각각 기대 결과와 함께: 수식, 다이어그램, 프로세스 내부 서버에 대한 웹 이미지, 차단된 주소, 모든 명령이 쓰는 텍스트, 각 이미지 형식을 두 가지 내보내기로 통과시키기, 응답을 멈추는 페이지, 그리고 방어가 없는 페이지에 대한 웹 뷰의 방어. 약 30초 걸립니다. 앱이 화면 앞에 있어야 하는 것은 잠긴 화면에서 건너뜁니다 |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | 실행 중인 앱을 클릭 하나하나 검사합니다. 윈도우를 열고 입력하며, 약 4분 동안 Mac을 점유합니다. `--scenarios`는 두 번째 부분만 약 1분 30초 동안 실행 |
 | `cargo xtask selftest resize` | 구분선을 옮긴 뒤 윈도우를 넓힙니다: 윈도우 크기를 바꾸는 동안 소스가 줄 바꿈을 다시 합니다. 약 10초 걸림 |
 | `cargo xtask selftest bench <file.md>` | 큰 파일을 열고, 입력하고, 스크롤하는 시간 측정 |
-| `cargo test --release -- --ignored partial_updates` | 10MB에서의 키 입력 한 번: 부분 업데이트와 전체 업데이트의 결과 및 시간 제한 비교 |
-| `cargo test --release --test hostile` | 스택을 넘치게 하거나 제곱 시간이 걸리도록 만든 문서를 구문 분석, 레이아웃, 두 가지 내보내기, 키 입력, 명령에 통과시킴 |
+| `cargo test --release -- --ignored partial_updates` | 10MB에서의 키 입력 한 번: 부분 업데이트와 전체 업데이트 비교, 같은 결과를 최대 4분의 1의 시간에 |
+| `cargo test --release --test hostile` | 스택을 넘치게 하거나 제곱 시간이 걸리도록 만든 문서를, 각각 시간이 텍스트와 같은 비율로 늘어나야 하는 두 가지 크기로, 구문 분석, 레이아웃, 두 가지 내보내기, 키 입력, 명령에 통과시킴 |
 | `make mutants` | `src/markdown/`와 `src/preview/`에 결함을 하나씩 심고 [cargo-mutants](https://mutants.rs)(`cargo install cargo-mutants`)로 실행하여 어떤 결함을 테스트가 알아채지 못하는지 알려 줍니다. 몇 시간 걸리며, `FILE=src/preview/bridge.rs`로 범위를 좁힘 |
 | `cargo test --release --test decoder` | 디코더 프로세스가 이미지를 디코딩하고 파일과 네트워크에는 접근하지 못하는지 |
 | `make coverage` | `cargo test`와 모든 자체 테스트의 줄 커버리지를 [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)(`brew install cargo-llvm-cov llvm`)로 측정하며 최소 기준에 못 미치면 실패합니다. 약 5분 동안 Mac을 점유 |
-| `make coverage-library` | `src/markdown/`, `src/preview/`, `i18n.rs`의 최소 기준을 `cargo test`만으로 측정 |
+| `make coverage-library` | `src/markdown/`, `src/preview/`, `i18n.rs`의 더 높은 최소 기준을 `cargo test`만으로 측정 |
 
-단위 테스트는 테스트 대상 코드 옆에 있습니다. `tests/`에는 라이브러리에 바깥에서 접근하는 테스트가 있습니다. `sync.rs`의 테스트와 `src/fuzz.rs`의 생성기를 공유하는 `robustness.rs`의 무작위 테스트, 해를 입히도록 만든 문서를 다루는 `hostile.rs`, 빌드된 프로그램을 시작하는 디코더 테스트가 그것입니다. 윈도우가 필요 없는 `src/editor/`의 판단은 자체 테스트가 있는 독립 함수에 들어 있습니다. 컨트롤러가 아는 모든 것과 그것이 바뀌는 모든 방식은 `state.rs`에, 렌더링 규칙은 `render_queue.rs`에, 텍스트 복사본은 `sync.rs`에 있습니다. 윈도우 자체 테스트의 한 단계가 헛되이 기다리면 실행은 실패합니다. 윈도우 자체 테스트는 주된 클릭 순서가 끝난 뒤 `src/editor/selftest/scenarios.rs`에서 두 번째 부분을 실행합니다. 모든 포맷 및 표 명령, 대화상자, 링크 클릭, 붙여넣기, 드롭, 내보내기, 큰 변경, 디스크에서 바뀌는 이미지, 메모리 압박, 거대한 문서, 충돌 후 복구가 그 대상입니다.
+단위 테스트는 테스트 대상 코드 옆에 있습니다. `tests/`에는 라이브러리에 바깥에서 접근하는 테스트가 있습니다. `sync.rs`의 테스트와 `src/fuzz.rs`의 생성기를 공유하는 `robustness.rs`의 무작위 테스트, 해를 입히도록 만든 문서를 다루는 `hostile.rs`, 빌드된 프로그램을 시작하는 디코더 테스트가 그것입니다. 윈도우가 필요 없는 `src/editor/`의 판단은 자체 테스트가 있는 독립 함수에 들어 있습니다. 컨트롤러가 아는 모든 것과 그것이 바뀌는 모든 방식은 `state.rs`에, 렌더링 규칙은 `render_queue.rs`에, 텍스트 복사본은 `sync.rs`에, 단락 스타일·글꼴·색상은 값으로 `render.rs`에, 도구 막대 식별자가 무엇을 뜻하는지는 `toolbar.rs`에, 링크 클릭이 무엇을 뜻하는지는 `navigation.rs`에 있습니다.
 
-커버리지에는 두 가지 최소 기준이 있습니다. 모든 모듈은 줄의 80% 이상, 모든 모듈을 합치면 85% 이상이어야 합니다. `make coverage`는 `cargo test`와 자체 테스트를 함께 측정하며 둘 중 하나라도 못 미치면 실패합니다. 이 기준과 충돌 때만 실행되는 `main.rs`의 패닉 훅 같은 몇몇 예외는 그 이유와 함께 [xtask](../../../xtask/src/coverage.rs)에 있습니다. 측정용 빌드는 `target/coverage/`에 만들어지므로 측정 코드가 `target/release/`나 디스크 이미지에 들어가는 일은 없습니다. 디코더 보조 프로세스는 스스로를 가두기 전에 측정 파일을 열어 두므로 이것도 측정됩니다.
+윈도우 자체 테스트의 한 단계는 시간이 아니라 이름 붙은 조건을 기다립니다. 신호를 주지 않는 것, 예를 들어 무언가가 없음을 확인하는 경우만 이유를 적은 대기를 남깁니다. 헛되이 기다리는 것은 오지 않은 것을 이름으로 알리는 실패한 검사이고, 패닉하는 단계도 실패한 검사이며, 어느 쪽이든 실행은 계속됩니다. 이번 실행에서 아무것도 말할 수 없는 검사는 `SELFTEST SKIP`을 보고합니다. xtask가 이를 나열하며, 통과도 실패도 아닙니다. xtask는 각 모드에, 그리고 `--scenarios`에는 따로, 검사의 약 10분의 9가 실행될 것을 요구합니다. 윈도우 자체 테스트는 주된 클릭 순서가 끝난 뒤 `src/editor/selftest/scenarios.rs`에서 두 번째 부분을 실행합니다. 모든 포맷 및 표 명령, 대화상자, 링크 클릭, 붙여넣기, 드롭, 내보내기, 큰 변경, 디스크에서 바뀌는 이미지, 메모리 압박, 거대한 문서, 충돌 후 복구가 그 대상입니다.
+
+커버리지에는 두 가지 최소 기준이 있습니다. 모든 모듈은 줄의 84% 이상, 모든 모듈을 합치면 96% 이상이어야 합니다. `make coverage`는 `cargo test`와 자체 테스트를 함께 측정하며 둘 중 하나라도 못 미치면 실패합니다. `make coverage-library`는 윈도우가 필요 없는 부분을 90%와 97%로 유지합니다. 이 기준과 충돌 때만 실행되는 `main.rs`의 패닉 훅 같은 몇몇 예외는 그 이유와 함께 [xtask](../../../xtask/src/coverage.rs)에 있습니다. 측정용 빌드는 `target/coverage/`에 만들어지므로 측정 코드가 `target/release/`나 디스크 이미지에 들어가는 일은 없습니다. 디코더 보조 프로세스는 스스로를 가두기 전에 측정 파일을 열어 두므로 이것도 측정됩니다.
 
 CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 대한 모든 푸시와 모든 풀 리퀘스트에서 Apple Silicon에서는 `make check`, `make coverage-library`, 유니버설 빌드를, Intel에서는 `cargo test`를 실행합니다. 매일 밤 [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml)이 새로운 무작위 입력으로 `make test-long`을 실행합니다. 자체 테스트와 디스크 이미지는 개발자의 Mac에서만 실행합니다. 화면과 키체인의 서명 인증서가 필요하기 때문입니다.
 
@@ -644,36 +648,39 @@ CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 �
 
 ### 프로젝트 구조
 
-`src/lib.rs`는 윈도우가 필요 없는 모든 것을 `splat`이라는 독립된 라이브러리로 만듭니다. `markdown/`, `preview/`, `i18n.rs`, 테스트 생성기 `fuzz.rs`가 여기에 속합니다. `src/main.rs`의 앱이 이를 기반으로 합니다.
+`src/lib.rs`는 윈도우가 필요 없는 모든 것을 `splat`이라는 독립된 라이브러리로 만듭니다. `markdown/`, `preview/`, `i18n.rs`, 테스트 생성기 `fuzz.rs`가 여기에 속합니다. macOS 없이 빌드됩니다. `src/main.rs`의 앱이 이를 기반으로 합니다.
 
-- `src/markdown/`: 파서 바인딩(comrak), 구문 색상, 순수한 텍스트 편집(`Edit`)으로 구현된 모든 명령. 그리고 편집 후의 재구문 분석(`incremental.rs`), 삽입된 HTML용 리더(`markup.rs`), 타이포그래피, 태그, 본문의 참조와 인용(`typography.rs`), 텍스트의 모양과 그것을 만드는 Markdown 및 HTML(`style.rs`), 주소로 허용되는 것(`url.rs`), HTML 및 Word 내보내기(`html.rs`, 그리고 `docx/html.rs`와 `docx/xml.rs`를 쓰는 `docx.rs`). 미리보기와 두 가지 내보내기는 모두 같은 트리 `Doc`를 읽습니다. AppKit은 없습니다.
-- `src/preview/`: 미리보기 레이아웃, 그 안의 삽입된 HTML(`layout/html.rs`), 미리보기와 소스 사이의 매핑(`Bridge`, `Index`). AppKit은 없습니다.
-- `src/editor/`: 윈도우. `EditorController` 객체 하나가 두 뷰의 델리게이트로서 AppKit을 담당하며, 작업은 책임별로 나뉩니다.
+- `src/markdown/`: 모든 소비자가 읽는 트리, 곧 자체 텍스트를 소유하는 `doc/`의 `Doc`과, 파서에 대한 유일한 바인딩인 `reader/`: comrak은 다른 어디에도 이름이 나오지 않고, `reader/assumptions.rs`에 코드가 comrak에 대해 가정하는 것이 담겨 있습니다. 구문 색상, 그리고 순수한 텍스트 편집(`Edit`)으로 구현된 모든 명령은 `commands/`에 있습니다. 그리고 편집 후의 재구문 분석(`incremental.rs`), 삽입된 HTML용 리더(`markup.rs`), 타이포그래피, 태그, 본문의 참조와 인용(`typography.rs`), 텍스트의 모양과 그것을 만드는 Markdown 및 HTML(`style.rs`), 주소로 허용되는 것(`url.rs`), HTML 및 Word 내보내기(`html.rs`, 그리고 `docx/html.rs`와 `docx/xml.rs`를 쓰는 `docx.rs`). 위치에는 고유한 타입이 있습니다. 소스 텍스트에서는 `Byte`, 소스 뷰에서는 `U16`, 미리보기 뷰에서는 `Shown`입니다(`text.rs`). AppKit은 없습니다.
+- `src/preview/`: `layout/`의 미리보기 레이아웃과 그 안의 삽입된 HTML(`layout/html.rs`), 미리보기와 소스 사이의 매핑(`Bridge`, `Index`). `Bridge`는 `Doc`의 다른 버전에 대한 레이아웃을 거부합니다. AppKit은 없습니다.
+- `src/editor/`: 윈도우. `EditorController` 객체 하나가 두 뷰의 델리게이트로서 AppKit을 담당하고 컴포넌트에 전달합니다. 컴포넌트는 컨트롤러 위의 작은 구조체와 그것이 소유한 상태이며, 그 필드에는 다른 모듈이 접근할 수 없습니다.
 
 | 모듈 | 책임 |
 |---|---|
-| `mod.rs` | 클래스, 델리게이트 메서드, `invalidate` |
+| `mod.rs` | 클래스, 전달하는 델리게이트 메서드, `invalidate` |
+| `panes.rs` | `Panes`: 텍스트 뷰, 개요, 패널의 표시와 숨김, 그리고 뷰에 접근하게 해 주는 것 |
 | `state.rs` | 컨트롤러가 문서에 대해 아는 것과 그것이 바뀌는 모든 방식; 필드는 비공개이며 뷰를 건드리지 않음 |
+| `model.rs` | 뷰에 닿을 수 없는 클로저에 상태와 텍스트 복사본을 빌려줌 |
 | `actions.rs` | 명령 레지스트리: 셀렉터, 제목, 단축키, 심볼, 명령이 적용되는 때 |
-| `editing.rs` | 명령 실행과 검증, 미리보기에서의 입력 |
-| `update.rs` | 구문 분석, 색상 입히기, 미리보기 업데이트; 편집 후에는 영향을 받는 단락만 |
+| `editing.rs` | `Editing`: 명령 실행과 검증, 미리보기에서의 입력 |
+| `update.rs` | `Updater`: 구문 분석, 색상 입히기, 미리보기 업데이트; 편집 후에는 영향을 받는 단락만 |
 | `sync.rs` | 텍스트 복사본과 블록 관리, AppKit 없이 무작위 테스트 포함 |
-| `progressive.rs` | 큰 미리보기를 단계별로 렌더링 |
-| `selection.rs`, `scroll.rs` | 두 패널의 선택과 스크롤 위치를 일치시킴 |
-| `atom.rs`, `atom_edit.rs` | 수식 및 다이어그램 편집기 |
-| `navigation.rs`, `links.rs` | 링크, 위키 링크, 태그, 작업 체크박스, 접기, 각주 |
+| `progressive.rs` | `Progressive`: 큰 미리보기를 단계별로 렌더링 |
+| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: 두 패널의 선택과 스크롤 위치를 일치시킴 |
+| `atom.rs`, `atom/edit.rs` | `AtomEditor`: 수식 및 다이어그램 편집기 |
+| `navigation.rs`, `links.rs` | `Links`: 링크, 위키 링크, 태그, 작업 체크박스, 접기, 각주 |
 | `env.rs` | 미리보기가 텍스트 바깥에서 읽는 것: 타이포그래피 문장 부호, `@name`과 `#12`를 위한 저장소, BibTeX 파일, 삽입된 메모 |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | 미리보기 텍스트, 로컬 및 원격 이미지 |
+| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | 미리보기 텍스트, 로컬 및 원격 이미지; `images.rs`의 `Pictures` |
 | `attributes.rs` | 텍스트 속성; 각 키는 기대하는 타입의 값만 받음 |
 | `shadow.rs` | 충돌 후 복구를 위한 저장하지 않은 텍스트의 복사본 |
 | `decoder.rs` | 이미지와 그래픽을 디코딩하는 샌드박스 보조 프로세스 |
-| `export.rs`, `outline.rs` | HTML 및 Word 내보내기; 개요 사이드바 |
+| `export.rs`, `outline.rs` | `Sharing`: HTML 및 Word 내보내기, 공유 파일, 인쇄; 개요 사이드바 |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | MathJax, Mermaid, Graphviz, PlantUML, 비주얼 수식 편집기를 위한 WebKit; 무엇을 언제 렌더링할지에 대한 규칙(WebKit과는 별개) |
 | `webkit.rs` | WebKit 호출; 내비게이션 델리게이트의 수명만 `js.rs`와 `mathfield.rs`에 남음 |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | 윈도우, 도구 막대, 텍스트 뷰, 대화상자, 색상 |
+| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | 윈도우 구성, 도구 막대, 텍스트 뷰, 대화상자, 색상 |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: 메뉴 막대, 앱 델리게이트, 문서(`NSDocument`의 서브클래스인 `MDDocument`).
-- `src/i18n.rs`와 `resources/*.lproj`: 35개 언어; 키는 독일어 텍스트입니다.
+- `src/i18n.rs`와 `resources/*.lproj`: 35개 언어; 키는 독일어 텍스트이며, 앱은 시작할 때 인터페이스 언어의 표를 설치합니다.
+- `src/util/`: 작업 스레드(`lanes.rs`), 응답을 멈출 수 있는 볼륨(`volumes.rs`), AppKit 도우미, 파일과 프로세스. `src/diag.rs`: 사용자의 눈에 띄지 않게 잘못되는 일은 문서의 텍스트 없이 시스템 로그로 갑니다.
 - `src/large_alloc.rs`: 큰 할당은 커널에서 직접 받고 해제하면 곧바로 커널에 돌려주므로, 큰 편집 후 메모리가 반환됩니다.
 - `resources/js/`: 웹 페이지와 라이브러리; 버전과 체크섬은 [vendor.lock](../../../vendor.lock)에 있습니다.
 - `xtask/`: 번들링, 서명, 디스크 이미지, 아이콘, 벤더링, 자체 테스트 실행기, 커버리지 최소 기준.
@@ -684,21 +691,21 @@ CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 �
 
 1. 그곳의 모든 문자 변경은 텍스트를 다시 읽지 않고 텍스트 복사본(`Snapshot`)을 제자리에서 갱신합니다.
 2. 업데이트는 복사본을 구문 분석하고, 색상이 바뀐 곳만 소스에 다시 색을 입히고, 미리보기를 레이아웃하고, 내용이 바뀐 블록만 교체합니다.
-3. 편집 후에는 이웃이 그대로인 한 영향을 받는 단락만 다시 구문 분석하고 색을 입히고 레이아웃합니다. 그렇지 않은 경우는 `reparse_part_and_color`가 알려 줍니다. `%%` 주석 블록이 있는 문서, 프런트 매터의 변경, 링크 참조 정의 근처의 변경은 전체를 처리합니다. comrak은 각주 참조를 같은 구문 분석 안에 정의가 있을 때만 인식하고 정의를 본문 뒤로 옮기므로, 해당 부분은 레이블마다 대역 정의를 두고 구문 분석하여 번호는 이전 트리에서 가져옵니다. 그 부분의 참조나 정의의 변경, 또는 인라인 각주 옆의 변경은 전체를 처리합니다.
+3. 편집 후에는 이웃이 그대로인 한 영향을 받는 단락만 다시 구문 분석하고 색을 입히고 레이아웃합니다. 그렇지 않은 경우는 `reparse_part_and_color`가 알려 줍니다. `%%` 주석 블록이 있는 문서, 프런트 매터의 변경, 그리고 링크 참조 정의가 있는 문서에서 대괄호가 든 부분의 변경은 전체를 처리합니다. comrak은 각주 참조를 같은 구문 분석 안에 정의가 있을 때만 인식하고 정의를 본문 뒤로 옮기므로, 해당 부분은 레이블마다 대역 정의를 두고 구문 분석하여 번호는 이전 트리에서 가져옵니다. 그 부분의 참조나 정의의 변경, 또는 인라인 각주 옆의 변경은 전체를 처리합니다.
 4. `<details>`나 `<div align>`을 열고 나중에 닫는 HTML 블록은 그 사이의 Markdown 블록에 영향을 줍니다. 재사용하는 블록은 주변이 같아야 합니다.
 5. 2MB까지의 문서 소스에서 입력하는 동안에는 부분 업데이트가 즉시 실행됩니다. 적용되지 않거나 문서가 더 크면 구문 분석과 레이아웃이 백그라운드에서 실행됩니다. 미리보기에서 입력하는 동안에는 미리보기의 커서가 결과에 달려 있으므로 즉시 실행됩니다.
 6. 미리보기의 입력은 `Bridge`가 소스의 편집으로 변환하며, 그 뒤로는 같은 경로를 따릅니다. Markdown에는 텍스트를 구문으로 바꾸는 방법이 규칙만으로 다루기에는 너무 많으므로, `preview/verify.rs`가 변경된 부분을 다시 구문 분석하여 표시되는 내용을 입력한 내용과 비교합니다. 성립하지 않는 편집은 더 이스케이프하거나 거부합니다.
-7. comrak의 인라인 위치는 링크 참조 정의 뒤 같은 몇 군데에서 틀립니다. `markdown/positions.rs`는 블록을 읽을 때 위치를 소스와 대조하고, 맞지 않는 곳은 소스에서 다시 읽습니다.
+7. comrak의 인라인 위치는 링크 참조 정의 뒤 같은 몇 군데에서 틀립니다. `markdown/reader/positions.rs`는 블록을 읽을 때 위치를 소스와 대조하고, 맞지 않는 곳은 소스에서 다시 읽습니다.
 
 ### 컨트롤러의 규칙
 
-1. 컨트롤러가 뷰에 가하는 자체 변경은 `silently()` 안에서 실행하며, 델리게이트 콜백은 이를 무시합니다.
-2. `state`는 읽고 계산할 때만 빌리며, 뷰를 변경하거나 레이아웃하거나 스크롤하는 호출에 걸쳐서는 절대 빌리지 않습니다. 변경은 자체 메서드를 통해서만 일어나며, 그 테스트에는 윈도우가 필요 없습니다.
+1. 컨트롤러가 뷰에 가하는 자체 변경은 `Panes::silently` 안에서 실행하며, 델리게이트 콜백은 이를 무시합니다. 다른 곳에서는 뷰를 읽기만 할 수 있어서 컴파일러가 이를 검사합니다. 콜백이 들어야 하는 것, 또는 뷰를 AppKit에 넘기는 것은 `Panes::for_appkit`을 거쳐 그렇게 밝힙니다.
+2. 상태는 읽고 계산할 때만 빌리며, 뷰를 변경하거나 레이아웃하거나 스크롤하는 호출에 걸쳐서는 절대 빌리지 않습니다. `Model`이 이를 `Send` 클로저에 빌려주고 `Send`인 뷰는 없으므로 컴파일러가 이를 검사합니다. 변경은 자체 메서드를 통해서만 일어나며, 그 테스트에는 윈도우가 필요 없습니다.
 3. 바깥에서 오는 메시지(이미지가 로드됨, 수식이 렌더링됨)는 `renders_arrived`와 `image_arrived`를 통해 지연되어 도착하며, 업데이트 도중에는 절대 도착하지 않습니다.
 4. 텍스트 변경 없이 다시 그리는 일은 `invalidate(reason)`을 통해서만 합니다.
-5. `Rc<Snapshot>`은 소스를 변경하는 동안 붙들고 있지 않습니다. 그렇지 않으면 그 변경이 전체 텍스트를 복사합니다.
-6. 새 명령에는 `actions.rs`의 항목, `mod.rs`의 메서드, `editing::perform`의 분기가 필요합니다.
-7. 모든 `unsafe` 블록은 근거를 `// SAFETY:` 주석으로 담습니다. 바이트는 앱에서 `decoder::system_image`를 통해서만 시스템의 이미지 디코더에 도달합니다.
+5. 텍스트 복사본은 소스를 변경하는 동안 붙들고 있지 않습니다. 그렇지 않으면 그 변경이 전체 텍스트를 복사합니다. `with_text`는 `Send` 클로저가 도는 동안에만 이를 빌려줍니다.
+6. 새 명령에는 `actions.rs`의 항목, `mod.rs`의 메서드, `Editing::perform`의 분기가 필요합니다.
+7. 모든 `unsafe` 블록은 근거를 `// SAFETY:` 주석으로 담습니다. 바이트는 헬퍼 프로세스에서 `decoder::decode_native`를 통해서만 시스템의 이미지 디코더에 도달하며, 테스트가 소스에서 다른 호출을 찾아봅니다.
 8. 메인 스레드의 어떤 것도 사용자의 폴더를 기다리지 않습니다. 네트워크 볼륨이 응답을 멈출 수 있기 때문입니다. 파일은 `DISK` 스레드에서 확인하며 미리보기는 `Env::known`을 통해 그 응답을 읽습니다. 내보내기나 저장처럼 사용자가 기다리는 동작만 디스크에 직접 접근할 수 있습니다.
 
 ### 명령 추가
@@ -707,7 +714,7 @@ CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 �
 
 1. `Action`의 변형과 그 `Spec`: 셀렉터, 제목, 도구 막대 레이블, 툴팁(동사로 시작, 최대 75자), 단축키, SF Symbol, 적용되는 때
 2. `src/editor/mod.rs`의 메서드
-3. `editing::perform`의 분기
+3. `Editing::perform`의 분기
 4. 모든 `Localizable.strings`의 텍스트
 
 `every_command_has_a_method_and_every_method_a_command` 테스트는 레지스트리와 메서드가 일치하는지 검사합니다. ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F, ⌘, 같은 Apple의 표준 단축키는 건드리지 않습니다.

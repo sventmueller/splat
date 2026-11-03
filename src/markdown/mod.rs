@@ -7,7 +7,7 @@ pub mod html;
 pub mod incremental;
 pub mod markup;
 pub mod palette;
-mod positions;
+pub mod reader;
 pub mod snippets;
 pub mod style;
 pub mod table;

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Bewaar eerst het document";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Geplakte afbeeldingen worden als bestand naast het document bewaard. Bewaar het en plak de afbeelding opnieuw.";
 "Export fehlgeschlagen" = "Exporteren mislukt";
+"Das Dokument ließ sich nicht umwandeln." = "Het document kon niet worden omgezet.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Het document is te groot voor een Word-bestand.";
 "Gliederung ausblenden" = "Verberg structuur";
 "Gliederung einblenden" = "Toon structuur";
 "Metadaten" = "Metadata";

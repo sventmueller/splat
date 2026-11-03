@@ -799,6 +799,9 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
     let line_end = |from: usize| code[from..].find('\n').map_or(code.len(), |i| from + i);
     let mut in_tag = false;
     let mut line_start = true;
+    // How far each closing mark of a label is known to be missing: a long line of opening marks would otherwise be
+    // searched once per mark.
+    let mut no_closer_until = [0usize; 4];
     let mut i = 0;
     while i < code.len() {
         let rest = &code[i..];
@@ -864,20 +867,23 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
             continue;
         }
         if lang.labels && matches!(c, '[' | '(' | '{' | '|') && prev.is_some_and(|p| is_word(p) || p == '>') {
-            let close = match c {
-                '[' => ']',
-                '(' => ')',
-                '{' => '}',
-                _ => '|',
+            let (close, closer) = match c {
+                '[' => (']', 0),
+                '(' => (')', 1),
+                '{' => ('}', 2),
+                _ => ('|', 3),
             };
-            let end = line_end(i);
-            if let Some(k) = code[i + 1..end].find(close) {
-                let label = i + 1..i + 1 + k;
-                if !label.is_empty() {
-                    out.push((label, CodeToken::String));
+            if i >= no_closer_until[closer] {
+                let end = line_end(i);
+                if let Some(k) = code[i + 1..end].find(close) {
+                    let label = i + 1..i + 1 + k;
+                    if !label.is_empty() {
+                        out.push((label, CodeToken::String));
+                    }
+                    i += 1 + k + 1;
+                    continue;
                 }
-                i += 1 + k + 1;
-                continue;
+                no_closer_until[closer] = end;
             }
         }
         if c.is_ascii_digit() && !prev.is_some_and(is_word) {
@@ -944,6 +950,14 @@ fn string_end(code: &str, start: usize, quote: char) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_label_is_found_behind_opening_marks_of_other_kinds_without_a_closing_mark() {
+        let found = tokens_of("mermaid", "a[b(c[d]");
+        assert_eq!(found, [("b(c[d", CodeToken::String)]);
+        let unclosed = tokens_of("mermaid", "a[b\nc(d)");
+        assert_eq!(unclosed, [("d", CodeToken::String)]);
+    }
 
     fn tokens_of<'a>(info: &str, code: &'a str) -> Vec<(&'a str, CodeToken)> {
         tokens(info, code).into_iter().map(|(r, t)| (&code[r], t)).collect()

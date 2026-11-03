@@ -23,6 +23,8 @@ pub const EXPORT_SIDE: u32 = 4096;
 
 pub enum Decoded {
     Pdf(Vec<u8>),
+    /// A picture from the pasteboard as a file to keep, with its full size and colors.
+    Png(Vec<u8>),
     Rgba {
         width: u32,
         height: u32,

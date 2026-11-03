@@ -1,4 +1,4 @@
-use crate::markdown::text::line_start;
+use crate::markdown::text::{Byte, line_start};
 use std::ops::Range;
 
 use crate::i18n::{n, t};
@@ -353,7 +353,7 @@ pub fn diagram_snippet(code: &str, caret: usize, action: DiagramAction, today: &
     }
     let caret = caret.min(code.len());
     let line_end = code[caret..].find('\n').map_or(code.len(), |i| caret + i);
-    let line_begin = line_start(code, line_end);
+    let line_begin = line_start(code, Byte::new(line_end)).get();
     let caret_indent = code[line_begin..line_end].len() - code[line_begin..line_end].trim_start().len();
     let indent = " ".repeat(caret_indent.max(4));
     let (body, select): (String, Range<usize>) = match action {

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "احفظ المستند أولًا";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "يتم حفظ الصور الملصقة كملفات بجوار المستند. احفظ المستند، ثم الصق الصورة مرة أخرى.";
 "Export fehlgeschlagen" = "فشل التصدير";
+"Das Dokument ließ sich nicht umwandeln." = "تعذّر تحويل المستند.";
+"Das Dokument ist zu groß für eine Word-Datei." = "المستند كبير جدًا بالنسبة إلى ملف Word.";
 "Gliederung ausblenden" = "إخفاء المخطط التفصيلي";
 "Gliederung einblenden" = "إظهار المخطط التفصيلي";
 "Metadaten" = "البيانات الوصفية";

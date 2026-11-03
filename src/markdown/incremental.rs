@@ -3,13 +3,12 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
+use std::sync::Arc;
 
-use super::doc::{
-    Block, BlockKind, Doc, Inline, InlineKind, formulas_are_limited, inline_notes_may_be_limited, parse, parse_part,
-    walk_blocks, walk_inlines,
-};
-use super::highlight::{Style, highlight, rehighlight};
-use super::text::{common_prefix, common_suffix, growth, line_start, shifted};
+use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, walk_blocks, walk_inlines};
+use super::highlight::{Style, highlight, highlight_blocks, rehighlight};
+use super::reader::{formulas_are_limited, inline_notes_may_be_limited, parse_part, parse_shared};
+use super::text::{Byte, TextAt, common_prefix, common_suffix, growth, line_start, shifted};
 
 /// What an edit replaced: the top-level block indexes before and after, and the shift of everything behind it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,16 +16,16 @@ pub struct Splice {
     pub old: Range<usize>,
     pub new: Range<usize>,
     pub delta: isize,
-    /// The re-parsed part of the new text; offsets from its end on are shifted by `delta`.
-    pub window: Range<usize>,
+    /// The re-parsed part of the new text; positions from its end on are shifted by `delta`.
+    pub window: Range<Byte>,
     /// Where the change ends in the new text: blocks outside `new` from here on moved by `delta`, those before it not.
-    pub behind: usize,
+    pub behind: Byte,
 }
 
 /// The parsed document and its source colors.
 pub struct Parsed {
     pub doc: Doc,
-    pub spans: Vec<(Range<usize>, Style)>,
+    pub spans: Vec<(Range<Byte>, Style)>,
     /// Which top-level blocks changed, when only those were parsed again.
     pub splice: Option<Splice>,
 }
@@ -74,9 +73,9 @@ const MOST_STAND_INS: usize = 1000;
 
 impl Parsed {
     /// No blocks and no colors: commands treat the text as plain, and the preview shows nothing.
-    pub fn plain() -> Parsed {
+    pub fn plain(text: Arc<str>) -> Parsed {
         Parsed {
-            doc: Doc::default(),
+            doc: Doc::new(text, Vec::new()),
             spans: Vec::new(),
             splice: None,
         }
@@ -84,11 +83,15 @@ impl Parsed {
 }
 
 pub fn parse_and_color(text: &str) -> Parsed {
-    if stays_plain(text) {
-        return Parsed::plain();
+    parse_shared_and_color(text.into())
+}
+
+pub fn parse_shared_and_color(text: Arc<str>) -> Parsed {
+    if stays_plain(&text) {
+        return Parsed::plain(text);
     }
-    let doc = parse(text);
-    let spans = highlight(text, &doc);
+    let doc = parse_shared(text);
+    let spans = highlight(&doc);
     Parsed {
         doc,
         spans,
@@ -96,38 +99,33 @@ pub fn parse_and_color(text: &str) -> Parsed {
     }
 }
 
-/// Parses `new_text` only around its change from `old_text` where that is safe, otherwise all of it. `doc` and
-/// `spans` belong to `old_text`; a partial parse takes `doc` over, a full one leaves it as it was.
-pub fn reparse_and_color(doc: &mut Doc, old_text: &str, spans: &[(Range<usize>, Style)], new_text: &str) -> Parsed {
-    reparse_part_and_color(doc, old_text, spans, new_text).unwrap_or_else(|| parse_and_color(new_text))
+/// Parses `new_text` only around its change from the text of `doc` where that is safe, otherwise all of it. `spans`
+/// belong to `doc`; a partial parse takes its blocks over, a full one leaves it as it was.
+pub fn reparse_and_color(doc: &mut Doc, spans: &[(Range<Byte>, Style)], new_text: &str) -> Parsed {
+    reparse_part_and_color(doc, spans, new_text).unwrap_or_else(|| parse_and_color(new_text))
 }
 
 /// The partial parse of `reparse_and_color`; `None` when all of `new_text` has to be parsed, with `doc` as it was.
-pub fn reparse_part_and_color(
-    doc: &mut Doc,
-    old_text: &str,
-    spans: &[(Range<usize>, Style)],
-    new_text: &str,
-) -> Option<Parsed> {
+pub fn reparse_part_and_color(doc: &mut Doc, spans: &[(Range<Byte>, Style)], new_text: &str) -> Option<Parsed> {
     if stays_plain(new_text) {
         return None;
     }
-    let mut taken = std::mem::take(doc);
-    match reparse(&mut taken, old_text, new_text) {
+    let mut taken = doc.split_off_blocks();
+    match reparse(&mut taken, new_text) {
         Some(splice) => Some(Parsed {
-            spans: with_definitions_in_window(rehighlight(spans, new_text, &taken, &splice), new_text, &taken, &splice),
+            spans: with_definitions_in_window(rehighlight(spans, &taken, &splice), &taken, &splice),
             doc: taken,
             splice: Some(splice),
         }),
         None => {
-            *doc = taken;
+            doc.blocks = taken.blocks;
             None
         }
     }
 }
 
-/// The changed part of a text, as byte ranges in the old and the new text.
-pub fn changed(old: &str, new: &str) -> (Range<usize>, Range<usize>) {
+/// The changed part of a text, as ranges in the old and the new text.
+pub fn changed(old: &str, new: &str) -> (Range<Byte>, Range<Byte>) {
     let mut prefix = common_prefix(old.as_bytes(), new.as_bytes());
     while !(old.is_char_boundary(prefix) && new.is_char_boundary(prefix)) {
         prefix -= 1;
@@ -137,7 +135,10 @@ pub fn changed(old: &str, new: &str) -> (Range<usize>, Range<usize>) {
     while !(old.is_char_boundary(old.len() - suffix) && new.is_char_boundary(new.len() - suffix)) {
         suffix -= 1;
     }
-    (prefix..old.len() - suffix, prefix..new.len() - suffix)
+    (
+        Byte::new(prefix)..old.end() - suffix,
+        Byte::new(prefix)..new.end() - suffix,
+    )
 }
 
 fn is_definition(b: &Block) -> bool {
@@ -151,11 +152,10 @@ fn is_written_definition(b: &Block) -> bool {
 
 /// `rehighlight` colors the blocks of the splice, and definitions between them lost theirs with the window.
 fn with_definitions_in_window(
-    mut spans: Vec<(Range<usize>, Style)>,
-    text: &str,
+    mut spans: Vec<(Range<Byte>, Style)>,
     doc: &Doc,
     splice: &Splice,
-) -> Vec<(Range<usize>, Style)> {
+) -> Vec<(Range<Byte>, Style)> {
     let blocks: Vec<Block> = doc
         .blocks
         .iter()
@@ -165,7 +165,7 @@ fn with_definitions_in_window(
         .cloned()
         .collect();
     if !blocks.is_empty() {
-        spans.extend(highlight(text, &Doc { blocks }));
+        spans.extend(highlight_blocks(doc.text(), &blocks));
         spans.sort_by_key(|(r, _)| r.start);
         // `rehighlight` may have colored the whole text.
         spans.dedup();
@@ -238,7 +238,7 @@ fn parse_window(text: &str, at_start: bool, at_end: bool) -> Option<Vec<Block>> 
         return None;
     }
     let mut part = parse_part(&format!("{text}{definitions}"), at_start);
-    part.retain(|b| b.range.start < text.len());
+    part.retain(|b| b.range.start < text.end());
     Some(part)
 }
 
@@ -330,7 +330,7 @@ fn source_order(blocks: &[Block], text_blocks: usize) -> Option<Vec<usize>> {
 fn definitions_stay<'a>(
     written: impl Iterator<Item = &'a Block>,
     part: &[Block],
-    old_change: &Range<usize>,
+    old_change: &Range<Byte>,
     delta: isize,
 ) -> bool {
     let expected = written.map(|definition| {
@@ -344,7 +344,7 @@ fn definitions_stay<'a>(
 }
 
 /// Puts `part` in the place of the text blocks `old` and moves the blocks behind the change along with it.
-fn replace_blocks(doc: &mut Doc, old: Range<usize>, part: Vec<Block>, old_change: &Range<usize>, delta: isize) {
+fn replace_blocks(doc: &mut Doc, old: Range<usize>, part: Vec<Block>, old_change: &Range<Byte>, delta: isize) {
     let tail = doc.blocks.split_off(old.end);
     doc.blocks.truncate(old.start);
     doc.blocks.extend(part);
@@ -369,9 +369,11 @@ fn is_read_as_a_whole(old_text: &str, new_text: &str) -> bool {
         || comment(new_text)
 }
 
-/// Updates `doc`, parsed from `old_text`, to `new_text` by parsing only what the change can affect. `None` when
-/// the whole document has to be parsed again; `doc` is unchanged then.
-pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> {
+/// Updates `doc` to `new_text` by parsing only what the change can affect. `None` when the whole document has to be
+/// parsed again; `doc` is unchanged then.
+pub fn reparse(doc: &mut Doc, new_text: &str) -> Option<Splice> {
+    let shared = doc.shared_text();
+    let old_text: &str = &shared;
     if is_read_as_a_whole(old_text, new_text) {
         return None;
     }
@@ -388,7 +390,7 @@ pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> 
             return None;
         }
     }
-    let delta = growth(new_text.len(), old_text.len());
+    let delta = growth(new_text.end(), old_text.end());
     let blocks = &doc.blocks;
     let text_blocks = blocks.iter().rposition(|b| !is_definition(b)).map_or(0, |i| i + 1);
     let order = source_order(blocks, text_blocks)?;
@@ -400,20 +402,20 @@ pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> 
     let mut after = (after_change < n).then_some(after_change);
     let mut step = 1;
     loop {
-        let start = before.map_or(0, |b| line_start(old_text, blocks[order[b]].range.start));
+        let start = before.map_or(Byte::default(), |b| line_start(old_text, blocks[order[b]].range.start));
         let old_end = match after {
             Some(a) if a + 1 < n => line_start(old_text, blocks[order[a + 1]].range.start),
-            _ => old_text.len(),
+            _ => old_text.end(),
         };
         let new_end = shifted(old_end, delta);
-        if new_end < start || new_end > new_text.len() || !new_text.is_char_boundary(new_end) {
+        if new_end < start || new_end > new_text.end() || !new_text.boundary(new_end) {
             return None;
         }
         // Past half the document, parsing all of it is no slower.
         if new_end - start > new_text.len() / 2 && new_text.len() > 4096 {
             return None;
         }
-        let (old_part, new_part) = (&old_text[start..old_end], &new_text[start..new_end]);
+        let (old_part, new_part) = (old_text.at(start..old_end), new_text.at(start..new_end));
         if has_definitions && (holds_link_bracket(old_part) || holds_link_bracket(new_part)) {
             return None;
         }
@@ -431,13 +433,13 @@ pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> 
         }
         let old_references = references(in_window.iter().map(|&i| &blocks[i]));
         let known: HashMap<&str, u32> = old_references.iter().copied().collect();
-        let mut part = parse_window(new_part, start == 0, after.is_none())?;
+        let mut part = parse_window(new_part, start == Byte::default(), after.is_none())?;
         // A reference comrak would not know in the whole document, or that the window did not hold, changes numbers.
         if !number_references(&mut part, &known) || may_hide_reference(&part) {
             return None;
         }
         for b in &mut part {
-            shift_block(b, growth(start, 0));
+            shift_block(b, growth(start, Byte::default()));
         }
         let head_holds = before.is_none_or(|b| part.first() == Some(&blocks[order[b]]));
         let tail_holds = after.is_none_or(|a| {
@@ -460,6 +462,7 @@ pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> 
                 text.partition_point(|b| b.range.start < start)..text.partition_point(|b| b.range.start < old_end);
             let new = old.start..old.start + part.len();
             replace_blocks(doc, old.clone(), part, &old_change, delta);
+            doc.renew(new_text);
             return Some(Splice {
                 old,
                 new,
@@ -477,7 +480,7 @@ pub fn reparse(doc: &mut Doc, old_text: &str, new_text: &str) -> Option<Splice> 
     }
 }
 
-fn moved(r: &mut Range<usize>, delta: isize) {
+fn moved(r: &mut Range<Byte>, delta: isize) {
     *r = shifted(r.start, delta)..shifted(r.end, delta);
 }
 
@@ -539,12 +542,52 @@ fn shift_inline(i: &mut Inline, delta: isize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::markdown::reader::parse;
+    use crate::markdown::text::bytes;
 
     fn reparsed(old: &str, new: &str) -> (Doc, Parsed) {
         let mut doc = parse(old);
-        let spans = highlight(old, &doc);
-        let parsed = reparse_and_color(&mut doc, old, &spans, new);
+        let spans = highlight(&doc);
+        let parsed = reparse_and_color(&mut doc, &spans, new);
         (doc, parsed)
+    }
+
+    #[test]
+    fn every_parse_makes_a_new_version() {
+        assert_eq!(Doc::default().version(), 0);
+        let old = "Eins\n\nZwei\n\nDrei\n\nVier\n\nFünf\n\nSechs\n\nSieben\n";
+        let (first, second) = (parse(old), parse(old));
+        assert_ne!(first.version(), second.version(), "the same text, parsed twice");
+        let new = old.replace("Vier", "Viertel");
+        let mut doc = parse(old);
+        let version = doc.version();
+        let spans = highlight(&doc);
+        assert!(reparse_part_and_color(&mut doc, &spans, old).is_some_and(|p| p.doc.version() != version));
+        let mut doc = parse(old);
+        let version = doc.version();
+        let parsed = reparse_and_color(&mut doc, &highlight(&parse(old)), &new);
+        assert!(parsed.splice.is_some());
+        assert_ne!(parsed.doc.version(), version, "only a part parsed");
+        assert_eq!(parsed.doc.text(), new);
+    }
+
+    #[test]
+    fn a_failed_partial_parse_leaves_the_document_as_it_was() {
+        let (old, new) = ("Text[^1]\n\n[^1]: Fuß\n", "Text[^1]\n\n[^1]: Füße\n");
+        let mut doc = parse(old);
+        let version = doc.version();
+        let spans = highlight(&doc);
+        assert!(reparse_part_and_color(&mut doc, &spans, new).is_none());
+        assert_eq!((doc.version(), doc.text()), (version, old));
+        assert_eq!(doc.blocks, parse(old).blocks);
+    }
+
+    #[test]
+    fn a_plain_text_keeps_its_text_without_blocks() {
+        let parsed = Parsed::plain("# Titel\n".into());
+        assert!(parsed.doc.blocks.is_empty());
+        assert_eq!(parsed.doc.text(), "# Titel\n");
+        assert_ne!(parsed.doc.version(), 0);
     }
 
     #[test]
@@ -555,7 +598,7 @@ mod tests {
         let (doc, parsed) = reparsed(old, new);
         assert_eq!(parsed.splice.map(|s| (s.new, s.delta)), Some((2..5, 3)));
         assert_eq!(parsed.doc.blocks, parse(new).blocks);
-        assert_eq!(parsed.spans, highlight(new, &parse(new)));
+        assert_eq!(parsed.spans, highlight(&parse(new)));
         assert!(doc.blocks.is_empty());
     }
 
@@ -583,18 +626,13 @@ mod tests {
     #[test]
     fn a_document_over_the_limit_stays_plain_text() {
         let huge = "# Titel\n".repeat(3 << 20);
-        let parsed = parse_and_color(&huge);
+        let mut parsed = parse_and_color(&huge);
         assert!(parsed.doc.blocks.is_empty() && parsed.spans.is_empty());
         let mut doc = parse("# Titel\n");
-        let spans = highlight("# Titel\n", &doc);
-        assert!(reparse_part_and_color(&mut doc, "# Titel\n", &spans, &huge).is_none());
-        assert!(
-            reparse_and_color(&mut doc, "# Titel\n", &spans, &huge)
-                .doc
-                .blocks
-                .is_empty()
-        );
-        let shrunk = reparse_and_color(&mut Doc::default(), &huge, &[], "# Titel\n");
+        let spans = highlight(&doc);
+        assert!(reparse_part_and_color(&mut doc, &spans, &huge).is_none());
+        assert!(reparse_and_color(&mut doc, &spans, &huge).doc.blocks.is_empty());
+        let shrunk = reparse_and_color(&mut parsed.doc, &[], "# Titel\n");
         assert_eq!(shrunk.doc.blocks, parse("# Titel\n").blocks);
     }
 
@@ -618,10 +656,22 @@ mod tests {
 
     #[test]
     fn a_change_starts_and_ends_at_whole_letters() {
-        assert_eq!(changed("x é y", "x è y"), (2..4, 2..4), "the letters begin alike");
-        assert_eq!(changed("x éy", "x ĩy"), (2..4, 2..4), "the letters end alike");
-        assert_eq!(changed("abXcd", "abYcd"), (2..3, 2..3));
-        assert_eq!(changed("aa", "aaa"), (2..2, 2..3), "the common parts do not overlap");
+        assert_eq!(
+            changed("x é y", "x è y"),
+            (bytes(2..4), bytes(2..4)),
+            "the letters begin alike"
+        );
+        assert_eq!(
+            changed("x éy", "x ĩy"),
+            (bytes(2..4), bytes(2..4)),
+            "the letters end alike"
+        );
+        assert_eq!(changed("abXcd", "abYcd"), (bytes(2..3), bytes(2..3)));
+        assert_eq!(
+            changed("aa", "aaa"),
+            (bytes(2..2), bytes(2..3)),
+            "the common parts do not overlap"
+        );
     }
 
     fn partly(old: &str, new: &str) -> Option<Splice> {
@@ -798,9 +848,9 @@ mod tests {
             "a[^1]\n\n[^1]: e\n\nbb\n\nc\n\nd\n",
         );
         let doc = parse(new);
-        let splice = reparse(&mut parse(old), old, new).unwrap();
-        let once = highlight(new, &doc);
-        assert_eq!(with_definitions_in_window(once.clone(), new, &doc, &splice), once);
+        let splice = reparse(&mut parse(old), new).unwrap();
+        let once = highlight(&doc);
+        assert_eq!(with_definitions_in_window(once.clone(), &doc, &splice), once);
     }
 
     #[test]
@@ -809,7 +859,7 @@ mod tests {
         let new = old.replace("b\n", "bb\n");
         let (_, parsed) = reparsed(old, &new);
         assert!(parsed.splice.is_some());
-        assert_eq!(parsed.spans, highlight(&new, &parse(&new)));
+        assert_eq!(parsed.spans, highlight(&parse(&new)));
     }
 
     #[test]

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Guarde primeiro o documento";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "As imagens coladas são guardadas como ficheiros junto do documento. Guarde-o e volte a colar a imagem.";
 "Export fehlgeschlagen" = "A exportação falhou";
+"Das Dokument ließ sich nicht umwandeln." = "Não foi possível converter o documento.";
+"Das Dokument ist zu groß für eine Word-Datei." = "O documento é demasiado grande para um ficheiro do Word.";
 "Gliederung ausblenden" = "Ocultar estrutura";
 "Gliederung einblenden" = "Mostrar estrutura";
 "Metadaten" = "Metadados";

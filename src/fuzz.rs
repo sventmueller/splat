@@ -6,6 +6,8 @@ use std::ops::Range;
 use std::sync::{Once, mpsc};
 use std::time::Duration;
 
+use crate::markdown::text::Byte;
+
 /// Rounds per test.
 pub fn rounds(default: usize) -> usize {
     match std::env::var("SPLAT_FUZZ_ROUNDS") {
@@ -130,16 +132,16 @@ impl Rng {
         &items[self.below(items.len())]
     }
 
-    /// A byte offset of `text` on a char boundary.
-    pub fn boundary(&mut self, text: &str) -> usize {
+    /// A position of `text` on a char boundary.
+    pub fn boundary(&mut self, text: &str) -> Byte {
         let mut at = self.below(text.len() + 1);
         while !text.is_char_boundary(at) {
             at -= 1;
         }
-        at
+        Byte::new(at)
     }
 
-    pub fn range(&mut self, text: &str) -> Range<usize> {
+    pub fn range(&mut self, text: &str) -> Range<Byte> {
         let (a, b) = (self.boundary(text), self.boundary(text));
         a.min(b)..a.max(b)
     }

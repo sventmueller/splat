@@ -128,27 +128,38 @@ fn start_waiting() {
     }
 }
 
-/// Failures the network may be to blame for get another try, for as long as a document shows them.
+/// The failures whose pause is over.
+fn due_for_retry(images: &HashMap<String, Stored>, now: Instant) -> Vec<String> {
+    images
+        .iter()
+        .filter(|(_, stored)| stored.retry.is_some_and(|(at, _)| at <= now))
+        .map(|(url, _)| url.clone())
+        .collect()
+}
+
+/// Failures the network may be to blame for get another try, for as long as a document shows them: a document decides
+/// which hosts hear from Splat, and one whose image was deleted from its text no longer does.
 pub fn try_failed_again() {
-    let due: Vec<String> = REMOTE.with(|r| {
+    let (due, listeners) = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         let listened = !r.listeners.is_empty();
         r.listeners.retain(|w| w.load().is_some());
-        if r.listeners.is_empty() {
+        if r.listeners.is_empty() && listened {
             // The last document that showed them has closed.
-            if listened {
-                release(&mut r);
-            }
-            return Vec::new();
+            release(&mut r);
         }
-        let now = Instant::now();
-        let due: Vec<String> = r
-            .images
-            .iter()
-            .filter(|(_, stored)| stored.retry.is_some_and(|(at, _)| at <= now))
-            .map(|(url, _)| url.clone())
-            .collect();
-        due.into_iter().filter(|url| r.loading.insert(url.clone())).collect()
+        let listeners: Vec<_> = r.listeners.iter().filter_map(Weak::load).collect();
+        (due_for_retry(&r.images, Instant::now()), listeners)
+    });
+    if due.is_empty() || listeners.is_empty() {
+        return;
+    }
+    let shown: HashSet<String> = listeners.iter().flat_map(|l| l.updater().web_images_shown()).collect();
+    let due: Vec<String> = REMOTE.with(|r| {
+        let mut r = r.borrow_mut();
+        due.into_iter()
+            .filter(|url| shown.contains(url) && r.loading.insert(url.clone()))
+            .collect()
     });
     for url in due {
         load(&url);
@@ -288,7 +299,8 @@ define_class!(
             }
             // The session's queue also delivers the data of all other downloads, so decoding must not hold it up.
             super::images::load_in_background(move || {
-                let decoded = super::decoder::decode(&bytes, super::images::allowed_side());
+                let decoded =
+                    crate::util::contained(|| super::decoder::decode(&bytes, super::images::allowed_side())).flatten();
                 DispatchQueue::main().exec_async(move || finish(url, decoded, Failure::Final));
             });
         }
@@ -382,13 +394,33 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
     });
     start_waiting();
     for l in listeners {
-        l.image_arrived(url.clone());
+        l.updater().image_arrived(url.clone());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failure_is_due_once_its_pause_is_over() {
+        let now = Instant::now();
+        let stored = |retry| Stored {
+            found: None,
+            bytes: 0,
+            retry,
+        };
+        let pause = Duration::from_secs(30);
+        let images = HashMap::from([
+            ("over".to_string(), stored(Some((now - pause, pause)))),
+            ("now".to_string(), stored(Some((now, pause)))),
+            ("later".to_string(), stored(Some((now + pause, pause)))),
+            ("final".to_string(), stored(None)),
+        ]);
+        let mut due = due_for_retry(&images, now);
+        due.sort();
+        assert_eq!(due, ["now", "over"]);
+    }
 
     #[test]
     fn only_passing_failures_are_tried_again() {

@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, sel};
+use objc2::{MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
     NSApplication, NSDocumentController, NSPrintInfo, NSPrintJobDisposition, NSPrintJobSavingURL, NSPrintSaveJob,
     NSTextInputClient, NSWindow,
@@ -30,7 +30,7 @@ pub use mock_web::protocol_classes;
 
 use super::EditorController;
 use crate::document::MdDocument;
-use crate::markdown::text::Utf16Map;
+use crate::markdown::text::{Byte, TextAt, Utf16Map, bytes};
 use crate::util::{ns, obj, storage};
 
 thread_local! {
@@ -39,23 +39,95 @@ thread_local! {
     static LAST_CHECK: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
 }
 
+/// The checks act like the user: what they do to the views is meant to reach the delegate callbacks.
+impl EditorController {
+    pub(in crate::editor::selftest) fn source(&self) -> &crate::editor::views::SourceTextView {
+        self.panes().for_appkit().source
+    }
+
+    pub(in crate::editor::selftest) fn preview(&self) -> &crate::editor::views::PreviewTextView {
+        self.panes().for_appkit().preview
+    }
+}
+
 fn check(name: &str, ok: bool, detail: &str) {
-    LAST_CHECK.with(|c| name.clone_into(&mut c.borrow_mut()));
     if ok {
         eprintln!("SELFTEST PASS {name}");
     } else {
         FAILURES.with(|f| f.set(f.get() + 1));
         eprintln!("SELFTEST FAIL {name}: {detail}");
     }
+    reported(name);
+}
+
+/// A check that cannot say anything in this run: it neither passes nor fails, and xtask lists it.
+fn skip(name: &str, reason: &str) {
+    eprintln!("SELFTEST SKIP {name}: {reason}");
+    reported(name);
+}
+
+/// A check of what AppKit does only for the app in front, which a locked screen or another app takes away.
+fn check_in_front(mtm: MainThreadMarker, name: &str, ok: bool, detail: &str) {
+    if NSApplication::sharedApplication(mtm).isActive() {
+        check(name, ok, detail);
+    } else {
+        skip(name, "the app is not active");
+    }
+}
+
+fn reported(name: &str) {
+    LAST_CHECK.with(|c| name.clone_into(&mut c.borrow_mut()));
     // A shorter run for one area: SPLAT_SELFTEST_STOP_AFTER names the last check.
     if std::env::var("SPLAT_SELFTEST_STOP_AFTER").is_ok_and(|last| last == name) {
         finish();
     }
 }
 
+/// Runs a part of the run that makes checks. One that cannot go on is a failed check, and what stands behind it still runs.
+fn guarded(what: &str, f: impl FnOnce()) {
+    if crate::util::contained(f).is_none() {
+        check(&format!("{what} runs to its end"), false, "it panicked, see above");
+    }
+}
+
 fn after(seconds: f64, f: impl Fn() + 'static) {
-    let block = RcBlock::new(move |_timer: std::ptr::NonNull<NSTimer>| f());
+    let block = RcBlock::new(move |_timer: std::ptr::NonNull<NSTimer>| guarded("a timed part", &f));
     unsafe { NSTimer::scheduledTimerWithTimeInterval_repeats_block(seconds, false, &block) };
+}
+
+/// Calls `then` once `cond` holds, `seconds` from now at the earliest. Waiting in vain is a failed check that names what
+/// never came, and `then` still runs, as its checks tell what is missing.
+fn once(seconds: f64, name: &'static str, cond: impl Fn() -> bool + 'static, then: impl Fn() + 'static) {
+    let cond: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(cond);
+    let then: std::rc::Rc<dyn Fn()> = std::rc::Rc::new(then);
+    after(seconds, move || {
+        poll_once(
+            name,
+            UNTIL_TIMEOUT,
+            cond.clone(),
+            then.clone(),
+            std::time::Instant::now(),
+        );
+    });
+}
+
+fn poll_once(
+    name: &'static str,
+    timeout: f64,
+    cond: std::rc::Rc<dyn Fn() -> bool>,
+    then: std::rc::Rc<dyn Fn()>,
+    started: std::time::Instant,
+) {
+    if cond() {
+        then();
+    } else if started.elapsed().as_secs_f64() > timeout {
+        check(name, false, &format!("waited {timeout} s for it"));
+        then();
+    } else {
+        after(0.05, move || {
+            poll_once(name, timeout, cond.clone(), then.clone(), started)
+        });
+    }
 }
 
 /// Writes the visible part of both panes as PDF (text views draw reliably through the printing path).
@@ -136,7 +208,8 @@ fn same_selection_colour(
         (Some(s), Some(m), Some(p)) => close(s, m) && !close(m, p),
         _ => false,
     };
-    check(
+    check_in_front(
+        focused.mtm(),
         name,
         ok,
         &format!("selection {selected:?}, highlight {marked:?}, unselected {plain:?}"),
@@ -236,74 +309,89 @@ pub fn start(mtm: MainThreadMarker) {
         return;
     };
     if std::env::var_os("SPLAT_RESIZE_PROBE").is_some() {
-        let controller = NSDocumentController::sharedDocumentController(mtm);
-        let url = NSURL::fileURLWithPath(&ns(&file));
-        let done = RcBlock::new(
-            |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
+        open_document(mtm, &file);
+        once(
+            2.5,
+            "the document window to open",
+            move || window_rendered(mtm),
+            move || resize::resize_probe(mtm),
         );
-        controller.openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
-        after(2.5, move || resize::resize_probe(mtm));
         return;
     }
     if std::env::var("SPLAT_BENCH").is_ok() {
-        let controller = NSDocumentController::sharedDocumentController(mtm);
-        let url = NSURL::fileURLWithPath(&ns(&file));
-        let done = RcBlock::new(
-            |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
-        );
         let opened = std::time::Instant::now();
-        controller.openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
-        eprintln!(
-            "BENCH open+first render: {:.0} ms",
-            opened.elapsed().as_secs_f64() * 1000.0
-        );
-        if std::env::var_os("SPLAT_BENCH_IDLE").is_some() {
-            after(12.0, || std::process::exit(0));
-        } else {
-            after(2.0, move || bench::bench(mtm));
-        }
+        open_document(mtm, &file);
+        bench::after_first_render(mtm, opened);
         return;
     }
     if std::env::var("SPLAT_SELFTEST_EXPECT_OPEN").is_ok() {
         // Launched by LaunchServices with the file as an open-document event, like a Finder double-click.
-        after(3.0, move || {
-            let docs = NSDocumentController::sharedDocumentController(mtm).documents();
-            let opened = docs.iter().any(|d| {
-                d.fileURL()
-                    .and_then(|u| u.path())
-                    .is_some_and(|p| p.to_string() == file)
-                    && d.downcast::<MdDocument>().is_ok()
-            });
-            let rendered = editor(mtm).is_some_and(|e| storage(e.preview()).length() > 100);
-            check(
-                "double-click opens file in cold-started app",
-                opened && rendered,
-                &format!("opened={opened} rendered={rendered}"),
-            );
-            finish();
-        });
+        let opened = {
+            let file = file.clone();
+            move || {
+                NSDocumentController::sharedDocumentController(mtm)
+                    .documents()
+                    .iter()
+                    .any(|d| {
+                        d.fileURL()
+                            .and_then(|u| u.path())
+                            .is_some_and(|p| p.to_string() == file)
+                            && d.downcast::<MdDocument>().is_ok()
+                    })
+            }
+        };
+        let rendered = move || editor(mtm).is_some_and(|e| storage(e.preview()).length() > 100);
+        let (opened_then, rendered_then) = (opened.clone(), rendered);
+        once(
+            0.0,
+            "the file of the open-document event to open and render",
+            move || opened() && rendered(),
+            move || {
+                check(
+                    "double-click opens file in cold-started app",
+                    opened_then() && rendered_then(),
+                    &format!("opened={} rendered={}", opened_then(), rendered_then()),
+                );
+                finish();
+            },
+        );
         return;
     }
     let out = PathBuf::from(std::env::var("SPLAT_SELFTEST_OUT").unwrap_or_else(|_| ".".into()));
     forget_web_image_permission(&file);
+    // AppKit opens its untitled window after this call, and says so to nobody.
     after(1.0, move || {
         let (file, out) = (file.clone(), out.clone());
         dock_click_opens_a_document(mtm, move || {
-            let controller = NSDocumentController::sharedDocumentController(mtm);
-            let url = NSURL::fileURLWithPath(&ns(&file));
-            let done = RcBlock::new(
-                |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
-            );
-            controller.openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
+            open_document(mtm, &file);
             let out = out.clone();
-            after(1.5, move || run(mtm, &out));
+            once(
+                1.5,
+                "the test file to open and render",
+                move || window_rendered(mtm),
+                move || run(mtm, &out),
+            );
         });
     });
 }
 
+fn open_document(mtm: MainThreadMarker, file: &str) {
+    let controller = NSDocumentController::sharedDocumentController(mtm);
+    let url = NSURL::fileURLWithPath(&ns(file));
+    let done = RcBlock::new(
+        |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, _: *mut objc2_foundation::NSError| {},
+    );
+    controller.openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
+}
+
+/// The window of the test file shows, with the text applied.
+fn window_rendered(mtm: MainThreadMarker) -> bool {
+    editor(mtm).is_some_and(|e| e.window().is_some_and(|w| w.isVisible()) && quiet(&e))
+}
+
 /// User defaults keep the permission an earlier run gave its copy of the document.
 fn forget_web_image_permission(file: &str) {
-    let paths: Vec<_> = super::window::allowed_documents()
+    let paths: Vec<_> = super::images::allowed_documents()
         .iter()
         .filter(|p| *p != file)
         .map(|p| ns(p))
@@ -311,7 +399,7 @@ fn forget_web_image_permission(file: &str) {
     let list = objc2_foundation::NSArray::from_retained_slice(&paths);
     unsafe {
         objc2_foundation::NSUserDefaults::standardUserDefaults()
-            .setObject_forKey(Some(&list), &ns(super::window::ALLOWED_KEY))
+            .setObject_forKey(Some(&list), &ns(super::images::ALLOWED_KEY))
     };
 }
 
@@ -332,7 +420,8 @@ fn dock_click_opens_a_document(mtm: MainThreadMarker, then: impl Fn() + 'static)
         doc.close();
     }
     let then = std::rc::Rc::new(then);
-    after(0.5, move || {
+    let no_window = move || !document_window_shown(mtm);
+    once(0.5, "the open documents to close", no_window, move || {
         let closed = !document_window_shown(mtm);
         let target = objc2_foundation::NSAppleEventDescriptor::currentProcessDescriptor();
         let event: Retained<objc2_foundation::NSAppleEventDescriptor> = unsafe {
@@ -363,7 +452,7 @@ fn dock_click_opens_a_document(mtm: MainThreadMarker, then: impl Fn() + 'static)
                     doc.close();
                 }
                 let then = then.clone();
-                after(0.3, move || then());
+                once(0.3, "the document of the Dock icon to close", no_window, move || then());
             }),
         );
     });
@@ -392,11 +481,14 @@ struct Ctx {
     out: PathBuf,
 }
 
-/// What the runner waits for before a step: at least a time, for animations and screen captures, and until the editor
-/// has applied the text; or until a condition holds.
-enum Wait {
-    Fixed(f64),
-    Until(Box<dyn Fn(&Ctx) -> bool>),
+/// What the runner waits for before a step, named for the failure when it never comes.
+struct Wait {
+    /// Before the condition is looked at, for what no condition can tell.
+    at_least: f64,
+    name: String,
+    holds: Box<dyn Fn(&Ctx) -> bool>,
+    /// How many looks in a row must find it, so work the first look triggered is seen as well.
+    in_a_row: usize,
 }
 
 type Step = (Wait, Box<dyn Fn(&Ctx)>);
@@ -435,28 +527,28 @@ fn wait_for(i: usize) {
     let Some(ctx) = CTX.with(|c| c.borrow().clone()) else {
         return;
     };
-    let seconds = STEPS.with(|s| match s.borrow().get(i).map(|s| &s.0) {
-        Some(Wait::Fixed(seconds)) => *seconds,
-        _ => 0.0,
-    });
+    let seconds = STEPS.with(|s| s.borrow().get(i).map_or(0.0, |s| s.0.at_least));
     after(seconds, move || poll(i, ctx.clone(), std::time::Instant::now(), 0));
 }
 
-/// Checks the condition of step `i` every 50 ms; it must hold three times in a row, so work the first check triggered
-/// is seen as well and the window has been drawn since. After a fixed wait the editor must be quiet once.
+/// Looks at the condition of step `i` every 50 ms.
 fn poll(i: usize, ctx: std::rc::Rc<Ctx>, started: std::time::Instant, held: usize) {
-    let (holds, needed) = STEPS.with(|s| match s.borrow().get(i).map(|s| &s.0) {
-        Some(Wait::Until(cond)) => (cond(&ctx), 3),
-        _ => (quiet(&ctx.e), 1),
+    let (holds, needed, name) = STEPS.with(|s| {
+        s.borrow().get(i).map_or((true, 1, String::new()), |(wait, _)| {
+            ((wait.holds)(&ctx), wait.in_a_row, wait.name.clone())
+        })
     });
     let held = if holds { held + 1 } else { 0 };
     if held >= needed {
         copy_is_the_source(&ctx.e, i);
         post_step(i);
     } else if started.elapsed().as_secs_f64() > UNTIL_TIMEOUT {
-        FAILURES.with(|f| f.set(f.get() + 1));
         let last = LAST_CHECK.with(|c| c.borrow().clone());
-        eprintln!("SELFTEST FAIL step {i}, after \"{last}\": waited {UNTIL_TIMEOUT} s for what it needs");
+        check(
+            &format!("step {i}, after \"{last}\", gets what it waits for"),
+            false,
+            &format!("waited {UNTIL_TIMEOUT} s for {name}"),
+        );
         post_step(i);
     } else {
         after(0.05, move || poll(i, ctx.clone(), started, held));
@@ -470,7 +562,7 @@ fn copy_is_the_source(e: &EditorController, i: usize) {
         return;
     }
     let shown = e.source().string().to_string();
-    if e.snapshot().text != shown {
+    if e.source_text() != shown {
         FAILURES.with(|f| f.set(f.get() + 1));
         let last = LAST_CHECK.with(|c| c.borrow().clone());
         eprintln!("SELFTEST FAIL step {i}, after \"{last}\": the copy of the text differs from the source view");
@@ -482,15 +574,11 @@ fn quiet(e: &EditorController) -> bool {
     if e.source().hasMarkedText() {
         return true;
     }
-    let snap = e.snapshot();
-    let Ok(st) = e.ivars().state.try_borrow() else {
-        return false;
-    };
-    !e.ivars().copy.update_is_scheduled()
-        && !e.ivars().arrivals.is_scheduled()
-        && st.is_current(&snap)
+    let hidden = !e.panes().preview_visible();
+    !e.model().update_is_scheduled()
+        && !e.updater().arrivals_scheduled()
         // A hidden preview is laid out when it comes back.
-        && (!st.stale_layout() || !e.preview_visible())
+        && e.with_text(move |snap, st| st.is_current(snap) && (!st.stale_layout() || hidden))
 }
 
 /// The editor has applied the current text, rendered its formulas and diagrams and loaded its images.
@@ -498,15 +586,14 @@ fn settled(e: &EditorController) -> bool {
     if !quiet(e) {
         return false;
     }
-    let Ok(st) = e.ivars().state.try_borrow() else {
-        return false;
-    };
     let dark = e.is_dark();
     super::js::renderer(e.mtm()).idle()
         && super::remote::idle()
-        && crate::markdown::doc::figures(st.doc())
-            .iter()
-            .all(|(_, f)| super::js::outcome(&super::update::render_key(f, dark)).is_some())
+        && e.model().read(move |st| {
+            crate::markdown::doc::figures(st.doc())
+                .iter()
+                .all(|(_, f)| super::js::outcome(&super::update::render_key(f, dark)).is_some())
+        })
 }
 
 fn run_steps(ctx: Ctx, list: Vec<Step>) {
@@ -519,16 +606,21 @@ fn run_steps(ctx: Ctx, list: Vec<Step>) {
                 return event as *const _ as *mut _;
             }
             let i = crate::util::to_usize(event.data1());
-            let ctx = CTX.with(|c| c.borrow().clone()).unwrap();
-            STEPS.with(|s| (s.borrow()[i].1)(&ctx));
+            let Some(ctx) = CTX.with(|c| c.borrow().clone()) else {
+                return event as *const _ as *mut _;
+            };
+            let last = LAST_CHECK.with(|c| c.borrow().clone());
+            guarded(&format!("step {i}, after \"{last}\","), || {
+                STEPS.with(|s| (s.borrow()[i].1)(&ctx))
+            });
             match STEPS.with(|s| s.borrow().len()) {
                 n if i + 1 < n => wait_for(i + 1),
                 _ => {
-                    let snapshot = ctx.e.snapshot();
+                    let copy = ctx.e.source_text();
                     check(
                         "the patched text copy matches the source view",
-                        snapshot.text == ctx.e.exact_text(),
-                        &format!("{} vs {} bytes", snapshot.text.len(), ctx.e.exact_text().len()),
+                        copy == ctx.e.exact_text(),
+                        &format!("{} vs {} bytes", copy.len(), ctx.e.exact_text().len()),
                     );
                     finish()
                 }
@@ -546,31 +638,72 @@ fn run_steps(ctx: Ctx, list: Vec<Step>) {
     wait_for(0);
 }
 
-fn step(delay: f64, f: impl Fn(&Ctx) + 'static) -> Step {
-    (Wait::Fixed(delay), Box::new(f))
+/// A step that runs once `cond` holds. `name` completes "waited for ...".
+fn when(name: &str, cond: impl Fn(&Ctx) -> bool + 'static, f: impl Fn(&Ctx) + 'static) -> Step {
+    at_least(0.0, name, cond, f)
 }
 
-/// A step that runs once `cond` holds.
-fn when(cond: impl Fn(&Ctx) -> bool + 'static, f: impl Fn(&Ctx) + 'static) -> Step {
-    (Wait::Until(Box::new(cond)), Box::new(f))
+/// Like `when`, not before `seconds` have passed either, for a condition that alone may be too early.
+fn at_least(seconds: f64, name: &str, cond: impl Fn(&Ctx) -> bool + 'static, f: impl Fn(&Ctx) + 'static) -> Step {
+    (
+        Wait {
+            at_least: seconds,
+            name: name.to_string(),
+            holds: Box::new(cond),
+            in_a_row: 3,
+        },
+        Box::new(f),
+    )
+}
+
+const APPLIED: &str = "the editor to apply the text";
+
+/// A step that runs once the editor has applied the text.
+fn applied(f: impl Fn(&Ctx) + 'static) -> Step {
+    when(APPLIED, |c| quiet(&c.e), f)
+}
+
+/// Like `applied`, not before `seconds` have passed either.
+fn applied_after(seconds: f64, f: impl Fn(&Ctx) + 'static) -> Step {
+    at_least(seconds, APPLIED, |c| quiet(&c.e), f)
+}
+
+/// A fixed delay, only where no condition exists, as `why` says.
+fn pause(seconds: f64, why: &str, f: impl Fn(&Ctx) + 'static) -> Step {
+    let (mut wait, f) = at_least(
+        seconds,
+        &format!("{APPLIED}, after a pause since {why}"),
+        |c| quiet(&c.e),
+        f,
+    );
+    wait.in_a_row = 1;
+    (wait, f)
 }
 
 /// A step that runs once the editor has settled.
 fn settle(f: impl Fn(&Ctx) + 'static) -> Step {
-    when(|c| settled(&c.e), f)
+    when(
+        "the editor to settle, with its formulas, diagrams and images in",
+        |c| settled(&c.e),
+        f,
+    )
 }
 
 /// A step that runs once the formula or diagram editor has closed and the editor has settled.
 fn closed(f: impl Fn(&Ctx) + 'static) -> Step {
-    when(|c| c.e.ivars().atoms.edit.borrow().is_none() && settled(&c.e), f)
+    when(
+        "the formula or diagram editor to close and the editor to settle",
+        |c| !c.e.atom_editor().is_open() && settled(&c.e),
+        f,
+    )
 }
 
 fn run(mtm: MainThreadMarker, out: &Path) {
-    let Some(e) = editor(mtm) else {
+    let Some((e, window)) = editor(mtm).and_then(|e| e.window().map(|w| (e, w))) else {
         check("open document", false, "no editor window");
-        std::process::exit(1);
+        finish();
+        return;
     };
-    let window = e.window().unwrap();
     #[expect(deprecated, reason = "the replacement does not bring a test run to the front")]
     NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
     window.makeKeyAndOrderFront(None);
@@ -629,14 +762,6 @@ fn run(mtm: MainThreadMarker, out: &Path) {
         scenarios::steps(),
     ];
     run_steps(ctx, groups.into_iter().flatten().collect());
-}
-
-fn hang_check_formula() -> super::js::Key {
-    super::js::Key::Math {
-        tex: "a^2 + b^2 = c^2".into(),
-        display: false,
-        dark: false,
-    }
 }
 
 /// The UTF-16 index of the first character in the preview that links to `target`.
@@ -707,7 +832,7 @@ fn perform(e: &EditorController, action: objc2::runtime::Sel, tag: isize) {
 fn set_source_caret(e: &EditorController, at: usize) {
     let s = source(e);
     e.source()
-        .setSelectedRange(NSRange::new(Utf16Map::new(&s).to_u16(at).0, 0));
+        .setSelectedRange(NSRange::new(Utf16Map::new(&s).to_u16(Byte::new(at)).get(), 0));
 }
 
 fn select_in_source(e: &EditorController, needle: &str) {
@@ -719,8 +844,10 @@ fn select_in_source(e: &EditorController, needle: &str) {
     };
     let map = Utf16Map::new(&s);
     e.window().unwrap().makeFirstResponder(Some(e.source()));
-    e.source()
-        .setSelectedRange(NSRange::new(map.to_u16(at).0, needle.encode_utf16().count()));
+    e.source().setSelectedRange(NSRange::new(
+        map.to_u16(Byte::new(at)).get(),
+        needle.encode_utf16().count(),
+    ));
 }
 
 /// Shows `text` as marked text at the caret, as an input method does while a word is being composed.
@@ -784,11 +911,11 @@ fn window_image(window: &NSWindow, path: &Path) {
 fn append(e: &EditorController, text: &str) {
     let end = source(e).len();
     let edit = crate::markdown::commands::Edit {
-        range: end..end,
+        range: bytes(end..end),
         replacement: text.to_string(),
-        selection: end..end,
+        selection: bytes(end..end),
     };
-    e.apply_edit(edit, None, false);
+    e.editing().apply_edit(edit, None, false);
 }
 
 fn export_pdf(e: &EditorController, pdf: &Path) {
@@ -806,7 +933,7 @@ fn export_pdf(e: &EditorController, pdf: &Path) {
             objc2::runtime::ProtocolObject::from_ref(NSPrintJobSavingURL),
         );
     }
-    let op = e.print_operation(&info);
+    let op = e.sharing().print_operation(&info);
     op.setShowsPrintPanel(false);
     op.setShowsProgressPanel(false);
     let ok = op.runOperation();
@@ -820,13 +947,14 @@ fn open_formula_editor(e: &EditorController) -> Option<Retained<objc2_app_kit::N
     let map = crate::markdown::text::Utf16Map::new(&src);
     let window = e.window()?;
     window.makeFirstResponder(Some(e.source()));
-    e.source().setSelectedRange(NSRange::new(map.to_u16(formula).0, 0));
-    e.edit_atom_at_selection();
-    e.ivars().atoms.edit.borrow().as_ref().map(|a| a.view.clone())
+    e.source()
+        .setSelectedRange(NSRange::new(map.to_u16(Byte::new(formula)).get(), 0));
+    e.atom_editor().edit_at_selection();
+    e.atom_editor().code_view()
 }
 
 fn close_popover(e: &EditorController) {
-    let popover = e.ivars().atoms.edit.borrow().as_ref().map(|a| a.popover.clone());
+    let popover = e.atom_editor().open_popover();
     if let Some(p) = popover {
         p.close();
     }
@@ -923,7 +1051,7 @@ fn check_context_menu(e: &EditorController) {
     let menu = menu.map(|m| m.copy()).unwrap();
     let p = storage(e.preview()).string().to_string();
     let formula = p[..p.find("Inline-Formel: ").unwrap()].encode_utf16().count() + "Inline-Formel: ".len();
-    let adjusted = e.adjust_context_menu(&menu, e.preview(), formula);
+    let adjusted = e.editing().adjust_context_menu(&menu, e.preview(), formula);
     let titles: Vec<String> = adjusted.itemArray().iter().map(|i| i.title().to_string()).collect();
     check(
         "context menu on a formula offers to edit it",

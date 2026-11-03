@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "請先儲存文件";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "貼上的影像會以檔案形式存放在文件旁。請先儲存文件，再重新貼上影像。";
 "Export fehlgeschlagen" = "輸出失敗";
+"Das Dokument ließ sich nicht umwandeln." = "無法轉換文件。";
+"Das Dokument ist zu groß für eine Word-Datei." = "文件太大，無法存為 Word 檔案。";
 "Gliederung ausblenden" = "隱藏大綱";
 "Gliederung einblenden" = "顯示大綱";
 "Metadaten" = "後設資料";

@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "יש לשמור את המסמך תחילה";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "תמונות מודבקות נשמרות כקבצים לצד המסמך. יש לשמור את המסמך ואז להדביק את התמונה שוב.";
 "Export fehlgeschlagen" = "הייצוא נכשל";
+"Das Dokument ließ sich nicht umwandeln." = "לא ניתן היה להמיר את המסמך.";
+"Das Dokument ist zu groß für eine Word-Datei." = "המסמך גדול מדי עבור קובץ Word.";
 "Gliederung ausblenden" = "הסתרת המתאר";
 "Gliederung einblenden" = "הצגת המתאר";
 "Metadaten" = "מטא-נתונים";

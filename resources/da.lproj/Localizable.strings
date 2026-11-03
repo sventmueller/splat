@@ -286,6 +286,8 @@
 "Dokument zuerst sichern" = "Gem dokumentet først";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Indsatte billeder gemmes som filer ved siden af dokumentet. Gem det, og sæt derefter billedet ind igen.";
 "Export fehlgeschlagen" = "Eksporten mislykkedes";
+"Das Dokument ließ sich nicht umwandeln." = "Dokumentet kunne ikke konverteres.";
+"Das Dokument ist zu groß für eine Word-Datei." = "Dokumentet er for stort til en Word-fil.";
 "Gliederung ausblenden" = "Skjul disposition";
 "Gliederung einblenden" = "Vis disposition";
 "Metadaten" = "Metadata";

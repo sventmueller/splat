@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use crate::markdown::text::Byte;
 pub use crate::markdown::text::Shown;
 
 use super::layout::{CharMap, Layout, Para, ParaKind, Run, RunMap, RunStyle, para_len_u16};
@@ -24,7 +25,7 @@ pub struct Index {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsertPoint {
-    pub src: usize,
+    pub src: Byte,
     pub code: bool,
     pub at_para_start: bool,
     pub para_kind: ParaKind,
@@ -36,7 +37,7 @@ impl Index {
     pub fn new(layout: &Layout) -> Index {
         let mut paras = Vec::new();
         let mut block_starts = Vec::new();
-        let mut pos = Shown(0);
+        let mut pos = Shown::new(0);
         let in_order = layout
             .blocks
             .windows(2)
@@ -111,11 +112,11 @@ fn char_index(text: &str, u16_offset: usize) -> usize {
     text.chars().count()
 }
 
-fn text_source(chars: &CharMap, text: &str, end: usize, k: usize) -> usize {
+fn text_source(chars: &CharMap, text: &str, end: Byte, k: usize) -> Byte {
     chars.get(text, k).unwrap_or(end)
 }
 
-fn text_start(run: &Run) -> Option<usize> {
+fn text_start(run: &Run) -> Option<Byte> {
     match &run.map {
         RunMap::Text { chars, end } => Some(text_source(chars, &run.text, *end, 0)),
         RunMap::Atom { .. } => None,
@@ -123,17 +124,17 @@ fn text_start(run: &Run) -> Option<usize> {
 }
 
 /// The start of `next` if only a line's prefix, its quote marks and indentation, lies between `from` and it.
-fn behind_line_prefix(text: &str, next: Option<&Run>, from: usize) -> Option<usize> {
+fn behind_line_prefix(text: &str, next: Option<&Run>, from: Byte) -> Option<Byte> {
     let start = text_start(next?)?;
-    let between = text.get(from..start)?;
+    let between = text.get(from.get()..start.get())?;
     between
         .bytes()
         .all(|b| matches!(b, b' ' | b'\t' | b'>'))
         .then_some(start)
 }
 
-/// Source offset of the start of a paragraph's content.
-pub fn content_start(para: &Para) -> usize {
+/// Source position of the start of a paragraph's content.
+pub fn content_start(para: &Para) -> Byte {
     match para.runs.first() {
         Some(r) => match &r.map {
             RunMap::Text { chars, end } => text_source(chars, &r.text, *end, 0),
@@ -143,8 +144,8 @@ pub fn content_start(para: &Para) -> usize {
     }
 }
 
-/// Source offset of the end of a paragraph's content.
-pub fn content_end(para: &Para) -> usize {
+/// Source position of the end of a paragraph's content.
+pub fn content_end(para: &Para) -> Byte {
     match para.runs.last().map(|r| &r.map) {
         Some(RunMap::Text { end, .. }) => *end,
         Some(RunMap::Atom { src, .. }) => src.end,
@@ -153,7 +154,7 @@ pub fn content_end(para: &Para) -> usize {
 }
 
 /// Where text goes that is typed behind a line break shown as a space: on the next line, in front of its text.
-fn behind_atom(run: &Run, next: Option<&Run>) -> Option<usize> {
+fn behind_atom(run: &Run, next: Option<&Run>) -> Option<Byte> {
     let line_break = matches!(
         run.map,
         RunMap::Atom {
@@ -170,8 +171,9 @@ pub fn insert_point(layout: &Layout, index: &Index, p: Shown) -> Option<InsertPo
     let place = index.paras[para_index];
     let para = index.para(layout, para_index);
     let marker_len = marker_len(para);
-    let off = p.0.saturating_sub(place.start.0).min(place.len).max(marker_len);
-    let make = |src: usize, style: &RunStyle| InsertPoint {
+    let off = p.get().saturating_sub(place.start.get()).min(place.len).max(marker_len);
+    let caret = place.start + off;
+    let make = |src: Byte, style: &RunStyle| InsertPoint {
         src,
         code: style.text.code || matches!(para.style.kind, ParaKind::Code { .. }),
         at_para_start: off == marker_len,
@@ -188,28 +190,25 @@ pub fn insert_point(layout: &Layout, index: &Index, p: Shown) -> Option<InsertPo
             None => make(para.insert_at, &RunStyle::default()),
         });
     }
-    let mut unit = 0;
-    for (ri, run) in para.runs.iter().enumerate() {
-        let len = run_len(&run.text);
-        if off > unit && off <= unit + len {
+    for (ri, (at, run)) in para.runs_at(place.start).enumerate() {
+        if caret > at.start && caret <= at.end {
             return Some(match &run.map {
                 RunMap::Text { chars, end } => {
-                    let k = char_index(&run.text, off - unit);
+                    let k = char_index(&run.text, caret - at.start);
                     make(text_source(chars, &run.text, *end, k), &run.style)
                 }
-                RunMap::Atom { src, .. } if off < unit + len => make(src.start, &RunStyle::default()),
+                RunMap::Atom { src, .. } if caret < at.end => make(src.start, &RunStyle::default()),
                 RunMap::Atom { src, .. } => {
                     make(behind_atom(run, para.runs.get(ri + 1)).unwrap_or(src.end), &run.style)
                 }
             });
         }
-        unit += len;
     }
     Some(make(para.insert_at, &RunStyle::default()))
 }
 
-/// Preview offset for a source offset; positions inside markup snap to the nearest rendered text.
-pub fn preview_offset(layout: &Layout, index: &Index, src: usize) -> Shown {
+/// Preview position for a source position; positions inside markup snap to the nearest rendered text.
+pub fn preview_offset(layout: &Layout, index: &Index, src: Byte) -> Shown {
     let mut best: Option<(usize, Shown)> = None;
     let mut consider = |distance: usize, pos: Shown| {
         // At the same distance the later one wins: markup at the start of a paragraph belongs to its text.
@@ -237,12 +236,10 @@ pub fn preview_offset(layout: &Layout, index: &Index, src: usize) -> Shown {
             break;
         }
         let para = index.para(layout, i);
-        let mut unit = 0;
         if para.runs.is_empty() {
-            consider(para.insert_at.abs_diff(src), place.start);
+            consider(para.insert_at.distance(src), place.start);
         }
-        for run in &para.runs {
-            let len = run_len(&run.text);
+        for (at, run) in para.runs_at(place.start) {
             match &run.map {
                 RunMap::Text { chars, end } => {
                     let first = chars.get(&run.text, 0);
@@ -251,26 +248,25 @@ pub fn preview_offset(layout: &Layout, index: &Index, src: usize) -> Shown {
                     {
                         let k = chars.count_before(&run.text, src);
                         let u16_in: usize = run.text.chars().take(k).map(char::len_utf16).sum();
-                        return place.start + unit + u16_in;
+                        return at.start + u16_in;
                     }
                     if let Some(first) = first {
-                        consider(first.abs_diff(src), place.start + unit);
-                        consider(end.abs_diff(src), place.start + unit + len);
+                        consider(first.distance(src), at.start);
+                        consider(end.distance(src), at.end);
                     }
                 }
                 RunMap::Atom { src: r, atom } => {
                     if r.start <= src && src < r.end {
                         let after = matches!(atom, super::layout::Atom::Marker);
-                        return place.start + unit + if after { len } else { 0 };
+                        return if after { at.end } else { at.start };
                     }
-                    consider(r.start.abs_diff(src), place.start + unit);
-                    consider(r.end.abs_diff(src), place.start + unit + len);
+                    consider(r.start.distance(src), at.start);
+                    consider(r.end.distance(src), at.end);
                 }
             }
-            unit += len;
         }
     }
-    best.map_or(Shown(0), |(_, p)| p)
+    best.map_or(Shown::new(0), |(_, p)| p)
 }
 
 /// Kinds whose paragraphs can be joined by deleting the break between them.
@@ -280,7 +276,7 @@ pub fn mergeable(kind: &ParaKind) -> bool {
 
 /// Source ranges to delete for a preview range. Markup between rendered characters stays,
 /// unless the range joins two paragraphs.
-pub fn deletion_ranges(text: &str, layout: &Layout, index: &Index, range: Range<Shown>) -> Vec<Range<usize>> {
+pub fn deletion_ranges(text: &str, layout: &Layout, index: &Index, range: Range<Shown>) -> Vec<Range<Byte>> {
     let mut out = Vec::new();
     let (Some(first), Some(last)) = (index.para_at(range.start), index.para_at(range.end)) else {
         return out;
@@ -302,17 +298,13 @@ pub fn deletion_ranges(text: &str, layout: &Layout, index: &Index, range: Range<
     for para_index in first..=last {
         let place = index.paras[para_index];
         let para = index.para(layout, para_index);
-        let a = range.start.max(place.start) - place.start;
-        let b = range.end.min(place.start + place.len).0.saturating_sub(place.start.0);
-        let mut unit = 0;
-        for (ri, run) in para.runs.iter().enumerate() {
-            let len = run_len(&run.text);
-            let (hit_start, hit_end) = (a.max(unit), b.min(unit + len));
+        for (ri, (at, run)) in para.runs_at(place.start).enumerate() {
+            let (hit_start, hit_end) = (range.start.max(at.start), range.end.min(at.end));
             if hit_start < hit_end {
                 match &run.map {
                     RunMap::Text { chars, end } => {
-                        let k1 = char_index(&run.text, hit_start - unit);
-                        let k2 = char_index(&run.text, hit_end - unit);
+                        let k1 = char_index(&run.text, hit_start - at.start);
+                        let k2 = char_index(&run.text, hit_end - at.start);
                         out.push(text_source(chars, &run.text, *end, k1)..text_source(chars, &run.text, *end, k2));
                     }
                     RunMap::Atom { src, .. } => {
@@ -325,7 +317,6 @@ pub fn deletion_ranges(text: &str, layout: &Layout, index: &Index, range: Range<
                     }
                 }
             }
-            unit += len;
         }
         if !joins
             && para_index != first
@@ -338,10 +329,10 @@ pub fn deletion_ranges(text: &str, layout: &Layout, index: &Index, range: Range<
     normalize(out)
 }
 
-pub fn normalize(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
+pub fn normalize(mut ranges: Vec<Range<Byte>>) -> Vec<Range<Byte>> {
     ranges.retain(|r| r.start < r.end);
     ranges.sort_by_key(|r| r.start);
-    let mut out: Vec<Range<usize>> = Vec::new();
+    let mut out: Vec<Range<Byte>> = Vec::new();
     for r in ranges {
         match out.last_mut() {
             Some(last) if r.start <= last.end => last.end = last.end.max(r.end),
@@ -354,7 +345,7 @@ pub fn normalize(mut ranges: Vec<Range<usize>>) -> Vec<Range<usize>> {
 #[cfg(test)]
 mod order_tests {
     use super::*;
-    use crate::markdown::doc::parse;
+    use crate::markdown::reader::parse;
     use crate::preview::layout::{NoImages, layout};
 
     /// Text appended after footnotes lies in the preview before the definitions comrak moved behind it.
@@ -362,7 +353,7 @@ mod order_tests {
     fn source_positions_find_their_block_behind_moved_footnotes() {
         let t = "Text^[innen] und[^1].\n\n[^1]: Anmerkung.\n\nNeu am Ende\n";
         let d = parse(t);
-        let l = layout(t, &d, &NoImages, None);
+        let l = layout(&d, &NoImages, None);
         let i = Index::new(&l);
         assert!(i.in_order < l.blocks.len());
         let mut preview = String::new();
@@ -376,18 +367,18 @@ mod order_tests {
         let def_end = t.find("Anmerkung.").unwrap() + "Anmerkung.".len();
         let shown_end = preview.find("Anmerkung.").unwrap() + "Anmerkung.".len();
         assert_eq!(
-            preview_offset(&l, &i, def_end),
-            Shown(preview[..shown_end].encode_utf16().count())
+            preview_offset(&l, &i, Byte::new(def_end)),
+            Shown::new(preview[..shown_end].encode_utf16().count())
         );
         let end = t.find("Neu am Ende").unwrap() + "Neu am Ende".len();
-        let p = preview_offset(&l, &i, end);
+        let p = preview_offset(&l, &i, Byte::new(end));
         let at = preview.find("Neu am Ende").unwrap() + "Neu am Ende".len();
-        assert_eq!(p, Shown(preview[..at].encode_utf16().count()));
+        assert_eq!(p, Shown::new(preview[..at].encode_utf16().count()));
 
         assert!(preview.contains("1.\tinnen"), "{preview}");
         // The empty paragraph for a caret at the end of the text stays with the text, before the footnotes.
         let caret = t.len();
-        let with_caret = layout(&format!("{t}\n"), &parse(&format!("{t}\n")), &NoImages, Some(caret + 1));
+        let with_caret = layout(&parse(&format!("{t}\n")), &NoImages, Some(Byte::new(caret + 1)));
         let last_text = with_caret
             .blocks
             .iter()
@@ -410,11 +401,12 @@ mod order_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::doc::parse;
+    use crate::markdown::reader::parse;
+    use crate::markdown::text::{TextAt, bytes, offsets};
     use crate::preview::layout::{NoImages, layout};
 
     fn setup(t: &str) -> (Layout, Index) {
-        let l = layout(t, &parse(t), &NoImages, None);
+        let l = layout(&parse(t), &NoImages, None);
         let i = Index::new(&l);
         (l, i)
     }
@@ -422,8 +414,11 @@ mod tests {
     fn deleted(t: &str, from: usize, to: usize) -> String {
         let (l, i) = setup(t);
         let mut s = t.to_string();
-        for d in deletion_ranges(t, &l, &i, Shown(from)..Shown(to)).iter().rev() {
-            s.replace_range(d.clone(), "");
+        for d in deletion_ranges(t, &l, &i, Shown::new(from)..Shown::new(to))
+            .iter()
+            .rev()
+        {
+            s.replace_range(offsets(d), "");
         }
         s
     }
@@ -448,7 +443,7 @@ mod tests {
         let (l, i) = setup("a\n\n---\n\nb\n");
         let rule = l.blocks[1].paras[0].runs[0].text.encode_utf16().count();
         assert_eq!(rule, 1);
-        assert_eq!(i.paras[1].start, Shown(2));
+        assert_eq!(i.paras[1].start, Shown::new(2));
         // From inside the paragraph to the end of the rule: the break behind the rule stays.
         assert_eq!(deleted("ab\n\n---\n\nc\n", 1, 4), "a\n\nc\n");
         // From the start of a rule to inside the paragraph: the break before the rule stays.
@@ -473,10 +468,10 @@ mod tests {
 
     #[test]
     fn deletions_that_touch_are_one_and_those_with_a_gap_are_two() {
-        assert_eq!(normalize(vec![0..2, 2..4]), vec![0..4]);
-        assert_eq!(normalize(vec![3..4, 0..2]), [0..2, 3..4]);
-        assert_eq!(normalize(vec![0..4, 1..2]), vec![0..4]);
-        assert_eq!(normalize(vec![1..1, 0..0]), Vec::<std::ops::Range<usize>>::new());
+        assert_eq!(normalize(vec![bytes(0..2), bytes(2..4)]), vec![bytes(0..4)]);
+        assert_eq!(normalize(vec![bytes(3..4), bytes(0..2)]), [bytes(0..2), bytes(3..4)]);
+        assert_eq!(normalize(vec![bytes(0..4), bytes(1..2)]), vec![bytes(0..4)]);
+        assert_eq!(normalize(vec![bytes(1..1), bytes(0..0)]), Vec::<Range<Byte>>::new());
     }
 
     #[test]
@@ -501,44 +496,44 @@ mod tests {
         let marker = marker_len(&l.blocks[0].paras[0]);
         assert_eq!(marker, 2);
         assert_eq!(
-            insert_point(&l, &i, Shown(0)).unwrap().src,
-            t.find('a').unwrap(),
+            insert_point(&l, &i, Shown::new(0)).unwrap().src,
+            Byte::new(t.find('a').unwrap()),
             "before the text, not the marker"
         );
-        assert!(insert_point(&l, &i, Shown(marker)).unwrap().at_para_start);
-        assert!(!insert_point(&l, &i, Shown(marker + 1)).unwrap().at_para_start);
+        assert!(insert_point(&l, &i, Shown::new(marker)).unwrap().at_para_start);
+        assert!(!insert_point(&l, &i, Shown::new(marker + 1)).unwrap().at_para_start);
         let t = "a ![b](c.png) d\n";
         let (l, i) = setup(t);
         assert_eq!(
-            insert_point(&l, &i, Shown(3)).unwrap().src,
-            t.find(" d").unwrap(),
+            insert_point(&l, &i, Shown::new(3)).unwrap().src,
+            Byte::new(t.find(" d").unwrap()),
             "behind the picture"
         );
         assert_eq!(
-            insert_point(&l, &i, Shown(2)).unwrap().src,
-            t.find('!').unwrap(),
+            insert_point(&l, &i, Shown::new(2)).unwrap().src,
+            Byte::new(t.find('!').unwrap()),
             "before it"
         );
         let t = "ab\ncd\n";
         let (l, i) = setup(t);
         assert_eq!(
-            insert_point(&l, &i, Shown(3)).unwrap().src,
-            t.find('c').unwrap(),
+            insert_point(&l, &i, Shown::new(3)).unwrap().src,
+            Byte::new(t.find('c').unwrap()),
             "behind a line end, on the next line"
         );
         let t = "[ab](c) d\n";
         let (l, i) = setup(t);
-        let edge = insert_point(&l, &i, Shown(2)).unwrap();
+        let edge = insert_point(&l, &i, Shown::new(2)).unwrap();
         assert_eq!(
             edge.src,
-            t.find("](").unwrap(),
+            Byte::new(t.find("](").unwrap()),
             "typing at the end of a link stays in it"
         );
-        assert!(insert_point(&l, &i, Shown(1)).is_some_and(|p| !p.code && !p.html));
+        assert!(insert_point(&l, &i, Shown::new(1)).is_some_and(|p| !p.code && !p.html));
         let t = "`ab` c\n";
         let (l, i) = setup(t);
-        assert!(insert_point(&l, &i, Shown(1)).unwrap().code);
-        assert!(!insert_point(&l, &i, Shown(3)).unwrap().code);
+        assert!(insert_point(&l, &i, Shown::new(1)).unwrap().code);
+        assert!(!insert_point(&l, &i, Shown::new(3)).unwrap().code);
     }
 
     #[test]
@@ -547,31 +542,43 @@ mod tests {
         let (l, i) = setup(t);
         let at = |needle: &str| t.find(needle).unwrap();
         assert_eq!(
-            preview_offset(&l, &i, 0),
-            Shown(0),
+            preview_offset(&l, &i, Byte::new(0)),
+            Shown::new(0),
             "the hashes stand for the start of the title"
         );
-        assert_eq!(preview_offset(&l, &i, at("Titel")), Shown(0));
-        assert_eq!(preview_offset(&l, &i, at("itel")), Shown(1));
+        assert_eq!(preview_offset(&l, &i, Byte::new(at("Titel"))), Shown::new(0));
+        assert_eq!(preview_offset(&l, &i, Byte::new(at("itel"))), Shown::new(1));
         assert_eq!(
-            preview_offset(&l, &i, at("\n\n**")),
-            Shown(5),
+            preview_offset(&l, &i, Byte::new(at("\n\n**"))),
+            Shown::new(5),
             "the end of a line is the end of what it shows"
         );
         let fett = i.paras[1].start;
-        assert_eq!(preview_offset(&l, &i, at("**fett")), fett, "markup snaps to the text");
-        assert_eq!(preview_offset(&l, &i, at("fett")), fett);
-        assert_eq!(preview_offset(&l, &i, at("ett")), fett + 1);
-        let picture = fett + 5;
-        assert_eq!(preview_offset(&l, &i, at("![b]")), picture, "at a picture, before it");
-        assert_eq!(preview_offset(&l, &i, at("[b]")), picture, "inside its source too");
         assert_eq!(
-            preview_offset(&l, &i, at("- Punkt")),
+            preview_offset(&l, &i, Byte::new(at("**fett"))),
+            fett,
+            "markup snaps to the text"
+        );
+        assert_eq!(preview_offset(&l, &i, Byte::new(at("fett"))), fett);
+        assert_eq!(preview_offset(&l, &i, Byte::new(at("ett"))), fett + 1);
+        let picture = fett + 5;
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(at("![b]"))),
+            picture,
+            "at a picture, before it"
+        );
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(at("[b]"))),
+            picture,
+            "inside its source too"
+        );
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(at("- Punkt"))),
             i.paras[2].start + 2,
             "a marker counts behind itself"
         );
         assert_eq!(
-            preview_offset(&l, &i, t.len()),
+            preview_offset(&l, &i, Byte::new(t.len())),
             i.paras[2].start + 7,
             "the end of the text"
         );
@@ -590,29 +597,35 @@ mod tests {
     fn typing_at_end_of_bold_stays_bold() {
         let t = "a **fett** b\n";
         let (l, i) = setup(t);
-        let point = insert_point(&l, &i, Shown(6)).unwrap();
-        assert_eq!(point.src, t.find("** b").unwrap());
-        let ip0 = insert_point(&l, &i, Shown(0)).unwrap();
-        assert_eq!(ip0.src, 0);
+        let point = insert_point(&l, &i, Shown::new(6)).unwrap();
+        assert_eq!(point.src, Byte::new(t.find("** b").unwrap()));
+        let ip0 = insert_point(&l, &i, Shown::new(0)).unwrap();
+        assert_eq!(ip0.src, Byte::new(0));
     }
 
     #[test]
     fn preview_offsets_roundtrip() {
         let t = "# Ü\n\nx **fett** y\n";
         let (l, i) = setup(t);
-        assert_eq!(preview_offset(&l, &i, t.find("fett").unwrap()), Shown(2 + 2));
-        assert_eq!(preview_offset(&l, &i, t.find("Ü").unwrap()), Shown(0));
-        assert_eq!(preview_offset(&l, &i, t.find('y').unwrap()), Shown(2 + 7));
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(t.find("fett").unwrap())),
+            Shown::new(2 + 2)
+        );
+        assert_eq!(preview_offset(&l, &i, Byte::new(t.find("Ü").unwrap())), Shown::new(0));
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(t.find('y').unwrap())),
+            Shown::new(2 + 7)
+        );
     }
 
     #[test]
     fn deleting_across_formatting_keeps_delimiters() {
         let t = "ab **cd** ef\n";
         let (l, i) = setup(t);
-        let r = deletion_ranges(t, &l, &i, Shown(1)..Shown(4));
+        let r = deletion_ranges(t, &l, &i, Shown::new(1)..Shown::new(4));
         let mut s = t.to_string();
         for d in r.iter().rev() {
-            s.replace_range(d.clone(), "");
+            s.replace_range(offsets(d), "");
         }
         assert_eq!(s, "a**d** ef\n");
     }
@@ -621,10 +634,10 @@ mod tests {
     fn deleting_paragraph_break_joins_blocks() {
         let t = "eins\n\n## zwei\n";
         let (l, i) = setup(t);
-        let r = deletion_ranges(t, &l, &i, Shown(4)..Shown(5));
+        let r = deletion_ranges(t, &l, &i, Shown::new(4)..Shown::new(5));
         let mut s = t.to_string();
         for d in r.iter().rev() {
-            s.replace_range(d.clone(), "");
+            s.replace_range(offsets(d), "");
         }
         assert_eq!(s, "einszwei\n");
     }
@@ -633,8 +646,8 @@ mod tests {
     fn soft_break_maps_to_next_line_text() {
         let t = "> zitat\n> zwei\n";
         let (l, i) = setup(t);
-        let point = insert_point(&l, &i, Shown(6)).unwrap();
-        assert_eq!(&t[point.src..point.src + 4], "zwei");
+        let point = insert_point(&l, &i, Shown::new(6)).unwrap();
+        assert_eq!(t.at(point.src..point.src + 4), "zwei");
     }
 
     #[test]
@@ -653,21 +666,28 @@ mod tests {
         let before: usize = para.runs[..label].iter().map(|r| run_len(&r.text)).sum();
         let len = run_len(&para.runs[label].text);
         for inside in [before + 1, before + len - 1] {
-            assert_eq!(insert_point(&l, &i, Shown(inside)).unwrap().src, src.start, "{inside}");
+            assert_eq!(
+                insert_point(&l, &i, Shown::new(inside)).unwrap().src,
+                src.start,
+                "{inside}"
+            );
         }
-        assert_eq!(insert_point(&l, &i, Shown(before + len)).unwrap().src, src.end);
+        assert_eq!(insert_point(&l, &i, Shown::new(before + len)).unwrap().src, src.end);
     }
 
     #[test]
     fn only_a_space_for_a_line_break_runs_on_to_the_next_text() {
         let t = ":smile:**b**\n";
         let (l, i) = setup(t);
-        assert_eq!(insert_point(&l, &i, Shown(2)).unwrap().src, t.find("**").unwrap());
+        assert_eq!(
+            insert_point(&l, &i, Shown::new(2)).unwrap().src,
+            Byte::new(t.find("**").unwrap())
+        );
         let t = "ab\n![x](y.png)c\n";
         let (l, i) = setup(t);
         assert_eq!(
-            insert_point(&l, &i, Shown(3)).unwrap().src,
-            t.find('!').unwrap(),
+            insert_point(&l, &i, Shown::new(3)).unwrap().src,
+            Byte::new(t.find('!').unwrap()),
             "before the picture"
         );
     }
@@ -677,15 +697,15 @@ mod tests {
         let t = "Text^[innen] und.\n";
         let (l, i) = setup(t);
         assert_eq!(
-            preview_offset(&l, &i, t.find("innen").unwrap()),
-            Shown(4),
+            preview_offset(&l, &i, Byte::new(t.find("innen").unwrap())),
+            Shown::new(4),
             "the reference"
         );
         let t = "Text^[innen] und.\n\nzwei\n\ndrei\n";
         let (l, i) = setup(t);
         assert_eq!(
-            preview_offset(&l, &i, t.find("innen").unwrap()),
-            Shown(4),
+            preview_offset(&l, &i, Byte::new(t.find("innen").unwrap())),
+            Shown::new(4),
             "far from the note"
         );
 
@@ -700,7 +720,7 @@ mod tests {
         let run = i.para(&l, k).runs.iter().position(|r| r.text == "Anm.").unwrap();
         let lead: usize = i.para(&l, k).runs[..run].iter().map(|r| run_len(&r.text)).sum();
         assert_eq!(
-            preview_offset(&l, &i, t.find("Anm.").unwrap() + 1),
+            preview_offset(&l, &i, Byte::new(t.find("Anm.").unwrap() + 1)),
             place.start + lead + 1
         );
     }
@@ -715,15 +735,19 @@ mod tests {
             .enumerate()
             .find(|(k, _)| i.para(&l, *k).runs.iter().any(|r| r.text == "bb"));
         let bb = bb.expect("the block is shown").1.start;
-        assert_eq!(preview_offset(&l, &i, t.find("bb").unwrap() - 1), bb, "the next block");
-        assert_eq!(preview_offset(&l, &i, 3), Shown(2), "the block before");
+        assert_eq!(
+            preview_offset(&l, &i, Byte::new(t.find("bb").unwrap() - 1)),
+            bb,
+            "the next block"
+        );
+        assert_eq!(preview_offset(&l, &i, Byte::new(3)), Shown::new(2), "the block before");
     }
 
     #[test]
     fn behind_a_picture_is_behind_it_in_the_preview_as_well() {
         let t = "a ![b](c.png) d\n";
         let (l, i) = setup(t);
-        assert_eq!(preview_offset(&l, &i, t.find(" d").unwrap()), Shown(3));
+        assert_eq!(preview_offset(&l, &i, Byte::new(t.find(" d").unwrap())), Shown::new(3));
     }
 
     #[test]
