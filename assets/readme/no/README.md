@@ -8,9 +8,9 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
  
 
 
-[![Last ned Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
+[![Last ned Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
 
-**[Last ned Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: signert og notarisert av Apple, for macOS 14 eller nyere på Apple Silicon og Intel.
+**[Last ned Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: signert og notarisert av Apple, for macOS 14 eller nyere på Apple Silicon og Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 
 ## Installasjon
 
-**Fra diskbildet.** Last ned [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg), åpne det og dra Splat til Apper-mappen. Bildet er signert med en Developer ID og notarisert av Apple, så det åpnes uten advarsler.
+**Fra diskbildet.** Last ned [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg), åpne det og dra Splat til Apper-mappen. Bildet er signert med en Developer ID og notarisert av Apple, så det åpnes uten advarsler.
 
 **Med Homebrew.** Cask-pakken ligger i en egen tap:
 

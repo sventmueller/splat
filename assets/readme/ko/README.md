@@ -8,9 +8,9 @@ Splat은 구문이 색상으로 표시된 Markdown 소스를 왼쪽에, 실시�
  
 
 
-[![macOS용 Splat 다운로드](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
+[![macOS용 Splat 다운로드](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
 
-**[Download Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: Apple의 서명과 공증을 거쳤으며, Apple Silicon과 Intel을 탑재한 macOS 14 이상에서 사용할 수 있습니다.
+**[Download Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: Apple의 서명과 공증을 거쳤으며, Apple Silicon과 Intel을 탑재한 macOS 14 이상에서 사용할 수 있습니다.
  
  
 
@@ -132,7 +132,7 @@ Splat은 구문이 색상으로 표시된 Markdown 소스를 왼쪽에, 실시�
 
 ## 설치
 
-**디스크 이미지로 설치.** [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)를 내려받아 열고, Splat을 응용 프로그램 폴더로 드래그하십시오. 이 이미지는 Developer ID로 서명되고 Apple의 공증을 거쳤으므로 경고 없이 열립니다.
+**디스크 이미지로 설치.** [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)를 내려받아 열고, Splat을 응용 프로그램 폴더로 드래그하십시오. 이 이미지는 Developer ID로 서명되고 Apple의 공증을 거쳤으므로 경고 없이 열립니다.
 
 **Homebrew로 설치.** 이 cask는 전용 tap에 있습니다.
 

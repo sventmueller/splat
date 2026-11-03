@@ -8,9 +8,9 @@ Splat показує вихідний текст Markdown із підсвічу�
  
 
 
-[![Завантажити Splat для macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)
+[![Завантажити Splat для macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
 
-**[Завантажити Splat-1.0.4.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg)**: підписано й нотаризовано Apple, для macOS 14 або новішої на Apple Silicon та Intel.
+**[Завантажити Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: підписано й нотаризовано Apple, для macOS 14 або новішої на Apple Silicon та Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat показує вихідний текст Markdown із підсвічу�
 
 ## Інсталяція
 
-**З образу диска.** Завантажте [`dist/Splat-1.0.4.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.4.dmg), відкрийте його й перетягніть Splat у теку «Програми». Образ підписано сертифікатом Developer ID і нотаризовано Apple, тому він відкривається без попереджень.
+**З образу диска.** Завантажте [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg), відкрийте його й перетягніть Splat у теку «Програми». Образ підписано сертифікатом Developer ID і нотаризовано Apple, тому він відкривається без попереджень.
 
 **Через Homebrew.** Cask міститься у власному tap:
 
