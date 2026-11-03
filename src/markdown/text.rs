@@ -308,26 +308,29 @@ impl Utf16Map {
 
 /// UTF-16 length of a string slice.
 pub fn utf16_len(s: &str) -> usize {
-    // Every byte but a continuation byte starts a char; four-byte chars take a surrogate pair.
+    // Every byte but a continuation byte starts a char; four-byte chars take a surrogate pair. No slice holds more bytes
+    // than a `usize` counts, and additions checked for overflow, as in `Iterator::count`, would keep the loops from
+    // vectorising.
     let b = s.as_bytes();
+    let (mut chars, mut pairs) = (0usize, 0usize);
     if b.len() < VECTORISING_PAYS_FROM {
-        return b.iter().fold(0, |n: usize, &x| {
-            n.wrapping_add(usize::from(x & 0xC0 != 0x80) + usize::from(x >= 0xF0))
-        });
+        for &x in b {
+            chars = chars.wrapping_add(usize::from(x & 0xC0 != 0x80));
+            pairs = pairs.wrapping_add(usize::from(x >= 0xF0));
+        }
+    } else {
+        for &x in b {
+            chars = chars.wrapping_add(usize::from(x & 0xC0 != 0x80));
+        }
+        for &x in b {
+            pairs = pairs.wrapping_add(usize::from(x >= 0xF0));
+        }
     }
-    count_bytes(b, |x| x & 0xC0 != 0x80) + count_bytes(b, |x| x >= 0xF0)
+    chars + pairs
 }
 
 /// Two counting passes vectorise, which most of the many short runs of a layout pay for and a long text gains from.
 const VECTORISING_PAYS_FROM: usize = 64;
-
-/// `Iterator::count` checks every addition for overflow in this profile, which keeps it from vectorising, and no slice
-/// holds more bytes than a `usize` counts.
-fn count_bytes(bytes: &[u8], counted: impl Fn(u8) -> bool) -> usize {
-    bytes
-        .iter()
-        .fold(0, |n: usize, &x| n.wrapping_add(usize::from(counted(x))))
-}
 
 /// Whether `text` reads right to left: its first letter is Hebrew, Arabic or another right-to-left script, which is
 /// how the Unicode bidirectional algorithm picks the direction of a paragraph. `None` for a text without letters.
