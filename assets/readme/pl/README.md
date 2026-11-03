@@ -8,9 +8,9 @@ Splat pokazuje po lewej tekst źródłowy Markdown z kolorowaniem składni, a po
  
 
 
-[![Pobierz Splat dla macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
+[![Pobierz Splat dla macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
 
-**[Pobierz Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: podpisany i poświadczony notarialnie przez Apple, dla macOS 14 lub nowszego na Apple Silicon i Intel.
+**[Pobierz Splat-1.0.6.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: podpisany i poświadczony notarialnie przez Apple, dla macOS 14 lub nowszego na Apple Silicon i Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat pokazuje po lewej tekst źródłowy Markdown z kolorowaniem składni, a po
 
 ## Instalacja
 
-**Z obrazu dysku.** Pobierz [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg), otwórz go i przeciągnij Splat do folderu Programy. Obraz jest podpisany certyfikatem Developer ID i poświadczony notarialnie przez Apple, więc otwiera się bez ostrzeżeń.
+**Z obrazu dysku.** Pobierz [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg), otwórz go i przeciągnij Splat do folderu Programy. Obraz jest podpisany certyfikatem Developer ID i poświadczony notarialnie przez Apple, więc otwiera się bez ostrzeżeń.
 
 **Przez Homebrew.** Cask znajduje się we własnym tapie:
 

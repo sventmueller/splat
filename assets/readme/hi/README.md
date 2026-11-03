@@ -8,9 +8,9 @@ Splat बाईं ओर सिंटैक्स के रंगों वा
  
 
 
-[![macOS के लिए Splat डाउनलोड करें](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
+[![macOS के लिए Splat डाउनलोड करें](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
 
-**[Splat-1.0.5.dmg डाउनलोड करें](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: Apple द्वारा साइन और नोटराइज़ किया हुआ, Apple Silicon और Intel पर macOS 14 या उसके बाद के लिए।
+**[Splat-1.0.6.dmg डाउनलोड करें](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: Apple द्वारा साइन और नोटराइज़ किया हुआ, Apple Silicon और Intel पर macOS 14 या उसके बाद के लिए।
  
  
 
@@ -132,7 +132,7 @@ Splat बाईं ओर सिंटैक्स के रंगों वा
 
 ## इंस्टॉलेशन
 
-**डिस्क इमेज से।** [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg) डाउनलोड कीजिए, उसे खोलिए और Splat को ऐप्लिकेशन फ़ोल्डर पर खींच दीजिए। इमेज Developer ID से साइन की गई है और Apple द्वारा नोटराइज़ की गई है, इसलिए यह बिना चेतावनी के खुलती है।
+**डिस्क इमेज से।** [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg) डाउनलोड कीजिए, उसे खोलिए और Splat को ऐप्लिकेशन फ़ोल्डर पर खींच दीजिए। इमेज Developer ID से साइन की गई है और Apple द्वारा नोटराइज़ की गई है, इसलिए यह बिना चेतावनी के खुलती है।
 
 **Homebrew से।** cask का अपना अलग tap है:
 

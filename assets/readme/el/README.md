@@ -8,9 +8,9 @@
  
 
 
-[![Λήψη του Splat για macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
+[![Λήψη του Splat για macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
 
-**[Λήψη του Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: υπογεγραμμένο και πιστοποιημένο (notarized) από την Apple, για macOS 14 ή νεότερο σε Apple Silicon και Intel.
+**[Λήψη του Splat-1.0.6.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: υπογεγραμμένο και πιστοποιημένο (notarized) από την Apple, για macOS 14 ή νεότερο σε Apple Silicon και Intel.
  
  
 
@@ -132,7 +132,7 @@
 
 ## Εγκατάσταση
 
-**Από την εικόνα δίσκου.** Κάντε λήψη του [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg), ανοίξτε το και σύρετε το Splat στον φάκελο Εφαρμογές. Η εικόνα είναι υπογεγραμμένη με Developer ID και πιστοποιημένη (notarized) από την Apple, γι' αυτό ανοίγει χωρίς προειδοποιήσεις.
+**Από την εικόνα δίσκου.** Κάντε λήψη του [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg), ανοίξτε το και σύρετε το Splat στον φάκελο Εφαρμογές. Η εικόνα είναι υπογεγραμμένη με Developer ID και πιστοποιημένη (notarized) από την Apple, γι' αυτό ανοίγει χωρίς προειδοποιήσεις.
 
 **Με το Homebrew.** Το cask βρίσκεται σε δικό του tap:
 

@@ -13,9 +13,9 @@ Splat เขียนด้วย Rust บนตัวควบคุม AppKit 
  
 
 
-[![ดาวน์โหลด Splat สำหรับ macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
+[![ดาวน์โหลด Splat สำหรับ macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
 
-**[ดาวน์โหลด Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: ลงนามและผ่านการรับรองโดย Apple สำหรับ macOS 14 ขึ้นไป บน Apple Silicon และ Intel
+**[ดาวน์โหลด Splat-1.0.6.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: ลงนามและผ่านการรับรองโดย Apple สำหรับ macOS 14 ขึ้นไป บน Apple Silicon และ Intel
  
  
 
@@ -146,7 +146,7 @@ Splat เขียนด้วย Rust บนตัวควบคุม AppKit 
 
 ## การติดตั้ง
 
-**จากดิสก์อิมเมจ** ดาวน์โหลด [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg) เปิดไฟล์ แล้วลาก Splat ไปวางบนโฟลเดอร์แอปพลิเคชัน อิมเมจนี้ลงนามด้วย
+**จากดิสก์อิมเมจ** ดาวน์โหลด [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg) เปิดไฟล์ แล้วลาก Splat ไปวางบนโฟลเดอร์แอปพลิเคชัน อิมเมจนี้ลงนามด้วย
 Developer ID และผ่านการรับรองโดย Apple จึงเปิดได้โดยไม่มีคำเตือน
 
 **ผ่าน Homebrew** cask อยู่ใน tap ของตัวเอง:

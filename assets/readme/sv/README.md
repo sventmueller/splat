@@ -14,9 +14,9 @@ nätverket om du inte ber om det.
  
 
 
-[![Ladda ner Splat för macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)
+[![Ladda ner Splat för macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
 
-**[Ladda ner Splat-1.0.5.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg)**: signerad och notariserad av Apple, för macOS 14 eller senare på Apple Silicon och Intel.
+**[Ladda ner Splat-1.0.6.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: signerad och notariserad av Apple, för macOS 14 eller senare på Apple Silicon och Intel.
  
  
 
@@ -149,7 +149,7 @@ nätverket om du inte ber om det.
 
 ## Installation
 
-**Från skivavbilden.** Ladda ner [`dist/Splat-1.0.5.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.5.dmg), öppna den och dra Splat till mappen Appar. Avbilden är signerad med ett
+**Från skivavbilden.** Ladda ner [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg), öppna den och dra Splat till mappen Appar. Avbilden är signerad med ett
 Developer ID och notariserad av Apple, så den öppnas utan varningar.
 
 **Med Homebrew.** Cask-paketet finns i en egen tap:
