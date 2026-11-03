@@ -519,7 +519,7 @@ Splat ostaja odziven tudi pri dokumentih z več megabajti:
 - Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki: okoli 25 ms v dokumentu velikosti 10 MB in okoli 50 ms za pritisk tipke v njegovem predogledu, z lastnim delom pogleda.
 - Veliki predogledi najprej upodobijo vidni del, preostalo pa, ko je aplikacija nedejavna. Bloki, ki jih pomaknete v vidno polje, se upodobijo, preden se narišejo.
 - V izvornem besedilu večjih dokumentov razčlenjevanje za predogled med tipkanjem teče v ozadju.
-- Od 64 MB naprej dokument ostane navadno besedilo: izvorno besedilo nima barv, predogled pa pove, zakaj ostaja prazen. Izvozi še vedno delujejo.
+- Dokument ostane navadno besedilo, ko bi potreboval približno 4 GB pomnilnika, kar je približno 50 do 120 MB običajnega Markdowna, a le 10 do 20 MB, če vsebuje samo tabele ali naslove: izvorno besedilo nima barv, predogled pa pove, zakaj ostaja prazen. Izvozi še vedno delujejo.
 - Od približno 200 KB naprej dokument odpre okno, preden je razčlenjen; pri 5 MB barve in predogled sledijo približno četrt sekunde pozneje.
 
 Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 10 MB: spremembe definicije ali sklicev sprotne opombe, ob opombi v vrstici, čisto na koncu dokumenta ob sprotni opombi, spremembe front matterja ali blizu definicij sklicev na povezave ter vsaka sprememba v dokumentu z bloki komentarjev `%%` ali s sprotno opombo, definirano dvakrat ali znotraj citata ali seznama. Pomnilnik raste z datoteko, na približno 115–160 MB za 1 MB Markdowna in 340–510 MB za 10 MB.

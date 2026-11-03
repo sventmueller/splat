@@ -31,8 +31,43 @@ pub struct Parsed {
     pub splice: Option<Splice>,
 }
 
-/// From this size on a document stays plain text in the editor: its tree and layout would take gigabytes.
-pub const PLAIN_FROM: usize = 64 << 20;
+/// The estimated memory from which a document stays plain text in the editor.
+const MOST_MEMORY: u64 = 4 << 30;
+
+const HEAVIEST_BYTE: u64 = 800;
+
+/// Roughly what a byte adds to the peak memory of tree, colors and layout, measured per syntax; every byte that can
+/// start a node counts, as telling code from markup here would let a crafted document pass for code.
+const fn memory_of(byte: u8) -> u16 {
+    match byte {
+        b'#' | b'|' | b'^' | b'@' => 800,
+        b'\n' => 750,
+        b'*' | b'_' | b'[' => 600,
+        b'`' | b'<' | b'>' | b'$' | b'&' | b'"' | b'~' | b'=' => 400,
+        b']' | b'(' | b')' | b'\\' | b'-' | b'+' | b':' | b'.' => 250,
+        _ => 4,
+    }
+}
+
+const MEMORY_OF: [u16; 256] = {
+    let mut table = [memory_of(0); 256];
+    let mut byte = u8::MAX;
+    while byte > 0 {
+        table[byte as usize] = memory_of(byte);
+        byte -= 1;
+    }
+    table
+};
+
+/// The memory `text` is estimated to take once it is parsed and laid out.
+pub fn memory_estimate(text: &str) -> u64 {
+    text.bytes().map(|b| u64::from(MEMORY_OF[usize::from(b)])).sum()
+}
+
+/// Whether `text` would take too much memory to parse and lay out; shorter texts need no look at their bytes.
+pub fn stays_plain(text: &str) -> bool {
+    text.len() as u64 * HEAVIEST_BYTE >= MOST_MEMORY && memory_estimate(text) >= MOST_MEMORY
+}
 
 const LONGEST_LABEL: usize = 1000;
 const MOST_STAND_INS: usize = 1000;
@@ -49,7 +84,7 @@ impl Parsed {
 }
 
 pub fn parse_and_color(text: &str) -> Parsed {
-    if text.len() >= PLAIN_FROM {
+    if stays_plain(text) {
         return Parsed::plain();
     }
     let doc = parse(text);
@@ -74,7 +109,7 @@ pub fn reparse_part_and_color(
     spans: &[(Range<usize>, Style)],
     new_text: &str,
 ) -> Option<Parsed> {
-    if new_text.len() >= PLAIN_FROM {
+    if stays_plain(new_text) {
         return None;
     }
     let mut taken = std::mem::take(doc);
@@ -525,8 +560,29 @@ mod tests {
     }
 
     #[test]
-    fn a_document_from_the_size_limit_on_stays_plain_text() {
-        let huge = "# Titel\n".repeat(PLAIN_FROM / 8 + 1);
+    fn the_content_decides_what_stays_plain_text() {
+        let size = 64 << 20;
+        let prose = "Ein Satz, wie er in einem langen Text ohne jede Auszeichnung stehen kann\n";
+        assert!(!stays_plain(&prose.repeat(size / prose.len())));
+        assert!(stays_plain(&"| a |\n".repeat(size / 6)));
+        assert!(!stays_plain(&"| a |\n".repeat(1000)), "too short to matter");
+        assert!(!stays_plain(""));
+    }
+
+    #[test]
+    fn no_byte_outweighs_the_heaviest() {
+        assert_eq!(MEMORY_OF.iter().max().map(|m| u64::from(*m)), Some(HEAVIEST_BYTE));
+    }
+
+    #[test]
+    fn the_estimate_adds_up_the_bytes() {
+        assert_eq!(memory_estimate("a"), 4);
+        assert_eq!(memory_estimate("# a\n"), 800 + 4 + 4 + 750);
+    }
+
+    #[test]
+    fn a_document_over_the_limit_stays_plain_text() {
+        let huge = "# Titel\n".repeat(3 << 20);
         let parsed = parse_and_color(&huge);
         assert!(parsed.doc.blocks.is_empty() && parsed.spans.is_empty());
         let mut doc = parse("# Titel\n");

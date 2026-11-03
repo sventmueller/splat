@@ -519,7 +519,7 @@ Splat zostáva pohotový aj pri dokumentoch s veľkosťou niekoľkých megabajto
 - Počas písania v náhľade a v zdrojovom texte dokumentov do 2 MB sa len dotknuté odseky znova parsujú, farbia a rozvrhujú: asi 25 ms v dokumente s veľkosťou 10 MB a asi 50 ms pre stlačenie klávesu v jeho náhľade, s vlastnou prácou zobrazenia.
 - Veľké náhľady vykresľujú najprv viditeľnú časť a zvyšok, keď aplikácia nič nerobí. Bloky, ktoré sa posunú do zobrazenia, sa vykreslia pred vykreslením na obrazovku.
 - V zdrojovom texte väčších dokumentov beží parsovanie pre náhľad na pozadí, kým píšete.
-- Od 64 MB zostane dokument čistým textom: zdrojový text nemá farby a náhľad uvádza, prečo zostáva prázdny. Exporty stále fungujú.
+- Dokument zostane čistým textom, keď by potreboval asi 4 GB pamäte, čo je približne 50 až 120 MB bežného Markdownu, ale len 10 až 20 MB samých tabuliek alebo nadpisov: zdrojový text nemá farby a náhľad uvádza, prečo zostáva prázdny. Exporty stále fungujú.
 - Od približne 200 KB sa okno dokumentu otvorí pred parsovaním; pri 5 MB nasledujú farby a náhľad asi o štvrť sekundy neskôr.
 
 Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klávesu: zmeny definície alebo odkazov poznámky pod čiarou, vedľa poznámky pod čiarou v texte, na úplnom konci dokumentu vedľa poznámky pod čiarou, vo front matter alebo blízko definícií referenčných odkazov a každá zmena v dokumente s blokmi komentárov `%%` alebo s dvakrát definovanou poznámkou pod čiarou alebo s poznámkou vnútri citácie či zoznamu. Pamäť rastie so súborom, zhruba na 115 – 160 MB pre 1 MB Markdownu a 340 – 510 MB pre 10 MB.

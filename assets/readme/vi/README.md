@@ -518,7 +518,7 @@ Splat vẫn phản hồi nhanh với tài liệu vài megabyte:
 - Khi bạn gõ trong bản xem trước, và trong mã nguồn của tài liệu tới 2 MB, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại: khoảng 25 ms trong tài liệu 10 MB, và khoảng 50 ms cho một lần gõ phím trong bản xem trước của nó, kể cả phần việc của chính view.
 - Bản xem trước lớn hiển thị phần nhìn thấy trước và phần còn lại khi ứng dụng rảnh. Các khối cuộn vào tầm nhìn được hiển thị trước khi được vẽ.
 - Trong mã nguồn của tài liệu lớn hơn, việc phân tích cho bản xem trước chạy ở chế độ nền khi bạn gõ.
-- Từ 64 MB, tài liệu chỉ còn là văn bản thuần: mã nguồn không có màu và bản xem trước nói lý do nó để trống. Việc xuất vẫn hoạt động.
+- Tài liệu chỉ còn là văn bản thuần khi sẽ cần khoảng 4 GB bộ nhớ, tức khoảng 50 đến 120 MB Markdown thông thường, nhưng chỉ 10 đến 20 MB nếu toàn bảng hoặc tiêu đề: mã nguồn không có màu và bản xem trước nói lý do nó để trống. Việc xuất vẫn hoạt động.
 - Từ khoảng 200 KB, tài liệu mở cửa sổ trước khi được phân tích; ở 5 MB, màu sắc và bản xem trước theo sau khoảng một phần tư giây.
 
 Một số thay đổi được xử lý toàn bộ, khoảng 300 ms cho mỗi lần gõ phím ở 10 MB: những thay đổi ở định nghĩa hoặc tham chiếu của chú thích cuối trang, bên cạnh chú thích cuối trang trong dòng, ở ngay cuối tài liệu cạnh một chú thích cuối trang, ở front matter hoặc gần các định nghĩa tham chiếu liên kết, và mọi thay đổi trong tài liệu có khối chú thích `%%` hoặc có chú thích cuối trang được định nghĩa hai lần hay nằm trong một trích dẫn hoặc danh sách. Bộ nhớ tăng theo tệp, đến khoảng 115–160 MB cho 1 MB Markdown và 340–510 MB cho 10 MB.

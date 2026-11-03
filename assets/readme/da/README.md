@@ -519,7 +519,7 @@ Splat forbliver responsivt med dokumenter på flere megabyte:
 - Mens du taster i eksemplet, og i kildeteksten i dokumenter på op til 2 MB, parses, farvelægges og lægges kun de berørte afsnit ud igen: cirka 25 ms i et dokument på 10 MB og cirka 50 ms for et tastetryk i dets eksempel, med visningens eget arbejde.
 - Store eksempler gengiver den synlige del først og resten, mens appen er ledig. Blokke, der ruller ind i billedet, gengives, før de tegnes.
 - I kildeteksten i større dokumenter kører parsingen til eksemplet i baggrunden, mens du taster.
-- Fra 64 MB forbliver et dokument ren tekst: Kildeteksten har ingen farver, og eksemplet siger, hvorfor det forbliver tomt. Eksporter virker stadig.
+- Et dokument forbliver ren tekst, når det ville bruge omkring 4 GB hukommelse, hvilket svarer til cirka 50 til 120 MB almindelig Markdown, men kun 10 til 20 MB, hvis det udelukkende består af tabeller eller overskrifter: Kildeteksten har ingen farver, og eksemplet siger, hvorfor det forbliver tomt. Eksporter virker stadig.
 - Fra cirka 200 KB åbner et dokument sit vindue, før det er parset; ved 5 MB følger farverne og eksemplet cirka et kvart sekund senere.
 
 Nogle ændringer behandles i fuld, med omkring 300 ms pr. tastetryk ved 10 MB: ændringer af en fodnotes definition eller henvisninger, ved siden af en fodnote i teksten, helt til sidst i et dokument ved siden af en fodnote, af front matter eller tæt på definitioner af linkreferencer, og enhver ændring i et dokument med `%%`-kommentarblokke eller med en fodnote, der er defineret to gange eller inde i et citat eller en liste. Hukommelsen vokser med filen, til cirka 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.

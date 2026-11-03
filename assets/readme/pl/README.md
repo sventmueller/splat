@@ -519,7 +519,7 @@ Splat pozostaje responsywny przy dokumentach o rozmiarze kilku megabajtów:
 - Gdy piszesz w podglądzie, a w tekście źródłowym dokumentów do 2 MB, tylko dotknięte akapity są parsowane, kolorowane i układane od nowa: około 25 ms w dokumencie 10 MB i około 50 ms na naciśnięcie klawisza w jego podglądzie, łącznie z własną pracą widoku.
 - Duże podglądy renderują najpierw widoczną część, a resztę, gdy aplikacja jest bezczynna. Bloki przewinięte do widoku są renderowane, zanim zostaną narysowane.
 - W tekście źródłowym większych dokumentów parsowanie na potrzeby podglądu działa w tle, gdy piszesz.
-- Od 64 MB dokument pozostaje zwykłym tekstem: tekst źródłowy nie ma kolorów, a podgląd mówi, dlaczego jest pusty. Eksporty nadal działają.
+- Dokument pozostaje zwykłym tekstem, gdy wymagałby około 4 GB pamięci, czyli około 50–120 MB zwykłego Markdowna, ale tylko od 10 do 20 MB, jeśli składa się wyłącznie z tabel lub nagłówków: tekst źródłowy nie ma kolorów, a podgląd mówi, dlaczego jest pusty. Eksporty nadal działają.
 - Od około 200 KB dokument otwiera okno, zanim zostanie sparsowany; przy 5 MB kolory i podgląd pojawiają się około ćwierć sekundy później.
 
 Niektóre zmiany są przetwarzane w całości, przy około 300 ms na naciśnięcie klawisza w 10 MB: zmiany definicji lub odwołań przypisu, obok przypisu w tekście, na samym końcu dokumentu obok przypisu, we front matter lub tuż przy definicjach łączy referencyjnych, a także każda zmiana w dokumencie z blokami komentarzy `%%` albo z przypisem zdefiniowanym dwa razy lub wewnątrz cytatu czy listy. Pamięć rośnie wraz z plikiem, do około 115–160 MB dla 1 MB Markdown i 340–510 MB dla 10 MB.

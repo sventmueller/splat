@@ -645,8 +645,9 @@ Splat förblir responsivt med dokument på flera megabyte:
 - Stora förhandsvisningar renderar den synliga delen först och resten medan appen är overksam. Block som rullas in i bild renderas
   innan de ritas.
 - I källtexten i större dokument sker tolkningen för förhandsvisningen i bakgrunden medan du skriver.
-- Från 64 MB förblir ett dokument ren text: källtexten har inga färger och förhandsvisningen förklarar varför den förblir tom. Exporter
-  fungerar fortfarande.
+- Ett dokument förblir ren text när det skulle kräva ungefär 4 GB minne, vilket motsvarar cirka 50 till 120 MB vanlig
+  Markdown men bara 10 till 20 MB om det enbart består av tabeller eller rubriker: källtexten har inga färger och
+  förhandsvisningen förklarar varför den förblir tom. Exporter fungerar fortfarande.
 - Från cirka 200 KB öppnar ett dokument sitt fönster innan det tolkats; vid 5 MB följer färgerna och förhandsvisningen
   cirka en kvarts sekund senare.
 

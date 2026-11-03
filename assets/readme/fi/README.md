@@ -519,7 +519,7 @@ Splat pysyy vastaavana useiden megatavujen dokumenteillakin:
 - Kun kirjoitat esikatselussa ja enintään 2 Mt:n dokumenttien lähdetekstissä, vain muuttuneet kappaleet jäsennetään, väritetään ja taitetaan uudelleen: noin 25 ms 10 Mt:n dokumentissa ja noin 50 ms näppäinpainallukselle sen esikatselussa, näkymän oman työn kanssa.
 - Suuret esikatselut renderöivät ensin näkyvän osan ja loput appin ollessa joutilaana. Näkymään vieritetyt lohkot renderöidään ennen kuin ne piirretään.
 - Suurempien dokumenttien lähdetekstissä esikatselun jäsennys ajetaan taustalla kirjoittaessasi.
-- 64 Mt:stä alkaen dokumentti pysyy pelkkänä tekstinä: lähdetekstissä ei ole värejä ja esikatselu kertoo, miksi se pysyy tyhjänä. Viennit toimivat edelleen.
+- Dokumentti pysyy pelkkänä tekstinä, kun se veisi noin 4 Gt muistia, eli noin 50–120 Mt tavallista Markdownia mutta vain 10–20 Mt pelkkiä taulukoita tai otsikoita: lähdetekstissä ei ole värejä ja esikatselu kertoo, miksi se pysyy tyhjänä. Viennit toimivat edelleen.
 - Noin 200 kt:stä alkaen dokumentti avaa ikkunansa ennen kuin se jäsennetään; 5 Mt:n kohdalla värit ja esikatselu seuraavat noin neljännessekunnin kuluttua.
 
 Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti 10 Mt:n dokumentissa: alaviitteen määritelmän tai viittausten muutokset, muutokset tekstinsisäisen alaviitteen vieressä, dokumentin aivan lopussa alaviitteen vieressä, front matterissa tai linkkiviitemääritelmien lähellä sekä jokainen muutos dokumentissa, jossa on `%%`-kommenttilohkoja tai kahdesti määritelty alaviite tai alaviite lainauksen tai luettelon sisällä. Muisti kasvaa tiedoston mukana, noin 115–160 Mt:iin 1 Mt:n Markdownille ja 340–510 Mt:iin 10 Mt:lle.

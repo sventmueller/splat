@@ -518,7 +518,7 @@ Splat kekal responsif dengan dokumen beberapa megabait:
 - Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula: kira-kira 25 ms dalam dokumen 10 MB, dan kira-kira 50 ms untuk satu ketukan kekunci dalam pratontonnya, termasuk kerja paparan itu sendiri.
 - Pratonton besar memaparkan bahagian yang kelihatan dahulu dan selebihnya semasa app terbiar. Blok yang digulung ke paparan dipaparkan sebelum dilukis.
 - Dalam sumber dokumen yang lebih besar, penghuraian untuk pratonton berjalan di latar belakang semasa anda menaip.
-- Mulai 64 MB, dokumen kekal sebagai teks biasa: sumber tiada warna dan pratonton menyatakan sebab ia kekal kosong. Eksport masih berfungsi.
+- Dokumen kekal sebagai teks biasa apabila ia akan memerlukan kira-kira 4 GB memori, iaitu kira-kira 50 hingga 120 MB Markdown biasa, tetapi hanya 10 hingga 20 MB jika isinya hanya jadual atau tajuk: sumber tiada warna dan pratonton menyatakan sebab ia kekal kosong. Eksport masih berfungsi.
 - Mulai kira-kira 200 KB, dokumen membuka tetingkapnya sebelum dihuraikan; pada 5 MB, warna dan pratonton menyusul kira-kira suku saat kemudian.
 
 Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan kekunci pada 10 MB: perubahan pada takrifan atau rujukan nota kaki, di sebelah nota kaki sebaris, di hujung dokumen sebelah nota kaki, pada front matter atau berhampiran takrifan rujukan pautan, dan setiap perubahan dalam dokumen dengan blok ulasan `%%` atau dengan nota kaki yang ditakrifkan dua kali atau di dalam petikan atau senarai. Memori bertambah bersama fail, kepada kira-kira 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.

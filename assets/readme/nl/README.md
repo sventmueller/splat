@@ -666,8 +666,9 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
 - Grote voorvertoningen geven eerst het zichtbare deel weer en de rest zodra de app niets te doen heeft. Blokken die in
   beeld scrollen, worden weergegeven voordat ze worden getekend.
 - In de bron van grotere documenten draait het parseren voor de voorvertoning op de achtergrond terwijl je typt.
-- Vanaf 64 MB blijft een document platte tekst: de bron heeft geen kleuren en de voorvertoning zegt waarom ze leeg
-  blijft. Exports werken nog steeds.
+- Een document blijft platte tekst zodra het ongeveer 4 GB geheugen zou kosten, dat is zo’n 50 tot 120 MB gewone
+  Markdown, maar slechts 10 tot 20 MB als het alleen uit tabellen of koppen bestaat: de bron heeft geen kleuren en de
+  voorvertoning zegt waarom ze leeg blijft. Exports werken nog steeds.
 - Vanaf ongeveer 200 KB opent een document zijn venster voordat het is geparseerd; bij 5 MB volgen de kleuren en de
   voorvertoning ongeveer een kwart seconde later.
 

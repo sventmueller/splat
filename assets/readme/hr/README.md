@@ -519,7 +519,7 @@ Splat ostaje responzivan s dokumentima od nekoliko megabajta:
 - Dok tipkate u pregledu, i u izvornom kodu dokumenata do 2 MB, ponovno se parsiraju, boje i slažu samo zahvaćeni odlomci: oko 25 ms u dokumentu od 10 MB i oko 50 ms za pritisak tipke u njegovu pregledu, uključujući vlastiti rad prikaza.
 - Veliki pregledi najprije prikazuju vidljivi dio, a ostatak dok je aplikacija u mirovanju. Blokovi koji se pomaknu u vidno polje prikazuju se prije crtanja.
 - U izvornom kodu većih dokumenata parsiranje za pregled radi u pozadini dok tipkate.
-- Od 64 MB dokument ostaje običan tekst: izvorni kod nema boja, a pregled kaže zašto ostaje prazan. Izvozi i dalje rade.
+- Dokument ostaje običan tekst čim bi trebao oko 4 GB memorije, što je oko 50 do 120 MB uobičajenog Markdowna, ali samo 10 do 20 MB ako su u njemu samo tablice ili naslovi: izvorni kod nema boja, a pregled kaže zašto ostaje prazan. Izvozi i dalje rade.
 - Od otprilike 200 KB dokument otvara prozor prije nego što je parsiran; kod 5 MB boje i pregled slijede otprilike četvrt sekunde kasnije.
 
 Neke se promjene obrađuju u cijelosti, oko 300 ms po pritisku tipke kod 10 MB: promjene definicije ili referenci fusnote, uz fusnotu u retku, na samom kraju dokumenta uz fusnotu, front mattera ili blizu definicija referenci linkova te svaka promjena u dokumentu s blokovima komentara `%%` ili s fusnotom definiranom dvaput ili unutar citata ili popisa. Memorija raste s datotekom, na otprilike 115–160 MB za 1 MB Markdowna i 340–510 MB za 10 MB.

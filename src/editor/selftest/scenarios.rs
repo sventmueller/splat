@@ -1104,7 +1104,7 @@ fn huge_document_steps() -> Vec<Step> {
     vec![
         step(0.1, |c| {
             remember(c);
-            let huge = "Zeile\n".repeat(crate::markdown::incremental::PLAIN_FROM / 6 + 1);
+            let huge = "| Zeile |\n".repeat(3 << 20);
             append(&c.e, &huge);
         }),
         settle(|c| {

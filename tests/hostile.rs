@@ -7,11 +7,11 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use splat::markdown::commands::{self, InlineStyle, ListStyle, heading_anchors};
-use splat::markdown::doc::{DiagramKind, figures, has_remote_images, parse};
+use splat::markdown::doc::{DiagramKind, figures, has_remote_images, parse, walk_blocks, walk_inlines};
 use splat::markdown::docx::{WordExport, to_docx};
 use splat::markdown::highlight::highlight;
 use splat::markdown::html::{Export, to_html};
-use splat::markdown::incremental::reparse_and_color;
+use splat::markdown::incremental::{memory_estimate, reparse_and_color};
 use splat::markdown::typography::Quotes;
 use splat::preview::bridge::Bridge;
 use splat::preview::layout::{Resolver, layout, relayout, reusable};
@@ -322,6 +322,24 @@ fn a_small_table_stays_small_however_many_cells_it_asks_for() {
     let laid_out = layout(&text, &parse(&text), &Everything, None);
     let paragraphs: usize = laid_out.blocks.iter().map(|b| b.paras.len()).sum();
     assert!(paragraphs < 10_000, "{paragraphs} paragraphs from {} bytes", text.len());
+}
+
+#[test]
+fn the_memory_estimate_keeps_up_with_what_a_parse_builds() {
+    const LEAST_PER_NODE: u64 = 150;
+    for (name, text) in cases() {
+        let thread = std::thread::Builder::new().stack_size(STACK).spawn(move || {
+            let doc = parse(&text);
+            let mut nodes = 1;
+            walk_blocks(&doc.blocks, &mut |b| {
+                nodes += 1;
+                walk_inlines(b.inlines(), &mut |_| nodes += 1);
+            });
+            memory_estimate(&text) / nodes
+        });
+        let per_node = thread.expect("a thread").join().expect("no panic");
+        assert!(per_node >= LEAST_PER_NODE, "{name}: {per_node} per node");
+    }
 }
 
 #[test]

@@ -647,8 +647,9 @@ Splat stays responsive with documents of several megabytes:
 - Large previews render the visible part first and the rest while the app is idle. Blocks scrolled into view are
   rendered before they are drawn.
 - In the source of larger documents, parsing for the preview runs in the background while you type.
-- From 64 MB, a document stays plain text: the source has no colours and the preview says why it stays empty. Exports
-  still work.
+- A document stays plain text once it would take about 4 GB of memory, which is roughly 50 to 120 MB of ordinary
+  Markdown but only 10 to 20 MB of nothing but tables or headings: the source has no colours and the preview says why
+  it stays empty. Exports still work.
 - From about 200 KB, a document opens its window before it is parsed; at 5 MB, the colours and the preview follow
   about a quarter of a second later.
 

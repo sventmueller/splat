@@ -19,7 +19,7 @@ use super::style::{self, SourceFonts};
 use super::sync::Snapshot;
 use super::{EditorController, js, string_of};
 use crate::markdown::doc::{DiagramKind, Figure, figures};
-use crate::markdown::incremental::{PLAIN_FROM, Parsed, Splice, parse_and_color};
+use crate::markdown::incremental::{Parsed, Splice, parse_and_color, stays_plain};
 use crate::preview::layout::{Layout, Resolver, TopBlock};
 use crate::preview::map::Index;
 use crate::util::{Lane, contained, free_in_background, from_nsrange, perform_later, shown_to_ns, storage};
@@ -532,7 +532,7 @@ impl EditorController {
             if st.preview_failed() {
                 Some(crate::i18n::t("Darstellung fehlgeschlagen"))
             } else {
-                (st.text().len() >= PLAIN_FROM).then(|| {
+                stays_plain(st.text()).then(|| {
                     crate::i18n::t(
                         "Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten.",
                     )

@@ -13,7 +13,7 @@ use crate::markdown::commands::Pending;
 use crate::markdown::doc::Doc;
 use crate::markdown::highlight::Style;
 use crate::markdown::incremental::{
-    PLAIN_FROM, Parsed, Splice, parse_and_color, reparse_and_color, reparse_part_and_color,
+    Parsed, Splice, parse_and_color, reparse_and_color, reparse_part_and_color, stays_plain,
 };
 use crate::markdown::text::Shown;
 use crate::preview::layout::{Layout, Resolver, TopBlock, layout, relayout, reusable};
@@ -152,9 +152,9 @@ pub(super) struct Recolor {
     pub fonts: Option<SourceFonts>,
 }
 
-/// The layout of a text, which has none from `PLAIN_FROM` on; `None` if it panicked.
+/// The layout of a text, which has none if it stays plain; `None` if it panicked.
 pub(super) fn laid_out(text: &str, doc: &Doc, resolver: &dyn Resolver, caret: Option<usize>) -> Option<Layout> {
-    if text.len() >= PLAIN_FROM {
+    if stays_plain(text) {
         return Some(Layout::default());
     }
     contained(|| layout(text, doc, resolver, caret))
@@ -678,8 +678,8 @@ mod tests {
     }
 
     #[test]
-    fn a_text_beyond_the_size_limit_has_no_layout() {
-        let huge = "a".repeat(PLAIN_FROM);
+    fn a_text_that_stays_plain_has_no_layout() {
+        let huge = "|\n".repeat(8 << 20);
         let doc = Doc::default();
         assert!(laid_out(&huge, &doc, &NoImages, None).unwrap().blocks.is_empty());
     }
