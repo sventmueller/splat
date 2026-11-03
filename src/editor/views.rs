@@ -6,9 +6,11 @@ use objc2::{AnyThread, ClassType, DefinedClass, MainThreadMarker, MainThreadOnly
 use objc2_app_kit::{
     NSDragOperation, NSDraggingInfo, NSLayoutManager, NSPasteboard, NSPasteboardType, NSPasteboardTypePNG,
     NSPasteboardTypeString, NSPasteboardTypeTIFF, NSPasteboardTypeURL, NSTextContainer, NSTextContentStorage,
-    NSTextLayoutManager, NSTextStorage, NSTextView,
+    NSTextLayoutManager, NSTextStorage, NSTextView, NSView,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSObject, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString, NSURL};
+use objc2_foundation::{
+    NSArray, NSDictionary, NSObject, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL, NSUnionRect,
+};
 
 use super::EditorController;
 use crate::util::constant;
@@ -167,12 +169,52 @@ define_class!(
     }
 );
 
+define_class!(
+    /// Redraws the view for any change instead of the changed range: to find that range's place, AppKit lays it out and
+    /// adds up the whole layout, for every piece it lays out, which froze a preview of 1 MB of tables for minutes.
+    #[unsafe(super(NSLayoutManager))]
+    #[name = "MDPreviewLayoutManager"]
+    struct PreviewLayoutManager;
+
+    unsafe impl NSObjectProtocol for PreviewLayoutManager {}
+
+    impl PreviewLayoutManager {
+        #[unsafe(method(invalidateDisplayForCharacterRange:))]
+        fn invalidate_characters(&self, _range: NSRange) {
+            self.redraw_view();
+        }
+
+        #[unsafe(method(invalidateDisplayForGlyphRange:))]
+        fn invalidate_glyphs(&self, _range: NSRange) {
+            self.redraw_view();
+        }
+    }
+);
+
+impl PreviewLayoutManager {
+    fn create() -> Retained<Self> {
+        // SAFETY: NSLayoutManager's designated initializer.
+        unsafe { msg_send![super(Self::alloc().set_ivars(())), init] }
+    }
+
+    fn redraw_view(&self) {
+        // SAFETY: The result is retained on return, and only the main thread changes the views of a layout manager.
+        let view = MainThreadMarker::new().and_then(|mtm| unsafe { self.firstTextView(mtm) });
+        let Some(view) = view else {
+            return;
+        };
+        let shown = NSUnionRect(view.visibleRect(), view.preparedContentRect());
+        // SAFETY: NSView's implementation, with this method's signature; NSTextView's own adds up the whole layout first.
+        let _: () = unsafe { msg_send![super(&*view, NSView::class()), setNeedsDisplayInRect: shown] };
+    }
+}
+
 type TextSystem = (Retained<NSObject>, Retained<NSTextContainer>);
 
 /// A TextKit 1 text system for the preview: tables (NSTextTable) only work with NSLayoutManager.
 fn text_system() -> TextSystem {
     let storage = NSTextStorage::new();
-    let layout = NSLayoutManager::new();
+    let layout = PreviewLayoutManager::create();
     storage.addLayoutManager(&layout);
     let container = NSTextContainer::initWithSize(NSTextContainer::alloc(), NSSize::new(1.0e7, 1.0e7));
     container.setWidthTracksTextView(true);

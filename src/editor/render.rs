@@ -107,11 +107,15 @@ impl RenderCtx<'_> {
             }
             // Every paragraph ends with a newline, also the last one: an unterminated empty table cell
             // carries no text block and drops out of the table.
-            let nl = Attributes::new(&[
+            let mut nl = vec![
                 Attribute::paragraph(&style),
                 Attribute::font(&self.base_font(&para.style.kind)),
-            ]);
-            out.appendAttributedString(&attributed("\n", Some(&nl)));
+            ];
+            // A newline shows no color, but with one it joins the run before it, and every run slows down edits of the text.
+            if let Some(last) = para.runs.last() {
+                nl.push(Attribute::foreground(&self.color_for(last, para)));
+            }
+            out.appendAttributedString(&attributed("\n", Some(&Attributes::new(&nl))));
         }
         out
     }

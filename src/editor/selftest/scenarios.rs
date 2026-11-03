@@ -10,10 +10,10 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject, Sel};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
-    NSAlertFirstButtonReturn, NSAlertSecondButtonReturn, NSApplication, NSDocumentController, NSEventModifierFlags,
-    NSMenu, NSModalResponse, NSModalResponseCancel, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeString,
-    NSPasteboardTypeTIFF, NSSavePanel, NSSegmentedControl, NSTextFinderAction, NSTextFinderBarContainer,
-    NSUserInterfaceItemIdentification, NSWindow,
+    NSAlertFirstButtonReturn, NSAlertSecondButtonReturn, NSApplication, NSBitmapImageRep, NSColor,
+    NSDocumentController, NSEventModifierFlags, NSMenu, NSModalResponse, NSModalResponseCancel, NSPasteboard,
+    NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF, NSSavePanel, NSScreen, NSSegmentedControl,
+    NSTextFinderAction, NSTextFinderBarContainer, NSUserInterfaceItemIdentification, NSWindow,
 };
 use objc2_foundation::{NSArray, NSData, NSRange, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL, NSUserDefaults};
 
@@ -1099,6 +1099,70 @@ fn outline_without_preview_steps() -> Vec<Step> {
     ]
 }
 
+/// Captures the preview's part of the screen: only the window server shows what was really redrawn, and a capture of the
+/// window itself changes its size along the way.
+fn capture_preview(c: &Ctx, path: &Path) {
+    let preview = c.e.preview();
+    let window = c.e.window().expect("a window");
+    let shown = window.convertRectToScreen(preview.convertRect_toView(preview.visibleRect(), None));
+    let main = NSScreen::screens(MainThreadMarker::new().expect("the main thread"))
+        .firstObject()
+        .expect("a screen");
+    let top = main.frame().size.height - shown.origin.y - shown.size.height;
+    let region = format!("{},{top},{},{}", shown.origin.x, shown.size.width, shown.size.height);
+    let captured = std::process::Command::new("screencapture")
+        .args(["-x", "-R", &region])
+        .arg(path)
+        .status();
+    check(
+        "the preview can be captured",
+        captured.is_ok_and(|s| s.success()),
+        &region,
+    );
+}
+
+/// The colors of a capture, without the right edge, where a scroller fades.
+fn colors_in(path: &Path) -> Vec<Retained<NSColor>> {
+    let Some(image) = std::fs::read(path)
+        .ok()
+        .and_then(|png| NSBitmapImageRep::imageRepWithData(&NSData::with_bytes(&png)))
+    else {
+        return Vec::new();
+    };
+    let (wide, high) = (image.pixelsWide(), image.pixelsHigh());
+    (0..wide * 9 / 10)
+        .step_by(4)
+        .flat_map(|x| (0..high).step_by(4).map(move |y| (x, y)))
+        .filter_map(|(x, y)| image.colorAtX_y(x, y))
+        .collect()
+}
+
+fn marks_on_screen_steps() -> Vec<Step> {
+    vec![
+        step(0.3, |c| {
+            c.e.window().expect("a window").makeFirstResponder(Some(c.e.source()));
+            c.e.source().setSelectedRange(NSRange::new(0, 0));
+            c.e.source().scrollRangeToVisible(NSRange::new(0, 0));
+        }),
+        step(1.0, |c| {
+            capture_preview(c, &c.out.join("marks-before.png"));
+            c.e.source().setSelectedRange(NSRange::new(0, 300));
+        }),
+        step(0.5, |c| {
+            capture_preview(c, &c.out.join("marks-after.png"));
+            let before = colors_in(&c.out.join("marks-before.png"));
+            let after = colors_in(&c.out.join("marks-after.png"));
+            let changed = before.iter().zip(&after).filter(|(a, b)| a != b).count();
+            check(
+                "what is selected in the source gets marked on screen in the preview",
+                changed > 100 && before.len() == after.len(),
+                &format!("{changed} of {} and {} points changed", before.len(), after.len()),
+            );
+            c.e.source().setSelectedRange(NSRange::new(0, 0));
+        }),
+    ]
+}
+
 fn huge_document_steps() -> Vec<Step> {
     const NOTICE: &str = "Dieses Dokument ist zu groß für die Vorschau. Der Text lässt sich weiter bearbeiten.";
     vec![
@@ -1238,6 +1302,7 @@ pub(super) fn steps() -> Vec<Step> {
     steps.extend(memory_steps());
     steps.extend(old_encoding_steps());
     steps.extend(unsaved_copy_steps());
+    steps.extend(marks_on_screen_steps());
     steps.extend(huge_document_steps());
     steps.extend(app_steps());
     // Last: on a locked screen, where popovers do not close, the open editor would keep the window from being key.

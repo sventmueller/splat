@@ -3,6 +3,7 @@
 
 use std::cell::Cell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use objc2::AnyThread;
 use objc2::rc::Retained;
@@ -123,6 +124,29 @@ fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
         "the caret mirrors to the source after a cancelled composition",
         e.source().selectedRange().location > 14,
         &format!("{:?}", e.source().selectedRange()),
+    );
+    document.close();
+}
+
+fn a_preview_of_many_tables_answers_at_once(mtm: MainThreadMarker) {
+    let table = format!("| A | B | C |\n|---|---|---|\n{}\n", "| 1 | 2 | 3 |\n".repeat(50));
+    let (document, e) = open(mtm, &table.repeat(771));
+    let count = e.ivars().state.borrow().blocks().placeholders.len();
+    e.render_blocks(0..count, 0, None);
+    let preview = e.preview();
+    let layout = crate::util::layout_manager(preview).expect("a layout manager");
+    let len = crate::util::storage(preview).length();
+    let started = Instant::now();
+    for quarter in 1..4 {
+        let glyph = layout.glyphIndexForCharacterAtIndex(len / 4 * quarter);
+        // SAFETY: A null range pointer is allowed when the effective range is not wanted.
+        let _ = unsafe { layout.lineFragmentRectForGlyphAtIndex_effectiveRange(glyph, std::ptr::null_mut()) };
+    }
+    let took = started.elapsed().as_secs_f64();
+    check(
+        "a far line of a preview of many tables has its place at once",
+        took < 5.0,
+        &format!("{took:.1} s"),
     );
     document.close();
 }
@@ -433,6 +457,7 @@ pub(super) fn checks(mtm: MainThreadMarker) {
     a_translucent_pixel_stays_translucent();
     a_formula_arriving_during_a_composition_leaves_the_text_alone(mtm);
     a_cancelled_composition_ends_the_edit_it_announced(mtm);
+    a_preview_of_many_tables_answers_at_once(mtm);
     a_click_on_a_task_behind_the_text_changes_nothing(mtm);
     a_space_behind_bold_and_the_next_word_stay_bold(mtm);
     the_formula_editor_keeps_the_text_whole(mtm);

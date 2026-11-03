@@ -16,6 +16,29 @@ use crate::util::{perform_later, storage};
 /// Placeholders this many blocks before and after the visible one get rendered while idle.
 const RENDER_BEHIND: usize = 150;
 const RENDER_AHEAD: usize = 600;
+/// And this many paragraphs: a table has one per cell, and every one slows down all later edits of the text.
+const RENDER_PARAS_BEHIND: usize = 1_500;
+const RENDER_PARAS_AHEAD: usize = 4_500;
+
+/// The blocks around `near`, of `count` in all, to render while idle, given how many paragraphs a block has.
+fn idle_window(near: usize, count: usize, paras_of: impl Fn(usize) -> usize) -> Range<usize> {
+    let fitting = |blocks: &mut dyn Iterator<Item = usize>, mut left: usize| {
+        blocks
+            .take_while(|&block| {
+                let paras = paras_of(block);
+                let fits = paras <= left;
+                left = left.saturating_sub(paras);
+                fits
+            })
+            .count()
+    };
+    let behind = fitting(
+        &mut (near.saturating_sub(RENDER_BEHIND)..near).rev(),
+        RENDER_PARAS_BEHIND,
+    );
+    let ahead = fitting(&mut (near..(near + RENDER_AHEAD).min(count)), RENDER_PARAS_AHEAD);
+    near - behind..near + ahead
+}
 
 /// The blocks around those from `top` to `bottom`, of `count` in all. While TextKit lays out a large text, it can name a
 /// line for the bottom of the view that stands above the one it names for the top.
@@ -96,8 +119,13 @@ impl EditorController {
             return;
         }
         let near = self.visible_preview_block();
-        let count = self.ivars().state.borrow().blocks().placeholders.len();
-        let window = near.saturating_sub(RENDER_BEHIND)..(near + RENDER_AHEAD).min(count);
+        let window = {
+            let st = self.ivars().state.borrow();
+            let blocks = &st.layout().blocks;
+            idle_window(near, st.blocks().placeholders.len(), |block| {
+                blocks.get(block).map_or(0, |b| b.paras.len())
+            })
+        };
         if self.render_blocks(window, near, Some(Duration::from_millis(16))) {
             self.schedule_pending_blocks();
         }
@@ -187,5 +215,19 @@ mod tests {
         assert_eq!(window_around(35_933, 35_926, 40_000), 35_924..35_936);
         assert_eq!(window_around(500, 600, 100), 100..100);
         assert_eq!(window_around(0, 0, 0), 0..0);
+    }
+
+    #[test]
+    fn idle_rendering_stops_at_as_many_blocks_as_ever_for_ordinary_text() {
+        assert_eq!(idle_window(1_000, 10_000, |_| 1), 850..1_600);
+        assert_eq!(idle_window(0, 10_000, |_| 1), 0..600);
+        assert_eq!(idle_window(9_990, 10_000, |_| 1), 9_840..10_000);
+        assert_eq!(idle_window(0, 0, |_| 1), 0..0);
+    }
+
+    #[test]
+    fn idle_rendering_counts_the_cells_of_tables() {
+        assert_eq!(idle_window(1_000, 10_000, |_| 153), 991..1_029);
+        assert_eq!(idle_window(1_000, 10_000, |_| 10_000), 1_000..1_000);
     }
 }
