@@ -120,7 +120,7 @@ Splat mostra a sinistra il tuo codice sorgente Markdown con i colori della sinta
 - **Un pulsante per tutto.** Ogni elemento Markdown ha un pulsante nella barra strumenti e una voce di menu, quelli più comuni anche una scorciatoia da tastiera. Le tabelle hanno un menu tutto loro per righe, colonne e allineamento.
 - **Esporta senza perdere nulla.** PDF, un unico file HTML autonomo o un documento Word con intestazioni, elenchi, tabelle, note a piè di pagina e immagini autentici.
 - **Nativo fino in fondo.** Vere finestre, pannelli, menu e popover di AppKit, Versioni, Salvataggio automatico, il menu Condividi, modalità scura, controllo ortografico, dettatura e VoiceOver. Niente Electron, niente web view per il testo stesso.
-- **Veloce anche con file grandi.** Una battuta di tasto in un documento da 10 MB richiede circa 25 ms.
+- **Veloce anche con file grandi.** Il rendering di una battuta di tasto in un documento da 10 MB richiede circa 25 ms, prima del lavoro della vista stessa.
 - **Riservato e prudente.** Le immagini dal web si caricano solo dopo il tuo consenso, i link verso altre app chiedono prima conferma e tutto ciò che decodifica dati di immagini non attendibili gira in processi ausiliari isolati.
 - **Nella tua lingua.** L’interfaccia e la guida rapida a Markdown integrata sono disponibili in 35 lingue: arabo, catalano, cinese (semplificato), cinese (tradizionale), croato, ceco, danese, olandese, inglese, finlandese, francese, tedesco, greco, ebraico, hindi, ungherese, indonesiano, italiano, giapponese, coreano, malese, norvegese, polacco, portoghese (Brasile), portoghese (Portogallo), rumeno, russo, slovacco, sloveno, spagnolo, svedese, tailandese, turco, ucraino e vietnamita.
 
@@ -516,7 +516,7 @@ Un file Markdown può arrivare da chiunque, quindi Splat tratta ogni documento c
 Splat resta reattivo con documenti di diversi megabyte:
 
 - Il codice sorgente usa TextKit 2, che impagina solo la parte visibile.
-- Mentre scrivi nell’anteprima, e nel codice sorgente di documenti fino a 2 MB, solo i paragrafi interessati vengono analizzati, colorati e impaginati di nuovo: circa 25 ms in un documento da 10 MB e circa 50 ms per una battuta di tasto nella sua anteprima, compreso il lavoro della vista stessa.
+- Mentre scrivi nell’anteprima, e nel codice sorgente di documenti fino a 2 MB, solo i paragrafi interessati vengono analizzati, colorati e impaginati di nuovo. In un documento da 10 MB, analisi e colorazione richiedono circa 20 ms, il rendering circa 25 ms e una battuta di tasto completa nella sua anteprima circa 60 ms, compreso il lavoro della vista stessa.
 - Le anteprime grandi elaborano prima la parte visibile e il resto quando l’app è inattiva. I blocchi fatti scorrere in vista vengono elaborati prima di essere disegnati.
 - Nel codice sorgente dei documenti più grandi, l’analisi per l’anteprima gira in background mentre scrivi.
 - Un documento resta testo semplice quando richiederebbe circa 4 GB di memoria, cioè circa 50-120 MB di Markdown comune, ma solo da 10 a 20 MB se contiene soltanto tabelle o titoli: il codice sorgente non ha colori e l’anteprima spiega perché resta vuota. Le esportazioni funzionano comunque.

@@ -120,7 +120,7 @@ Splat pokazuje po lewej tekst źródłowy Markdown z kolorowaniem składni, a po
 - **Przycisk do wszystkiego.** Każda konstrukcja Markdown ma przycisk na pasku narzędzi i pozycję w menu, a te częste także skrót klawiszowy. Tabele mają własne menu do wierszy, kolumn i wyrównania.
 - **Eksport bez strat.** PDF, jeden samodzielny plik HTML albo dokument Word z prawdziwymi nagłówkami, listami, tabelami, przypisami i obrazkami.
 - **Natywny na wskroś.** Prawdziwe okna AppKit, karty, menu, dymki, Wersje, automatyczne zachowywanie, menu udostępniania, tryb ciemny, sprawdzanie pisowni, dyktowanie i VoiceOver. Bez Electrona i bez widoku webowego dla samego tekstu.
-- **Szybki przy dużych plikach.** Naciśnięcie klawisza w dokumencie o rozmiarze 10 MB trwa około 25 ms.
+- **Szybki przy dużych plikach.** Renderowanie naciśnięcia klawisza w dokumencie o rozmiarze 10 MB trwa około 25 ms, przed własną pracą widoku.
 - **Prywatny i ostrożny.** Obrazki z internetu wczytują się dopiero po Twojej zgodzie, łącza do innych aplikacji najpierw pytają, a wszystko, co dekoduje niezaufane dane obrazów, działa w izolowanych procesach pomocniczych.
 - **W Twoim języku.** Interfejs i wbudowany skrócony przewodnik po Markdown są dostępne w 35 językach: arabski, kataloński, chiński (uproszczony), chiński (tradycyjny), chorwacki, czeski, duński, holenderski, angielski, fiński, francuski, niemiecki, grecki, hebrajski, hindi, węgierski, indonezyjski, włoski, japoński, koreański, malajski, norweski, polski, portugalski (Brazylia), portugalski (Portugalia), rumuński, rosyjski, słowacki, słoweński, hiszpański, szwedzki, tajski, turecki, ukraiński i wietnamski.
 
@@ -516,7 +516,7 @@ Plik Markdown może pochodzić od kogokolwiek, więc Splat traktuje każdy dokum
 Splat pozostaje responsywny przy dokumentach o rozmiarze kilku megabajtów:
 
 - Tekst źródłowy używa TextKit 2, który układa tylko widoczną część.
-- Gdy piszesz w podglądzie, a w tekście źródłowym dokumentów do 2 MB, tylko dotknięte akapity są parsowane, kolorowane i układane od nowa: około 25 ms w dokumencie 10 MB i około 50 ms na naciśnięcie klawisza w jego podglądzie, łącznie z własną pracą widoku.
+- Gdy piszesz w podglądzie, a w tekście źródłowym dokumentów do 2 MB, tylko dotknięte akapity są parsowane, kolorowane i układane od nowa. W dokumencie 10 MB parsowanie i kolorowanie trwają około 20 ms, renderowanie około 25 ms, a całe naciśnięcie klawisza w jego podglądzie około 60 ms, łącznie z własną pracą widoku.
 - Duże podglądy renderują najpierw widoczną część, a resztę, gdy aplikacja jest bezczynna. Bloki przewinięte do widoku są renderowane, zanim zostaną narysowane.
 - W tekście źródłowym większych dokumentów parsowanie na potrzeby podglądu działa w tle, gdy piszesz.
 - Dokument pozostaje zwykłym tekstem, gdy wymagałby około 4 GB pamięci, czyli około 50–120 MB zwykłego Markdowna, ale tylko od 10 do 20 MB, jeśli składa się wyłącznie z tabel lub nagłówków: tekst źródłowy nie ma kolorów, a podgląd mówi, dlaczego jest pusty. Eksporty nadal działają.

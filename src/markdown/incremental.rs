@@ -75,6 +75,15 @@ impl Parsed {
     /// No blocks and no colors: commands treat the text as plain, and the preview shows nothing.
     pub fn plain(text: Arc<str>) -> Parsed {
         Parsed {
+            doc: Doc::too_large(text),
+            spans: Vec::new(),
+            splice: None,
+        }
+    }
+
+    /// The same for a text a parse failed on.
+    pub fn failed(text: Arc<str>) -> Parsed {
+        Parsed {
             doc: Doc::new(text, Vec::new()),
             spans: Vec::new(),
             splice: None,
@@ -621,6 +630,17 @@ mod tests {
     fn the_estimate_adds_up_the_bytes() {
         assert_eq!(memory_estimate("a"), 4);
         assert_eq!(memory_estimate("# a\n"), 800 + 4 + 4 + 750);
+    }
+
+    #[test]
+    fn only_a_text_over_the_limit_counts_as_too_large() {
+        let huge = "# Titel\n".repeat(3 << 20);
+        let mut parsed = parse_and_color(&huge);
+        assert!(parsed.doc.is_too_large());
+        assert!(!Parsed::failed(huge.as_str().into()).doc.is_too_large());
+        assert!(!parse_and_color("# Titel\n").doc.is_too_large());
+        let shrunk = reparse_and_color(&mut parsed.doc, &[], "# Titel\n");
+        assert!(!shrunk.doc.is_too_large());
     }
 
     #[test]

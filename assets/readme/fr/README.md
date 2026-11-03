@@ -120,7 +120,7 @@ Splat affiche à gauche votre source Markdown avec coloration syntaxique et, à 
 - **Un bouton pour tout.** Chaque élément Markdown a son bouton dans la barre d’outils et son élément de menu, et les plus courants ont aussi un raccourci clavier. Les tableaux ont leur propre menu pour les lignes, les colonnes et l’alignement.
 - **Exporter sans rien perdre.** PDF, un fichier HTML unique et autonome, ou un document Word avec de vrais titres, listes, tableaux, notes de bas de page et images.
 - **Natif jusqu’au bout.** De vraies fenêtres, de vrais onglets, menus et popovers AppKit, les Versions, l’enregistrement automatique, le menu de partage, le mode sombre, la vérification orthographique, la dictée et VoiceOver. Pas d’Electron, pas de vue web pour le texte lui-même.
-- **Rapide avec les gros fichiers.** Une frappe dans un document de 10 Mo prend environ 25 ms.
+- **Rapide avec les gros fichiers.** Le rendu d’une frappe dans un document de 10 Mo prend environ 25 ms, avant le travail propre à la vue.
 - **Discret et prudent.** Les images du web ne se chargent qu’après votre autorisation, les liens vers d’autres apps demandent d’abord confirmation, et tout ce qui décode des données d’image non fiables s’exécute dans des processus auxiliaires isolés.
 - **Dans votre langue.** L’interface et l’aide-mémoire Markdown intégré existent en 35 langues : allemand, anglais, arabe, catalan, chinois (simplifié), chinois (traditionnel), coréen, croate, danois, espagnol, finnois, français, grec, hébreu, hindi, hongrois, indonésien, italien, japonais, malais, néerlandais, norvégien, polonais, portugais (Brésil), portugais (Portugal), roumain, russe, slovaque, slovène, suédois, tchèque, thaï, turc, ukrainien et vietnamien.
 
@@ -516,7 +516,7 @@ Un fichier Markdown peut venir de n’importe qui, c’est pourquoi Splat traite
 Splat reste réactif avec des documents de plusieurs mégaoctets :
 
 - La source utilise TextKit 2, qui ne met en page que la partie visible.
-- Pendant la saisie dans l’aperçu, et dans la source des documents jusqu’à 2 Mo, seuls les paragraphes concernés sont de nouveau analysés, colorés et mis en page : environ 25 ms dans un document de 10 Mo, et environ 50 ms pour une frappe dans son aperçu, avec le travail propre à la vue.
+- Pendant la saisie dans l’aperçu, et dans la source des documents jusqu’à 2 Mo, seuls les paragraphes concernés sont de nouveau analysés, colorés et mis en page. Dans un document de 10 Mo, l’analyse et la coloration prennent environ 20 ms, le rendu environ 25 ms, et une frappe complète dans son aperçu environ 60 ms avec le travail propre à la vue.
 - Les aperçus volumineux rendent d’abord la partie visible, puis le reste lorsque l’app est inactive. Les blocs qui défilent dans la zone visible sont rendus avant d’être dessinés.
 - Dans la source des documents plus volumineux, l’analyse pour l’aperçu s’exécute en arrière-plan pendant la saisie.
 - Un document reste en texte brut dès qu’il demanderait environ 4 Go de mémoire, soit environ 50 à 120 Mo de Markdown ordinaire, mais seulement 10 à 20 Mo s’il ne contient que des tableaux ou des titres : la source n’a pas de couleurs et l’aperçu dit pourquoi il reste vide. Les exports fonctionnent toujours.

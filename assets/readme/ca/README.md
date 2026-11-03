@@ -120,7 +120,7 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - **Un botó per a tot.** Cada construcció de Markdown té un botó a la barra d’eines i un element de menú, i les més habituals també una drecera de teclat. Les taules tenen el seu propi menú per a files, columnes i alineació.
 - **Exporta sense perdre res.** PDF, un únic fitxer HTML autònom o un document de Word amb capçaleres, llistes, taules, notes a peu de pàgina i imatges de debò.
 - **Natiu fins al moll de l’os.** Finestres, pestanyes, menús, finestres emergents, Versions, desament automàtic, el menú de compartir, mode fosc, correcció ortogràfica, dictat i VoiceOver autèntics d’AppKit. Sense Electron, i sense vista web per al text mateix.
-- **Àgil amb fitxers grans.** Una pulsació de tecla en un document de 10 MB triga uns 25 ms.
+- **Àgil amb fitxers grans.** Renderitzar una pulsació de tecla en un document de 10 MB triga uns 25 ms, abans de la feina pròpia de la vista.
 - **Privat i prudent.** Les imatges d’internet només es carreguen quan ho permets, els enllaços a altres apps demanen confirmació, i tot el que descodifica dades d’imatge no fiables s’executa en processos auxiliars aïllats en una caixa de proves.
 - **En el teu idioma.** La interfície i la referència ràpida de Markdown integrada estan disponibles en 35 idiomes: àrab, català, xinès (simplificat), xinès (tradicional), croat, txec, danès, neerlandès, anglès, finès, francès, alemany, grec, hebreu, hindi, hongarès, indonesi, italià, japonès, coreà, malai, noruec, polonès, portuguès (Brasil), portuguès (Portugal), romanès, rus, eslovac, eslovè, castellà, suec, tailandès, turc, ucraïnès i vietnamita.
 
@@ -515,7 +515,7 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 El Splat continua responent amb documents de diversos megabytes:
 
 - El codi font fa servir TextKit 2, que només disposa la part visible.
-- Mentre escrius a la previsualització, i al codi font de documents de fins a 2 MB, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats: uns 25 ms en un document de 10 MB, i uns 50 ms per a una pulsació de tecla a la seva previsualització, amb la feina pròpia de la vista.
+- Mentre escrius a la previsualització, i al codi font de documents de fins a 2 MB, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats. En un document de 10 MB, analitzar i colorejar triga uns 20 ms, renderitzar uns 25 ms, i una pulsació de tecla sencera a la seva previsualització uns 60 ms amb la feina pròpia de la vista.
 - Les previsualitzacions grans renderitzen primer la part visible i la resta mentre l’app està inactiva. Els blocs que es desplacen a la vista es renderitzen abans de dibuixar-se.
 - Al codi font dels documents més grans, l’anàlisi per a la previsualització s’executa en segon pla mentre escrius.
 - Un document es manté com a text pla quan necessitaria uns 4 GB de memòria, és a dir, uns 50 a 120 MB de Markdown habitual, però només de 10 a 20 MB si tot són taules o encapçalaments: el codi font no té colors i la previsualització diu per què es manté buida. Les exportacions continuen funcionant.

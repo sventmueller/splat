@@ -120,7 +120,7 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
 - **Für alles eine Schaltfläche.** Jedes Markdown-Element hat eine Schaltfläche in der Symbolleiste und einen Menübefehl, die gängigen auch einen Kurzbefehl. Tabellen haben ein eigenes Menü für Zeilen, Spalten und Ausrichtung.
 - **Export ohne Verluste.** PDF, eine einzelne, in sich geschlossene HTML-Datei oder ein Word-Dokument mit echten Überschriften, Listen, Tabellen, Fußnoten und Bildern.
 - **Durch und durch nativ.** Echte AppKit-Fenster, Tabs, Menüs, Popover, Versionen, automatisches Sichern, das Teilen-Menü, Dark Mode, Rechtschreibprüfung, Diktierfunktion und VoiceOver. Kein Electron, keine Web-Ansicht für den Text selbst.
-- **Schnell mit großen Dateien.** Ein Tastendruck in einem 10-MB-Dokument dauert etwa 25 ms.
+- **Schnell mit großen Dateien.** Das Rendern eines Tastendrucks in einem 10-MB-Dokument dauert etwa 25 ms, vor der eigenen Arbeit der Ansicht.
 - **Privat und sorgfältig.** Bilder aus dem Web laden erst, wenn du es erlaubst, Links zu anderen Apps fragen vorher nach, und alles, was nicht vertrauenswürdige Bilddaten dekodiert, läuft in Hilfsprozessen in einer Sandbox.
 - **In deiner Sprache.** Die Oberfläche und die eingebaute Markdown-Kurzreferenz gibt es in 35 Sprachen: Arabisch, Katalanisch, Chinesisch (vereinfacht), Chinesisch (traditionell), Kroatisch, Tschechisch, Dänisch, Niederländisch, Englisch, Finnisch, Französisch, Deutsch, Griechisch, Hebräisch, Hindi, Ungarisch, Indonesisch, Italienisch, Japanisch, Koreanisch, Malaiisch, Norwegisch, Polnisch, Portugiesisch (Brasilien), Portugiesisch (Portugal), Rumänisch, Russisch, Slowakisch, Slowenisch, Spanisch, Schwedisch, Thai, Türkisch, Ukrainisch und Vietnamesisch.
 
@@ -516,7 +516,7 @@ Eine Markdown-Datei kann von jedem stammen, deshalb behandelt Splat jedes Dokume
 Splat bleibt auch mit Dokumenten von mehreren Megabyte reaktionsschnell:
 
 - Der Quelltext nutzt TextKit 2, das nur den sichtbaren Teil setzt.
-- Beim Tippen in der Vorschau und im Quelltext von Dokumenten bis 2 MB werden nur die betroffenen Absätze neu geparst, gefärbt und gesetzt: etwa 25 ms in einem 10-MB-Dokument und etwa 50 ms für einen Tastendruck in dessen Vorschau, mit der eigenen Arbeit der Ansicht.
+- Beim Tippen in der Vorschau und im Quelltext von Dokumenten bis 2 MB werden nur die betroffenen Absätze neu geparst, gefärbt und gesetzt. In einem 10-MB-Dokument dauern Parsen und Färben etwa 20 ms, das Rendern etwa 25 ms und ein ganzer Tastendruck in dessen Vorschau etwa 60 ms mit der eigenen Arbeit der Ansicht.
 - Große Vorschauen stellen zuerst den sichtbaren Teil dar und den Rest, solange die App untätig ist. Blöcke, die ins Bild scrollen, werden dargestellt, bevor sie gezeichnet werden.
 - Im Quelltext größerer Dokumente läuft das Parsen für die Vorschau im Hintergrund, während du tippst.
 - Ein Dokument bleibt reiner Text, sobald es etwa 4 GB Arbeitsspeicher bräuchte, das sind rund 50 bis 120 MB gewöhnliches Markdown, aber nur 10 bis 20 MB aus lauter Tabellen oder Überschriften: Der Quelltext hat keine Farben, und die Vorschau sagt, warum sie leer bleibt. Exporte funktionieren weiterhin.

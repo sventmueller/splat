@@ -120,7 +120,7 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - **Butang untuk setiap perkara.** Setiap binaan Markdown mempunyai butang bar alat dan item menu, dan yang biasa digunakan juga mempunyai pintasan papan kekunci. Jadual mendapat menunya sendiri untuk baris, lajur dan penjajaran.
 - **Eksport tanpa kehilangan apa-apa.** PDF, satu fail HTML yang berdiri sendiri, atau dokumen Word dengan tajuk, senarai, jadual, nota kaki dan imej yang sebenar.
 - **Natif sepenuhnya.** Tetingkap, tab, menu, popover, Versi, Simpan Auto, menu kongsi, mod gelap, semakan ejaan, dikte dan VoiceOver yang sebenar daripada AppKit. Tiada Electron, tiada paparan web untuk teks itu sendiri.
-- **Pantas dengan fail besar.** Satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 25 ms.
+- **Pantas dengan fail besar.** Merender satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 25 ms, sebelum kerja paparan itu sendiri.
 - **Peribadi dan berhati-hati.** Imej dari web dimuatkan hanya selepas anda membenarkannya, pautan ke app lain bertanya dahulu, dan semua yang menyahkod data imej yang tidak dipercayai berjalan dalam proses pembantu berkotak pasir.
 - **Dalam bahasa anda.** Antara muka dan rujukan pantas Markdown terbina dalam tersedia dalam 35 bahasa: Arab, Katalan, Cina (Ringkas), Cina (Tradisional), Croatia, Czech, Denmark, Belanda, Inggeris, Finland, Perancis, Jerman, Yunani, Ibrani, Hindi, Hungary, Indonesia, Itali, Jepun, Korea, Melayu, Norway, Poland, Portugis (Brazil), Portugis (Portugal), Romania, Rusia, Slovak, Slovenia, Sepanyol, Sweden, Thai, Turki, Ukraine dan Vietnam.
 
@@ -515,7 +515,7 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 Splat kekal responsif dengan dokumen beberapa megabait:
 
 - Sumber menggunakan TextKit 2, yang hanya menyusun atur bahagian yang kelihatan.
-- Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula: kira-kira 25 ms dalam dokumen 10 MB, dan kira-kira 50 ms untuk satu ketukan kekunci dalam pratontonnya, termasuk kerja paparan itu sendiri.
+- Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula. Dalam dokumen 10 MB, penghuraian dan pewarnaan mengambil kira-kira 20 ms, perenderan kira-kira 25 ms, dan satu ketukan kekunci penuh dalam pratontonnya kira-kira 60 ms termasuk kerja paparan itu sendiri.
 - Pratonton besar memaparkan bahagian yang kelihatan dahulu dan selebihnya semasa app terbiar. Blok yang digulung ke paparan dipaparkan sebelum dilukis.
 - Dalam sumber dokumen yang lebih besar, penghuraian untuk pratonton berjalan di latar belakang semasa anda menaip.
 - Dokumen kekal sebagai teks biasa apabila ia akan memerlukan kira-kira 4 GB memori, iaitu kira-kira 50 hingga 120 MB Markdown biasa, tetapi hanya 10 hingga 20 MB jika isinya hanya jadual atau tajuk: sumber tiada warna dan pratonton menyatakan sebab ia kekal kosong. Eksport masih berfungsi.

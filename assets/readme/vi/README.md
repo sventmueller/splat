@@ -120,7 +120,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 - **Có nút cho mọi thứ.** Mỗi cấu trúc Markdown đều có một nút trên thanh công cụ và một mục trong menu, những cấu trúc thông dụng còn có phím tắt. Bảng có menu riêng để thêm bớt hàng, cột và căn chỉnh.
 - **Xuất mà không mất gì.** PDF, một tệp HTML độc lập duy nhất, hoặc tài liệu Word với đề mục, danh sách, bảng, chú thích cuối trang và hình ảnh thực thụ.
 - **Chính gốc từ trong ra ngoài.** Cửa sổ, tab, menu, popover AppKit thật, Phiên bản, Tự động lưu, menu chia sẻ, chế độ tối, kiểm tra chính tả, đọc chính tả và VoiceOver. Không Electron, không web view cho chính phần văn bản.
-- **Nhanh với tệp lớn.** Một lần gõ phím trong tài liệu 10 MB mất khoảng 25 ms.
+- **Nhanh với tệp lớn.** Kết xuất một lần gõ phím trong tài liệu 10 MB mất khoảng 25 ms, trước phần việc của chính view.
 - **Riêng tư và cẩn trọng.** Hình ảnh từ web chỉ được tải sau khi bạn cho phép, liên kết sang ứng dụng khác sẽ hỏi trước, và mọi thao tác giải mã dữ liệu hình ảnh không đáng tin đều chạy trong các tiến trình phụ trợ có sandbox.
 - **Bằng ngôn ngữ của bạn.** Giao diện và phần tham khảo nhanh Markdown tích hợp có 35 ngôn ngữ: Ả Rập, Catalan, Trung Quốc (Giản thể), Trung Quốc (Phồn thể), Croatia, Séc, Đan Mạch, Hà Lan, Anh, Phần Lan, Pháp, Đức, Hy Lạp, Do Thái, Hindi, Hungary, Indonesia, Ý, Nhật, Hàn, Mã Lai, Na Uy, Ba Lan, Bồ Đào Nha (Brazil), Bồ Đào Nha (Bồ Đào Nha), Romania, Nga, Slovakia, Slovenia, Tây Ban Nha, Thụy Điển, Thái, Thổ Nhĩ Kỳ, Ukraina và Việt Nam.
 
@@ -515,7 +515,7 @@ Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi t
 Splat vẫn phản hồi nhanh với tài liệu vài megabyte:
 
 - Mã nguồn dùng TextKit 2, chỉ dàn trang phần nhìn thấy.
-- Khi bạn gõ trong bản xem trước, và trong mã nguồn của tài liệu tới 2 MB, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại: khoảng 25 ms trong tài liệu 10 MB, và khoảng 50 ms cho một lần gõ phím trong bản xem trước của nó, kể cả phần việc của chính view.
+- Khi bạn gõ trong bản xem trước, và trong mã nguồn của tài liệu tới 2 MB, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại. Trong tài liệu 10 MB, phân tích và tô màu mất khoảng 20 ms, kết xuất khoảng 25 ms, và trọn một lần gõ phím trong bản xem trước của nó khoảng 60 ms, kể cả phần việc của chính view.
 - Bản xem trước lớn hiển thị phần nhìn thấy trước và phần còn lại khi ứng dụng rảnh. Các khối cuộn vào tầm nhìn được hiển thị trước khi được vẽ.
 - Trong mã nguồn của tài liệu lớn hơn, việc phân tích cho bản xem trước chạy ở chế độ nền khi bạn gõ.
 - Tài liệu chỉ còn là văn bản thuần khi sẽ cần khoảng 4 GB bộ nhớ, tức khoảng 50 đến 120 MB Markdown thông thường, nhưng chỉ 10 đến 20 MB nếu toàn bảng hoặc tiêu đề: mã nguồn không có màu và bản xem trước nói lý do nó để trống. Việc xuất vẫn hoạt động.

@@ -120,7 +120,7 @@ Splat viser din Markdown-kildetekst med syntaksfarver til venstre og et levende,
 - **En knap til alt.** Hver Markdown-konstruktion har en knap i værktøjslinjen og et menupunkt, de almindelige også en tastaturgenvej. Tabeller har deres egen menu til rækker, kolonner og justering.
 - **Eksport uden tab.** PDF, en enkelt selvstændig HTML-fil eller et Word-dokument med rigtige overskrifter, lister, tabeller, fodnoter og billeder.
 - **Native helt ind til benet.** Ægte AppKit-vinduer, faner, menuer, popovers, Versioner, automatisk arkivering, delingsmenuen, mørk tilstand, stavekontrol, diktering og VoiceOver. Ingen Electron, ingen webvisning til selve teksten.
-- **Hurtig med store filer.** Et tastetryk i et dokument på 10 MB tager omkring 25 ms.
+- **Hurtig med store filer.** At gengive et tastetryk i et dokument på 10 MB tager omkring 25 ms, før visningens eget arbejde.
 - **Privat og forsigtig.** Billeder fra nettet indlæses først, når du tillader det, links til andre apps spørger først, og alt, der afkoder upålidelige billeddata, kører i helperprocesser i en sandbox.
 - **På dit sprog.** Grænsefladen og den indbyggede Markdown-hurtigreference findes på 35 sprog: arabisk, catalansk, kinesisk (forenklet), kinesisk (traditionelt), kroatisk, tjekkisk, dansk, hollandsk, engelsk, finsk, fransk, tysk, græsk, hebraisk, hindi, ungarsk, indonesisk, italiensk, japansk, koreansk, malajisk, norsk, polsk, portugisisk (Brasilien), portugisisk (Portugal), rumænsk, russisk, slovakisk, slovensk, spansk, svensk, thai, tyrkisk, ukrainsk og vietnamesisk.
 
@@ -516,7 +516,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 Splat forbliver responsivt med dokumenter på flere megabyte:
 
 - Kildeteksten bruger TextKit 2, som kun lægger den synlige del ud.
-- Mens du taster i eksemplet, og i kildeteksten i dokumenter på op til 2 MB, parses, farvelægges og lægges kun de berørte afsnit ud igen: cirka 25 ms i et dokument på 10 MB og cirka 50 ms for et tastetryk i dets eksempel, med visningens eget arbejde.
+- Mens du taster i eksemplet, og i kildeteksten i dokumenter på op til 2 MB, parses, farvelægges og lægges kun de berørte afsnit ud igen. I et dokument på 10 MB tager parsning og farvelægning cirka 20 ms, gengivelse cirka 25 ms og et helt tastetryk i dets eksempel cirka 60 ms med visningens eget arbejde.
 - Store eksempler gengiver den synlige del først og resten, mens appen er ledig. Blokke, der ruller ind i billedet, gengives, før de tegnes.
 - I kildeteksten i større dokumenter kører parsingen til eksemplet i baggrunden, mens du taster.
 - Et dokument forbliver ren tekst, når det ville bruge omkring 4 GB hukommelse, hvilket svarer til cirka 50 til 120 MB almindelig Markdown, men kun 10 til 20 MB, hvis det udelukkende består af tabeller eller overskrifter: Kildeteksten har ingen farver, og eksemplet siger, hvorfor det forbliver tomt. Eksporter virker stadig.

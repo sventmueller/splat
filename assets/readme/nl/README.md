@@ -134,7 +134,7 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 - **Door en door native.** Echte AppKit-vensters, tabbladen, menu's, pop-overs, Versies, automatisch bewaren, het
   deelmenu, donkere modus, spellingcontrole, dicteren en VoiceOver. Geen Electron en geen webweergave voor de tekst
   zelf.
-- **Snel met grote bestanden.** Een toetsaanslag in een document van 10 MB kost ongeveer 25 ms.
+- **Snel met grote bestanden.** Het renderen van een toetsaanslag in een document van 10 MB kost ongeveer 25 ms, vóór het eigen werk van de weergave.
 - **Privé en zorgvuldig.** Afbeeldingen van internet laden pas nadat je dat toestaat, links naar andere apps vragen
   eerst om bevestiging en alles wat onbetrouwbare afbeeldingsdata decodeert, draait in hulpprocessen in een sandbox.
 - **In jouw taal.** De interface en de ingebouwde beknopte Markdown-naslag zijn er in 35 talen: Arabisch, Catalaans,
@@ -661,8 +661,9 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
 
 - De bron gebruikt TextKit 2, dat alleen het zichtbare deel opmaakt.
 - Tijdens het typen in de voorvertoning, en in de bron van documenten tot 2 MB, worden alleen de betrokken alinea's
-  opnieuw geparseerd, gekleurd en opgemaakt: ongeveer 25 ms in een document van 10 MB en ongeveer 50 ms voor een toetsaanslag
-  in de voorvertoning, met het eigen werk van de weergave.
+  opnieuw geparseerd, gekleurd en opgemaakt. In een document van 10 MB kosten parseren en kleuren ongeveer 20 ms,
+  renderen ongeveer 25 ms en een hele toetsaanslag in de voorvertoning ongeveer 60 ms, met het eigen werk van de
+  weergave.
 - Grote voorvertoningen geven eerst het zichtbare deel weer en de rest zodra de app niets te doen heeft. Blokken die in
   beeld scrollen, worden weergegeven voordat ze worden getekend.
 - In de bron van grotere documenten draait het parseren voor de voorvertoning op de achtergrond terwijl je typt.

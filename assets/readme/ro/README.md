@@ -120,7 +120,7 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - **Un buton pentru orice.** Fiecare construcție Markdown are un buton în bara de instrumente și un element de meniu, iar cele uzuale au și o scurtătură de tastatură. Tabelele au propriul meniu pentru rânduri, coloane și aliniere.
 - **Export fără pierderi.** PDF, un singur fișier HTML autonom sau un document Word cu titluri, liste, tabele, note de subsol și imagini reale.
 - **Nativ până în măduva oaselor.** Ferestre, file, meniuri, popovere, Versiuni, Salvare automată, meniul de partajare, modul întunecat, verificarea ortografică, dictarea și VoiceOver autentice AppKit. Fără Electron, fără vizualizare web pentru textul propriu-zis.
-- **Rapid cu fișiere mari.** O apăsare de tastă într-un document de 10 MB durează circa 25 ms.
+- **Rapid cu fișiere mari.** Randarea unei apăsări de tastă într-un document de 10 MB durează circa 25 ms, înainte de munca proprie a vizualizării.
 - **Privat și atent.** Imaginile de pe web se încarcă doar după ce permiteți, linkurile către alte aplicații cer mai întâi confirmare, iar tot ce decodează date de imagine nesigure rulează în procese ajutătoare izolate într-un sandbox.
 - **În limba dumneavoastră.** Interfața și referința rapidă Markdown integrată există în 35 de limbi: arabă, catalană, chineză (simplificată), chineză (tradițională), croată, cehă, daneză, olandeză, engleză, finlandeză, franceză, germană, greacă, ebraică, hindi, maghiară, indoneziană, italiană, japoneză, coreeană, malaeză, norvegiană, poloneză, portugheză (Brazilia), portugheză (Portugalia), română, rusă, slovacă, slovenă, spaniolă, suedeză, thailandeză, turcă, ucraineană și vietnameză.
 
@@ -516,7 +516,7 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 Splat rămâne receptiv cu documente de câțiva megaocteți:
 
 - Sursa folosește TextKit 2, care așază în pagină doar partea vizibilă.
-- Cât timp tastați în previzualizare, și în sursa documentelor de până la 2 MB, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină: circa 25 ms într-un document de 10 MB și circa 50 ms pentru o apăsare de tastă în previzualizarea lui, cu tot cu munca proprie a vizualizării.
+- Cât timp tastați în previzualizare, și în sursa documentelor de până la 2 MB, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină. Într-un document de 10 MB, analiza și colorarea durează circa 20 ms, randarea circa 25 ms, iar o apăsare de tastă completă în previzualizarea lui circa 60 ms, cu tot cu munca proprie a vizualizării.
 - Previzualizările mari randează mai întâi partea vizibilă, iar restul cât timp aplicația este inactivă. Blocurile derulate în câmpul vizual sunt randate înainte de a fi desenate.
 - În sursa documentelor mai mari, analiza pentru previzualizare rulează în fundal cât timp tastați.
 - Un document rămâne text simplu când ar necesita circa 4 GB de memorie, adică circa 50–120 MB de Markdown obișnuit, dar doar 10–20 MB dacă are numai tabele sau titluri: sursa nu are culori, iar previzualizarea spune de ce rămâne goală. Exporturile funcționează în continuare.

@@ -11,9 +11,7 @@ use super::sync::{BlockDiff, Blocks, Snapshot};
 use crate::markdown::commands::Pending;
 use crate::markdown::doc::Doc;
 use crate::markdown::highlight::Style;
-use crate::markdown::incremental::{
-    Parsed, Splice, parse_shared_and_color, reparse_and_color, reparse_part_and_color, stays_plain,
-};
+use crate::markdown::incremental::{Parsed, Splice, parse_shared_and_color, reparse_and_color, reparse_part_and_color};
 use crate::markdown::text::{Byte, Shown, U16};
 use crate::preview::layout::{Layout, Marker, Resolver, TopBlock, layout, relayout, reusable};
 use crate::preview::map::Index;
@@ -197,16 +195,16 @@ pub(super) struct Recolor {
 
 /// The layout of a text, which has none when it stays plain; `None` if it panicked.
 pub(super) fn laid_out(doc: &Doc, resolver: &dyn Resolver, caret: Option<Byte>) -> Option<Layout> {
-    if stays_plain(doc.text()) {
+    if doc.is_too_large() {
         return Some(Layout::nothing_of(doc));
     }
     contained(|| layout(doc, resolver, caret))
 }
 
-fn mode_of(failed: bool, text: &str) -> PreviewMode {
+fn mode_of(failed: bool, doc: &Doc) -> PreviewMode {
     if failed {
         PreviewMode::Failed
-    } else if stays_plain(text) {
+    } else if doc.is_too_large() {
         PreviewMode::TooLarge
     } else {
         PreviewMode::Shows
@@ -434,7 +432,7 @@ impl State {
                 let in_step = !self.preview_is_behind();
                 let text = self.doc.shared_text();
                 self.doc =
-                    contained(|| parse_shared_and_color(text.clone()).doc).unwrap_or_else(|| Parsed::plain(text).doc);
+                    contained(|| parse_shared_and_color(text.clone()).doc).unwrap_or_else(|| Parsed::failed(text).doc);
                 if in_step {
                     self.layout.doc_version = self.doc.version();
                 }
@@ -450,7 +448,7 @@ impl State {
             reparse_and_color(&mut self.doc, &self.spans, new_text)
         });
         self.parse_failed = parsed.is_none();
-        parsed.unwrap_or_else(|| Parsed::plain(new_text.into()))
+        parsed.unwrap_or_else(|| Parsed::failed(new_text.into()))
     }
 
     fn take_over<R: Resolver>(
@@ -543,7 +541,7 @@ impl State {
             }
             LayoutSource::Full => (laid_out(&self.doc, &images, caret), None),
         };
-        self.mode = mode_of(self.parse_failed || layout.is_none(), self.doc.text());
+        self.mode = mode_of(self.parse_failed || layout.is_none(), &self.doc);
         let layout = layout.unwrap_or_else(|| Layout::nothing_of(&self.doc));
         let index = index.unwrap_or_else(|| Index::new(&layout));
         let keys: Vec<u64> = layout.blocks.iter().map(|b| b.key).collect();
@@ -887,7 +885,7 @@ mod tests {
     fn a_failed_parse_keeps_the_text_of_the_snapshot() {
         let mut state = shown("Text\n");
         let snap = snapshot("Neu\n", 2);
-        state.adopt(&snap, Some(Parsed::plain("Neu\n".into())));
+        state.adopt(&snap, Some(Parsed::failed("Neu\n".into())));
         assert_eq!(state.text(), "Neu\n");
         assert!(state.doc().blocks.is_empty());
         assert!(state.is_current(&snapshot("Neu\n", 9)));
@@ -1005,7 +1003,7 @@ mod tests {
     #[test]
     fn a_background_result_takes_the_failure_with_it() {
         let mut state = shown("Text\n");
-        let parsed = Parsed::plain("Neu\n".into());
+        let parsed = Parsed::failed("Neu\n".into());
         let layout = Layout::nothing_of(&parsed.doc);
         let index = Index::new(&layout);
         let facts = views(&state, true);

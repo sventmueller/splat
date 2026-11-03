@@ -308,10 +308,25 @@ impl Utf16Map {
 
 /// UTF-16 length of a string slice.
 pub fn utf16_len(s: &str) -> usize {
-    // Every byte but a continuation byte starts a char; four-byte chars take a surrogate pair. Two counting passes
-    // vectorise, one pass adding both does not.
+    // Every byte but a continuation byte starts a char; four-byte chars take a surrogate pair.
     let b = s.as_bytes();
-    b.iter().filter(|&&x| x & 0xC0 != 0x80).count() + b.iter().filter(|&&x| x >= 0xF0).count()
+    if b.len() < VECTORISING_PAYS_FROM {
+        return b.iter().fold(0, |n: usize, &x| {
+            n.wrapping_add(usize::from(x & 0xC0 != 0x80) + usize::from(x >= 0xF0))
+        });
+    }
+    count_bytes(b, |x| x & 0xC0 != 0x80) + count_bytes(b, |x| x >= 0xF0)
+}
+
+/// Two counting passes vectorise, which most of the many short runs of a layout pay for and a long text gains from.
+const VECTORISING_PAYS_FROM: usize = 64;
+
+/// `Iterator::count` checks every addition for overflow in this profile, which keeps it from vectorising, and no slice
+/// holds more bytes than a `usize` counts.
+fn count_bytes(bytes: &[u8], counted: impl Fn(u8) -> bool) -> usize {
+    bytes
+        .iter()
+        .fold(0, |n: usize, &x| n.wrapping_add(usize::from(counted(x))))
 }
 
 /// Whether `text` reads right to left: its first letter is Hebrew, Arabic or another right-to-left script, which is
@@ -416,6 +431,16 @@ impl<'a> Utf16Cursor<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_text_counts_the_same_in_utf16_at_any_length() {
+        for unit in ["a", "ä", "€", "😀", "aä€😀"] {
+            for count in [0, 1, 7, 15, 16, 17, 31, 63, 64, 65, 200, 1000] {
+                let text = unit.repeat(count);
+                assert_eq!(utf16_len(&text), text.encode_utf16().count(), "{count} × {unit}");
+            }
+        }
+    }
 
     #[test]
     fn slicing_by_positions_is_slicing_by_their_numbers() {

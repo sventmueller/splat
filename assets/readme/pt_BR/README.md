@@ -120,7 +120,7 @@ O Splat mostra à esquerda o código-fonte Markdown com cores de sintaxe e, à d
 - **Um botão para tudo.** Todo elemento do Markdown tem um botão na barra de ferramentas e um item de menu, e os mais comuns também um atalho de teclado. As tabelas têm um menu próprio para linhas, colunas e alinhamento.
 - **Exporte sem perder nada.** PDF, um único arquivo HTML autossuficiente ou um documento do Word com títulos, listas, tabelas, notas de rodapé e imagens de verdade.
 - **Nativo até a raiz.** Janelas, abas, menus, popovers, Versões, Salvamento Automático, menu de compartilhamento, modo escuro, verificação ortográfica, ditado e VoiceOver autênticos do AppKit. Sem Electron, sem web view para o texto em si.
-- **Rápido com arquivos grandes.** Uma tecla pressionada em um documento de 10 MB leva cerca de 25 ms.
+- **Rápido com arquivos grandes.** Renderizar uma tecla pressionada em um documento de 10 MB leva cerca de 25 ms, antes do trabalho da própria view.
 - **Privado e cuidadoso.** As imagens da web só carregam depois que você permite, links para outros apps perguntam antes, e tudo o que decodifica dados de imagem não confiáveis roda em processos auxiliares isolados em sandbox.
 - **No seu idioma.** A interface e a referência rápida de Markdown integrada estão disponíveis em 35 idiomas: alemão, árabe, catalão, checo, chinês (simplificado), chinês (tradicional), coreano, croata, dinamarquês, eslovaco, esloveno, espanhol, finlandês, francês, grego, hebraico, hindi, holandês, húngaro, indonésio, inglês, italiano, japonês, malaio, norueguês, polonês, português (Brasil), português (Portugal), romeno, russo, sueco, tailandês, turco, ucraniano e vietnamita.
 
@@ -516,7 +516,7 @@ Um arquivo Markdown pode vir de qualquer pessoa, por isso o Splat trata todo doc
 O Splat continua responsivo com documentos de vários megabytes:
 
 - O código-fonte usa o TextKit 2, que faz o layout apenas da parte visível.
-- Enquanto você digita na pré-visualização, e no código-fonte de documentos de até 2 MB, só os parágrafos afetados são analisados, coloridos e diagramados de novo: cerca de 25 ms em um documento de 10 MB e cerca de 50 ms para uma tecla na pré-visualização dele, com o trabalho da própria view.
+- Enquanto você digita na pré-visualização, e no código-fonte de documentos de até 2 MB, só os parágrafos afetados são analisados, coloridos e diagramados de novo. Em um documento de 10 MB, analisar e colorir leva cerca de 20 ms, renderizar cerca de 25 ms, e uma tecla inteira na pré-visualização dele cerca de 60 ms, com o trabalho da própria view.
 - Pré-visualizações grandes renderizam primeiro a parte visível e o resto enquanto o app está ocioso. Os blocos que entram na área visível pela rolagem são renderizados antes de serem desenhados.
 - No código-fonte de documentos maiores, a análise para a pré-visualização roda em segundo plano enquanto você digita.
 - Um documento continua sendo texto simples quando precisaria de cerca de 4 GB de memória, ou seja, cerca de 50 a 120 MB de Markdown comum, mas apenas de 10 a 20 MB se tiver só tabelas ou títulos: o código-fonte fica sem cores e a pré-visualização diz por que continua vazia. As exportações ainda funcionam.

@@ -288,6 +288,7 @@ pub struct Doc {
     pub blocks: Vec<Block>,
     text: Arc<str>,
     version: u64,
+    too_large: bool,
 }
 
 fn next_version() -> u64 {
@@ -301,7 +302,21 @@ impl Doc {
             blocks,
             text,
             version: next_version(),
+            too_large: false,
         }
+    }
+
+    /// A text that takes too much memory to parse, which leaves it without blocks.
+    pub fn too_large(text: Arc<str>) -> Doc {
+        Doc {
+            too_large: true,
+            ..Doc::new(text, Vec::new())
+        }
+    }
+
+    /// Whether this text stays plain; looking at the bytes again would take milliseconds in a large text.
+    pub fn is_too_large(&self) -> bool {
+        self.too_large
     }
 
     pub fn text(&self) -> &str {
@@ -324,6 +339,7 @@ impl Doc {
             blocks: std::mem::take(&mut self.blocks),
             text: self.text.clone(),
             version: self.version,
+            too_large: self.too_large,
         }
     }
 
@@ -331,6 +347,7 @@ impl Doc {
     pub(super) fn renew(&mut self, text: &str) {
         self.text = text.into();
         self.version = next_version();
+        self.too_large = false;
     }
 }
 

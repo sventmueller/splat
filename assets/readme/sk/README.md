@@ -120,7 +120,7 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 - **Tlačidlo pre všetko.** Každý prvok Markdownu má tlačidlo na paneli s nástrojmi a položku v menu, bežné aj klávesovú skratku. Tabuľky majú vlastné menu pre riadky, stĺpce a zarovnanie.
 - **Export bez straty.** PDF, jeden samostatný súbor HTML alebo dokument Word so skutočnými nadpismi, zoznamami, tabuľkami, poznámkami pod čiarou a obrázkami.
 - **Natívny od základov.** Skutočné okná AppKit, taby, menu, popovery, Verzie, Automatické ukladanie, menu Zdieľať, tmavý režim, kontrola pravopisu, diktovanie a VoiceOver. Žiadny Electron, žiadny webový prvok pre samotný text.
-- **Rýchly aj pri veľkých súboroch.** Stlačenie klávesu v dokumente s veľkosťou 10 MB trvá asi 25 ms.
+- **Rýchly aj pri veľkých súboroch.** Vykreslenie stlačenia klávesu v dokumente s veľkosťou 10 MB trvá asi 25 ms, pred vlastnou prácou zobrazenia.
 - **Súkromný a opatrný.** Obrázky z webu sa načítajú, až keď ich povolíte, odkazy do iných aplikácií sa najprv pýtajú a všetko, čo dekóduje nedôveryhodné obrázkové dáta, beží v pomocných procesoch v sandboxe.
 - **Vo vašom jazyku.** Rozhranie a vstavaný stručný prehľad Markdownu sú v 35 jazykoch: arabčina, katalánčina, čínština (zjednodušená), čínština (tradičná), chorvátčina, čeština, dánčina, holandčina, angličtina, fínčina, francúzština, nemčina, gréčtina, hebrejčina, hindčina, maďarčina, indonézština, taliančina, japončina, kórejčina, malajčina, nórčina, poľština, portugalčina (Brazília), portugalčina (Portugalsko), rumunčina, ruština, slovenčina, slovinčina, španielčina, švédčina, thajčina, turečtina, ukrajinčina a vietnamčina.
 
@@ -516,7 +516,7 @@ Súbor Markdown môže pochádzať od kohokoľvek, preto Splat považuje každý
 Splat zostáva pohotový aj pri dokumentoch s veľkosťou niekoľkých megabajtov:
 
 - Zdrojový text používa TextKit 2, ktorý rozvrhuje len viditeľnú časť.
-- Počas písania v náhľade a v zdrojovom texte dokumentov do 2 MB sa len dotknuté odseky znova parsujú, farbia a rozvrhujú: asi 25 ms v dokumente s veľkosťou 10 MB a asi 50 ms pre stlačenie klávesu v jeho náhľade, s vlastnou prácou zobrazenia.
+- Počas písania v náhľade a v zdrojovom texte dokumentov do 2 MB sa len dotknuté odseky znova parsujú, farbia a rozvrhujú. V dokumente s veľkosťou 10 MB trvá parsovanie a farbenie asi 20 ms, vykreslenie asi 25 ms a celé stlačenie klávesu v jeho náhľade asi 60 ms s vlastnou prácou zobrazenia.
 - Veľké náhľady vykresľujú najprv viditeľnú časť a zvyšok, keď aplikácia nič nerobí. Bloky, ktoré sa posunú do zobrazenia, sa vykreslia pred vykreslením na obrazovku.
 - V zdrojovom texte väčších dokumentov beží parsovanie pre náhľad na pozadí, kým píšete.
 - Dokument zostane čistým textom, keď by potreboval asi 4 GB pamäte, čo je približne 50 až 120 MB bežného Markdownu, ale len 10 až 20 MB samých tabuliek alebo nadpisov: zdrojový text nemá farby a náhľad uvádza, prečo zostáva prázdny. Exporty stále fungujú.

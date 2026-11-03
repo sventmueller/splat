@@ -132,7 +132,7 @@ the network unless you ask it to.
   lists, tables, footnotes and images.
 - **Native to the bone.** Real AppKit windows, tabs, menus, popovers, Versions, Auto Save, the share menu, dark mode,
   spell checking, dictation and VoiceOver. No Electron, no web view for the text itself.
-- **Fast with big files.** A keystroke in a 10 MB document takes about 25 ms.
+- **Fast with big files.** Rendering a keystroke in a 10 MB document takes about 25 ms, before the view's own work.
 - **Private and careful.** Images from the web load only after you allow them, links to other apps ask first, and
   everything that decodes untrusted image data runs in sandboxed helper processes.
 - **In your language.** The interface and the built-in Markdown quick reference come in 35 languages: Arabic, Catalan,
@@ -642,8 +642,8 @@ Splat stays responsive with documents of several megabytes:
 
 - The source uses TextKit 2, which lays out only the visible part.
 - While you type in the preview, and in the source of documents up to 2 MB, only the affected paragraphs are parsed,
-  coloured and laid out again: about 25 ms in a 10 MB document, and about 50 ms for a keystroke in its preview, with
-  the view's own work.
+  coloured and laid out again. In a 10 MB document, parsing and colouring take about 20 ms, rendering about 25 ms, and a
+  whole keystroke in its preview about 60 ms with the view's own work.
 - Large previews render the visible part first and the rest while the app is idle. Blocks scrolled into view are
   rendered before they are drawn.
 - In the source of larger documents, parsing for the preview runs in the background while you type.

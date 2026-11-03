@@ -120,7 +120,7 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 - **Gumb za vse.** Vsak element Markdown ima gumb v orodni vrstici in ukaz v meniju, pogosti tudi bližnjico na tipkovnici. Tabele imajo svoj meni za vrstice, stolpce in poravnavo.
 - **Izvoz brez izgub.** PDF, ena sama samostojna datoteka HTML ali dokument Word s pravimi naslovi, seznami, tabelami, sprotnimi opombami in slikami.
 - **Domač na Macu skozi in skozi.** Prava okna AppKit, zavihki, meniji, pojavna okna, različice, samodejno shranjevanje, meni za deljenje, temni način, preverjanje črkovanja, narekovanje in VoiceOver. Brez Electrona, brez spletnega pogleda za samo besedilo.
-- **Hiter z velikimi datotekami.** Pritisk tipke v dokumentu velikosti 10 MB traja okoli 25 ms.
+- **Hiter z velikimi datotekami.** Izris pritiska tipke v dokumentu velikosti 10 MB traja okoli 25 ms, pred lastnim delom pogleda.
 - **Zasebnost in previdnost.** Slike iz spleta se naložijo šele, ko jih dovolite, povezave do drugih aplikacij vprašajo za dovoljenje, vse, kar dekodira nezaupane slikovne podatke, pa teče v pomožnih procesih v peskovniku.
 - **V vašem jeziku.** Vmesnik in vgrajeni hitri priročnik za Markdown sta na voljo v 35 jezikih: arabščini, katalonščini, kitajščini (poenostavljeni), kitajščini (tradicionalni), hrvaščini, češčini, danščini, nizozemščini, angleščini, finščini, francoščini, nemščini, grščini, hebrejščini, hindijščini, madžarščini, indonezijščini, italijanščini, japonščini, korejščini, malajščini, norveščini, poljščini, portugalščini (Brazilija), portugalščini (Portugalska), romunščini, ruščini, slovaščini, slovenščini, španščini, švedščini, tajščini, turščini, ukrajinščini in vietnamščini.
 
@@ -516,7 +516,7 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 Splat ostaja odziven tudi pri dokumentih z več megabajti:
 
 - Izvorno besedilo uporablja TextKit 2, ki razporedi samo vidni del.
-- Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki: okoli 25 ms v dokumentu velikosti 10 MB in okoli 50 ms za pritisk tipke v njegovem predogledu, z lastnim delom pogleda.
+- Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki. V dokumentu velikosti 10 MB razčlenjevanje in barvanje trajata okoli 20 ms, izris okoli 25 ms, celoten pritisk tipke v njegovem predogledu pa okoli 60 ms z lastnim delom pogleda.
 - Veliki predogledi najprej upodobijo vidni del, preostalo pa, ko je aplikacija nedejavna. Bloki, ki jih pomaknete v vidno polje, se upodobijo, preden se narišejo.
 - V izvornem besedilu večjih dokumentov razčlenjevanje za predogled med tipkanjem teče v ozadju.
 - Dokument ostane navadno besedilo, ko bi potreboval približno 4 GB pomnilnika, kar je približno 50 do 120 MB običajnega Markdowna, a le 10 do 20 MB, če vsebuje samo tabele ali naslove: izvorno besedilo nima barv, predogled pa pove, zakaj ostaja prazen. Izvozi še vedno delujejo.

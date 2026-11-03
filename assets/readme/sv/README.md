@@ -132,7 +132,7 @@ nätverket om du inte ber om det.
   listor, tabeller, fotnoter och bilder.
 - **Native in i märgen.** Äkta AppKit-fönster, flikar, menyer, popovers, Versioner, Spara automatiskt, delningsmenyn, mörkt läge,
   stavningskontroll, diktering och VoiceOver. Inget Electron, ingen webbvy för själva texten.
-- **Snabb med stora filer.** En tangenttryckning i ett dokument på 10 MB tar cirka 25 ms.
+- **Snabb med stora filer.** Att rendera en tangenttryckning i ett dokument på 10 MB tar cirka 25 ms, före vyns eget arbete.
 - **Privat och försiktig.** Bilder från webben läses in först när du tillåter det, länkar till andra appar frågar först, och
   allt som avkodar opålitliga bilddata körs i hjälpprocesser i en sandlåda.
 - **På ditt språk.** Gränssnittet och den inbyggda Markdown-snabbreferensen finns på 35 språk: arabiska, katalanska,
@@ -639,9 +639,9 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
 Splat förblir responsivt med dokument på flera megabyte:
 
 - Källtexten använder TextKit 2, som bara lägger ut den synliga delen.
-- Medan du skriver i förhandsvisningen, och i källtexten i dokument upp till 2 MB, tolkas, färgläggs och läggs bara de berörda
-  styckena ut på nytt: cirka 25 ms i ett dokument på 10 MB och cirka 50 ms för en tangenttryckning i dess förhandsvisning, med
-  vyns eget arbete.
+- Medan du skriver i förhandsvisningen, och i källtexten i dokument upp till 2 MB, tolkas, färgläggs och läggs bara de
+  berörda styckena ut på nytt. I ett dokument på 10 MB tar tolkning och färgläggning cirka 20 ms, rendering cirka 25 ms
+  och en hel tangenttryckning i dess förhandsvisning cirka 60 ms med vyns eget arbete.
 - Stora förhandsvisningar renderar den synliga delen först och resten medan appen är overksam. Block som rullas in i bild renderas
   innan de ritas.
 - I källtexten i större dokument sker tolkningen för förhandsvisningen i bakgrunden medan du skriver.

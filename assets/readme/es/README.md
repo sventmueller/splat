@@ -120,7 +120,7 @@ Splat muestra a la izquierda tu código fuente Markdown con colores de sintaxis 
 - **Un botón para todo.** Cada elemento de Markdown tiene un botón en la barra de herramientas y una opción de menú, y los más habituales también un atajo de teclado. Las tablas tienen su propio menú para filas, columnas y alineación.
 - **Exporta sin perder nada.** PDF, un único archivo HTML autocontenido o un documento de Word con encabezamientos, listas, tablas, notas al pie e imágenes de verdad.
 - **Nativa hasta la médula.** Ventanas, pestañas, menús, popovers, Versiones, Autoguardado, el menú de compartir, modo oscuro, corrección ortográfica, dictado y VoiceOver de AppKit, sin imitaciones. Sin Electron y sin vista web para el texto en sí.
-- **Rápida con archivos grandes.** Una pulsación de tecla en un documento de 10 MB tarda unos 25 ms.
+- **Rápida con archivos grandes.** Renderizar una pulsación de tecla en un documento de 10 MB tarda unos 25 ms, antes del trabajo propio de la vista.
 - **Privada y cuidadosa.** Las imágenes de la web se cargan solo cuando lo permites, los enlaces a otras apps preguntan antes y todo lo que decodifica datos de imagen no fiables se ejecuta en procesos auxiliares aislados en un sandbox.
 - **En tu idioma.** La interfaz y la referencia rápida de Markdown integrada están disponibles en 35 idiomas: alemán, árabe, catalán, checo, chino (simplificado), chino (tradicional), coreano, croata, danés, eslovaco, esloveno, español, finés, francés, griego, hebreo, hindi, húngaro, indonesio, inglés, italiano, japonés, malayo, neerlandés, noruego, polaco, portugués (Brasil), portugués (Portugal), rumano, ruso, sueco, tailandés, turco, ucraniano y vietnamita.
 
@@ -516,7 +516,7 @@ Un archivo Markdown puede venir de cualquiera, así que Splat trata todo documen
 Splat sigue respondiendo con documentos de varios megabytes:
 
 - El código fuente usa TextKit 2, que maqueta solo la parte visible.
-- Mientras escribes en la previsualización, y en el código fuente de documentos de hasta 2 MB, solo se vuelven a analizar, colorear y maquetar los párrafos afectados: unos 25 ms en un documento de 10 MB, y unos 50 ms por pulsación en su previsualización, con el trabajo propio de la vista.
+- Mientras escribes en la previsualización, y en el código fuente de documentos de hasta 2 MB, solo se vuelven a analizar, colorear y maquetar los párrafos afectados. En un documento de 10 MB, analizar y colorear tarda unos 20 ms, renderizar unos 25 ms, y una pulsación completa en su previsualización unos 60 ms con el trabajo propio de la vista.
 - Las previsualizaciones grandes renderizan primero la parte visible y el resto mientras la app está inactiva. Los bloques que se desplazan a la vista se renderizan antes de dibujarse.
 - En el código fuente de los documentos más grandes, el análisis para la previsualización se ejecuta en segundo plano mientras escribes.
 - Un documento sigue siendo texto sin formato cuando necesitaría unos 4 GB de memoria, es decir, unos 50 a 120 MB de Markdown corriente, pero solo de 10 a 20 MB si todo son tablas o encabezados: el código fuente no tiene colores y la previsualización explica por qué sigue vacía. Las exportaciones siguen funcionando.

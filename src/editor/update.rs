@@ -432,7 +432,7 @@ impl Updater<'_> {
             }
             let parsed = contained(|| parse_shared_and_color(text.clone()));
             let mut failed = parsed.is_none();
-            let parsed = parsed.unwrap_or_else(|| Parsed::plain(text.clone()));
+            let parsed = parsed.unwrap_or_else(|| Parsed::failed(text.clone()));
             // A newer text is waiting; the layout of this one would be thrown away.
             if !current() {
                 return;
