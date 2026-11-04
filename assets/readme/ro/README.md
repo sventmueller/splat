@@ -21,11 +21,11 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark și GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz prin Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 de limbi de interfață](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Offline implicit](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Semnat cu Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Celelalte tipuri de diagrame se editează ca cod. VoiceOver citește titlul sau textul alternativ al unei diagrame.
 
-Prima diagramă de după pornire durează circa o secundă, pentru că motorul de randare pornește în fundal. O diagramă care durează mai mult de 10 secunde afișează o eroare, iar motorul de randare pornește din nou pentru următoarea. Motorul PlantUML (7 MB) se încarcă abia la prima diagramă PlantUML. Un `!include` PlantUML de pe web este blocat.
+Prima diagramă de după pornire durează circa o secundă, pentru că motorul de randare pornește în fundal. O diagramă care durează mai mult de 10 secunde afișează o eroare, iar motorul de randare pornește din nou pentru următoarea. Motorul PlantUML (3 MB) se încarcă abia la prima diagramă PlantUML. Un `!include` PlantUML de pe web este blocat.
 
 ## Imagini
 
@@ -742,11 +742,11 @@ Codul folosește textul german drept cheie: `t("Fett")` îl caută la rulare, `n
 | [image](https://github.com/image-rs/image) | 0.25 | decodarea PNG, JPEG, GIF, WebP și BMP | MIT sau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alinierea coloanelor de tabel | MIT sau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | numele referințelor de caractere HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | randarea formulelor | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | editor vizual de formule, cu fonturi KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | diagrame Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | randarea formulelor | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | editor vizual de formule, cu fonturi KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | diagrame Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz compilat în WebAssembly, conține Graphviz (EPL-1.0) și Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | diagrame PlantUML, compilate în JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | diagrame PlantUML, compilate în JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | actualizările versiunii din imaginea de disc | MIT, cu părți sub licențe BSD și zlib |
 
 Bibliotecile JavaScript sunt păstrate în `resources/js/` exact așa cum au fost publicate; [vendor.lock](../../../vendor.lock) înregistrează sursele și sumele lor de control SHA-256. Textele licențelor lor, inclusiv cele ale Graphviz și Expat din Viz.js, se află lângă ele ca `resources/js/LICENSE-*` și sunt livrate în aplicație. Sparkle nu este păstrat în depozit: `cargo xtask dmg` îi descarcă lansarea și o verifică față de suma de control din xtask, iar licența sa este livrată în aplicație ca `LICENSE-sparkle`.

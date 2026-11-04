@@ -21,11 +21,11 @@ Splat बाईं ओर सिंटैक्स के रंगों वा
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark और GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Viz.js 3.24 के ज़रिए Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 इंटरफ़ेस भाषाएँ](https://img.shields.io/badge/languages-35-4C9A2A)
 ![डिफ़ॉल्ट रूप से ऑफ़लाइन](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Hardened Runtime के साथ साइन किया हुआ](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 बाकी डायग्राम प्रकार कोड के रूप में संपादित होते हैं। VoiceOver डायग्राम का शीर्षक या वैकल्पिक टेक्स्ट पढ़ता है।
 
-लॉन्च के बाद पहले डायग्राम में लगभग एक सेकंड लगता है, क्योंकि रेंडरिंग इंजन बैकग्राउंड में शुरू होता है। जिस डायग्राम में 10 सेकंड से ज़्यादा लगें, वह त्रुटि दिखाता है, और अगले डायग्राम के लिए रेंडरिंग इंजन नए सिरे से शुरू होता है। PlantUML का इंजन (7 MB) केवल पहले PlantUML डायग्राम के साथ लोड होता है। वेब से PlantUML का `!include` ब्लॉक कर दिया जाता है।
+लॉन्च के बाद पहले डायग्राम में लगभग एक सेकंड लगता है, क्योंकि रेंडरिंग इंजन बैकग्राउंड में शुरू होता है। जिस डायग्राम में 10 सेकंड से ज़्यादा लगें, वह त्रुटि दिखाता है, और अगले डायग्राम के लिए रेंडरिंग इंजन नए सिरे से शुरू होता है। PlantUML का इंजन (3 MB) केवल पहले PlantUML डायग्राम के साथ लोड होता है। वेब से PlantUML का `!include` ब्लॉक कर दिया जाता है।
 
 ## इमेज
 
@@ -742,11 +742,11 @@ CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) `main` पर
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP और BMP डिकोड करना | MIT या Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | टेबल कॉलम अलाइन करना | MIT या Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML कैरेक्टर रेफ़रेंस के नाम | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | सूत्र रेंडर करना | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | विज़ुअल सूत्र एडिटर, KaTeX फ़ॉन्ट के साथ | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid डायग्राम | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | सूत्र रेंडर करना | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | विज़ुअल सूत्र एडिटर, KaTeX फ़ॉन्ट के साथ | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid डायग्राम | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssembly में कंपाइल किया Graphviz, जिसमें Graphviz (EPL-1.0) और Expat (MIT) शामिल हैं | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML डायग्राम, JavaScript में कंपाइल किए हुए | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML डायग्राम, JavaScript में कंपाइल किए हुए | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | डिस्क इमेज संस्करण के अपडेट | MIT, कुछ हिस्से BSD और zlib लाइसेंस के अंतर्गत |
 
 JavaScript लाइब्रेरी `resources/js/` में ठीक वैसी ही रखी हैं जैसी प्रकाशित हुईं; [vendor.lock](../../../vendor.lock) उनके स्रोत और SHA-256 चेकसम दर्ज करती है। उनके लाइसेंस टेक्स्ट, Viz.js के अंदर Graphviz और Expat के समेत, उनके पास `resources/js/LICENSE-*` के रूप में हैं और ऐप के अंदर भेजे जाते हैं। Sparkle रिपॉज़िटरी में नहीं रखा जाता: `cargo xtask dmg` उसकी रिलीज़ डाउनलोड करता है और xtask के चेकसम से जाँचता है, और उसका लाइसेंस ऐप के अंदर `LICENSE-sparkle` के रूप में आता है।

@@ -21,11 +21,11 @@ Splat מציג את קוד המקור של ה-Markdown עם צבעי תחביר 
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark ו-GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz דרך Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 שפות ממשק](https://img.shields.io/badge/languages-35-4C9A2A)
 ![ללא רשת כברירת מחדל](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![חתום עם Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -415,7 +415,7 @@ flowchart LR
 
 סוגי תרשימים אחרים נערכים כקוד. VoiceOver מקריא את הכותרת של התרשים או את הטקסט החלופי שלו.
 
-התרשים הראשון אחרי ההפעלה לוקח כשנייה, כי מנוע העיבוד עולה ברקע. תרשים שלוקח יותר מ-10 שניות מציג שגיאה, ומנוע העיבוד מתחיל מחדש לקראת התרשים הבא. המנוע של PlantUML (7 MB) נטען רק עם תרשים ה-PlantUML הראשון. `!include` של PlantUML מהאינטרנט חסום.
+התרשים הראשון אחרי ההפעלה לוקח כשנייה, כי מנוע העיבוד עולה ברקע. תרשים שלוקח יותר מ-10 שניות מציג שגיאה, ומנוע העיבוד מתחיל מחדש לקראת התרשים הבא. המנוע של PlantUML (3 MB) נטען רק עם תרשים ה-PlantUML הראשון. `!include` של PlantUML מהאינטרנט חסום.
 
 ## תמונות
 
@@ -743,11 +743,11 @@ CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) מריץ `mak
 | [image](https://github.com/image-rs/image) | 0.25 | פענוח PNG, JPEG, GIF, WebP ו-BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | יישור עמודות בטבלה | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | שמות הפניות התווים של HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | עיבוד נוסחאות | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | עורך נוסחאות חזותי, עם גופני KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | תרשימי Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | עיבוד נוסחאות | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | עורך נוסחאות חזותי, עם גופני KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | תרשימי Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz שהודר ל-WebAssembly, מכיל את Graphviz (EPL-1.0) ואת Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | תרשימי PlantUML, מהודרים ל-JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | תרשימי PlantUML, מהודרים ל-JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | עדכונים של גירסת ה-disk image | MIT, עם חלקים ברישיונות BSD ו-zlib |
 
 ספריות ה-JavaScript נשמרות ב-`resources/js/` בדיוק כפי שפורסמו; [vendor.lock](../../../vendor.lock) מתעד את המקורות שלהן ואת סכומי הביקורת SHA-256. טקסטי הרישיון שלהן, כולל אלה של Graphviz ושל Expat בתוך Viz.js, נמצאים לצדן כ-`resources/js/LICENSE-*` ומצורפים ליישום. Sparkle אינו נשמר במאגר: `cargo xtask dmg` מוריד את ה-release שלו ובודק אותו מול סכום הביקורת ב-xtask, והרישיון שלו מצורף ליישום כ-`LICENSE-sparkle`.

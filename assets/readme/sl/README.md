@@ -21,11 +21,11 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark in GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz prek Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 jezikov vmesnika](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Privzeto brez omrežja](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Podpisan s Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Druge vrste diagramov se urejajo kot koda. VoiceOver prebere naslov ali nadomestno besedilo diagrama.
 
-Prvi diagram po zagonu traja približno sekundo, ker se pogon za upodabljanje zažene v ozadju. Diagram, ki traja dlje kot 10 sekund, prikaže napako, pogon za upodabljanje pa se za naslednjega zažene znova. Pogon PlantUML (7 MB) se naloži šele s prvim diagramom PlantUML. `!include` v PlantUML iz spleta je blokiran.
+Prvi diagram po zagonu traja približno sekundo, ker se pogon za upodabljanje zažene v ozadju. Diagram, ki traja dlje kot 10 sekund, prikaže napako, pogon za upodabljanje pa se za naslednjega zažene znova. Pogon PlantUML (3 MB) se naloži šele s prvim diagramom PlantUML. `!include` v PlantUML iz spleta je blokiran.
 
 ## Slike
 
@@ -742,11 +742,11 @@ Koda uporablja nemško besedilo kot ključ: `t("Fett")` ga poišče med izvajanj
 | [image](https://github.com/image-rs/image) | 0.25 | dekodiranje PNG, JPEG, GIF, WebP in BMP | MIT ali Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | poravnavanje stolpcev tabel | MIT ali Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | imena znakovnih sklicev HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | upodabljanje formul | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | vizualni urejevalnik formul, s pisavami KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | diagrami Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | upodabljanje formul | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | vizualni urejevalnik formul, s pisavami KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | diagrami Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz, prevedan v WebAssembly, vsebuje Graphviz (EPL-1.0) in Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | diagrami PlantUML, prevedeni v JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | diagrami PlantUML, prevedeni v JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | posodobitve različice z diskovne slike | MIT, z deli pod licencama BSD in zlib |
 
 Knjižnice JavaScript so v `resources/js/` shranjene natanko tako, kot so izdane; [vendor.lock](../../../vendor.lock) beleži njihove vire in kontrolne vsote SHA-256. Besedila njihovih licenc, vključno z licencama Graphviza in Expata znotraj Viz.js, so ob njih kot `resources/js/LICENSE-*` in so del aplikacije. Sparkle ni shranjen v repozitoriju: `cargo xtask dmg` prenese njegovo izdajo in jo preveri glede na kontrolno vsoto v xtask, njegova licenca pa je del aplikacije kot `LICENSE-sparkle`.

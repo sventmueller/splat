@@ -27,11 +27,11 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark en GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 interfacetalen](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Standaard offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Ondertekend met Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -516,7 +516,7 @@ Andere diagramtypen bewerk je als code. VoiceOver leest de titel of alternatieve
 
 Het eerste diagram na het opstarten duurt ongeveer een seconde, omdat de weergave-engine op de achtergrond start. Een
 diagram dat langer dan 10 seconden duurt, toont een fout en de weergave-engine start opnieuw voor het volgende.
-De engine van PlantUML (7 MB) laadt pas bij het eerste PlantUML-diagram. Een PlantUML-`!include` van het web wordt
+De engine van PlantUML (3 MB) laadt pas bij het eerste PlantUML-diagram. Een PlantUML-`!include` van het web wordt
 geblokkeerd.
 
 ## Afbeeldingen
@@ -991,11 +991,11 @@ toont. Een wijziging in deze README hoort ook in die kopieën.
 | [image](https://github.com/image-rs/image) | 0.25 | decoderen van PNG, JPEG, GIF, WebP en BMP | MIT of Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | tabelkolommen uitlijnen | MIT of Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | de namen van HTML-tekenverwijzingen | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | formules weergeven | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | visuele formule-editor, met KaTeX-lettertypen | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid-diagrammen | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | formules weergeven | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuele formule-editor, met KaTeX-lettertypen | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-diagrammen | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz gecompileerd naar WebAssembly, bevat Graphviz (EPL-1.0) en Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML-diagrammen, gecompileerd naar JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML-diagrammen, gecompileerd naar JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | updates van de versie van de schijfkopie | MIT, met onderdelen onder BSD- en zlib-licenties |
 
 De JavaScript-bibliotheken staan precies zoals gepubliceerd in `resources/js/`; [vendor.lock](../../../vendor.lock) legt hun

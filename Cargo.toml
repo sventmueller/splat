@@ -51,7 +51,7 @@ svg2pdf = "0.13"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [dev-dependencies]
-roxmltree = "0.20"
+roxmltree = "0.21"
 
 [features]
 selftest = []

@@ -21,11 +21,11 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark ve GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Viz.js 3.24 üzerinden Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 arayüz dili](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Varsayılan olarak çevrimdışı](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Hardened Runtime ile imzalı](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Diğer diyagram türleri kod olarak düzenlenir. VoiceOver bir diyagramın başlığını ya da alternatif metnini okur.
 
-Açılıştan sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görüntüleme motoru arka planda başlar. 10 saniyeden uzun süren bir diyagram hata gösterir ve görüntüleme motoru bir sonrakine yeniden başlar. PlantUML’in motoru (7 MB) yalnızca ilk PlantUML diyagramıyla yüklenir. Web’den bir PlantUML `!include` engellenir.
+Açılıştan sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görüntüleme motoru arka planda başlar. 10 saniyeden uzun süren bir diyagram hata gösterir ve görüntüleme motoru bir sonrakine yeniden başlar. PlantUML’in motoru (3 MB) yalnızca ilk PlantUML diyagramıyla yüklenir. Web’den bir PlantUML `!include` engellenir.
 
 ## Görüntüler
 
@@ -742,11 +742,11 @@ Kod, anahtar olarak Almanca metni kullanır: `t("Fett")` onu çalışma anında 
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP ve BMP çözme | MIT veya Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | tablo sütunlarını hizalama | MIT veya Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML karakter başvurularının adları | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | formülleri görüntüleme | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | KaTeX fontlarıyla görsel formül düzenleyicisi | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid diyagramları | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | formülleri görüntüleme | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | KaTeX fontlarıyla görsel formül düzenleyicisi | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid diyagramları | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssembly’ye derlenmiş Graphviz; Graphviz (EPL-1.0) ve Expat (MIT) içerir | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | JavaScript’e derlenmiş PlantUML diyagramları | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | JavaScript’e derlenmiş PlantUML diyagramları | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | disk görüntüsü sürümünün güncellemeleri | MIT; parçaları BSD ve zlib lisansları altında |
 
 JavaScript kütüphaneleri `resources/js/` içinde tam yayımlandıkları gibi saklanır; [vendor.lock](../../../vendor.lock) kaynaklarını ve SHA-256 sağlama toplamlarını kaydeder. Viz.js içindeki Graphviz ve Expat’ınkiler dahil lisans metinleri, yanlarında `resources/js/LICENSE-*` olarak durur ve uygulamanın içinde dağıtılır. Sparkle depoda saklanmaz: `cargo xtask dmg` sürümünü indirir ve xtask’taki sağlama toplamına karşı denetler; lisansı uygulamanın içinde `LICENSE-sparkle` olarak dağıtılır.

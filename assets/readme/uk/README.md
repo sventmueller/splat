@@ -21,11 +21,11 @@ Splat показує вихідний текст Markdown із підсвічу�
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark і GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz через Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 мов інтерфейсу](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Офлайн за замовчуванням](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Підписано із Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Інші типи діаграм редагуються як код. VoiceOver читає заголовок діаграми або її альтернативний текст.
 
-Перша діаграма після запуску займає близько секунди, бо рушій відображення стартує у фоновому режимі. Діаграма, яка триває довше за 10 секунд, показує помилку, а рушій відображення для наступної запускається заново. Рушій PlantUML (7 МБ) завантажується лише з першою діаграмою PlantUML. `!include` у PlantUML з інтернету заблоковано.
+Перша діаграма після запуску займає близько секунди, бо рушій відображення стартує у фоновому режимі. Діаграма, яка триває довше за 10 секунд, показує помилку, а рушій відображення для наступної запускається заново. Рушій PlantUML (3 МБ) завантажується лише з першою діаграмою PlantUML. `!include` у PlantUML з інтернету заблоковано.
 
 ## Зображення
 
@@ -742,11 +742,11 @@ CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) запуск�
 | [image](https://github.com/image-rs/image) | 0.25 | розпізнавання PNG, JPEG, GIF, WebP і BMP | MIT або Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | вирівнювання стовпців таблиць | MIT або Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | назви символьних посилань HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | відображення формул | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | візуальний редактор формул зі шрифтами KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | діаграми Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | відображення формул | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | візуальний редактор формул зі шрифтами KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | діаграми Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz, скомпільований у WebAssembly, містить Graphviz (EPL-1.0) та Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | діаграми PlantUML, скомпільовані в JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | діаграми PlantUML, скомпільовані в JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | оновлення версії з образу диска | MIT, із частинами під ліцензіями BSD і zlib |
 
 Бібліотеки JavaScript зберігаються в `resources/js/` саме в тому вигляді, як їх опубліковано; [vendor.lock](../../../vendor.lock) фіксує їхні джерела та контрольні суми SHA-256. Тексти їхніх ліцензій, зокрема Graphviz і Expat всередині Viz.js, лежать поруч як `resources/js/LICENSE-*` і постачаються разом із програмою. Sparkle не зберігається в репозиторії: `cargo xtask dmg` завантажує його випуск і звіряє з контрольною сумою в xtask, а його ліцензія постачається в програмі як `LICENSE-sparkle`.

@@ -27,11 +27,11 @@ the network unless you ask it to.
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark and GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 interface languages](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Offline by default](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Signed with Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -504,7 +504,7 @@ Other diagram types are edited as code. VoiceOver reads a diagram's title or alt
 
 The first diagram after launch takes about a second, because the rendering engine starts in the background. A diagram
 that takes longer than 10 seconds shows an error, and the rendering engine starts afresh for the next one.
-PlantUML's engine (7 MB) loads only with the first PlantUML diagram. A PlantUML `!include` from the web is blocked.
+PlantUML's engine (3 MB) loads only with the first PlantUML diagram. A PlantUML `!include` from the web is blocked.
 
 ## Images
 
@@ -985,11 +985,11 @@ shows. A change to this README belongs in those copies as well.
 | [image](https://github.com/image-rs/image) | 0.25 | decoding PNG, JPEG, GIF, WebP and BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | aligning table columns | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | the names of HTML character references | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | rendering formulas | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | visual formula editor, with KaTeX fonts | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid diagrams | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | rendering formulas | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visual formula editor, with KaTeX fonts | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid diagrams | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz compiled to WebAssembly, contains Graphviz (EPL-1.0) and Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML diagrams, compiled to JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML diagrams, compiled to JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | updates of the disk image version | MIT, with parts under BSD and zlib licenses |
 
 The JavaScript libraries are stored in `resources/js/` exactly as published; [vendor.lock](vendor.lock) records their

@@ -173,8 +173,8 @@ pub(crate) fn fewest_checks(mode: &str, part: Part) -> Option<usize> {
     }
 }
 
-/// Nine of ten of the checks a run makes, of which an inactive app skips some: 144, 168 and 253.
-const PROBE: usize = 130;
+/// Nine of ten of the checks a run makes, of which an inactive app skips some: 146, 168 and 253.
+const PROBE: usize = 131;
 const RESIZE: usize = 2;
 const GUI_SCENARIOS: usize = 151;
 const GUI_WHOLE: usize = 228;

@@ -1,4 +1,4 @@
-// The libraries load with the first formula or diagram: together they are 17 MB of script, which documents
+// The libraries load with the first formula or diagram: together they are 14 MB of script, which documents
 // without formulas or diagrams never need.
 const loading = {};
 function load(src) {
@@ -29,17 +29,32 @@ function keepShapedTextWhole({ data }) {
   });
 }
 
+// MathJax 4 lays out a line break outside an environment across the full width of a container this page does not have.
+function ignoreLineBreaks({ data }) {
+  data.root.walkTree((node) => {
+    if (node.isKind("mspace")) node.attributes.set("linebreak", "auto");
+  });
+}
+
 let mathLoaded;
+let mathStyle;
 function loadMath() {
-  mathLoaded ??= load("js/tex-svg-full.js")
+  mathLoaded ??= load("js/mathjax/tex-mml-svg-mathjax-tex.js")
     .then(() => MathJax.startup.promise)
-    .then(() => MathJax.startup.input[0].postFilters.add(keepShapedTextWhole));
+    .then(() => {
+      const { postFilters } = MathJax.startup.input[0];
+      postFilters.add(keepShapedTextWhole);
+      postFilters.add(ignoreLineBreaks);
+      // MathJax's stylesheet draws tables and errors; a formula leaves it behind with this page, and the SVG library would
+      // then fill their shapes black.
+      mathStyle = MathJax.svgStylesheet().textContent.match(/g\[data-mml-node="(?:merror|mtable)"\][^{]*\{[^}]*\}/g).join("");
+    });
   return mathLoaded;
 }
 
 async function renderMath(tex, display, color) {
   await loadMath();
-  const node = MathJax.tex2svg(tex, { display });
+  const node = await MathJax.tex2svgPromise(tex, { display });
   const svg = node.querySelector("svg");
   const w = parseFloat(svg.getAttribute("width"));
   const h = parseFloat(svg.getAttribute("height"));
@@ -51,6 +66,9 @@ async function renderMath(tex, display, color) {
   svg.setAttribute("height", h * 16);
   svg.setAttribute("color", color);
   svg.removeAttribute("style");
+  const rules = document.createElementNS(svg.namespaceURI, "style");
+  rules.textContent = mathStyle;
+  svg.prepend(rules);
   return { svg: svg.outerHTML, w, h, va, error: error ? error.getAttribute("data-mjx-error") : "" };
 }
 
@@ -148,6 +166,8 @@ async function renderGraphviz(code, dark) {
 
 async function renderPlantUml(code, dark) {
   await load("js/viz-global.js");
+  // PlantUML would fetch its themes on demand, which the policy of this page blocks.
+  await load("js/themes.js");
   await load("js/plantuml.js");
   let lines = code.replace(/\n$/, "").split("\n");
   if (!lines.some((l) => l.trim().startsWith("@start"))) lines = ["@startuml", ...lines, "@enduml"];

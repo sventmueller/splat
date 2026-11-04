@@ -21,11 +21,11 @@ Splat muestra a la izquierda tu código fuente Markdown con colores de sintaxis 
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark y GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz mediante Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 idiomas de interfaz](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Sin conexión por omisión](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Firmado con Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Los demás tipos de diagrama se editan como código. VoiceOver lee el título o el texto alternativo de un diagrama.
 
-El primer diagrama tras el arranque tarda cerca de un segundo, porque el motor de renderizado se inicia en segundo plano. Un diagrama que tarda más de 10 segundos muestra un error, y el motor de renderizado se reinicia para el siguiente. El motor de PlantUML (7 MB) se carga solo con el primer diagrama de PlantUML. Un `!include` de PlantUML desde la web está bloqueado.
+El primer diagrama tras el arranque tarda cerca de un segundo, porque el motor de renderizado se inicia en segundo plano. Un diagrama que tarda más de 10 segundos muestra un error, y el motor de renderizado se reinicia para el siguiente. El motor de PlantUML (3 MB) se carga solo con el primer diagrama de PlantUML. Un `!include` de PlantUML desde la web está bloqueado.
 
 ## Imágenes
 
@@ -742,11 +742,11 @@ El código usa el texto alemán como clave: `t("Fett")` lo busca en tiempo de ej
 | [image](https://github.com/image-rs/image) | 0.25 | decodificación de PNG, JPEG, GIF, WebP y BMP | MIT o Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alineación de columnas de tablas | MIT o Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | los nombres de las referencias de caracteres HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | renderizado de fórmulas | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | editor visual de fórmulas, con fuentes KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | diagramas de Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | renderizado de fórmulas | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | editor visual de fórmulas, con fuentes KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | diagramas de Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz compilado a WebAssembly, contiene Graphviz (EPL-1.0) y Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | diagramas de PlantUML, compilados a JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | diagramas de PlantUML, compilados a JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | actualizaciones de la versión de la imagen de disco | MIT, con partes bajo licencias BSD y zlib |
 
 Las bibliotecas JavaScript se guardan en `resources/js/` exactamente como se publicaron; [vendor.lock](../../../vendor.lock) registra sus fuentes y sumas de verificación SHA-256. Sus textos de licencia, incluidos los de Graphviz y Expat dentro de Viz.js, están junto a ellas como `resources/js/LICENSE-*` y se incluyen en la app. Sparkle no se guarda en el repositorio: `cargo xtask dmg` descarga su release y la comprueba con la suma de verificación de xtask, y su licencia se incluye en la app como `LICENSE-sparkle`.

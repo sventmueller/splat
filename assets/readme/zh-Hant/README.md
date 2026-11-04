@@ -21,11 +21,11 @@ Splat 左邊是帶語法上色的 Markdown 原始碼，右邊是即時且完全�
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark 與 GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![透過 Viz.js 3.24 使用 Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 種介面語言](https://img.shields.io/badge/languages-35-4C9A2A)
 ![預設離線](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![以 Hardened Runtime 簽署](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 其他圖表類型以程式碼編輯。旁白會讀出圖表的標題或替代文字。
 
-啟動後的第一個圖表約需一秒，因為呈現引擎會在背景啟動。耗時超過 10 秒的圖表會顯示錯誤，呈現引擎會為下一個圖表重新啟動。PlantUML 的引擎（7 MB）只在第一個 PlantUML 圖表出現時才載入。來自網路的 PlantUML `!include` 會被阻擋。
+啟動後的第一個圖表約需一秒，因為呈現引擎會在背景啟動。耗時超過 10 秒的圖表會顯示錯誤，呈現引擎會為下一個圖表重新啟動。PlantUML 的引擎（3 MB）只在第一個 PlantUML 圖表出現時才載入。來自網路的 PlantUML `!include` 會被阻擋。
 
 ## 影像
 
@@ -742,11 +742,11 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）在每次�
 | [image](https://github.com/image-rs/image) | 0.25 | 解碼 PNG、JPEG、GIF、WebP 和 BMP | MIT 或 Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 對齊表格欄位 | MIT 或 Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字元參照的名稱 | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | 呈現公式 | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | 視覺化公式編輯器，附 KaTeX 字體 | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid 圖表 | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | 呈現公式 | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | 視覺化公式編輯器，附 KaTeX 字體 | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid 圖表 | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | 編譯為 WebAssembly 的 Graphviz，內含 Graphviz（EPL-1.0）和 Expat（MIT） | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.6 | PlantUML 圖表，編譯為 JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.9 | PlantUML 圖表，編譯為 JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | 磁碟映像檔版本的更新 | MIT，部分採用 BSD 和 zlib 授權 |
 
 JavaScript 函式庫會原封不動地存放在 `resources/js/` 中；[vendor.lock](../../../vendor.lock) 記錄了它們的來源和 SHA-256 檢查碼。它們的授權文字，包括 Viz.js 內 Graphviz 和 Expat 的授權文字，就放在旁邊，名為 `resources/js/LICENSE-*`，並隨 App 一起發佈。Sparkle 不存放在儲存庫中：`cargo xtask dmg` 會下載它的發行版並對照 xtask 中的檢查碼驗證，它的授權則以 `LICENSE-sparkle` 隨 App 一起發佈。

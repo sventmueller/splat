@@ -21,11 +21,11 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark 和 GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![通过 Viz.js 3.24 使用 Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 种界面语言](https://img.shields.io/badge/languages-35-4C9A2A)
 ![默认离线](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![已使用 Hardened Runtime 签名](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 其他图表类型以代码形式编辑。旁白会读出图表的标题或替代文本。
 
-启动后的第一个图表约需一秒钟，因为渲染引擎要在后台启动。耗时超过 10 秒的图表会显示错误，渲染引擎会为下一个图表重新启动。PlantUML 的引擎（7 MB）只在第一个 PlantUML 图表出现时才载入。来自网络的 PlantUML `!include` 会被阻止。
+启动后的第一个图表约需一秒钟，因为渲染引擎要在后台启动。耗时超过 10 秒的图表会显示错误，渲染引擎会为下一个图表重新启动。PlantUML 的引擎（3 MB）只在第一个 PlantUML 图表出现时才载入。来自网络的 PlantUML `!include` 会被阻止。
 
 ## 图像
 
@@ -740,11 +740,11 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 | [image](https://github.com/image-rs/image) | 0.25 | 解码 PNG、JPEG、GIF、WebP 和 BMP | MIT 或 Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 对齐表格列 | MIT 或 Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字符引用的名称 | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | 渲染公式 | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | 可视化公式编辑器，附带 KaTeX 字体 | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid 图表 | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | 渲染公式 | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | 可视化公式编辑器，附带 KaTeX 字体 | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid 图表 | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | 编译为 WebAssembly 的 Graphviz，内含 Graphviz（EPL-1.0）和 Expat（MIT） | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.6 | 编译为 JavaScript 的 PlantUML 图表 | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.9 | 编译为 JavaScript 的 PlantUML 图表 | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | 磁盘映像版本的更新 | MIT，部分采用 BSD 和 zlib 许可证 |
 
 JavaScript 库按发布时的原样存放在 `resources/js/` 中；[vendor.lock](../../../vendor.lock) 记录了它们的来源和 SHA-256 校验和。它们的许可证文本，包括 Viz.js 内含的 Graphviz 和 Expat 的许可证文本，以 `resources/js/LICENSE-*` 的形式放在它们旁边，并随 App 一起发布。Sparkle 不存放在仓库中：`cargo xtask dmg` 会下载它的发布版本，并对照 xtask 中的校验和检查，其许可证以 `LICENSE-sparkle` 的形式随 App 一起发布。

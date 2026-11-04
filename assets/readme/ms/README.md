@@ -21,11 +21,11 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark dan GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz melalui Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 bahasa antara muka](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Luar talian secara lalai](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Ditandatangani dengan Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -413,7 +413,7 @@ flowchart LR
 
 Jenis rajah lain diedit sebagai kod. VoiceOver membaca tajuk atau teks alternatif rajah.
 
-Rajah pertama selepas pelancaran mengambil masa kira-kira satu saat, kerana enjin pemaparan bermula di latar belakang. Rajah yang mengambil masa lebih daripada 10 saat menunjukkan ralat, dan enjin pemaparan bermula semula untuk rajah seterusnya. Enjin PlantUML (7 MB) dimuatkan hanya dengan rajah PlantUML yang pertama. `!include` PlantUML dari web disekat.
+Rajah pertama selepas pelancaran mengambil masa kira-kira satu saat, kerana enjin pemaparan bermula di latar belakang. Rajah yang mengambil masa lebih daripada 10 saat menunjukkan ralat, dan enjin pemaparan bermula semula untuk rajah seterusnya. Enjin PlantUML (3 MB) dimuatkan hanya dengan rajah PlantUML yang pertama. `!include` PlantUML dari web disekat.
 
 ## Imej
 
@@ -741,11 +741,11 @@ Kod menggunakan teks bahasa Jerman sebagai kunci: `t("Fett")` mencarinya semasa 
 | [image](https://github.com/image-rs/image) | 0.25 | menyahkod PNG, JPEG, GIF, WebP dan BMP | MIT atau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | menjajarkan lajur jadual | MIT atau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | nama rujukan aksara HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | memaparkan formula | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | penyunting formula visual, dengan fon KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | rajah Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | memaparkan formula | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | penyunting formula visual, dengan fon KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | rajah Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz yang dikompil ke WebAssembly, mengandungi Graphviz (EPL-1.0) dan Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | rajah PlantUML, dikompil ke JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | rajah PlantUML, dikompil ke JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | kemas kini versi imej cakera | MIT, dengan bahagian di bawah lesen BSD dan zlib |
 
 Pustaka JavaScript disimpan dalam `resources/js/` tepat seperti yang diterbitkan; [vendor.lock](../../../vendor.lock) merekodkan sumber dan checksum SHA-256 mereka. Teks lesen mereka, termasuk teks Graphviz dan Expat di dalam Viz.js, terletak di sebelahnya sebagai `resources/js/LICENSE-*` dan disertakan di dalam app. Sparkle tidak disimpan dalam repositori: `cargo xtask dmg` memuat turun keluarannya dan menyemaknya terhadap checksum dalam xtask, dan lesennya disertakan di dalam app sebagai `LICENSE-sparkle`.

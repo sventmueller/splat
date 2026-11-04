@@ -21,11 +21,11 @@ Splat viser din Markdown-kildetekst med syntaksfarver til venstre og et levende,
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark og GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 grænsefladesprog](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Offline som standard](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Signeret med Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Andre diagramtyper redigeres som kode. VoiceOver læser et diagrams titel eller alternative tekst.
 
-Det første diagram efter opstart tager cirka et sekund, fordi gengivelsesmotoren starter i baggrunden. Et diagram, der tager længere end 10 sekunder, viser en fejl, og gengivelsesmotoren starter forfra til det næste. PlantUML's motor (7 MB) indlæses først med det første PlantUML-diagram. En PlantUML-`!include` fra nettet er blokeret.
+Det første diagram efter opstart tager cirka et sekund, fordi gengivelsesmotoren starter i baggrunden. Et diagram, der tager længere end 10 sekunder, viser en fejl, og gengivelsesmotoren starter forfra til det næste. PlantUML's motor (3 MB) indlæses først med det første PlantUML-diagram. En PlantUML-`!include` fra nettet er blokeret.
 
 ## Billeder
 
@@ -744,11 +744,11 @@ Koden bruger den tyske tekst som nøgle: `t("Fett")` slår den op ved kørsel, `
 | [image](https://github.com/image-rs/image) | 0.25 | afkodning af PNG, JPEG, GIF, WebP og BMP | MIT eller Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | justering af tabelkolonner | MIT eller Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | navnene på HTML-tegnreferencer | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | gengivelse af formler | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | visuel formeleditor med KaTeX-skrifttyper | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid-diagrammer | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | gengivelse af formler | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuel formeleditor med KaTeX-skrifttyper | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-diagrammer | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz kompileret til WebAssembly, indeholder Graphviz (EPL-1.0) og Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML-diagrammer, kompileret til JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML-diagrammer, kompileret til JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | opdateringer af versionen fra diskaftrykket | MIT, med dele under BSD- og zlib-licenser |
 
 JavaScript-bibliotekerne ligger i `resources/js/` præcis som udgivet; [vendor.lock](../../../vendor.lock) registrerer deres kilder og SHA-256-kontrolsummer. Deres licenstekster, også dem for Graphviz og Expat inde i Viz.js, ligger ved siden af som `resources/js/LICENSE-*` og følger med i appen. Sparkle ligger ikke i repositoryet: `cargo xtask dmg` henter dens release og kontrollerer den mod kontrolsummen i xtask, og dens licens følger med i appen som `LICENSE-sparkle`.

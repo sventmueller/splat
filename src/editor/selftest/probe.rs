@@ -16,8 +16,10 @@ use objc2_foundation::{NSData, NSDictionary, NSError, NSPoint, NSRange, NSRect, 
 use objc2_web_kit::WKWebView;
 
 use super::super::EditorController;
+use super::super::decoder;
 use super::super::js::{self, Key};
 use super::super::mathfield::{self, MathField};
+use super::super::safe_image::Decoded;
 use super::super::webkit;
 use super::mock_web::{HOST, requests_of};
 use super::{after, check, finish, guarded, once};
@@ -552,6 +554,36 @@ const FORMULA_TEXT: &str = "const svg = async (tex) => (await renderMath(tex, fa
     const latin = await svg('\\\\text{abc}'); \
     return [hebrew.includes('>שלום</text>'), arabic.includes('>العربية</text>'), arabic.includes('bold'), pieces(latin)].join(' / ');";
 
+/// MathJax 4 finds its packages and fonts in the bundle, and a formula stays one picture of its own width.
+const FORMULA_PACKAGES: &str = "const render = (tex) => renderMath(tex, false, '#000'); \
+    const chemistry = await render('\\\\ce{CO2 -> CO}'); \
+    const required = await render('\\\\require{physics}\\\\dv{f}{x}'); \
+    const broken = await render('a\\\\\\\\b'); \
+    const long = await render('x+'.repeat(300) + 'x'); \
+    return [chemistry.svg.includes('<text'), required.error, broken.w < 10, long.w > 400].join(' / ');";
+
+/// The lines of a table without content, in both colors of the renderer, and a formula that is an error.
+const FORMULA_STYLES: &str = "const svg = async (tex, color) => (await renderMath(tex, false, color)).svg; \
+    const table = '\\\\begin{array}{|c|}\\\\hline\\\\phantom{x}\\\\\\\\\\\\hline\\\\end{array}'; \
+    return [await svg(table, '#1D1D1F'), await svg(table, '#E8E8E8'), await svg('\\\\frac{a', '#1D1D1F')].join('@@@');";
+
+/// Of a formula's picture, the share of pixels that are drawn, and of those the share that is dark.
+fn drawn_and_dark(svg: &str) -> Option<(f64, f64)> {
+    let Some(Decoded::Rgba { pixels, .. }) = decoder::svg_to_pixels(svg) else {
+        return None;
+    };
+    let (pixels, _) = pixels.as_chunks::<4>();
+    let drawn: Vec<_> = pixels.iter().filter(|[.., alpha]| *alpha > 128).collect();
+    let dark = drawn
+        .iter()
+        .filter(|[r, g, b, _]| [r, g, b].iter().all(|&&c| c < 64))
+        .count();
+    Some((
+        drawn.len() as f64 / pixels.len().max(1) as f64,
+        dark as f64 / drawn.len().max(1) as f64,
+    ))
+}
+
 thread_local! {
     /// The last script asked, so that only the watch on the one still unanswered fires.
     static ASKED: Cell<u32> = const { Cell::new(0) };
@@ -687,6 +719,29 @@ fn formula_text(mtm: MainThreadMarker) {
     let name = "a formula keeps text that joins its letters in one piece";
     ask(&js::renderer(mtm).web(), name, FORMULA_TEXT, move |text| {
         check(name, text == "true / true / true / 0", &text);
+        formula_packages(mtm);
+    });
+}
+
+fn formula_packages(mtm: MainThreadMarker) {
+    let name = "a formula finds its packages and fonts in the app and stays one picture";
+    ask(&js::renderer(mtm).web(), name, FORMULA_PACKAGES, move |text| {
+        check(name, text == "false /  / true / true", &text);
+        formula_styles(mtm);
+    });
+}
+
+fn formula_styles(mtm: MainThreadMarker) {
+    let name = "a table draws its lines in the color of the text and an error draws no black block";
+    ask(&js::renderer(mtm).web(), name, FORMULA_STYLES, move |text| {
+        let shares: Vec<_> = text.split("@@@").map(drawn_and_dark).collect();
+        let lines = |share: (f64, f64)| (0.01..0.6).contains(&share.0);
+        let right = matches!(
+            shares[..],
+            [Some(dark), Some(light), Some(error)]
+                if lines(dark) && dark.1 > 0.5 && lines(light) && light.1 < 0.5 && error.0 > 0.5 && error.1 < 0.05
+        );
+        check(name, right, &format!("{shares:?}"));
         // A render already under way would run out of time before this one.
         once(
             0.0,

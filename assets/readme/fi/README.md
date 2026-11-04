@@ -21,11 +21,11 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark ja GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz Viz.js:n kautta 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 käyttöliittymäkieltä](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Oletuksena offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Allekirjoitettu Hardened Runtimella](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 Muita kaaviotyyppejä muokataan koodina. VoiceOver lukee kaavion otsikon tai vaihtoehtoisen tekstin.
 
-Ensimmäinen kaavio käynnistyksen jälkeen kestää noin sekunnin, koska renderöintimoottori käynnistyy taustalla. Yli 10 sekuntia kestävä kaavio näyttää virheen, ja renderöintimoottori käynnistyy seuraavaa varten uudelleen. PlantUML:n moottori (7 Mt) latautuu vasta ensimmäisen PlantUML-kaavion yhteydessä. PlantUML:n `!include` verkosta estetään.
+Ensimmäinen kaavio käynnistyksen jälkeen kestää noin sekunnin, koska renderöintimoottori käynnistyy taustalla. Yli 10 sekuntia kestävä kaavio näyttää virheen, ja renderöintimoottori käynnistyy seuraavaa varten uudelleen. PlantUML:n moottori (3 Mt) latautuu vasta ensimmäisen PlantUML-kaavion yhteydessä. PlantUML:n `!include` verkosta estetään.
 
 ## Kuvat
 
@@ -742,11 +742,11 @@ Koodi käyttää saksankielistä tekstiä avaimena: `t("Fett")` hakee sen ajon a
 | [image](https://github.com/image-rs/image) | 0.25 | PNG-, JPEG-, GIF-, WebP- ja BMP-tiedostojen purku | MIT tai Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | taulukon sarakkeiden tasaus | MIT tai Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML-merkkiviitteiden nimet | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | kaavojen renderöinti | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | visuaalinen kaavaeditori KaTeX-fonteilla | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid-kaaviot | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | kaavojen renderöinti | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuaalinen kaavaeditori KaTeX-fonteilla | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-kaaviot | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssemblyksi käännetty Graphviz, sisältää Graphvizin (EPL-1.0) ja Expatin (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML-kaaviot, käännetty JavaScriptiksi | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML-kaaviot, käännetty JavaScriptiksi | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | levykuvaversion päivitykset | MIT, osin BSD- ja zlib-lisensseillä |
 
 JavaScript-kirjastot tallennetaan hakemistoon `resources/js/` täsmälleen sellaisina kuin ne on julkaistu; [vendor.lock](../../../vendor.lock) kirjaa niiden lähteet ja SHA-256-tarkistussummat. Niiden lisenssitekstit, myös Viz.js:n sisällä olevien Graphvizin ja Expatin, ovat niiden vieressä tiedostoina `resources/js/LICENSE-*` ja kulkevat apin mukana. Sparklea ei tallenneta repositorioon: `cargo xtask dmg` lataa sen julkaisun ja tarkistaa sen xtaskin tarkistussummaa vasten, ja sen lisenssi kulkee apin mukana tiedostona `LICENSE-sparkle`.

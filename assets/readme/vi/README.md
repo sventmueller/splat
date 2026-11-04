@@ -21,11 +21,11 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark and GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 ngôn ngữ giao diện](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Mặc định ngoại tuyến](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Được ký với Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -413,7 +413,7 @@ flowchart LR
 
 Các loại sơ đồ khác được sửa dưới dạng mã. VoiceOver đọc tiêu đề hoặc văn bản thay thế của sơ đồ.
 
-Sơ đồ đầu tiên sau khi mở ứng dụng mất khoảng một giây, vì bộ máy hiển thị khởi động ở chế độ nền. Sơ đồ nào mất hơn 10 giây sẽ báo lỗi, và bộ máy hiển thị khởi động lại từ đầu cho sơ đồ tiếp theo. Bộ máy của PlantUML (7 MB) chỉ được tải cùng sơ đồ PlantUML đầu tiên. `!include` của PlantUML từ web bị chặn.
+Sơ đồ đầu tiên sau khi mở ứng dụng mất khoảng một giây, vì bộ máy hiển thị khởi động ở chế độ nền. Sơ đồ nào mất hơn 10 giây sẽ báo lỗi, và bộ máy hiển thị khởi động lại từ đầu cho sơ đồ tiếp theo. Bộ máy của PlantUML (3 MB) chỉ được tải cùng sơ đồ PlantUML đầu tiên. `!include` của PlantUML từ web bị chặn.
 
 ## Hình ảnh
 
@@ -740,11 +740,11 @@ Mã dùng văn bản tiếng Đức làm khóa: `t("Fett")` tra cứu nó khi ch
 | [image](https://github.com/image-rs/image) | 0.25 | giải mã PNG, JPEG, GIF, WebP và BMP | MIT hoặc Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | căn thẳng cột bảng | MIT hoặc Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | tên của các tham chiếu ký tự HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | hiển thị công thức | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | trình soạn công thức trực quan, kèm phông KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | sơ đồ Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | hiển thị công thức | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | trình soạn công thức trực quan, kèm phông KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | sơ đồ Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz biên dịch sang WebAssembly, chứa Graphviz (EPL-1.0) và Expat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | sơ đồ PlantUML, biên dịch sang JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | sơ đồ PlantUML, biên dịch sang JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | cập nhật cho phiên bản ảnh đĩa | MIT, một phần theo giấy phép BSD và zlib |
 
 Các thư viện JavaScript được lưu trong `resources/js/` đúng như khi được phát hành; [vendor.lock](../../../vendor.lock) ghi lại nguồn và giá trị kiểm tra SHA-256 của chúng. Văn bản giấy phép của chúng, gồm cả của Graphviz và Expat bên trong Viz.js, nằm cạnh chúng dưới dạng `resources/js/LICENSE-*` và được đóng gói trong ứng dụng. Sparkle không được lưu trong kho: `cargo xtask dmg` tải bản phát hành của nó về và kiểm tra theo giá trị kiểm tra trong xtask, và giấy phép của nó được đóng gói trong ứng dụng dưới dạng `LICENSE-sparkle`.

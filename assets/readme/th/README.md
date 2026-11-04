@@ -26,11 +26,11 @@ Splat เขียนด้วย Rust บนตัวควบคุม AppKit 
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark และ GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz ผ่าน Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![อินเทอร์เฟซ 35 ภาษา](https://img.shields.io/badge/languages-35-4C9A2A)
 ![ออฟไลน์เป็นค่าเริ่มต้น](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![ลงนามพร้อม Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -492,7 +492,7 @@ flowchart LR
 
 แผนภาพแรกหลังเปิดแอปใช้เวลาราวหนึ่งวินาที เพราะเอนจินแสดงผลเริ่มทำงานในเบื้องหลัง แผนภาพที่ใช้เวลานานกว่า 10 วินาที
 จะแสดงข้อผิดพลาด และเอนจินแสดงผลจะเริ่มใหม่สำหรับแผนภาพถัดไป
-เอนจินของ PlantUML (7 MB) จะโหลดเมื่อมีแผนภาพ PlantUML แรกเท่านั้น `!include` ของ PlantUML จากเว็บถูกบล็อก
+เอนจินของ PlantUML (3 MB) จะโหลดเมื่อมีแผนภาพ PlantUML แรกเท่านั้น `!include` ของ PlantUML จากเว็บถูกบล็อก
 
 ## ภาพ
 
@@ -973,11 +973,11 @@ bundle ID `local.splat.selftest`) และไม่แตะต้องกา�
 | [image](https://github.com/image-rs/image) | 0.25 | ถอดรหัส PNG, JPEG, GIF, WebP และ BMP | MIT หรือ Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | จัดแนวคอลัมน์ตาราง | MIT หรือ Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | ชื่อของการอ้างอิงอักขระ HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | แสดงผลสูตร | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | ตัวแก้ไขสูตรแบบภาพ พร้อมฟอนต์ KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | แผนภาพ Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | แสดงผลสูตร | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | ตัวแก้ไขสูตรแบบภาพ พร้อมฟอนต์ KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | แผนภาพ Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz ที่คอมไพล์เป็น WebAssembly มี Graphviz (EPL-1.0) และ Expat (MIT) อยู่ภายใน | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | แผนภาพ PlantUML ที่คอมไพล์เป็น JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | แผนภาพ PlantUML ที่คอมไพล์เป็น JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | การอัปเดตเวอร์ชั่นดิสก์อิมเมจ | MIT โดยบางส่วนอยู่ภายใต้สัญญาอนุญาต BSD และ zlib |
 
 ไลบรารี JavaScript เก็บไว้ใน `resources/js/` ตามที่เผยแพร่ทุกประการ; [vendor.lock](../../../vendor.lock) บันทึกแหล่งที่มา

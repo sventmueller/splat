@@ -21,11 +21,11 @@
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark وGFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz عبر Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 لغة للواجهة](https://img.shields.io/badge/languages-35-4C9A2A)
 ![دون اتصال افتراضيًا](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![موقّع مع Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 أنواع المخططات الأخرى تُحرَّر كرمز. يقرأ VoiceOver عنوان المخطط أو نصه البديل.
 
-يستغرق أول مخطط بعد التشغيل نحو ثانية، لأن محرك العرض يبدأ في الخلفية. والمخطط الذي يستغرق أكثر من 10 ثوانٍ يعرض خطأ، ويبدأ محرك العرض من جديد للمخطط التالي. ولا يُحمَّل محرك PlantUML (7 ميغابايت) إلا مع أول مخطط PlantUML. ويُحظر `!include` في PlantUML إذا كان من الويب.
+يستغرق أول مخطط بعد التشغيل نحو ثانية، لأن محرك العرض يبدأ في الخلفية. والمخطط الذي يستغرق أكثر من 10 ثوانٍ يعرض خطأ، ويبدأ محرك العرض من جديد للمخطط التالي. ولا يُحمَّل محرك PlantUML (3 ميغابايت) إلا مع أول مخطط PlantUML. ويُحظر `!include` في PlantUML إذا كان من الويب.
 
 ## الصور
 
@@ -742,11 +742,11 @@ cargo xtask vendor fetch       # تنزيله من جديد بعد تغيير إ
 | [image](https://github.com/image-rs/image) | 0.25 | فك ترميز PNG وJPEG وGIF وWebP وBMP | MIT أو Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | محاذاة أعمدة الجداول | MIT أو Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | أسماء مراجع أحرف HTML | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | عرض الصيغ | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | محرر الصيغ المرئي، مع خطوط KaTeX | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | مخططات Mermaid | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | عرض الصيغ | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | محرر الصيغ المرئي، مع خطوط KaTeX | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | مخططات Mermaid | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | Graphviz مجمّعًا إلى WebAssembly، ويتضمن Graphviz (EPL-1.0) وExpat (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | مخططات PlantUML، مجمّعة إلى JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | مخططات PlantUML، مجمّعة إلى JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | تحديثات نسخة صورة القرص | MIT، مع أجزاء بترخيصي BSD وzlib |
 
 تُخزَّن مكتبات JavaScript في `resources/js/` تمامًا كما نُشرت؛ ويسجّل [vendor.lock](../../../vendor.lock) مصادرها ومجاميعها الاختبارية SHA-256. وتوجد نصوص تراخيصها، بما فيها تراخيص Graphviz وExpat داخل Viz.js، بجوارها باسم `resources/js/LICENSE-*` وتُشحن داخل التطبيق. أما Sparkle فليس مخزَّنًا في المستودع: ينزّل `cargo xtask dmg` إصداره ويفحصه مقابل المجموع الاختباري في xtask، ويُشحن ترخيصه داخل التطبيق باسم `LICENSE-sparkle`.

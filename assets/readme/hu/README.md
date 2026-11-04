@@ -21,11 +21,11 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark és GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz a Viz.js 3.24-gyel](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 felületi nyelv](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Alapból offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Hardened Runtime-mal aláírva](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ A **diagram szerkesztése** a képlet szerkesztéséhez hasonlóan működik: ka
 
 A többi diagramtípust kódként kell szerkeszteni. A VoiceOver felolvassa a diagram címét vagy alternatív szövegét.
 
-Az indítás utáni első diagram nagyjából egy másodpercig tart, mert a megjelenítő motor a háttérben indul. A 10 másodpercnél tovább tartó diagram hibát mutat, és a motor a következőhöz újraindul. A PlantUML motorja (7 MB) csak az első PlantUML-diagrammal töltődik be. A weben található PlantUML `!include` le van tiltva.
+Az indítás utáni első diagram nagyjából egy másodpercig tart, mert a megjelenítő motor a háttérben indul. A 10 másodpercnél tovább tartó diagram hibát mutat, és a motor a következőhöz újraindul. A PlantUML motorja (3 MB) csak az első PlantUML-diagrammal töltődik be. A weben található PlantUML `!include` le van tiltva.
 
 ## Képek
 
@@ -742,11 +742,11 @@ Az `assets/readme/<language>/` ezt a README-t tartalmazza az adott nyelven, a k�
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP és BMP dekódolása | MIT vagy Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | táblázatoszlopok igazítása | MIT vagy Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | a HTML-karakterhivatkozások nevei | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | képletek megjelenítése | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | vizuális képletszerkesztő, KaTeX-betűtípusokkal | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid-diagramok | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | képletek megjelenítése | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | vizuális képletszerkesztő, KaTeX-betűtípusokkal | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-diagramok | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssemblyre fordított Graphviz, tartalmazza a Graphvizt (EPL-1.0) és az Expat-ot (MIT) | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | PlantUML-diagramok, JavaScriptre fordítva | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | PlantUML-diagramok, JavaScriptre fordítva | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | a lemezképes változat frissítései | MIT, részben BSD- és zlib-licenc alatt |
 
 A JavaScript-könyvtárak pontosan úgy vannak a `resources/js/` mappában, ahogy megjelentek; a [vendor.lock](../../../vendor.lock) rögzíti a forrásaikat és az SHA-256 ellenőrzőösszegeiket. A licencszövegeik, köztük a Viz.js-ben lévő Graphvizé és Expaté, mellettük állnak `resources/js/LICENSE-*` néven, és az appban is benne vannak. A Sparkle nincs a tárolóban: a `cargo xtask dmg` letölti a kiadását, és ellenőrzi az xtaskban lévő ellenőrzőösszeggel, a licence pedig `LICENSE-sparkle` néven benne van az appban.

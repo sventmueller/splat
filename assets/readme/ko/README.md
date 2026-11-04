@@ -21,11 +21,11 @@ Splat은 구문이 색상으로 표시된 Markdown 소스를 왼쪽에, 실시�
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark 및 GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Viz.js 3.24를 통한 Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35개 인터페이스 언어](https://img.shields.io/badge/languages-35-4C9A2A)
 ![기본적으로 오프라인](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Hardened Runtime으로 서명됨](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 그 밖의 다이어그램 유형은 코드로 편집합니다. VoiceOver는 다이어그램의 제목이나 대체 텍스트를 읽습니다.
 
-실행 후 처음 나타나는 다이어그램은 렌더링 엔진이 백그라운드에서 시작하므로 약 1초가 걸립니다. 10초보다 오래 걸리는 다이어그램은 오류를 표시하며, 다음 다이어그램을 위해 렌더링 엔진이 새로 시작됩니다. PlantUML 엔진(7MB)은 첫 PlantUML 다이어그램이 나올 때만 로드됩니다. 웹에서 가져오는 PlantUML `!include`는 차단됩니다.
+실행 후 처음 나타나는 다이어그램은 렌더링 엔진이 백그라운드에서 시작하므로 약 1초가 걸립니다. 10초보다 오래 걸리는 다이어그램은 오류를 표시하며, 다음 다이어그램을 위해 렌더링 엔진이 새로 시작됩니다. PlantUML 엔진(3MB)은 첫 PlantUML 다이어그램이 나올 때만 로드됩니다. 웹에서 가져오는 PlantUML `!include`는 차단됩니다.
 
 ## 이미지
 
@@ -742,11 +742,11 @@ CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 �
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP, BMP 디코딩 | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 표 열 정렬 | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 문자 참조의 이름 | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | 수식 렌더링 | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | KaTeX 서체를 포함한 비주얼 수식 편집기 | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaid 다이어그램 | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | 수식 렌더링 | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | KaTeX 서체를 포함한 비주얼 수식 편집기 | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid 다이어그램 | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssembly로 컴파일한 Graphviz, Graphviz(EPL-1.0)와 Expat(MIT) 포함 | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | JavaScript로 컴파일한 PlantUML 다이어그램 | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | JavaScript로 컴파일한 PlantUML 다이어그램 | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | 디스크 이미지 버전의 업데이트 | MIT, 일부는 BSD 및 zlib 라이선스 |
 
 JavaScript 라이브러리는 배포된 그대로 `resources/js/`에 저장되며, [vendor.lock](../../../vendor.lock)에 출처와 SHA-256 체크섬이 기록되어 있습니다. Viz.js 안의 Graphviz와 Expat을 포함한 이들의 라이선스 텍스트는 `resources/js/LICENSE-*`로 옆에 있으며 앱 안에 함께 들어갑니다. Sparkle은 저장소에 저장되지 않습니다. `cargo xtask dmg`가 해당 릴리스를 내려받아 xtask의 체크섬과 대조하며, 라이선스는 `LICENSE-sparkle`로 앱 안에 들어갑니다.

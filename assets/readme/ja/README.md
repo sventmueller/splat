@@ -21,11 +21,11 @@ Splatは、左にシンタックスカラー付きのMarkdownソース、右に�
 [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
 [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
 [![CommonMark and GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 3.2.2](https://img.shields.io/badge/MathJax-3.2.2-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.1](https://img.shields.io/badge/MathLive-0.111.1-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.2.0](https://img.shields.io/badge/Mermaid-12.2.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
+[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
+[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
+[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.6](https://img.shields.io/badge/PlantUML-1.2026.6-A80036)](https://plantuml.com)
+[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 interface languages](https://img.shields.io/badge/languages-35-4C9A2A)
 ![Offline by default](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
 ![Signed with Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
@@ -414,7 +414,7 @@ flowchart LR
 
 そのほかの図の種類は、コードで編集します。VoiceOverは、図のタイトルまたは代替テキストを読み上げます。
 
-起動後の最初の図には約1秒かかります。レンダリングエンジンがバックグラウンドで起動するためです。10秒を超える図はエラーになり、次の図のためにレンダリングエンジンが再起動されます。PlantUMLのエンジン（7 MB）は、最初のPlantUML図で初めて読み込まれます。WebからのPlantUML `!include`はブロックされます。
+起動後の最初の図には約1秒かかります。レンダリングエンジンがバックグラウンドで起動するためです。10秒を超える図はエラーになり、次の図のためにレンダリングエンジンが再起動されます。PlantUMLのエンジン（3 MB）は、最初のPlantUML図で初めて読み込まれます。WebからのPlantUML `!include`はブロックされます。
 
 ## 画像
 
@@ -742,11 +742,11 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）は、`main
 | [image](https://github.com/image-rs/image) | 0.25 | PNG、JPEG、GIF、WebP、BMPのデコード | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 表の列の位置揃え | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML文字参照の名前 | MIT |
-| [MathJax](https://www.mathjax.org) | 3.2.2 | 数式のレンダリング | Apache-2.0 |
-| [MathLive](https://cortexjs.io/mathlive/) | 0.111.1 | ビジュアルな数式エディタ（KaTeXフォント付き） | MIT |
-| [Mermaid](https://mermaid.js.org) | 12.2.0 | Mermaidの図 | MIT |
+| [MathJax](https://www.mathjax.org) | 4.1.3 | 数式のレンダリング | Apache-2.0 |
+| [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | ビジュアルな数式エディタ（KaTeXフォント付き） | MIT |
+| [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaidの図 | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | WebAssemblyにコンパイルされたGraphviz。Graphviz（EPL-1.0）とExpat（MIT）を含みます | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.6 | JavaScriptにコンパイルされたPlantUMLの図 | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml) (`@plantuml/core`) | 1.2026.9 | JavaScriptにコンパイルされたPlantUMLの図 | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | ディスクイメージ版のアップデート | MIT（一部はBSDとzlibライセンス） |
 
 JavaScriptライブラリは、公開されたとおりの状態で`resources/js/`に保存されています。その出典とSHA-256チェックサムは[vendor.lock](../../../vendor.lock)に記録されています。Viz.js内のGraphvizとExpatのものを含むライセンス文書は、すぐ隣に`resources/js/LICENSE-*`としてあり、アプリの中にも同梱されます。Sparkleはリポジトリには保存されていません。`cargo xtask dmg`がそのリリースをダウンロードし、xtask内のチェックサムと照合します。そのライセンスは`LICENSE-sparkle`としてアプリの中に同梱されます。
