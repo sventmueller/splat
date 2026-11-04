@@ -3,14 +3,14 @@
 use std::cell::Cell;
 use std::ops::Range;
 
-use objc2::DefinedClass;
 use objc2_foundation::NSRange;
 
+use super::State;
 use super::attributes::{Attribute, add_attribute, add_temporary_attribute};
 use super::editing::bridge;
+use super::layers::ForSelection;
 use super::panes::Side;
 use super::sync::Snapshot;
-use super::{EditorController, State};
 use crate::markdown::text::{Byte, U16};
 use crate::preview::map::{Shown, preview_offset};
 use crate::util::constant;
@@ -18,7 +18,7 @@ use crate::util::{contained, from_nsrange, layout_manager, shown_from_ns, shown_
 
 /// The selection of the focused view, shown as highlight in the other one.
 #[derive(Default)]
-pub(super) struct Marks {
+pub(super) struct SelectionMarks {
     /// The source selection while the preview has the focus. The source then shows it as a highlight: a text view
     /// without focus draws its own selection grey, whatever colour is set for it.
     source_mirror: Cell<Option<NSRange>>,
@@ -27,7 +27,7 @@ pub(super) struct Marks {
     preview: Cell<Option<NSRange>>,
 }
 
-impl Marks {
+impl SelectionMarks {
     fn slot(&self, side: Side) -> &Cell<Option<NSRange>> {
         match side {
             Side::Source => &self.source,
@@ -70,16 +70,13 @@ impl ViewSelection {
 }
 
 pub(super) struct Selection<'a> {
-    host: &'a EditorController,
-    state: &'a Marks,
+    host: ForSelection<'a>,
+    state: &'a SelectionMarks,
 }
 
-impl EditorController {
-    pub(super) fn selection(&self) -> Selection<'_> {
-        Selection {
-            host: self,
-            state: &self.ivars().marks,
-        }
+impl<'a> Selection<'a> {
+    pub(super) fn new(host: ForSelection<'a>, state: &'a SelectionMarks) -> Self {
+        Selection { host, state }
     }
 }
 
@@ -281,7 +278,7 @@ mod tests {
 
     #[test]
     fn the_source_selection_is_the_views_own_unless_the_preview_has_the_focus() {
-        let marks = Marks::default();
+        let marks = SelectionMarks::default();
         let range = NSRange::new(4, 3);
         assert_eq!(marks.source_selection(range), (range, None));
 

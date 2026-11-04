@@ -8,7 +8,7 @@ use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 
 use crate::i18n::t;
-use crate::util::ns;
+use crate::util::{guarded, ns};
 
 const FORM_WIDTH: f64 = 320.0;
 const LABEL_HEIGHT: f64 = 17.0;
@@ -79,7 +79,7 @@ fn alert(mtm: MainThreadMarker, title: &str, info: &str, accessory: &NSView) -> 
 
 /// What the address and the text field of the link dialog start with: a selected address is the address.
 fn link_fields(selected: &str) -> (&str, &str) {
-    if selected.starts_with("http://") || selected.starts_with("https://") {
+    if crate::markdown::url::is_web(selected) {
         (selected, "")
     } else {
         ("", selected)
@@ -122,11 +122,14 @@ pub fn link_alert(mtm: MainThreadMarker, selected: &str) -> LinkAlert {
 pub fn link(window: &NSWindow, selected: &str, done: impl Fn(String, String) + 'static) {
     let (a, url, text) = link_alert(window.mtm(), selected);
     let handler = RcBlock::new(move |response: NSModalResponse| {
-        if response == NSAlertFirstButtonReturn
-            && let Some((address, shown)) = link_answer(&url.stringValue().to_string(), &text.stringValue().to_string())
-        {
-            done(address, shown);
-        }
+        guarded((), || {
+            if response == NSAlertFirstButtonReturn
+                && let Some((address, shown)) =
+                    link_answer(&url.stringValue().to_string(), &text.stringValue().to_string())
+            {
+                done(address, shown);
+            }
+        });
     });
     a.beginSheetModalForWindow_completionHandler(window, Some(&handler));
 }
@@ -147,10 +150,12 @@ pub fn table(window: &NSWindow, done: impl Fn(usize, usize) + 'static) {
         &stack,
     );
     let handler = RcBlock::new(move |response: NSModalResponse| {
-        if response == NSAlertFirstButtonReturn {
-            let (r, c) = table_size(rows.integerValue(), cols.integerValue());
-            done(r, c);
-        }
+        guarded((), || {
+            if response == NSAlertFirstButtonReturn {
+                let (r, c) = table_size(rows.integerValue(), cols.integerValue());
+                done(r, c);
+            }
+        });
     });
     a.beginSheetModalForWindow_completionHandler(window, Some(&handler));
 }
@@ -169,11 +174,13 @@ pub fn image(window: &NSWindow, done: impl Fn(Retained<NSURL>) + 'static) {
     }
     let p = panel.clone();
     let handler = RcBlock::new(move |response: NSModalResponse| {
-        if response == NSModalResponseOK
-            && let Some(url) = p.URL()
-        {
-            done(url);
-        }
+        guarded((), || {
+            if response == NSModalResponseOK
+                && let Some(url) = p.URL()
+            {
+                done(url);
+            }
+        });
     });
     panel.beginSheetModalForWindow_completionHandler(window, &handler);
 }

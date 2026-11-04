@@ -12,10 +12,10 @@ use objc2::{MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
     NSAlertFirstButtonReturn, NSAlertSecondButtonReturn, NSApplication, NSBitmapImageRep, NSColor,
     NSDocumentController, NSEventModifierFlags, NSMenu, NSModalResponse, NSModalResponseCancel, NSPasteboard,
-    NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF, NSSavePanel, NSScreen, NSSegmentedControl,
+    NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF, NSSavePanel, NSSegmentedControl,
     NSTextFinderAction, NSTextFinderBarContainer, NSUserInterfaceItemIdentification, NSWindow,
 };
-use objc2_foundation::{NSArray, NSData, NSRange, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL, NSUserDefaults};
+use objc2_foundation::{NSArray, NSData, NSFileManager, NSRange, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL};
 
 use super::super::actions::Action;
 use super::{
@@ -554,7 +554,7 @@ fn html_image<'a>(page: &'a str, alt: &str) -> Option<&'a str> {
 pub(super) fn check_html_export(e: &EditorController, dir: &Path) {
     use super::super::export::ExportKind;
     let page = dir.join("Export.html");
-    let written = e.sharing().export_source().write(ExportKind::Html, "Export", &page);
+    let written = e.export_source().write(ExportKind::Html, "Export", &page);
     let page = std::fs::read_to_string(page).unwrap_or_default();
     check("the HTML export is written", written.is_ok(), &format!("{written:?}"));
     for (alt, kind, start, ..) in EXPORTED_IMAGES {
@@ -571,7 +571,7 @@ pub(super) fn check_html_export(e: &EditorController, dir: &Path) {
 pub(super) fn check_word_export(e: &EditorController, dir: &Path) {
     use super::super::export::ExportKind;
     let path = dir.join("Export.docx");
-    let written = e.sharing().export_source().write(ExportKind::Word, "Export", &path);
+    let written = e.export_source().write(ExportKind::Word, "Export", &path);
     let entries = crate::markdown::docx::stored_entries(&std::fs::read(path).unwrap_or_default());
     check("the Word export is written", written.is_ok(), &format!("{written:?}"));
     let text = |name: &str| {
@@ -648,11 +648,10 @@ fn export_steps() -> Vec<Step> {
                 );
                 check_word_export(&c.e, &doc_dir(c));
                 let failed =
-                    c.e.sharing()
-                        .export_source()
+                    c.e.export_source()
                         .write(ExportKind::Html, "Export", Path::new("/System/Export.html"));
                 if let Err(reason) = &failed {
-                    c.e.sharing().report_export_failure(reason);
+                    c.e.report_export_failure(reason);
                 }
                 check("an export to a place without write access fails", failed.is_err(), "");
             },
@@ -918,19 +917,29 @@ fn paste_steps() -> Vec<Step> {
             let board = NSPasteboard::pasteboardWithUniqueName();
             board.clearContents();
             board.setData_forType(Some(&NSData::with_bytes(&picture(c))), constant!(NSPasteboardTypePNG));
-            let pasted = c.e.editing().paste_image(&board);
-            let pictures = std::fs::read_dir(doc_dir(c))
-                .into_iter()
-                .flatten()
-                .flatten()
-                .filter(|f| f.file_name().to_string_lossy().starts_with("Bild "))
-                .count();
             check(
-                "a pasted picture becomes a file beside the document and an image link",
-                pasted && pictures == 1 && source(&c.e).contains("![Bild "),
-                &format!("pasted {pasted}, {pictures} files"),
+                "a pasted picture is taken without waiting for it",
+                c.e.paste_image(&board),
+                "",
             );
         }),
+        when(
+            "the pasted picture to arrive",
+            |c| source(&c.e).contains("![Bild "),
+            |c| {
+                let pictures = std::fs::read_dir(doc_dir(c))
+                    .into_iter()
+                    .flatten()
+                    .flatten()
+                    .filter(|f| f.file_name().to_string_lossy().starts_with("Bild "))
+                    .count();
+                check(
+                    "a pasted picture becomes a file beside the document and an image link",
+                    pictures == 1,
+                    &format!("{pictures} files"),
+                );
+            },
+        ),
         undone("pasting a picture is undone in one step".into()),
         applied(|c| {
             let board = NSPasteboard::pasteboardWithUniqueName();
@@ -938,13 +947,30 @@ fn paste_steps() -> Vec<Step> {
             let tiff = std::fs::read(doc_dir(c).join("scan.tiff")).unwrap_or_default();
             board.setData_forType(Some(&NSData::with_bytes(&tiff)), constant!(NSPasteboardTypeTIFF));
             remember(c);
-            let pasted = c.e.editing().paste_image(&board);
             check(
-                "a pasted TIFF picture is stored as PNG",
-                pasted && source(&c.e).matches("![Bild ").count() == 1,
-                &format!("pasted {pasted}"),
+                "a pasted TIFF picture is taken without waiting for it",
+                c.e.paste_image(&board),
+                "",
             );
         }),
+        when(
+            "the pasted TIFF picture to arrive",
+            |c| source(&c.e).matches("![Bild ").count() == 1,
+            |c| {
+                let (address, stored) = picture_in_text(c);
+                check(
+                    "a pasted TIFF picture is stored as PNG",
+                    stored
+                        .as_deref()
+                        .is_some_and(|bytes| bytes.starts_with(b"\x89PNG\r\n\x1a\n")),
+                    &format!(
+                        "{address}: {} bytes, {}",
+                        stored.map_or(0, |bytes| bytes.len()),
+                        sizes(c)
+                    ),
+                );
+            },
+        ),
         undone("pasting a TIFF picture is undone in one step".into()),
         applied(|c| {
             let board = NSPasteboard::pasteboardWithUniqueName();
@@ -953,7 +979,7 @@ fn paste_steps() -> Vec<Step> {
             board.setData_forType(Some(&NSData::with_bytes(b"x")), constant!(NSPasteboardTypePNG));
             check(
                 "text on the pasteboard wins over its picture",
-                !c.e.editing().paste_image(&board),
+                !c.e.paste_image(&board),
                 "",
             );
             let untitled = NSDocumentController::sharedDocumentController(c.e.mtm())
@@ -966,7 +992,7 @@ fn paste_steps() -> Vec<Step> {
             let asked = untitled
                 .as_ref()
                 .and_then(|d| d.editor())
-                .map(|e| e.editing().paste_image(&board));
+                .map(|e| e.paste_image(&board));
             check(
                 "a picture pasted into an unsaved document is taken",
                 asked == Some(true),
@@ -1016,14 +1042,13 @@ fn paste_steps() -> Vec<Step> {
                 board.clearContents();
                 board.writeObjects(&NSArray::from_retained_slice(&urls));
                 let at = c.e.source().selectedRange().location;
-                let dropped = c.e.editing().handle_source_drop(&board, at);
+                let before = source(&c.e);
+                let dropped = c.e.handle_source_drop(&board, at);
                 let s = source(&c.e);
+                let more = |mark: &str| s.matches(mark).count() > before.matches(mark).count();
                 check(
                     "dropped files and addresses become images and links",
-                    dropped
-                        && s.contains("(bild.png)")
-                        && s.contains("(andere.md)")
-                        && s.contains("https://example.org/seite"),
+                    dropped && more("(bild.png)") && more("(andere.md)") && more("https://example.org/seite"),
                     &format!("dropped {dropped}"),
                 );
             },
@@ -1315,10 +1340,10 @@ fn memory_steps() -> Vec<Step> {
         super::super::images::memory_pressure_changed(true);
         check(
             "while memory is short, images decode smaller",
-            super::super::images::allowed_side() == 640,
+            super::super::picture::allowed_side() == 640,
             "",
         );
-        let small = super::super::decoder::decode(&png_of_side(700), super::super::images::allowed_side());
+        let small = super::super::decoder::decode(&png_of_side(700), super::super::picture::allowed_side());
         check(
             "the helpers start again after they were ended for memory",
             matches!(small, Some(super::super::safe_image::Decoded::Rgba { width: 640, .. })),
@@ -1327,7 +1352,7 @@ fn memory_steps() -> Vec<Step> {
         super::super::images::memory_pressure_changed(false);
         check(
             "once memory is back, images decode at full size again",
-            super::super::images::allowed_side() == super::super::safe_image::SHOWN_SIDE,
+            super::super::picture::allowed_side() == super::super::safe_image::SHOWN_SIDE,
             "",
         );
         check("the shown image survives", shown_width(c, "bild.png").is_some(), "");
@@ -1473,7 +1498,7 @@ fn reload_under_an_open_editor_steps() -> Vec<Step> {
             |c| c.e.atom_editor().is_open(),
             |c| {
                 let replaced = "# Von außen geändert\n\nGanz anderer Text.\n";
-                c.e.updater().replace_all_text(replaced);
+                c.e.replace_all_text(replaced);
                 check(
                     "a reload closes the formula's editor",
                     !c.e.atom_editor().is_open(),
@@ -1497,8 +1522,23 @@ fn reload_under_an_open_editor_steps() -> Vec<Step> {
     ]
 }
 
-const FILES_LOOKED_AT: &str =
-    "files are looked at every two seconds, and a change that must not arrive gives no signal";
+/// A step that runs once a look at the files that began after it started waiting has been taken in: what that look left alone
+/// it will leave alone.
+fn after_a_look(f: impl Fn(&Ctx) + 'static) -> Step {
+    use std::sync::atomic::Ordering;
+    let seen = Cell::new(None);
+    when(
+        "a look at the files",
+        move |c| {
+            crate::document::reload_changed_documents(c.e.mtm());
+            let now = crate::document::LOOKS_TAKEN.load(Ordering::SeqCst);
+            let first = seen.get().unwrap_or(now);
+            seen.set(Some(first));
+            now >= first + 2
+        },
+        f,
+    )
+}
 
 /// What is saved is exactly what the source holds, and unsaved text outlives a change of its file by another program.
 fn saving_and_unsaved_text_steps() -> Vec<Step> {
@@ -1526,7 +1566,7 @@ fn saving_and_unsaved_text_steps() -> Vec<Step> {
                 }
             },
         ),
-        pause(3.0, FILES_LOOKED_AT, |c| {
+        after_a_look(|c| {
             check(
                 "unsaved text outlives a change of its file by another program",
                 source(&c.e).contains("Ungespeichert") && !source(&c.e).contains("Fremder Text"),
@@ -1538,7 +1578,7 @@ fn saving_and_unsaved_text_steps() -> Vec<Step> {
                 let _ = std::fs::write(p, before());
             }
         }),
-        pause(3.0, FILES_LOOKED_AT, |c| {
+        after_a_look(|c| {
             undo(c);
             check(
                 "the unsaved text can be taken back",
@@ -1546,11 +1586,212 @@ fn saving_and_unsaved_text_steps() -> Vec<Step> {
                 &sizes(c),
             );
         }),
+        // Until the look at the file has taken over its date, AppKit counts it as changed by another program: a save asks
+        // in a sheet, which ends the save if it is answered here, and an autosave fails without asking.
+        when(
+            "the look at the file to take its date",
+            move |c| {
+                end_sheet(c, NSAlertFirstButtonReturn);
+                let known = c.e.document().and_then(|d| d.fileModificationDate());
+                let on_disk = path(c).and_then(|p| {
+                    NSFileManager::defaultManager()
+                        .attributesOfItemAtPath_error(&ns(&p))
+                        .ok()
+                        .and_then(|attributes| attributes.fileModificationDate())
+                });
+                sheet(c).is_none()
+                    && known
+                        .zip(on_disk)
+                        .is_some_and(|(known, on_disk)| known.isEqualToDate(&on_disk))
+            },
+            |_| {},
+        ),
+    ]
+}
+
+fn buttons_of(view: &objc2_app_kit::NSView, out: &mut Vec<String>) {
+    for child in view.subviews().iter() {
+        if let Some(button) = child.downcast_ref::<objc2_app_kit::NSButton>() {
+            out.push(button.title().to_string());
+        }
+        buttons_of(&child, out);
+    }
+}
+
+/// The titles of the buttons on the sheet of the window, from right to left.
+fn sheet_buttons(c: &Ctx) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(view) = sheet(c).and_then(|s| s.contentView()) {
+        buttons_of(&view, &mut out);
+    }
+    out
+}
+
+fn another_version_on_disk_steps() -> Vec<Step> {
+    const OUTSIDE: &str = "Von einem anderen Programm\n";
+    let path = |c: &Ctx| {
+        c.e.document()
+            .and_then(|d| d.fileURL()?.path())
+            .map(|p| PathBuf::from(p.to_string()))
+    };
+    let on_file = move |c: &Ctx| {
+        path(c)
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .unwrap_or_default()
+    };
+    let ask = |c: &Ctx| {
+        if let Some(d) = c.e.document() {
+            unsafe { d.saveDocument(None) };
+        }
+    };
+    let typed_and_changed_elsewhere = move |c: &Ctx| {
+        type_in_source(&c.e, "Ungespeichert");
+        remember(c);
+        let path = path(c).expect("a file");
+        std::fs::write(&path, OUTSIDE).expect("a test file");
+        ask(c);
+    };
+    let saved = |c: &Ctx| sheet(c).is_none() && c.e.document().is_some_and(|d| !d.isDocumentEdited());
+    vec![
+        applied(ask),
+        when("the document to be saved", saved, typed_and_changed_elsewhere),
+        when(
+            "AppKit to ask about the other version",
+            |c| sheet(c).is_some(),
+            move |c| {
+                check(
+                    "a save over the file of another program asks first and leaves file and text alone",
+                    on_file(c) == OUTSIDE && source(&c.e) == before(),
+                    &on_file(c),
+                );
+                check(
+                    "the question offers to save anyway, to take the last version or to save elsewhere",
+                    sheet_buttons(c).len() == 3,
+                    &format!("{:?}", sheet_buttons(c)),
+                );
+                end_sheet(c, NSAlertFirstButtonReturn);
+            },
+        ),
+        when("the text to be saved over the other version", saved, move |c| {
+            check(
+                "saving anyway writes the text over the other version",
+                on_file(c) == before() && source(&c.e) == before(),
+                &sizes(c),
+            );
+            check(
+                "saving anyway keeps no copy of the text",
+                c.e.document().is_some_and(|d| !d.keeps_a_copy_of_its_text()),
+                "",
+            );
+            typed_and_changed_elsewhere(c);
+        }),
+        when(
+            "AppKit to ask about the other version again",
+            |c| sheet(c).is_some(),
+            |c| end_sheet(c, NSAlertSecondButtonReturn),
+        ),
+        when("the last version to be taken", saved, move |c| {
+            check(
+                "taking the last version shows what the other program wrote",
+                on_file(c) == OUTSIDE && source(&c.e) == OUTSIDE,
+                &sizes(c),
+            );
+            check(
+                "taking the last version keeps no copy of the text",
+                c.e.document().is_some_and(|d| !d.keeps_a_copy_of_its_text()),
+                "",
+            );
+        }),
+    ]
+}
+
+/// Keys, not `insertText`: only these merge into the undo step the view keeps open across a save, which no change count
+/// then sees.
+fn typing_through_a_save_steps() -> Vec<Step> {
+    let keys = |c: &Ctx, typed: &[&str]| {
+        if let Some(window) = c.e.window() {
+            window.makeFirstResponder(Some(c.e.source()));
+            for key in typed {
+                super::press_key(&window, key);
+            }
+        }
+    };
+    let saved_or_marked = |c: &Ctx| {
+        let edited = c.e.document().is_some_and(|d| d.isDocumentEdited());
+        let file = c.e.document().and_then(|d| d.fileURL()?.path()).map(|p| p.to_string());
+        edited
+            || file
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .is_some_and(|f| f == c.e.exact_text())
+    };
+    vec![
+        applied(move |c| {
+            remember(c);
+            let end = c.e.source().string().length();
+            c.e.source().setSelectedRange(NSRange::new(end, 0));
+            keys(c, &["A", "B"]);
+            if let Some(d) = c.e.document() {
+                unsafe { d.saveDocument(None) };
+            }
+        }),
+        when(
+            "the typed text to be saved",
+            |c| c.e.document().is_some_and(|d| !d.isDocumentEdited()),
+            move |c| {
+                keys(c, &["C"]);
+                check(
+                    "a key right after a save marks the document as edited",
+                    c.e.document().is_some_and(|d| d.isDocumentEdited()),
+                    "",
+                );
+                keys(c, &["D"]);
+            },
+        ),
+        after_a_look(move |c| {
+            check(
+                "keys right after a save outlive the look at the file",
+                source(&c.e) == format!("{}ABCD", before()),
+                &super::tail(&source(&c.e), 20),
+            );
+            check(
+                "keys right after a save can be undone",
+                c.e.document()
+                    .and_then(|d| d.undoManager())
+                    .is_some_and(|u| u.canUndo()),
+                "",
+            );
+            check(
+                "keys right after a save are either marked or written",
+                saved_or_marked(c),
+                "",
+            );
+            let undo_manager = c.e.document().and_then(|d| d.undoManager());
+            while source(&c.e) != before() && undo_manager.as_ref().is_some_and(|u| u.canUndo()) {
+                undo(c);
+            }
+            check(
+                "undoing reaches back across the save",
+                source(&c.e) == before(),
+                &sizes(c),
+            );
+            let back = before();
+            if source(&c.e) != back {
+                c.e.updater().replace_all_text(&back);
+            }
+        }),
         // AppKit autosaves every 15 to 25 seconds; one that falls in here finds the file changed and asks in a sheet.
         pause(1.5, "an autosave gives no signal when it has asked", |c| {
             end_sheet(c, NSAlertFirstButtonReturn);
         }),
-        when("the question of an autosave to close", |c| sheet(c).is_none(), |_| {}),
+        // The question may also come only now, and a save behind it would wait for its answer in a modal loop.
+        when(
+            "the question of an autosave to close",
+            |c| {
+                end_sheet(c, NSAlertFirstButtonReturn);
+                sheet(c).is_none()
+            },
+            |_| {},
+        ),
     ]
 }
 
@@ -1618,39 +1859,57 @@ fn outline_without_preview_steps() -> Vec<Step> {
 /// Captures the preview's part of the screen: only the window server shows what was really redrawn, and a capture of the
 /// window itself changes its size along the way.
 fn capture_preview(c: &Ctx, path: &Path) {
-    let preview = c.e.preview();
     let window = c.e.window().expect("a window");
-    let shown = window.convertRectToScreen(preview.convertRect_toView(preview.visibleRect(), None));
-    let main = NSScreen::screens(MainThreadMarker::new().expect("the main thread"))
-        .firstObject()
-        .expect("a screen");
-    let top = main.frame().size.height - shown.origin.y - shown.size.height;
-    let region = format!("{},{top},{},{}", shown.origin.x, shown.size.width, shown.size.height);
+    let number = window.windowNumber();
     let captured = std::process::Command::new("screencapture")
-        .args(["-x", "-R", &region])
+        .args(["-x", "-o", &format!("-l{number}")])
         .arg(path)
         .status();
     check(
         "the preview can be captured",
         captured.is_ok_and(|s| s.success()),
-        &region,
+        &format!("window {number}"),
     );
 }
 
 /// The colors of a capture, without the right edge, where a scroller fades.
-fn colors_in(path: &Path) -> Vec<Retained<NSColor>> {
+fn colors_in(c: &Ctx, path: &Path) -> Vec<Retained<NSColor>> {
     let Some(image) = std::fs::read(path)
         .ok()
         .and_then(|png| NSBitmapImageRep::imageRepWithData(&NSData::with_bytes(&png)))
     else {
         return Vec::new();
     };
-    let (wide, high) = (image.pixelsWide(), image.pixelsHigh());
-    (0..wide * 9 / 10)
+    let preview = c.e.preview();
+    let window = c.e.window().expect("a window");
+    let shown = preview.convertRect_toView(preview.visibleRect(), None);
+    let scale = window.backingScaleFactor();
+    #[expect(clippy::cast_possible_truncation, reason = "pixels of a window")]
+    let pixels = |points: f64| (points * scale) as isize;
+    let (left, wide) = (pixels(shown.origin.x), pixels(shown.size.width));
+    let top = pixels(window.frame().size.height - shown.origin.y - shown.size.height);
+    let high = pixels(shown.size.height);
+    (left..left + wide * 9 / 10)
         .step_by(4)
-        .flat_map(|x| (0..high).step_by(4).map(move |y| (x, y)))
+        .flat_map(|x| (top..top + high).step_by(4).map(move |y| (x, y)))
         .filter_map(|(x, y)| image.colorAtX_y(x, y))
         .collect()
+}
+
+/// The address of the picture the text refers to first, and its bytes.
+fn picture_in_text(c: &Ctx) -> (String, Option<Vec<u8>>) {
+    let text = source(&c.e);
+    let address = text.find("![Bild ").and_then(|start| {
+        let open = start + text[start..].find("](")? + 2;
+        let close = open + text[open..].find(')')?;
+        Some(text[open..close].trim_matches(['<', '>']).to_string())
+    });
+    let Some(address) = address else {
+        return (String::new(), None);
+    };
+    let bytes =
+        super::super::images::resolve_path(&address, c.e.doc_dir().as_deref()).and_then(|p| std::fs::read(p).ok());
+    (address, bytes)
 }
 
 fn marks_on_screen_steps() -> Vec<Step> {
@@ -1667,8 +1926,8 @@ fn marks_on_screen_steps() -> Vec<Step> {
         }),
         pause(0.5, REDRAWN, |c| {
             capture_preview(c, &c.out.join("marks-after.png"));
-            let before = colors_in(&c.out.join("marks-before.png"));
-            let after = colors_in(&c.out.join("marks-after.png"));
+            let before = colors_in(c, &c.out.join("marks-before.png"));
+            let after = colors_in(c, &c.out.join("marks-after.png"));
             let changed = before.iter().zip(&after).filter(|(a, b)| a != b).count();
             check_in_front(
                 c.e.mtm(),
@@ -1702,7 +1961,7 @@ fn huge_document_steps() -> Vec<Step> {
             check(
                 "the preview of a huge document takes no input",
                 !c.e.preview().isEditable()
-                    && !c.e.updater().preview_takes_input()
+                    && !c.e.preview_takes_input()
                     && source(&c.e).len() == before
                     && storage(c.e.preview()).string().to_string() == NOTICE,
                 "",
@@ -1718,7 +1977,7 @@ fn huge_document_steps() -> Vec<Step> {
             );
             check(
                 "the preview takes input again with the smaller text",
-                c.e.preview().isEditable() && c.e.updater().preview_takes_input(),
+                c.e.preview().isEditable() && c.e.preview_takes_input(),
                 "",
             );
         }),
@@ -1728,31 +1987,41 @@ fn huge_document_steps() -> Vec<Step> {
 fn app_steps() -> Vec<Step> {
     vec![
         applied(|c| {
+            remember(c);
+            type_in_source(&c.e, "Vor dem Absturz");
+        }),
+        applied(|c| {
             let files = super::super::emergency_save();
             let copy = files.iter().find_map(|f| {
                 let text = std::fs::read_to_string(f).ok()?;
                 (text == source(&c.e)).then_some(())
             });
             check(
-                "a crash leaves a copy of every open document",
+                "a crash leaves a copy of every document with unsaved text",
                 copy.is_some(),
                 &format!("{files:?}"),
             );
+        }),
+        undone("the text typed for the crash goes again".into()),
+        applied(|c| {
             let mtm = c.e.mtm();
-            MODAL_SEEN.with(|m| m.set(false));
-            let stop = RcBlock::new(move |_: std::ptr::NonNull<NSTimer>| {
-                let app = NSApplication::sharedApplication(mtm);
-                MODAL_SEEN.with(|m| m.set(app.modalWindow().is_some()));
-                app.stopModalWithCode(NSAlertSecondButtonReturn);
-            });
-            let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.5, false, &stop) };
-            unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
-            super::super::offer_recovered(mtm);
-            let stamp = NSUserDefaults::standardUserDefaults().doubleForKey(&ns("RecoveredTextsShownUntil"));
+            let says_so = || {
+                MODAL_SEEN.with(|m| m.set(false));
+                let stop = RcBlock::new(move |_: std::ptr::NonNull<NSTimer>| {
+                    let app = NSApplication::sharedApplication(mtm);
+                    MODAL_SEEN.with(|m| m.set(app.modalWindow().is_some()));
+                    app.stopModalWithCode(NSAlertSecondButtonReturn);
+                });
+                let timer = unsafe { NSTimer::timerWithTimeInterval_repeats_block(0.5, false, &stop) };
+                unsafe { NSRunLoop::currentRunLoop().addTimer_forMode(&timer, NSRunLoopCommonModes) };
+                super::super::offer_recovered(mtm);
+                MODAL_SEEN.with(Cell::get)
+            };
+            let (first, second) = (says_so(), says_so());
             check(
                 "the next start says once where the copies are",
-                MODAL_SEEN.with(Cell::get) && stamp > 0.0,
-                &format!("stamp {stamp}"),
+                first && !second,
+                &format!("first {first}, second {second}"),
             );
             let count = documents(mtm).len();
             let _ = unsafe {
@@ -1793,38 +2062,99 @@ fn app_steps() -> Vec<Step> {
     ]
 }
 
-pub(super) fn steps() -> Vec<Step> {
-    let mut steps = vec![
-        applied(|c| {
-            write_files(&doc_dir(c));
-            if let Some(window) = c.e.window() {
-                window.makeKeyAndOrderFront(None);
-            }
-            append(&c.e, SECTION);
+/// Each group of checks by its name, for `--only`.
+fn groups() -> Vec<(&'static str, Vec<Step>)> {
+    vec![
+        ("commands", COMMANDS.iter().flat_map(|case| command(case)).collect()),
+        ("outline without preview", outline_without_preview_steps()),
+        ("saving and unsaved text", saving_and_unsaved_text_steps()),
+        ("another version on disk", another_version_on_disk_steps()),
+        ("typing through a save", typing_through_a_save_steps()),
+        ("tables", table_steps()),
+        ("view", view_steps()),
+        ("dialogs", dialog_steps()),
+        ("links", link_steps()),
+        ("paste", paste_steps()),
+        ("exports", export_steps()),
+        ("toolbar", toolbar_steps()),
+        ("large change", large_change_steps()),
+        ("image files", image_file_steps()),
+        ("memory", memory_steps()),
+        ("old encoding", old_encoding_steps()),
+        ("unsaved copies", unsaved_copy_steps()),
+        ("marks on screen", marks_on_screen_steps()),
+        ("huge document", huge_document_steps()),
+        ("app", app_steps()),
+        // Last: on a locked screen, where popovers do not close, the open editor would keep the window from being key.
+        ("reload under an open editor", reload_under_an_open_editor_steps()),
+    ]
+}
+
+/// The document of a group, opened from the template with the section and files all groups work on, so that nothing the
+/// groups before did or failed to do reaches it.
+fn own_document(group: &'static str) -> Vec<Step> {
+    let file = move |c: &Ctx| {
+        c.out
+            .join("Gruppen")
+            .join(group.replace(' ', "-"))
+            .join("QuickReference.md")
+    };
+    let open = move |c: &Ctx, path: &Path| {
+        NSDocumentController::sharedDocumentController(c.e.mtm())
+            .documents()
+            .iter()
+            .filter_map(|d| d.downcast::<MdDocument>().ok())
+            .find(|d| {
+                d.fileURL()
+                    .and_then(|u| u.path())
+                    .is_some_and(|p| Path::new(&p.to_string()) == path)
+            })
+    };
+    vec![
+        applied(move |c| {
+            let path = file(c);
+            let dir = path.parent().expect("a folder").to_path_buf();
+            std::fs::create_dir_all(&dir).expect("a test folder");
+            write_files(&dir);
+            std::fs::write(&path, format!("{}{SECTION}", c.template)).expect("a test file");
+            super::open_document(c.e.mtm(), path.to_str().unwrap_or_default());
         }),
+        when(
+            &format!("the document of \"{group}\" to open"),
+            move |c| {
+                open(c, &file(c)).is_some_and(|d| d.editor().is_some_and(|e| e.window().is_some_and(|w| w.isVisible())))
+            },
+            move |c| {
+                let Some(next) = open(c, &file(c)).and_then(|d| d.editor()) else {
+                    return;
+                };
+                if let Some(previous) = c.e.document() {
+                    previous.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeCleared);
+                    previous.close();
+                }
+                if let Some(window) = next.window() {
+                    window.makeKeyAndOrderFront(None);
+                }
+                super::work_on(next);
+            },
+        ),
         settle(|_| {}),
-    ];
-    for case in &COMMANDS {
-        steps.extend(command(case));
+    ]
+}
+
+pub(super) fn steps() -> Vec<Step> {
+    let only = std::env::var("SPLAT_SELFTEST_ONLY").ok();
+    let mut steps = Vec::new();
+    let mut found = false;
+    for (name, group) in groups() {
+        if only.as_deref().is_none_or(|only| only == name) {
+            found = true;
+            steps.extend(own_document(name));
+            steps.extend(group);
+        }
     }
-    steps.extend(outline_without_preview_steps());
-    steps.extend(saving_and_unsaved_text_steps());
-    steps.extend(table_steps());
-    steps.extend(view_steps());
-    steps.extend(dialog_steps());
-    steps.extend(link_steps());
-    steps.extend(paste_steps());
-    steps.extend(export_steps());
-    steps.extend(toolbar_steps());
-    steps.extend(large_change_steps());
-    steps.extend(image_file_steps());
-    steps.extend(memory_steps());
-    steps.extend(old_encoding_steps());
-    steps.extend(unsaved_copy_steps());
-    steps.extend(marks_on_screen_steps());
-    steps.extend(huge_document_steps());
-    steps.extend(app_steps());
-    // Last: on a locked screen, where popovers do not close, the open editor would keep the window from being key.
-    steps.extend(reload_under_an_open_editor_steps());
+    if !found {
+        steps.push(applied(|_| check("the group named by --only exists", false, "")));
+    }
     steps
 }

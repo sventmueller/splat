@@ -141,12 +141,12 @@ fn panes_toggled_while_scrolled_away(mtm: MainThreadMarker, rounds: usize) {
         window.makeFirstResponder(Some(e.source()));
     }
     e.source().setSelectedRange(scroll(&e, 977));
-    e.panes().toggle_preview();
+    e.toggle_preview();
     // Timed to land while the pane moves, which reports nothing along the way.
     after(0.03, move || {
         let Some(e) = editor(mtm) else { return };
         scroll(&e, 613);
-        e.panes().toggle_preview();
+        e.toggle_preview();
         after(0.03, move || {
             let Some(e) = editor(mtm) else { return };
             scroll(&e, 331);

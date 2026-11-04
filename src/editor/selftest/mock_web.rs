@@ -19,6 +19,18 @@ pub const HOST: &str = "https://bilder.splat-test.example";
 /// Every address requested so far, and how often.
 static REQUESTS: Mutex<Option<HashMap<String, usize>>> = Mutex::new(None);
 
+/// What starts with this takes long enough to answer that a document can close meanwhile.
+pub const SLOW: &str = "/langsam";
+
+/// How many requests went to addresses that hold `part`.
+pub fn requests_holding(part: &str) -> usize {
+    REQUESTS.lock().ok().map_or(0, |r| {
+        r.as_ref().map_or(0, |all| {
+            all.iter().filter(|(url, _)| url.contains(part)).map(|(_, n)| n).sum()
+        })
+    })
+}
+
 pub fn requests_of(url: &str) -> usize {
     REQUESTS
         .lock()
@@ -48,6 +60,7 @@ fn answer(path: &str, count: usize) -> Answer {
         "/wackelig.svg" | "/nicht-gezeigt.svg" => Answer::Body(200, BADGE),
         "/ohne-netz.svg" if count == 1 => Answer::Unreachable,
         "/ohne-netz.svg" => Answer::Body(200, BADGE),
+        path if path.starts_with(SLOW) => Answer::Body(200, BADGE),
         _ => Answer::Body(404, ""),
     }
 }
@@ -91,6 +104,9 @@ impl MockWeb {
             *seen
         });
         let path = url.path().map(|p| p.to_string()).unwrap_or_default();
+        if path.starts_with(SLOW) {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
         let this: &NSURLProtocol = self;
         let response = |status: u16, headers: &[(&str, &str)]| -> Retained<NSURLResponse> {
             let keys: Vec<Retained<NSString>> = headers.iter().map(|(k, _)| ns(k)).collect();

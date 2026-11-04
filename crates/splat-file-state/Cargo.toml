@@ -1,0 +1,10 @@
+[package]
+name = "splat-file-state"
+version = "0.0.0"
+description = "Which text a file of Splat holds, in which format, and what follows from a look at it"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

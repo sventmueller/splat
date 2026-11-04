@@ -29,23 +29,114 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         "-DocumentWindowFrame",
         "",
     ]);
+    set_up_mode(&mut cmd, mode, args, &work)?;
+    let mut child = cmd
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{}: {e}", binary.display()))?;
+    let output = child.stderr.take().ok_or("the selftest has no output")?;
+    let report = std::thread::spawn(move || {
+        let mut report = Report::default();
+        for line in std::io::BufRead::lines(std::io::BufReader::new(output)).map_while(Result::ok) {
+            eprintln!("{line}");
+            report.note(&line);
+        }
+        report
+    });
+    let started = std::time::Instant::now();
+    let mut asked_to_front = 0;
+    loop {
+        // Started from a shell, the app cannot bring itself to the front while another is there.
+        if mode == "typing" && asked_to_front < 8 && started.elapsed().as_secs() > asked_to_front {
+            asked_to_front += 1;
+            let _ = Command::new("open").arg("-a").arg(&app).status();
+        }
+        if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
+            println!("output in {}", work.display());
+            let report = report.join().map_err(|_| "reading the selftest's output failed")?;
+            let part = Part::of(args);
+            if listed_checks(mode, part).is_some() {
+                println!("{}", report.summary());
+            }
+            if let Some(budget) = keystroke_budget(args)? {
+                within_budget(&report, budget)?;
+            }
+            if args.iter().any(|a| a == "--record")
+                && report.done
+                && report.failed.is_empty()
+                && let Some(file) = list_file(mode, part)
+            {
+                // A run of the whole lists on its own only what the scenarios, which it runs as well, do not.
+                let also_listed = if (mode, part) == ("gui", Part::Whole) {
+                    include_str!("../checks/scenarios.txt")
+                } else {
+                    ""
+                };
+                files::write(root().join("xtask/checks").join(file), recorded(&report, also_listed))?;
+                return Ok(());
+            }
+            return verdict(mode, part, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
+        }
+        if started.elapsed() > std::time::Duration::from_secs(600) {
+            let _ = child.kill();
+            return Err(format!("selftest {mode} did not finish within 10 minutes"));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+}
+
+/// What `--keystroke-ms` allows a keystroke in the window, if anything.
+fn keystroke_budget(args: &[String]) -> Result<Option<f64>, String> {
+    let Some(at) = args.iter().position(|a| a == "--keystroke-ms") else {
+        return Ok(None);
+    };
+    let value = args.get(at + 1).ok_or(USAGE)?;
+    value
+        .parse()
+        .map(Some)
+        .map_err(|_| format!("--keystroke-ms {value}: no number"))
+}
+
+/// The fastest keystroke says what the code costs; a slow one may have met a background job at its end.
+fn within_budget(report: &Report, budget: f64) -> Result<(), String> {
+    let fastest = report.keystrokes.iter().copied().fold(f64::INFINITY, f64::min);
+    if fastest.is_infinite() {
+        return Err("the benchmark reported no keystroke".into());
+    }
+    println!("fastest keystroke {fastest:.1} ms of at most {budget:.1} ms");
+    if fastest > budget {
+        return Err(format!("a keystroke took {fastest:.1} ms, more than {budget:.1} ms"));
+    }
+    Ok(())
+}
+
+/// What a mode needs of the app's environment, and the document it works on.
+fn set_up_mode(cmd: &mut Command, mode: &str, args: &[String], work: &std::path::Path) -> Result<(), String> {
     match mode {
         "probe" => {
             cmd.env("SPLAT_RENDER_PROBE", "1");
         }
         "gui" => {
-            if screen_locked() {
+            // A group of the caller's choice may need neither.
+            if screen_locked() && !args.iter().any(|a| a == "--only") {
                 return Err("the screen is locked: popovers do not close and screen captures fail".into());
             }
             // A copy, since the test edits the document and autosave would write the changes back.
             let file = work.join("QuickReference.md");
             files::copy(root().join("resources/de.lproj/QuickReference.md"), &file)?;
-            cmd.env("SPLAT_SELFTEST_FILE", &file).env("SPLAT_SELFTEST_OUT", &work);
+            cmd.env("SPLAT_SELFTEST_FILE", &file).env("SPLAT_SELFTEST_OUT", work);
             if let Some(i) = args.iter().position(|a| a == "--stop-after") {
                 cmd.env("SPLAT_SELFTEST_STOP_AFTER", args.get(i + 1).ok_or(USAGE)?);
             }
+            if let Some(i) = args.iter().position(|a| a == "--only") {
+                cmd.env("SPLAT_SELFTEST_SCENARIOS", "1");
+                cmd.env("SPLAT_SELFTEST_ONLY", args.get(i + 1).ok_or(USAGE)?);
+            }
             if args.iter().any(|a| a == "--scenarios") {
                 cmd.env("SPLAT_SELFTEST_SCENARIOS", "1");
+            }
+            if args.iter().any(|a| a == "--in-back") {
+                cmd.env("SPLAT_SELFTEST_IN_BACK", "1");
             }
         }
         "resize" => {
@@ -61,71 +152,63 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
             files::write(&file, text)?;
             cmd.env("SPLAT_RESIZE_PROBE", "1").env("SPLAT_SELFTEST_FILE", &file);
         }
+        "typing" => {
+            if screen_locked() {
+                return Err("the screen is locked: keys reach no window".into());
+            }
+            let file = work.join("Tippen.md");
+            let paragraph = "Ein Absatz, an dessen Ende weitergetippt wird. ".repeat(4);
+            files::write(&file, format!("# Tippen\n\n{paragraph}\n"))?;
+            cmd.env("SPLAT_TYPING_PROBE", "1").env("SPLAT_SELFTEST_FILE", &file);
+            if args.iter().any(|a| a == "--by-hand") {
+                cmd.env("SPLAT_TYPING_BY_HAND", "1");
+            }
+        }
         "bench" => {
             let file = args.get(1).ok_or(USAGE)?;
             cmd.env("SPLAT_SELFTEST_FILE", file).env("SPLAT_BENCH", "1");
         }
         _ => return Err(USAGE.into()),
     }
-    let mut child = cmd
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("{}: {e}", binary.display()))?;
-    let output = child.stderr.take().ok_or("the selftest has no output")?;
-    let report = std::thread::spawn(move || {
-        let mut report = Report::default();
-        for line in std::io::BufRead::lines(std::io::BufReader::new(output)).map_while(Result::ok) {
-            eprintln!("{line}");
-            report.note(&line);
-        }
-        report
-    });
-    let started = std::time::Instant::now();
-    loop {
-        if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
-            println!("output in {}", work.display());
-            let report = report.join().map_err(|_| "reading the selftest's output failed")?;
-            let part = Part::of(args);
-            if fewest_checks(mode, part).is_some() {
-                println!("{}", report.summary());
-            }
-            return verdict(mode, part, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
-        }
-        if started.elapsed() > std::time::Duration::from_secs(600) {
-            let _ = child.kill();
-            return Err(format!("selftest {mode} did not finish within 10 minutes"));
-        }
-        std::thread::sleep(std::time::Duration::from_millis(200));
-    }
+    Ok(())
 }
 
 /// What a selftest said about itself.
 #[derive(Default, Debug)]
 pub(crate) struct Report {
-    passed: usize,
+    /// How often each check passed: a check of one name in two places must not hide that one of them went away.
+    passed: std::collections::BTreeMap<String, usize>,
     failed: Vec<String>,
     /// Checks that could not say anything in this run: neither passed nor failed, and listed so nobody takes them for either.
     skipped: Vec<String>,
+    /// In milliseconds, as the benchmark reports them.
+    keystrokes: Vec<f64>,
     done: bool,
 }
 
 impl Report {
     pub(crate) fn note(&mut self, line: &str) {
-        if line.starts_with("SELFTEST PASS ") {
-            self.passed += 1;
+        if let Some(name) = line.strip_prefix("SELFTEST PASS ") {
+            *self.passed.entry(name.to_string()).or_default() += 1;
         } else if let Some(failure) = line.strip_prefix("SELFTEST FAIL ") {
             self.failed.push(failure.to_string());
         } else if let Some(skip) = line.strip_prefix("SELFTEST SKIP ") {
             self.skipped.push(skip.to_string());
         } else if line.starts_with("SELFTEST DONE ") {
             self.done = true;
+        } else if let Some(ms) = line
+            .strip_prefix("BENCH   another one: ")
+            .and_then(|rest| rest.strip_suffix(" ms"))
+            .and_then(|ms| ms.parse().ok())
+        {
+            self.keystrokes.push(ms);
         }
     }
 
     pub(crate) fn summary(&self) -> String {
         let mut summary = format!(
             "{} checks passed, {} failed, {} skipped",
-            self.passed,
+            self.passed.values().sum::<usize>(),
             self.failed.len(),
             self.skipped.len()
         );
@@ -143,13 +226,13 @@ pub(crate) enum Part {
     Whole,
     /// `gui --scenarios`, without the click-through in front.
     Scenarios,
-    /// `gui --stop-after`, which ends at a check of the caller's choice.
+    /// `gui --stop-after` or `--only`, which end at a check or run a group of the caller's choice.
     StopsEarly,
 }
 
 impl Part {
     fn of(args: &[String]) -> Part {
-        if args.iter().any(|a| a == "--stop-after") {
+        if args.iter().any(|a| a == "--stop-after" || a == "--only") {
             Part::StopsEarly
         } else if args.iter().any(|a| a == "--scenarios") {
             Part::Scenarios
@@ -159,27 +242,43 @@ impl Part {
     }
 }
 
-/// About nine tenths of the checks a run makes: an exit code alone would also pass a run that a stray environment variable
-/// ended before it began, and `--scenarios` must not be enough for a whole run. Skipped checks do not count, so a run that
-/// skips many shows here.
-pub(crate) fn fewest_checks(mode: &str, part: Part) -> Option<usize> {
+/// The checks a run has to make, by name: an exit code alone would also pass a run that a stray environment variable ended
+/// before it began, and a count would not notice one check that went away with another that came. `--record` writes the
+/// lists anew from a run.
+fn listed_checks(mode: &str, part: Part) -> Option<&'static str> {
     match (mode, part) {
-        ("gui", Part::StopsEarly) => Some(1),
-        ("gui", Part::Scenarios) => Some(GUI_SCENARIOS),
-        ("gui", Part::Whole) => Some(GUI_WHOLE),
-        ("probe", _) => Some(PROBE),
-        ("resize", _) => Some(RESIZE),
+        ("gui", Part::Scenarios) => Some(include_str!("../checks/scenarios.txt")),
+        ("gui", Part::Whole) => Some(concat!(
+            include_str!("../checks/gui.txt"),
+            include_str!("../checks/scenarios.txt")
+        )),
+        ("gui", Part::StopsEarly) => Some(""),
+        ("probe", _) => Some(include_str!("../checks/probe.txt")),
+        ("resize", _) => Some(include_str!("../checks/resize.txt")),
+        ("typing", _) => Some(include_str!("../checks/typing.txt")),
         _ => None,
     }
 }
 
-/// Nine of ten of the checks a run makes, of which an inactive app skips some: 146, 168 and 253.
-const PROBE: usize = 131;
-const RESIZE: usize = 2;
-const GUI_SCENARIOS: usize = 151;
-const GUI_WHOLE: usize = 228;
+/// The file of `listed_checks`, for writing it anew.
+fn list_file(mode: &str, part: Part) -> Option<&'static str> {
+    match (mode, part) {
+        ("gui", Part::Scenarios) => Some("scenarios.txt"),
+        ("gui", Part::Whole) => Some("gui.txt"),
+        ("probe", _) => Some("probe.txt"),
+        ("resize", _) => Some("resize.txt"),
+        ("typing", _) => Some("typing.txt"),
+        _ => None,
+    }
+}
 
 pub(crate) fn verdict(mode: &str, part: Part, exited_well: bool, report: &Report) -> Result<(), String> {
+    judged(listed_checks(mode, part), exited_well, report)
+}
+
+/// Whether a run went well that had to make the checks `listed`, one name per line. A check that says it could not tell in
+/// this run counts as made, and the summary names it.
+fn judged(listed: Option<&str>, exited_well: bool, report: &Report) -> Result<(), String> {
     if !report.failed.is_empty() {
         return Err(format!(
             "{} checks failed:\n  {}",
@@ -190,18 +289,74 @@ pub(crate) fn verdict(mode: &str, part: Part, exited_well: bool, report: &Report
     if !exited_well {
         return Err("the app ended with an error".into());
     }
-    if let Some(fewest) = fewest_checks(mode, part) {
-        if !report.done {
-            return Err("the app ended before reporting that it was done".into());
-        }
-        if report.passed < fewest {
+    let Some(listed) = listed else {
+        return Ok(());
+    };
+    if !report.done {
+        return Err("the app ended before reporting that it was done".into());
+    }
+    let skipped = |name: &str| {
+        report
+            .skipped
+            .iter()
+            .any(|s| s.strip_prefix(name).is_some_and(|r| r.starts_with(": ")))
+    };
+    let mut wanted: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for name in listed.lines() {
+        *wanted.entry(name).or_default() += 1;
+    }
+    let passed = |name: &str| report.passed.get(name).copied().unwrap_or(0);
+    let missing: Vec<&str> = wanted
+        .iter()
+        .filter(|(name, count)| passed(name) < **count && !skipped(name))
+        .map(|(name, _)| *name)
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "{} checks did not run:\n  {}",
+            missing.len(),
+            missing.join("\n  ")
+        ));
+    }
+    // What goes by the list must be on it, or a check that goes away later goes unnoticed; a run of the caller's choice has none.
+    if !listed.is_empty() {
+        let unlisted: Vec<&str> = report
+            .passed
+            .iter()
+            .filter(|(name, count)| **count > wanted.get(name.as_str()).copied().unwrap_or(0))
+            .map(|(name, _)| name.as_str())
+            .collect();
+        if !unlisted.is_empty() {
             return Err(format!(
-                "only {} checks passed, at least {fewest} were expected",
-                report.passed
+                "{} checks ran more often than listed, which --record writes:\n  {}",
+                unlisted.len(),
+                unlisted.join("\n  ")
             ));
         }
     }
+    if report.passed.is_empty() {
+        return Err("no check passed".into());
+    }
     Ok(())
+}
+
+/// What `--record` writes: every check the run made as often as it made it, without those that `also_listed` holds.
+fn recorded(report: &Report, also_listed: &str) -> String {
+    let mut left_out: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for name in also_listed.lines() {
+        *left_out.entry(name).or_default() += 1;
+    }
+    let skipped = report
+        .skipped
+        .iter()
+        .filter_map(|s| s.split(": ").next().map(|name| (name.to_string(), 1)));
+    let mut names: Vec<String> = Vec::new();
+    for (name, count) in report.passed.iter().map(|(n, c)| (n.clone(), *c)).chain(skipped) {
+        let count = count.saturating_sub(left_out.get(name.as_str()).copied().unwrap_or(0));
+        names.extend(std::iter::repeat_n(name, count));
+    }
+    names.sort();
+    names.into_iter().map(|name| name + "\n").collect()
 }
 
 /// The login window's lock state, as the window server reports it to the I/O registry.
@@ -233,67 +388,133 @@ mod tests {
         r
     }
 
-    fn passes(n: usize) -> String {
-        format!("{}SELFTEST DONE failures=0", "SELFTEST PASS x\n".repeat(n))
+    const DONE: &str = "SELFTEST DONE failures=0";
+
+    fn passes(names: &[&str]) -> String {
+        names.iter().map(|n| format!("SELFTEST PASS {n}\n")).collect::<String>() + DONE
     }
 
     #[test]
-    fn a_run_passes_only_when_it_says_it_finished_all_its_checks() {
-        assert!(verdict("probe", Part::Whole, true, &report(&passes(PROBE))).is_ok());
-        let unfinished = "SELFTEST PASS x\n".repeat(PROBE);
+    fn a_run_passes_only_when_it_made_all_its_checks_and_says_it_finished() {
+        let list = Some("a\nb\n");
+        assert!(judged(list, true, &report(&passes(&["a", "b"]))).is_ok());
         assert!(
-            verdict("probe", Part::Whole, true, &report(&unfinished))
+            judged(list, true, &report("SELFTEST PASS a\nSELFTEST PASS b"))
                 .unwrap_err()
                 .contains("before reporting")
         );
-        assert!(verdict("probe", Part::Whole, true, &report("MENU a | b")).is_err());
+        assert!(judged(list, true, &report("MENU a | b")).is_err());
         assert_eq!(
-            verdict("probe", Part::Whole, true, &report(&passes(1))).unwrap_err(),
-            format!("only 1 checks passed, at least {PROBE} were expected")
+            judged(list, true, &report(&passes(&["a"]))).unwrap_err(),
+            "1 checks did not run:\n  b"
         );
-        let failed = verdict(
-            "probe",
-            Part::Whole,
-            false,
-            &report("SELFTEST FAIL one: why\nSELFTEST FAIL two: how"),
-        )
-        .unwrap_err();
-        assert!(failed.contains("one: why") && failed.contains("two: how"), "{failed}");
         assert_eq!(
-            verdict("probe", Part::Whole, false, &report(&passes(PROBE))).unwrap_err(),
+            judged(list, false, &report(&passes(&["a", "b"]))).unwrap_err(),
             "the app ended with an error"
+        );
+        let failed = judged(list, false, &report("SELFTEST FAIL one: why\nSELFTEST FAIL two: how")).unwrap_err();
+        assert!(failed.contains("2 checks failed") && failed.contains("two: how"));
+    }
+
+    #[test]
+    fn a_new_check_asks_to_be_listed_and_one_that_goes_away_shows() {
+        let list = Some("a\n");
+        assert_eq!(
+            judged(list, true, &report(&passes(&["a", "neu"]))).unwrap_err(),
+            "1 checks ran more often than listed, which --record writes:\n  neu"
+        );
+        assert!(judged(list, true, &report(&passes(&["neu"]))).is_err());
+        assert!(
+            judged(Some(""), true, &report(&passes(&["neu"]))).is_ok(),
+            "a run without a list"
         );
     }
 
     #[test]
-    fn every_mode_and_part_has_its_own_floor() {
-        let at_floor = |mode, part| fewest_checks(mode, part).map(|n| verdict(mode, part, true, &report(&passes(n))));
-        let below_floor =
-            |mode, part| fewest_checks(mode, part).map(|n| verdict(mode, part, true, &report(&passes(n - 1))));
+    fn a_check_of_one_name_counts_as_often_as_it_is_listed() {
+        let list = Some("a\na\nb\n");
+        assert!(judged(list, true, &report(&passes(&["a", "a", "b"]))).is_ok());
+        assert_eq!(
+            judged(list, true, &report(&passes(&["a", "b"]))).unwrap_err(),
+            "1 checks did not run:\n  a"
+        );
+        assert!(judged(list, true, &report(&passes(&["a", "a", "a", "b"]))).is_err());
+    }
+
+    #[test]
+    fn a_skipped_check_neither_passes_nor_fails() {
+        let list = Some("a\nb\n");
+        let run = report(&format!("SELFTEST SKIP b: not active\n{}", passes(&["a"])));
+        assert!(judged(list, true, &run).is_ok(), "no failure");
+        assert_eq!(
+            run.summary(),
+            "1 checks passed, 0 failed, 1 skipped\n  skipped: b: not active"
+        );
+        assert_eq!(
+            judged(
+                Some("a\n"),
+                true,
+                &report(&format!("SELFTEST SKIP a: not active\n{DONE}"))
+            )
+            .unwrap_err(),
+            "no check passed"
+        );
+        assert!(
+            judged(
+                list,
+                true,
+                &report(&format!("SELFTEST SKIP bb: not active\n{}", passes(&["a"])))
+            )
+            .is_err(),
+            "another check of a similar name"
+        );
+    }
+
+    #[test]
+    fn the_budget_of_a_keystroke_goes_by_the_fastest() {
+        let run = report("BENCH   another one: 70.5 ms\nBENCH   another one: 36.0 ms\nBENCH open: 800.0 ms\n");
+        assert!(within_budget(&run, 40.0).is_ok());
+        assert!(within_budget(&run, 30.0).is_err());
+        assert!(within_budget(&report(""), 30.0).is_err(), "no keystroke at all");
+    }
+
+    #[test]
+    fn a_budget_is_a_number() {
+        let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
+        assert_eq!(keystroke_budget(&args(&["bench", "f"])), Ok(None));
+        assert_eq!(
+            keystroke_budget(&args(&["bench", "f", "--keystroke-ms", "50"])),
+            Ok(Some(50.0))
+        );
+        assert!(keystroke_budget(&args(&["bench", "f", "--keystroke-ms", "x"])).is_err());
+        assert!(keystroke_budget(&args(&["bench", "f", "--keystroke-ms"])).is_err());
+    }
+
+    #[test]
+    fn a_recording_lists_every_check_the_run_made() {
+        let run = report(&format!("SELFTEST SKIP b: not active\n{}", passes(&["c", "a", "c"])));
+        assert_eq!(recorded(&run, ""), "a\nb\nc\nc\n");
+        assert_eq!(recorded(&run, "c\nb\n"), "a\nc\n", "what the scenarios list");
+    }
+
+    #[test]
+    fn every_whole_mode_has_a_list_and_what_stops_early_only_has_to_end_well() {
         for (mode, part) in [
             ("probe", Part::Whole),
             ("resize", Part::Whole),
+            ("typing", Part::Whole),
             ("gui", Part::Whole),
             ("gui", Part::Scenarios),
-            ("gui", Part::StopsEarly),
         ] {
-            assert_eq!(at_floor(mode, part), Some(Ok(())), "{mode} {part:?}");
-            assert!(below_floor(mode, part).is_some_and(|v| v.is_err()), "{mode} {part:?}");
+            let list = listed_checks(mode, part).unwrap();
+            assert!(list.lines().count() > 1, "{mode} {part:?}");
+            assert!(list_file(mode, part).is_some(), "{mode} {part:?}");
         }
-        assert_eq!(fewest_checks("bench", Part::Whole), None);
-        let scenarios = fewest_checks("gui", Part::Scenarios).unwrap();
-        assert!(
-            verdict("gui", Part::Whole, true, &report(&passes(scenarios))).is_err(),
-            "what `--scenarios` reaches is not a whole run"
-        );
-        assert!(
-            verdict("resize", Part::Whole, true, &report(&passes(1))).is_err(),
-            "a resize run that ended before its second check"
-        );
-        assert!(
-            verdict("gui", Part::StopsEarly, true, &report(&passes(1))).is_ok(),
-            "a run told to stop early"
-        );
+        assert_eq!(listed_checks("bench", Part::Whole), None);
+        assert!(verdict("gui", Part::StopsEarly, true, &report(&passes(&["a"]))).is_ok());
+        let scenarios = listed_checks("gui", Part::Scenarios).unwrap();
+        let whole = listed_checks("gui", Part::Whole).unwrap();
+        assert!(whole.lines().count() > scenarios.lines().count());
     }
 
     #[test]
@@ -302,30 +523,10 @@ mod tests {
         assert_eq!(part(&["gui"]), Part::Whole);
         assert_eq!(part(&["gui", "--scenarios"]), Part::Scenarios);
         assert_eq!(part(&["gui", "--stop-after", "a check"]), Part::StopsEarly);
+        assert_eq!(part(&["gui", "--only", "links"]), Part::StopsEarly);
         assert_eq!(
             part(&["gui", "--scenarios", "--stop-after", "a check"]),
             Part::StopsEarly
-        );
-    }
-
-    #[test]
-    fn a_skipped_check_neither_passes_nor_fails() {
-        let skipping = format!("SELFTEST SKIP needs the app: not active\n{}", passes(PROBE));
-        let run = report(&skipping);
-        assert!(verdict("probe", Part::Whole, true, &run).is_ok(), "no failure");
-        assert_eq!(
-            run.summary(),
-            format!("{PROBE} checks passed, 0 failed, 1 skipped\n  skipped: needs the app: not active")
-        );
-        let only_skips = format!(
-            "{}SELFTEST DONE failures=0",
-            "SELFTEST SKIP x: not active\n".repeat(PROBE)
-        );
-        assert!(
-            verdict("probe", Part::Whole, true, &report(&only_skips))
-                .unwrap_err()
-                .contains("only 0 checks passed"),
-            "and no pass"
         );
     }
 }

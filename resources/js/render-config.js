@@ -1,6 +1,6 @@
 // MathJax 4 keeps these TeX packages in separate files; in MathJax 3 its full bundle had them all active.
 const TEX_PACKAGES = [
-  "action", "amscd", "bbox", "boldsymbol", "braket", "bussproofs", "cancel", "cases", "centernot", "color", "colortbl",
+  "action", "amscd", "bbox", "begingroup", "boldsymbol", "braket", "bussproofs", "cancel", "cases", "centernot", "color", "colortbl",
   "empheq", "enclose", "extpfeil", "gensymb", "html", "mathtools", "mhchem", "noerrors", "tagformat", "textcomp",
   "unicode", "upgreek", "verb",
 ];

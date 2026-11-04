@@ -10,10 +10,13 @@ use super::scroll::ScrollSpan;
 use super::sync::{BlockDiff, Blocks, Snapshot};
 use crate::markdown::commands::Pending;
 use crate::markdown::doc::Doc;
+use crate::markdown::doc::Splice;
 use crate::markdown::highlight::Style;
-use crate::markdown::incremental::{Parsed, Splice, parse_shared_and_color, reparse_and_color, reparse_part_and_color};
+use crate::markdown::incremental::{Parsed, parse_and_color, parse_shared_and_color, reparse_part_and_color};
 use crate::markdown::text::{Byte, Shown, U16};
-use crate::preview::layout::{Layout, Marker, Resolver, TopBlock, layout, relayout, reusable};
+use crate::preview::layout::{
+    Layout, Marker, Resolver, TopBlock, caret_shapes_layout, layout, relayout, reusable, reusable_behind_caret,
+};
 use crate::preview::map::Index;
 use crate::util::{contained, free_in_background};
 
@@ -70,6 +73,7 @@ pub(super) struct State {
     index: Index,
     blocks: Blocks,
     caret: Option<Byte>,
+    macros: Arc<str>,
     zoom: f64,
     /// Preview range (before the change) the user edited directly, and the length delta.
     dirty_preview: Option<(Range<Shown>, isize)>,
@@ -99,6 +103,8 @@ enum LayoutSource<'a> {
     Background(Layout, Index),
     /// The previous layout, with the blocks outside the changed ones taken over.
     Partial(&'a Splice),
+    /// The previous layout, with only the block of the caret that moved laid out anew.
+    AroundCaret,
     Full,
 }
 
@@ -106,6 +112,8 @@ enum LayoutSource<'a> {
 struct PreviewFacts<'a> {
     text_changed: bool,
     caret_moved: bool,
+    /// The caret stood or stands where it changes what the layout shows.
+    caret_shapes: bool,
     /// The user edited the preview itself, so it no longer shows what its blocks say.
     preview_edited: bool,
     shows_blocks: bool,
@@ -121,6 +129,7 @@ fn preview_work(f: PreviewFacts<'_>) -> PreviewWork<'_> {
     let PreviewFacts {
         text_changed,
         caret_moved,
+        caret_shapes,
         preview_edited,
         shows_blocks,
         stale_layout,
@@ -129,7 +138,8 @@ fn preview_work(f: PreviewFacts<'_>) -> PreviewWork<'_> {
         mut background_layout,
         partial_parse,
     } = f;
-    let work = if !text_changed && !caret_moved && !preview_edited && shows_blocks && !stale_layout {
+    let only_the_caret = !text_changed && !preview_edited && shows_blocks && !stale_layout;
+    let work = if only_the_caret && (!caret_moved || !caret_shapes) {
         PreviewWork::Keep
     } else if !visible && !preview_edited {
         PreviewWork::Postpone
@@ -137,6 +147,7 @@ fn preview_work(f: PreviewFacts<'_>) -> PreviewWork<'_> {
         match (background_layout.take_if(|_| !has_caret), partial_parse) {
             (Some((layout, index)), _) => PreviewWork::Lay(LayoutSource::Background(layout, index)),
             (None, Some(splice)) if !stale_layout => PreviewWork::Lay(LayoutSource::Partial(splice)),
+            _ if only_the_caret => PreviewWork::Lay(LayoutSource::AroundCaret),
             _ => PreviewWork::Lay(LayoutSource::Full),
         }
     };
@@ -254,6 +265,15 @@ impl State {
         &self.blocks
     }
 
+    /// What the formulas of the document define for each other, as of the last request for them.
+    pub(super) fn macros(&self) -> Arc<str> {
+        self.macros.clone()
+    }
+
+    pub(super) fn set_macros(&mut self, macros: Arc<str>) {
+        self.macros = macros;
+    }
+
     pub(super) fn caret(&self) -> Option<Byte> {
         self.caret
     }
@@ -278,7 +298,6 @@ impl State {
         self.stale.layout
     }
 
-    /// The state was computed from the text `snap` holds; equal versions save comparing the texts.
     /// Where the paragraph of the footnote called `name` starts in the preview, and its length.
     pub(super) fn footnote_paragraph(&self, name: &str) -> Option<(Shown, usize)> {
         self.index
@@ -291,6 +310,7 @@ impl State {
             .map(|(_, paragraph)| (paragraph.start, paragraph.len))
     }
 
+    /// The state was computed from the text `snap` holds; equal versions save comparing the texts.
     pub(super) fn is_current(&self, snap: &Snapshot) -> bool {
         self.version == snap.version || self.doc.text() == snap.text
     }
@@ -422,14 +442,20 @@ impl State {
     /// Parses `new_text` around the edit; `None` when its neighbours would not stay the same. A panic takes the tree
     /// apart, and commands must not find it empty, so it is read anew then.
     fn parse_part(&mut self, new_text: &str) -> Option<Parsed> {
+        let in_step = !self.preview_is_behind();
+        let doc = self.doc.split_off_blocks();
+        let spans = &self.spans;
         let parsed = contained(|| {
             panic_if_a_test_asks();
-            reparse_part_and_color(&mut self.doc, &self.spans, new_text)
+            reparse_part_and_color(doc, spans, new_text)
         });
         match parsed {
-            Some(parsed) => parsed,
+            Some(Ok(parsed)) => Some(parsed),
+            Some(Err(doc)) => {
+                self.doc = *doc;
+                None
+            }
             None => {
-                let in_step = !self.preview_is_behind();
                 let text = self.doc.shared_text();
                 self.doc =
                     contained(|| parse_shared_and_color(text.clone()).doc).unwrap_or_else(|| Parsed::failed(text).doc);
@@ -443,9 +469,15 @@ impl State {
 
     /// Parses `new_text`, around the edit where that is possible.
     fn parse(&mut self, new_text: &str) -> Parsed {
+        let doc = self.doc.split_off_blocks();
+        let spans = &self.spans;
         let parsed = contained(|| {
             panic_if_a_test_asks();
-            reparse_and_color(&mut self.doc, &self.spans, new_text)
+            // Freeing a large document tree takes long enough to be felt while typing.
+            reparse_part_and_color(doc, spans, new_text).unwrap_or_else(|old| {
+                free_in_background(old);
+                parse_and_color(new_text)
+            })
         });
         self.parse_failed = parsed.is_none();
         parsed.unwrap_or_else(|| Parsed::failed(new_text.into()))
@@ -508,9 +540,12 @@ impl State {
         resolver: impl FnOnce(&str) -> R,
     ) -> Option<PreviewChange> {
         let stale_layout = std::mem::take(&mut self.stale.layout);
+        let shapes = |caret: Option<Byte>| caret.is_some_and(|c| caret_shapes_layout(self.doc.text(), c));
+        let caret_moved = caret != self.caret;
         let work = preview_work(PreviewFacts {
             text_changed,
-            caret_moved: caret != self.caret,
+            caret_moved,
+            caret_shapes: caret_moved && (shapes(caret) || shapes(self.caret)),
             preview_edited: self.dirty_preview.is_some(),
             shows_blocks: !self.blocks.keys.is_empty(),
             stale_layout,
@@ -520,7 +555,10 @@ impl State {
             partial_parse: splice,
         });
         let source = match work {
-            PreviewWork::Keep => return None,
+            PreviewWork::Keep => {
+                self.caret = caret;
+                return None;
+            }
             PreviewWork::Postpone => {
                 // Showing the preview again lays it out anew.
                 self.caret = None;
@@ -537,6 +575,11 @@ impl State {
             LayoutSource::Partial(splice) => {
                 let old = std::mem::take(&mut self.layout);
                 let reuse = reusable(splice, &self.doc, old_caret);
+                (contained(|| relayout(&self.doc, &images, caret, old, &reuse)), None)
+            }
+            LayoutSource::AroundCaret => {
+                let old = std::mem::take(&mut self.layout);
+                let reuse = reusable_behind_caret(&self.doc, old_caret);
                 (contained(|| relayout(&self.doc, &images, caret, old, &reuse)), None)
             }
             LayoutSource::Full => (laid_out(&self.doc, &images, caret), None),
@@ -598,6 +641,7 @@ mod tests {
         PreviewFacts {
             text_changed: false,
             caret_moved: false,
+            caret_shapes: false,
             preview_edited: false,
             shows_blocks: true,
             stale_layout: false,
@@ -631,10 +675,6 @@ mod tests {
                 ..quiet()
             },
             PreviewFacts {
-                caret_moved: true,
-                ..quiet()
-            },
-            PreviewFacts {
                 preview_edited: true,
                 ..quiet()
             },
@@ -649,6 +689,34 @@ mod tests {
         ] {
             assert!(lays_out_all(&preview_work(f)));
         }
+    }
+
+    #[test]
+    fn a_caret_that_moves_costs_a_layout_only_where_it_changes_what_shows() {
+        let moved = || PreviewFacts {
+            caret_moved: true,
+            has_caret: true,
+            ..quiet()
+        };
+        assert!(matches!(preview_work(moved()), PreviewWork::Keep));
+        let shaping = || PreviewFacts {
+            caret_shapes: true,
+            ..moved()
+        };
+        assert!(matches!(
+            preview_work(shaping()),
+            PreviewWork::Lay(LayoutSource::AroundCaret)
+        ));
+        let with_more = PreviewFacts {
+            stale_layout: true,
+            ..shaping()
+        };
+        assert!(lays_out_all(&preview_work(with_more)), "formulas arrived as well");
+        let hidden = PreviewFacts {
+            visible: false,
+            ..shaping()
+        };
+        assert!(matches!(preview_work(hidden), PreviewWork::Postpone));
     }
 
     #[test]
@@ -924,10 +992,7 @@ mod tests {
     }
 
     fn with_panicking_parser<R>(f: impl FnOnce() -> R) -> R {
-        PARSING_PANICS.set(true);
-        let result = f();
-        PARSING_PANICS.set(false);
-        result
+        PARSING_PANICS.with(|panics| crate::util::with_raised(panics, f))
     }
 
     #[test]

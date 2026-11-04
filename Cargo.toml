@@ -1,5 +1,11 @@
 [workspace]
-members = ["xtask"]
+members = ["crates/*", "xtask"]
+default-members = [".", "crates/*", "xtask"]
+exclude = ["fuzz", "vendor/comrak"]
+
+# Until https://github.com/kivikakk/comrak/issues/904 is fixed in a release; see vendor/comrak/PATCH.md.
+[patch.crates-io]
+comrak = { path = "vendor/comrak" }
 
 [workspace.package]
 edition = "2024"
@@ -22,22 +28,27 @@ cast_possible_wrap = "warn"
 cast_sign_loss = "warn"
 
 [package]
-name = "splat"
+name = "splat-app"
 # The app version is in VERSION; xtask writes it into Info.plist.
+version = "0.0.0"
 description = "Markdown editor for macOS with a live, editable preview"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[[bin]]
+name = "splat"
+path = "src/main.rs"
+
 [lints]
 workspace = true
 
 [dependencies]
-comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
-entities = "1"
-unicode-width = "0.2"
+splat-file-state = { path = "crates/splat-file-state" }
+splat-i18n = { path = "crates/splat-i18n" }
+splat-markdown = { path = "crates/splat-markdown" }
+splat-preview = { path = "crates/splat-preview" }
 
-# The app alone; the library builds without them.
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
 dispatch2 = "0.3"
@@ -51,13 +62,18 @@ svg2pdf = "0.13"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [dev-dependencies]
-roxmltree = "0.21"
+splat-testkit = { path = "crates/splat-testkit" }
 
 [features]
-selftest = []
+selftest = ["splat-markdown/selftest"]
 
 # What ships does what the tests saw: an overflow ends in `contained` instead of a wrong offset. A keystroke costs the same;
 # measured on a full layout of 10 MB, about a fifth more.
+# As the release, with what a debug build checks on top.
+[profile.checked]
+inherits = "release"
+debug-assertions = true
+
 [profile.release]
 lto = "thin"
 overflow-checks = true

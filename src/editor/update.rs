@@ -8,23 +8,28 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use objc2::rc::Weak;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
+use objc2::{MainThreadMarker, Message, sel};
 use objc2_app_kit::NSTextStorage;
 use objc2_foundation::NSRange;
 
 use super::attributes::{attributed, set_typing_attributes};
+use super::layers::ForUpdater;
 use super::panes::Views;
 use super::render::RenderCtx;
 use super::state::{
     Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, laid_out,
 };
 use super::style::{self, SourceFonts};
-use super::{EditorController, js, string_of};
-use crate::markdown::doc::{DiagramKind, Figure, figures};
+use super::{js, string_of};
+use crate::markdown::commands::Edit;
+use crate::markdown::doc::{DiagramKind, Figure, figures, macros_of};
 use crate::markdown::incremental::{Parsed, parse_shared_and_color};
+use crate::markdown::text::TextAt;
 use crate::preview::layout::{Layout, Resolver, TopBlock};
 use crate::preview::map::Index;
-use crate::util::{Lane, contained, free_in_background, from_nsrange, perform_later, shown_to_ns, storage};
+use crate::util::{
+    Lane, contained, free_in_background, from_nsrange, insert_text, ns, perform_later, shown_to_ns, storage, to_nsrange,
+};
 
 /// Up to this many changed blocks render at once; more show as plain text first and render while idle.
 pub(super) const PROGRESSIVE_FROM: usize = 300;
@@ -82,16 +87,45 @@ impl Arrivals {
 pub(super) struct UpdateState {
     fonts: RefCell<Option<SourceFonts>>,
     arrivals: Arrivals,
+    parsing: Cell<Parsing>,
+}
+
+/// Where the background parse of a document stands. Each one holds a copy of the text, so while keys come faster than a
+/// parse only the newest waits.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+enum Parsing {
+    #[default]
+    Idle,
+    Running,
+    /// Another is due when this one ends.
+    RunningWithAnotherDue,
+}
+
+impl Parsing {
+    /// What asking for a parse comes to, and whether one starts now.
+    fn asked(self) -> (Parsing, bool) {
+        match self {
+            Parsing::Idle => (Parsing::Running, true),
+            Parsing::Running | Parsing::RunningWithAnotherDue => (Parsing::RunningWithAnotherDue, false),
+        }
+    }
+
+    /// What the end of a parse comes to, and whether another one is due.
+    fn ended(self) -> (Parsing, bool) {
+        debug_assert_ne!(self, Parsing::Idle, "a parse ended that never started");
+        (Parsing::Idle, self == Parsing::RunningWithAnotherDue)
+    }
 }
 
 pub(super) struct Images {
     pub dark: bool,
     pub env: super::env::Env,
+    pub macros: Arc<str>,
 }
 
 impl Resolver for Images {
     fn math_ready(&self, tex: &str, display: bool) -> bool {
-        js::ready(&js::Key::math(tex, display, self.dark))
+        js::ready(&js::Key::math(tex, display, self.dark, &self.macros))
     }
     fn diagram_ready(&self, source: &str, kind: DiagramKind) -> bool {
         js::ready(&js::Key::diagram(source, kind, self.dark))
@@ -115,9 +149,9 @@ impl Resolver for Images {
 static PARSER: Lane = Lane::new("splat-parse").with_stack(8 << 20);
 
 /// Formulas and diagrams of the document, as render keys for one appearance.
-pub(super) fn render_key(figure: &Figure, dark: bool) -> js::Key {
+pub(super) fn render_key(figure: &Figure, dark: bool, macros: &Arc<str>) -> js::Key {
     match figure {
-        Figure::Math { tex, display } => js::Key::math(tex, *display, dark),
+        Figure::Math { tex, display } => js::Key::math(tex, *display, dark, macros),
         Figure::Diagram { source, kind } => js::Key::diagram(source, *kind, dark),
     }
 }
@@ -134,16 +168,13 @@ fn eager_blocks(changed: Range<usize>, visible: impl FnOnce() -> usize) -> Range
 }
 
 pub(super) struct Updater<'a> {
-    host: &'a EditorController,
+    host: ForUpdater<'a>,
     state: &'a UpdateState,
 }
 
-impl EditorController {
-    pub(super) fn updater(&self) -> Updater<'_> {
-        Updater {
-            host: self,
-            state: &self.ivars().updates,
-        }
+impl<'a> Updater<'a> {
+    pub(super) fn new(host: ForUpdater<'a>, state: &'a UpdateState) -> Self {
+        Updater { host, state }
     }
 }
 
@@ -157,20 +188,18 @@ impl Updater<'_> {
 impl Updater<'_> {
     /// The source storage changed its characters: the copy of its text follows, or is read anew if it cannot.
     pub(super) fn source_edited(&self, storage: &NSTextStorage, range: NSRange, delta: isize) {
-        // Not the editor's own mirror of its text, so the offsets of an open editor mean nothing anymore.
-        if !self.host.panes().is_silent() {
-            self.host.atom_editor().abandon();
-        }
         let inserted = string_of(&storage.string().substringWithRange(range));
         self.host
             .model()
             .source_edited(from_nsrange(range), delta, &inserted, storage.length());
+        if let Some(document) = self.host.document() {
+            document.text_changed();
+        }
     }
 
     /// Replaces the whole source, e.g. after loading or reverting, without an undo step. The caret and the scroll
     /// position stay where they were, as far as the new text reaches.
     pub(super) fn replace_all_text(&self, text: &str) {
-        self.host.atom_editor().abandon();
         let panes = self.host.panes();
         let source = panes.source();
         let selection = source.selected_range();
@@ -202,10 +231,51 @@ impl Updater<'_> {
         self.host.invalidate(Invalidate::Text);
     }
 
+    /// Applies a source edit as one undo step. Typing edits coalesce like keystrokes in the source view.
+    pub(super) fn apply_edit(&self, edit: Edit, undo_name: Option<&str>, typing: bool) {
+        self.host.model().change(|st| st.clear_pending());
+        let range = self.host.with_text(|snap, _| {
+            let text = &snap.text;
+            (edit.range.end <= text.end() && text.boundary(edit.range.start) && text.boundary(edit.range.end))
+                .then(|| to_nsrange(snap.u16_range(&edit.range)))
+        });
+        let Some(range) = range else {
+            self.update_now();
+            return;
+        };
+        let replacement = ns(&edit.replacement);
+        let selection = self.host.panes().silently(|views| {
+            let source = views.source;
+            if typing {
+                insert_text(source, &replacement, range);
+            } else {
+                // Without this, NSTextView merges the command into the preceding typing undo step.
+                source.breakUndoCoalescing();
+                if source.shouldChangeTextInRange_replacementString(range, Some(&replacement)) {
+                    storage(source).replaceCharactersInRange_withString(range, &replacement);
+                    source.didChangeText();
+                    if let (Some(name), Some(undo)) = (undo_name, self.host.undo_manager()) {
+                        undo.setActionName(&ns(name));
+                    }
+                }
+                source.breakUndoCoalescing();
+            }
+            let selection = self
+                .host
+                .with_text(|snap, _| to_nsrange(snap.u16_range(&edit.selection)));
+            self.host.selection().set_source_selection(selection);
+            selection
+        });
+        self.update_now();
+        if !self.host.panes().preview_focused() {
+            self.host.panes().for_appkit().source.scrollRangeToVisible(selection);
+        }
+    }
+
     /// The right one while typing in the source: runs `catch_up` once the keys pause for a moment.
     pub(super) fn schedule_update(&self) {
         if self.host.model().schedule_update() {
-            perform_later(self.host, sel!(scheduledUpdateDue), 0.04, false);
+            perform_later(self.host.object(), sel!(scheduledUpdateDue), 0.04, false);
         }
     }
 
@@ -224,40 +294,48 @@ impl Updater<'_> {
 
     /// Asks the shared renderer for formulas and diagrams after a short pause in typing.
     pub(super) fn schedule_render_requests(&self) {
-        perform_later(self.host, sel!(requestRenders), 0.35, false);
+        perform_later(self.host.object(), sel!(requestRenders), 0.35, false);
     }
 
     pub(super) fn request_renders(&self) {
+        if self.host.has_closed() {
+            return;
+        }
+        self.host.pictures().forget_images_no_longer_shown();
         let dark = self.host.is_dark();
-        let (current, other): (Vec<_>, Vec<_>) = self.host.model().read(move |st| {
-            figures(st.doc())
+        let (current, other, macros) = self.host.model().read(move |st| {
+            let all = figures(st.doc());
+            let macros: Arc<str> = macros_of(all.iter().map(|(_, f)| f)).into();
+            let (current, other): (Vec<_>, Vec<_>) = all
                 .iter()
-                .map(|(_, f)| (render_key(f, dark), render_key(f, !dark)))
-                .unzip()
+                .map(|(_, f)| (render_key(f, dark, &macros), render_key(f, !dark, &macros)))
+                .unzip();
+            (current, other, macros)
         });
+        self.host.model().change(move |st| st.set_macros(macros));
         if current.is_empty() {
+            js::asks_for_nothing(self.host.object());
             return;
         }
         let renderer = js::renderer(self.host.mtm());
-        renderer.listen(self.host);
+        let owner = renderer.listen(self.host.object());
+        let mut keys = current;
         // Rendering ahead for the other appearance makes switching instant, but not at the price of doubling the
         // work for documents full of formulas.
-        let prefetch = current.len() <= 200;
-        renderer.request(current);
-        if prefetch {
-            renderer.request(other);
+        if keys.len() <= 200 {
+            keys.extend(other);
         }
+        renderer.request(owner, keys);
     }
 
     /// The renderer calls this when formulas and diagrams arrive, possibly while this controller is itself rendering
     /// and would see its own state half-changed; the update therefore waits for the current event to finish.
     pub(super) fn renders_arrived(&self) {
-        perform_later(self.host, sel!(applyArrivedRenders), 0.0, true);
+        perform_later(self.host.object(), sel!(applyArrivedRenders), 0.0, true);
     }
 
     pub(super) fn apply_arrived_renders(&self) {
         self.host.invalidate(Invalidate::Arrivals);
-        self.host.atom_editor().show_status();
     }
 
     /// The undo manager undid or redid a step, in the source or elsewhere.
@@ -273,8 +351,6 @@ impl Updater<'_> {
         }
     }
 
-    /// An image finished loading. A document with hundreds of them must not start over for each one, so they are
-    /// collected, and also not wait until the last one, as a pause in arrivals would make them.
     /// The addresses of the images from the web this document shows, wherever they stand.
     pub(super) fn web_images_shown(&self) -> Vec<String> {
         self.host.model().read(|st| {
@@ -285,9 +361,11 @@ impl Updater<'_> {
         })
     }
 
+    /// An image finished loading. A document with hundreds of them must not start over for each one, so they are
+    /// collected, and also not wait until the last one, as a pause in arrivals would make them.
     pub(super) fn image_arrived(&self, key: String) {
         if self.state.arrivals.add(key) {
-            perform_later(self.host, sel!(showArrivedImages), 0.1, true);
+            perform_later(self.host.object(), sel!(showArrivedImages), 0.1, true);
         }
     }
 
@@ -295,9 +373,9 @@ impl Updater<'_> {
     /// an image changes neither the layout nor any other block.
     pub(super) fn show_arrived_images(&self) {
         let arrived = self.state.arrivals.take();
-        if self.host.panes().is_silent() || self.host.editing().preview_editing() {
+        if self.host.under_way().holds_back_what_can_wait() {
             self.state.arrivals.put_back(arrived);
-            perform_later(self.host, sel!(showArrivedImages), 0.1, true);
+            perform_later(self.host.object(), sel!(showArrivedImages), 0.1, true);
             return;
         }
         let doc_dir = self.host.doc_dir();
@@ -331,7 +409,7 @@ impl Updater<'_> {
             });
             self.host.invalidate(Invalidate::Zoom);
         }
-        self.host.invalidateRestorableState();
+        self.host.object().invalidateRestorableState();
     }
 
     pub(super) fn appearance_changed(&self) {
@@ -370,8 +448,9 @@ impl Updater<'_> {
     fn updated_in_part(&self) -> bool {
         let views = self.view_facts();
         let doc_dir = self.host.doc_dir();
+        let macros = self.host.model().read(|st| st.macros());
         let update = self.host.change_with_text(move |snap, st| {
-            st.advance_in_part(snap, views, |text| images_for(views.dark, doc_dir, text))
+            st.advance_in_part(snap, views, |text| images_for(views.dark, doc_dir, text, macros))
         });
         let Some(update) = update else {
             return false;
@@ -386,7 +465,7 @@ impl Updater<'_> {
     pub(super) fn update_now(&self) {
         // Replacing the text under a composition would write its marked text and offsets into the wrong place; its end
         // comes back here.
-        if self.host.panes().is_silent() || self.host.panes().preview().has_marked_text() {
+        if self.host.under_way().holds_back_an_update() {
             return;
         }
         self.host.model().next_generation();
@@ -397,8 +476,11 @@ impl Updater<'_> {
     fn advance(&self, background: Option<Background>) {
         let views = self.view_facts();
         let doc_dir = self.host.doc_dir();
+        let macros = self.host.model().read(|st| st.macros());
         let update = self.host.change_with_text(move |snap, st| {
-            st.advance(snap, views, background, |text| images_for(views.dark, doc_dir, text))
+            st.advance(snap, views, background, |text| {
+                images_for(views.dark, doc_dir, text, macros)
+            })
         });
         self.show_update(update);
     }
@@ -419,42 +501,62 @@ impl Updater<'_> {
             return;
         }
         let generation = self.host.model().next_generation();
+        let (parsing, starts) = self.state.parsing.get().asked();
+        self.state.parsing.set(parsing);
+        if !starts {
+            return;
+        }
         let latest = self.host.model().latest_generation();
         let text: Arc<str> = self.host.on_source_text(|text| Arc::from(text));
         let dark = self.host.is_dark();
         let env = super::env::Env::known(self.host.doc_dir(), &text);
+        let macros = self.host.model().read(|st| st.macros());
         let with_layout = self.host.panes().preview_visible();
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host), self.host.mtm());
+        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
         PARSER.run(move || {
             let current = || latest.load(std::sync::atomic::Ordering::SeqCst) == generation;
-            if !current() {
-                return;
-            }
-            let parsed = contained(|| parse_shared_and_color(text.clone()));
-            let mut failed = parsed.is_none();
-            let parsed = parsed.unwrap_or_else(|| Parsed::failed(text.clone()));
-            // A newer text is waiting; the layout of this one would be thrown away.
-            if !current() {
-                return;
-            }
-            let layout = with_layout.then(|| {
-                let l = laid_out(&parsed.doc, &Images { dark, env }, None);
-                failed |= l.is_none();
-                let l = l.unwrap_or_else(|| Layout::nothing_of(&parsed.doc));
-                let index = Index::new(&l);
-                (l, index)
-            });
-            if !current() {
-                return;
-            }
-            let background = Background { parsed, layout, failed };
-            dispatch2::DispatchQueue::main().exec_async(move || {
+            let work = || {
+                if !current() {
+                    return None;
+                }
+                let parsed = contained(|| parse_shared_and_color(text.clone()));
+                let mut failed = parsed.is_none();
+                let parsed = parsed.unwrap_or_else(|| Parsed::failed(text.clone()));
+                // A newer text is waiting; the layout of this one would be thrown away.
+                if !current() {
+                    free_in_background(parsed);
+                    return None;
+                }
+                let layout = with_layout.then(|| {
+                    let l = laid_out(&parsed.doc, &Images { dark, env, macros }, None);
+                    failed |= l.is_none();
+                    let l = l.unwrap_or_else(|| Layout::nothing_of(&parsed.doc));
+                    let index = Index::new(&l);
+                    (l, index)
+                });
+                Some(Background { parsed, layout, failed })
+            };
+            // Whatever became of it, the main thread hears: the next parse waits for that.
+            let background = contained(work).flatten();
+            crate::util::main_soon(move || {
                 let Some(mtm) = MainThreadMarker::new() else { return };
                 if let Some(c) = me.get(mtm).load() {
-                    c.updater().apply_background(generation, &text, background);
+                    c.parse_ended(generation, &text, background);
                 }
             });
         });
+    }
+
+    /// The parse under way came back, with nothing if a newer text made it pointless.
+    pub(super) fn parse_ended(&self, generation: u64, text: &str, background: Option<Background>) {
+        let (parsing, again) = self.state.parsing.get().ended();
+        self.state.parsing.set(parsing);
+        if let Some(background) = background {
+            self.apply_background(generation, text, background);
+        }
+        if again {
+            self.update_in_background();
+        }
     }
 
     fn apply_background(&self, generation: u64, text: &str, background: Background) {
@@ -464,7 +566,7 @@ impl Updater<'_> {
             return;
         }
         let same_text = self.host.on_source_text(|current| current == text);
-        if !same_text || self.host.panes().is_silent() || self.host.editing().preview_editing() {
+        if !same_text || self.host.under_way().holds_back_what_can_wait() {
             free_in_background(background);
             self.schedule_update();
             return;
@@ -513,7 +615,7 @@ impl Updater<'_> {
             let remote = self
                 .host
                 .model()
-                .read(|st| crate::markdown::doc::has_remote_images(st.doc()));
+                .read(|st| crate::markdown::remote::has_remote_images(st.doc()));
             self.host.pictures().show_remote_banner(remote);
         }
         if !shown {
@@ -567,10 +669,12 @@ impl Updater<'_> {
             zoom,
             doc_dir: doc_dir.as_deref(),
             images: self.host.pictures().store(),
-            max_image_width: (self.host.panes().preview().bounds().size.width - 60.0).max(200.0),
+            max_image_width: self.host.panes().preview_image_width(),
             dark: self.host.is_dark(),
-            controller: Some(self.host),
+            controller: Some(self.host.object()),
             remote_images: self.host.pictures().remote_allowed(),
+            leaves_the_mac: false,
+            macros: self.host.model().read(|st| st.macros()),
         };
         let replacement = objc2_foundation::NSMutableAttributedString::new();
         let mut plain = String::new();
@@ -591,9 +695,9 @@ impl Updater<'_> {
             replacement.appendAttributedString(&ctx.placeholder(notice));
         }
         let storage = storage(views.preview);
-        storage.beginEditing();
-        storage.replaceCharactersInRange_withAttributedString(shown_to_ns(diff.replace), &replacement);
-        storage.endEditing();
+        crate::util::editing(&storage, || {
+            storage.replaceCharactersInRange_withAttributedString(shown_to_ns(diff.replace), &replacement);
+        });
         let takes_input = mode == PreviewMode::Shows;
         if views.preview.isEditable() != takes_input {
             views.preview.setEditable(takes_input);
@@ -607,16 +711,28 @@ impl Updater<'_> {
     }
 }
 
-fn images_for(dark: bool, doc_dir: Option<PathBuf>, text: &str) -> Images {
+fn images_for(dark: bool, doc_dir: Option<PathBuf>, text: &str, macros: Arc<str>) -> Images {
     Images {
         dark,
         env: super::env::Env::known(doc_dir, text),
+        macros,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_the_newest_parse_waits_behind_the_one_running() {
+        let (running, starts) = Parsing::Idle.asked();
+        assert_eq!((running, starts), (Parsing::Running, true));
+        let (due, starts) = running.asked();
+        assert_eq!((due, starts), (Parsing::RunningWithAnotherDue, false));
+        assert_eq!(due.asked(), (Parsing::RunningWithAnotherDue, false), "still one");
+        assert_eq!(due.ended(), (Parsing::Idle, true));
+        assert_eq!(running.ended(), (Parsing::Idle, false));
+    }
 
     #[test]
     fn small_changes_render_at_once_large_ones_around_the_visible_block() {

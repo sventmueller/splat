@@ -26,7 +26,7 @@ pub(crate) fn icon() -> Result<(), String> {
     if !master.exists() {
         return Err(format!("{} is missing", master.display()));
     }
-    let iconset = std::env::temp_dir().join(format!("{PACKAGE}-AppIcon.iconset"));
+    let iconset = std::env::temp_dir().join(format!("{PROGRAM}-AppIcon.iconset"));
     if iconset.exists() {
         files::remove_dir_all(&iconset)?;
     }

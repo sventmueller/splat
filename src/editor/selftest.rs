@@ -9,10 +9,13 @@
 mod bench;
 mod clickthrough;
 mod controller;
+mod documents;
 mod mock_web;
 mod probe;
 mod resize;
+mod saving;
 mod scenarios;
+mod typing;
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -66,12 +69,15 @@ fn skip(name: &str, reason: &str) {
     reported(name);
 }
 
-/// A check of what AppKit does only for the app in front, which a locked screen or another app takes away.
+/// A check of what AppKit does only for the app in front, which a locked screen or another app takes away. A run may
+/// only leave it out if it was told to run behind other apps.
 fn check_in_front(mtm: MainThreadMarker, name: &str, ok: bool, detail: &str) {
     if NSApplication::sharedApplication(mtm).isActive() {
         check(name, ok, detail);
-    } else {
+    } else if std::env::var_os("SPLAT_SELFTEST_IN_BACK").is_some() {
         skip(name, "the app is not active");
+    } else {
+        check(name, false, "the app is not active");
     }
 }
 
@@ -318,6 +324,16 @@ pub fn start(mtm: MainThreadMarker) {
         );
         return;
     }
+    if std::env::var_os("SPLAT_TYPING_PROBE").is_some() {
+        open_document(mtm, &file);
+        once(
+            2.5,
+            "the document window to open",
+            move || window_rendered(mtm),
+            move || typing::run(mtm),
+        );
+        return;
+    }
     if std::env::var("SPLAT_BENCH").is_ok() {
         let opened = std::time::Instant::now();
         open_document(mtm, &file);
@@ -468,7 +484,7 @@ fn wait_for_window(mtm: MainThreadMarker, started: std::time::Instant, done: std
 }
 
 fn source(e: &EditorController) -> String {
-    e.source_text()
+    e.source().string().to_string()
 }
 
 fn type_in_preview(e: &EditorController, text: &str) {
@@ -476,9 +492,28 @@ fn type_in_preview(e: &EditorController, text: &str) {
     unsafe { preview.insertText_replacementRange(&ns(text), NSRange::new(crate::util::to_usize(NSNotFound), 0)) };
 }
 
+/// What `--only` calls the click-through in front of the scenarios.
+const CLICK_THROUGH: &str = "click-through";
+
 struct Ctx {
     e: Retained<EditorController>,
     out: PathBuf,
+    /// The test file as it was before the first edit, which each group of checks starts from.
+    template: std::rc::Rc<str>,
+}
+
+/// The steps from here on work on `e`.
+fn work_on(e: Retained<EditorController>) {
+    CTX.with(|ctx| {
+        let mut ctx = ctx.borrow_mut();
+        if let Some(old) = ctx.take() {
+            *ctx = Some(std::rc::Rc::new(Ctx {
+                e,
+                out: old.out.clone(),
+                template: old.template.clone(),
+            }));
+        }
+    });
 }
 
 /// What the runner waits for before a step, named for the failure when it never comes.
@@ -587,12 +622,13 @@ fn settled(e: &EditorController) -> bool {
         return false;
     }
     let dark = e.is_dark();
+    let macros = e.model().read(|st| st.macros());
     super::js::renderer(e.mtm()).idle()
         && super::remote::idle()
         && e.model().read(move |st| {
             crate::markdown::doc::figures(st.doc())
                 .iter()
-                .all(|(_, f)| super::js::outcome(&super::update::render_key(f, dark)).is_some())
+                .all(|(_, f)| super::js::outcome(&super::update::render_key(f, dark, &macros)).is_some())
         })
 }
 
@@ -698,14 +734,40 @@ fn closed(f: impl Fn(&Ctx) + 'static) -> Step {
     )
 }
 
+thread_local! {
+    static IGNORING: std::cell::RefCell<Option<Retained<objc2::runtime::AnyObject>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// A key or click of whoever works at the Mac meanwhile would land in the window in front, move its caret and fail checks
+/// that have nothing wrong with them. The run's own events go to the window directly and pass no monitor.
+fn ignore_people(_mtm: MainThreadMarker) {
+    use objc2_app_kit::{NSEvent, NSEventMask};
+    let drop_it = RcBlock::new(|_: std::ptr::NonNull<NSEvent>| std::ptr::null_mut::<NSEvent>());
+    let input = NSEventMask::KeyDown
+        | NSEventMask::LeftMouseDown
+        | NSEventMask::RightMouseDown
+        | NSEventMask::OtherMouseDown
+        | NSEventMask::ScrollWheel;
+    // SAFETY: The handler touches nothing and answers on the main thread, and the monitor stays for the life of the run.
+    let monitor = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(input, &drop_it) };
+    IGNORING.with(|m| *m.borrow_mut() = monitor);
+}
+
 fn run(mtm: MainThreadMarker, out: &Path) {
     let Some((e, window)) = editor(mtm).and_then(|e| e.window().map(|w| (e, w))) else {
         check("open document", false, "no editor window");
         finish();
         return;
     };
-    #[expect(deprecated, reason = "the replacement does not bring a test run to the front")]
-    NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+    ignore_people(mtm);
+    let template: std::rc::Rc<str> = source(&e).into();
+    // How a run goes with another app in front, which macOS decides and a run has no say in: `--in-back` makes it certain.
+    if std::env::var_os("SPLAT_SELFTEST_IN_BACK").is_some() {
+        NSApplication::sharedApplication(mtm).deactivate();
+    } else {
+        #[expect(deprecated, reason = "the replacement does not bring a test run to the front")]
+        NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+    }
     window.makeKeyAndOrderFront(None);
     snapshot(&window, &out.join("01-opened.png"));
     let tab_plus = unsafe {
@@ -738,8 +800,11 @@ fn run(mtm: MainThreadMarker, out: &Path) {
     let ctx = Ctx {
         e,
         out: out.to_path_buf(),
+        template,
     };
-    if std::env::var_os("SPLAT_SELFTEST_SCENARIOS").is_some() {
+    let only = std::env::var("SPLAT_SELFTEST_ONLY").ok();
+    let click_through_alone = only.as_deref() == Some(CLICK_THROUGH);
+    if std::env::var_os("SPLAT_SELFTEST_SCENARIOS").is_some() && !click_through_alone {
         run_steps(ctx, scenarios::steps());
         return;
     }
@@ -759,7 +824,11 @@ fn run(mtm: MainThreadMarker, out: &Path) {
         clickthrough::building_block_steps(),
         clickthrough::empty_line_and_caret_steps(),
         clickthrough::reload_and_hidden_preview_steps(),
-        scenarios::steps(),
+        if click_through_alone {
+            Vec::new()
+        } else {
+            scenarios::steps()
+        },
     ];
     run_steps(ctx, groups.into_iter().flatten().collect());
 }
@@ -869,6 +938,25 @@ fn type_in_source(e: &EditorController, text: &str) {
     };
 }
 
+/// A key as the window gets it from the keyboard: unlike `insertText`, it merges into the undo step the view has open.
+fn press_key(window: &NSWindow, character: &str) {
+    let event = objc2_app_kit::NSEvent::keyEventWithType_location_modifierFlags_timestamp_windowNumber_context_characters_charactersIgnoringModifiers_isARepeat_keyCode(
+        objc2_app_kit::NSEventType::KeyDown,
+        objc2_foundation::NSPoint::new(0.0, 0.0),
+        objc2_app_kit::NSEventModifierFlags::empty(),
+        objc2_foundation::NSProcessInfo::processInfo().systemUptime(),
+        window.windowNumber(),
+        None,
+        &ns(character),
+        &ns(character),
+        false,
+        0,
+    );
+    if let Some(event) = event {
+        window.sendEvent(&event);
+    }
+}
+
 fn tail(s: &str, n: usize) -> String {
     let n = n.max(200);
     let chars: Vec<char> = s.chars().collect();
@@ -933,7 +1021,7 @@ fn export_pdf(e: &EditorController, pdf: &Path) {
             objc2::runtime::ProtocolObject::from_ref(NSPrintJobSavingURL),
         );
     }
-    let op = e.sharing().print_operation(&info);
+    let op = e.print_operation(&info);
     op.setShowsPrintPanel(false);
     op.setShowsProgressPanel(false);
     let ok = op.runOperation();

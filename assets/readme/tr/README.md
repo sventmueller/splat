@@ -120,7 +120,7 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 - **Her şey için bir düğme.** Her Markdown yapısının bir araç çubuğu düğmesi ve bir menü öğesi vardır; yaygın olanların klavye kısayolu da bulunur. Tabloların satırlar, sütunlar ve hizalama için kendi menüsü vardır.
 - **Hiçbir şey kaybetmeden dışa aktarma.** PDF, tek başına yeterli tek bir HTML dosyası ya da gerçek başlıklar, listeler, tablolar, dipnotlar ve görüntüler içeren bir Word belgesi.
 - **Tepeden tırnağa yerel.** Gerçek AppKit pencereleri, sekmeler, menüler, açılır pencereler, Sürümler, Otomatik Kaydet, paylaşım menüsü, koyu mod, yazım denetimi, dikte ve VoiceOver. Electron yok, metnin kendisi için web görünümü yok.
-- **Büyük dosyalarda hızlı.** 10 MB’lık bir belgede bir tuş vuruşunu işlemek, görünümün kendi işinden önce yaklaşık 25 ms sürer.
+- **Büyük dosyalarda hızlı.** 10 MB’lık bir belgede bir tuş vuruşunu işlemek, görünümün kendi işinden önce yaklaşık 10 ms sürer.
 - **Gizliliğe duyarlı ve özenli.** Web’deki görüntüler yalnızca siz izin verdikten sonra yüklenir, diğer uygulamalara giden bağlantılar önce sorar ve güvenilmeyen görüntü verilerini çözen her şey korumalı yardımcı işlemlerde çalışır.
 - **Kendi dilinizde.** Arayüz ve yerleşik Markdown hızlı başvurusu 35 dilde gelir: Arapça, Katalanca, Çince (Basitleştirilmiş), Çince (Geleneksel), Hırvatça, Çekçe, Danca, Felemenkçe, İngilizce, Fince, Fransızca, Almanca, Yunanca, İbranice, Hintçe, Macarca, Endonezce, İtalyanca, Japonca, Korece, Malayca, Norveççe, Lehçe, Portekizce (Brezilya), Portekizce (Portekiz), Romence, Rusça, Slovakça, Slovence, İspanyolca, İsveççe, Tayca, Türkçe, Ukraynaca ve Vietnamca.
 
@@ -504,7 +504,7 @@ Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenil
 - **Varsayılan olarak ağ yok.** Splat’ta telemetri yoktur. Güncellemeleri yalnızca siz onay verdikten sonra ya da **Güncellemeleri Denetle…**’yi seçtiğinizde arar: o zaman GitHub’dan küçük bir akış dosyası yükler ve istek uygulamanın adı ile sürümünden başka bir şey içermez. Formüller ve diyagramlar yerelde görüntülenir; bunu yapan web görünümleri ağa erişemez.
 - **Web’deki görüntüler** yalnızca izninizden sonra, yalnızca `https` üzerinden, asla yerel ağınızdaki sunuculardan olmayarak, her biri en fazla 10 MB ve çerezsiz özel bir oturumda yüklenir.
 - **Yalıtılmış çözme.** Görüntüler ile formüllerin ve diyagramların grafikleri, devraldıkları her dosyayı kapatan ve ilk baytı okumadan önce kendini bir sanal alana (sandbox) kilitleyen yardımcı işlemlerde çözülür: dosya erişimi yok, ağ yok. Yalnızca boyutu denetlenen pikselleri geri verirler ve 10 saniye sonra durdurulurlar. Apple’ın kendi görüntü çözücüleri yalnızca HEIC, TIFF, AVIF ve PDF’yi görür, o da yalnızca veri gerçekten o biçimdeyse; bunlar ayrıca sistemin font klasörlerini okuyabilen ve sistemin video çözücüsünü kullanabilen kendi yardımcılarında çalışır. SVG’ler, formüller ve diyagramlar da bu yardımcıdan geçer; bu yüzden Splat’ta sabit çözünürlüklü resimlerdir: nokta başına dört piksel, uzun kenarda en fazla 2560.
-- **Yerel dosyalar** bir belgeye yalnızca onun adlandırdığı yolla ulaşır. Gömmeler Markdown notlarını belgenin klasöründen ve altından gösterir, eksik bir resim de yalnızca orada aranır. Başka yerdeki, mutlak ya da `~` ile başlayan bir görüntü yolu yine yüklenir ve HTML ile Word dışa aktarmaları onu gömer: yazmadığınız bir belgenin dışa aktarımına, başkasına vermeden önce bakın.
+- **Yerel dosyalar** bir belgeye yalnızca onun adlandırdığı yolla ulaşır. Gömmeler Markdown notlarını belgenin klasöründen ve altından gösterir, eksik bir resim de yalnızca orada aranır. Başka yerdeki, mutlak ya da `~` ile başlayan bir görüntü yolu önizlemede yine yüklenir; HTML ve Word dışa aktarmaları, yazdırma ve PDF’ler yalnızca belgenin klasöründe ya da Git deposunda (bu depo Ana klasörünüzü de içermediği sürece) olanı yanına alır, böylece başkasından gelen bir belge dosyalarınızı ilettiğiniz bir dışa aktarmaya çekemez.
 - **Kaydedilmemiş metnin kopyaları**, bir çökmeden sonra kurtarma için Mac’inizde, Library klasörünüzde kalır. Kaydetmeyle ya da Splat’ın normal sonlanmasıyla giderler; bir çökmenin geride bıraktığı kopyalar siz silene kadar kurtarma klasöründe kalır.
 - **Bağlantılar** bir tıklamayla asla bir program başlatmaz. Web ve posta bağlantıları olağan şekilde açılır; diğer uygulamalara giden bağlantılar önce sorar.
 - **Belgelerdeki HTML**, Splat’ın kendi ayrıştırıcısı tarafından okunur. Betikler, stiller, çerçeveler ve formlar asla çalışmaz.
@@ -516,13 +516,14 @@ Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenil
 Splat, birkaç megabaytlık belgelerde de duyarlı kalır:
 
 - Kaynak, yalnızca görünen kısmı yerleştiren TextKit 2’yi kullanır.
-- Önizlemede yazarken ve 2 MB’a kadar belgelerin kaynağında, yalnızca etkilenen paragraflar yeniden ayrıştırılır, renklendirilir ve yerleştirilir. 10 MB’lık bir belgede ayrıştırma ve renklendirme yaklaşık 20 ms, işleme yaklaşık 25 ms, önizlemesinde görünümün kendi işiyle birlikte tam bir tuş vuruşu yaklaşık 60 ms sürer.
+- Önizlemede yazarken ve 2 MB’a kadar belgelerin kaynağında, yalnızca etkilenen paragraflar yeniden ayrıştırılır, renklendirilir ve yerleştirilir. 10 MB’lık bir belgede ayrıştırma ve renklendirme yaklaşık 3 ms, işleme yaklaşık 10 ms, önizlemesinde görünümün kendi işiyle birlikte tam bir tuş vuruşu yaklaşık 30 ms sürer.
 - Büyük önizlemeler önce görünen kısmı, kalanını uygulama boştayken görüntüler. Görünüme kaydırılan bloklar çizilmeden önce görüntülenir.
 - Daha büyük belgelerin kaynağında, siz yazarken önizleme için ayrıştırma arka planda çalışır.
 - Belge yaklaşık 4 GB bellek gerektirecek olduğunda düz metin olarak kalır; bu, sıradan Markdown için yaklaşık 50 ila 120 MB, yalnızca tablo veya başlıklardan oluşan belgeler için ise yalnızca 10 ila 20 MB demektir: kaynakta renk yoktur ve önizleme neden boş kaldığını söyler. Dışa aktarmalar yine çalışır.
 - Yaklaşık 200 KB’tan itibaren bir belge, ayrıştırılmadan önce penceresini açar; 5 MB’ta renkler ve önizleme yaklaşık çeyrek saniye sonra gelir.
+- Formüller ve diyagramlar dahil tüm görüntüler birlikte, Mac’in belleğinin en fazla dörtte birini, bellek azken de bunun yarısını kaplar. Bunun ötesinde, diğer görüntüler yeniden yer açılana kadar yer tutucu olarak gösterilir.
 
-Bazı değişiklikler tümüyle işlenir; 10 MB’ta tuş vuruşu başına yaklaşık 300 ms sürer: bir dipnotun tanımında ya da başvurularında, satır içi bir dipnotun yanında, belgenin en sonunda bir dipnotun yanında, front matter’da ya da bağlantı başvuru tanımlarının yakınında yapılanlar ve `%%` yorum blokları olan ya da iki kez ya da bir alıntı veya liste içinde tanımlanmış dipnotu olan bir belgedeki her değişiklik. Bellek dosyayla birlikte büyür: 1 MB’lık Markdown için kabaca 115–160 MB, 10 MB için 340–510 MB.
+Bazı değişiklikler tümüyle işlenir; 10 MB’ta tuş vuruşu başına yaklaşık 300 ms sürer: bir dipnotun tanımında ya da başvurularında, satır içi bir dipnotun yanında, belgenin en sonunda bir dipnotun yanında, front matter’da ya da bağlantı başvuru tanımlarında yapılanlar ve `%%` yorum blokları olan ya da iki kez ya da bir alıntı veya liste içinde tanımlanmış dipnotu olan bir belgedeki her değişiklik. Bellek dosyayla birlikte büyür: 1 MB’lık Markdown için kabaca 115–160 MB, 10 MB için 340–510 MB.
 
 ## Bilinen sınırlamalar
 
@@ -577,6 +578,7 @@ make check                  # biçimlendirme, uyarısız clippy, tüm testler, v
 make test                   # önce make check, sonra pencere olmadan öz-test
 make test-gui               # pencereli öz-testler; Mac'i yaklaşık dört dakika meşgul eder
 make test-long              # daha uzun rastgele arama ve 10 MB'lık kısmi güncelleme denetimi
+make fuzz                   # kısmi ayrıştırma ve tüm çıktılar için rastgele girdi
 make coverage               # tüm testlerin ve öz-testlerin satır kapsamı, modül başına bir tabanla
 make coverage-library       # pencere olmayan modüller için aynı tabanlar, CI'daki gibi
 make bench FILE=<file.md>   # büyük bir dosyayı açma, yazma ve kaydırma süreleri
@@ -626,19 +628,24 @@ Disk görüntüsü Apple Silicon ve Intel için evrensel (universal) bir ikili d
 | `cargo xtask check-library` | kütüphane Linux için derlenir, yani içindeki hiçbir şey macOS gerektirmez |
 | `cargo xtask vendor check` | JavaScript kütüphaneleri `vendor.lock` ile bayt bayt eşleşir |
 | `cargo xtask selftest probe` | pencere olmadan, her biri beklenen sonucuyla: formüller, diyagramlar, işlem içindeki bir sunucuya karşı web görüntüleri, engellenen adresler, her komutun yazdığı metin, her görüntü biçimi iki dışa aktarma üzerinden, yanıt vermeyi bırakan bir sayfa ve web görünümlerinin savunmaları, savunmasız bir sayfaya karşı. Yaklaşık yarım dakika sürer. Uygulamanın önde olmasını gerektiren şeyler kilitli bir ekranda atlanır |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | çalışan uygulama, tıklama tıklama. Bir pencere açar ve içine yazar; Mac yaklaşık dört dakika meşguldür. `--scenarios` yalnızca ikinci bölümü, yaklaşık bir buçuk dakikada çalıştırır |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | çalışan uygulama, tıklama tıklama. Bir pencere açar ve içine yazar; Mac yaklaşık dört dakika meşguldür. `--scenarios` yalnızca ikinci bölümü, yaklaşık bir buçuk dakikada çalıştırır. `--only` bu bölümün tek bir grubunu kendi belgesinde, kilitli ekranda da çalıştırır. `--in-back`, uygulamanın önde olmasını gerektireni atlar; o olmadan böyle bir denetim başarısız olur |
 | `cargo xtask selftest resize` | ayırıcıyı taşıdıktan sonra pencereyi genişletir: pencere yeniden boyutlandırılırken kaynak yeniden satırlanır. Yaklaşık on saniye sürer |
-| `cargo xtask selftest bench <file.md>` | büyük bir dosyayı açma, yazma ve kaydırma süreleri |
+| `cargo xtask selftest typing [--by-hand]` | kayıtlar boyunca yazar, uygulamanın olay kuyruğundan geçen tuşlarla ya da `--by-hand` ile elle: yazılanlar kalır ve kaydedilmemiş görünür. Yaklaşık bir dakika sürer |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | büyük bir dosyayı açma, yazma ve kaydırma süreleri; en hızlı tuş vuruşu daha uzun sürerse `--keystroke-ms` başarısız olur |
 | `cargo test --release -- --ignored partial_updates` | 10 MB’ta bir tuş vuruşu: kısmi güncellemeye karşı tam güncelleme, aynı sonuç en çok dörtte bir sürede |
 | `cargo test --release --test hostile` | yığını taşıracak ya da ikinci dereceden zaman alacak biçimde kurulmuş belgeler, her biri süreleri metinle birlikte artması gereken iki boyutta, ayrıştırma, yerleşim, her iki dışa aktarma, tuş vuruşları ve komutlar üzerinden |
-| `make mutants` | `src/markdown/` ve `src/preview/` içine tek tek yerleştirilen hatalar, [cargo-mutants](https://mutants.rs) üzerinden (`cargo install cargo-mutants`); hangilerini hiçbir testin fark etmediğini söyler. Saatler sürer; `FILE=src/preview/bridge.rs` kapsamı daraltır |
+| `make mutants` | `crates/splat-markdown`, `crates/splat-preview` ve `crates/splat-file-state` içine tek tek yerleştirilen hatalar, [cargo-mutants](https://mutants.rs) üzerinden (`cargo install cargo-mutants`); hangilerini hiçbir testin fark etmediğini söyler. Saatler sürer; `FILE=crates/splat-preview/src/bridge/mod.rs` kapsamı daraltır |
+| `make fuzz` | [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) ile rastgele girdi, rustup'ın nightly sürümünü gerektirir: tam ayrıştırma gibi okunması gereken tuş vuruşları, tüm çıktılar, önizlemedeki düzenlemeler, tüm komutlar ve açıldığı gibi kaydedilen bir dosya. `SECONDS=600` daha uzun arar |
+| `cargo test --release --test fuzz_seeds` | `fuzz/seeds/` içindeki tohumlar, fuzzer olmadan bu fuzz hedeflerinin denetimlerinden geçirilir; her `cargo test` içinde yer alır |
+| `cargo test --profile checked --workspace` | hata ayıklama derlemesinin ek olarak denetledikleriyle testler: her kısmi ayrıştırmadan sonra bloklar metne uyar ve taşıdığı şey metnin söylediğidir. `make test-long` kapsamındadır |
+| `cargo test --release --test entry_points --test structure` | kaynaklardan: sistemin çağırdığı her şey panic'e karşı korunur ve modüller yalnızca aşağı doğru bağımlıdır |
 | `cargo test --release --test decoder` | çözücü işlem görüntüleri çözer ve ne dosyalara ne de ağa ulaşır |
 | `make coverage` | `cargo test` ve tüm öz-testlerin satır kapsamı, [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) üzerinden (`brew install cargo-llvm-cov llvm`); tabanların altında başarısız olur. Mac’i yaklaşık beş dakika meşgul eder |
-| `make coverage-library` | yalnızca `cargo test` ile ölçülen `src/markdown/`, `src/preview/` ve `i18n.rs` için daha yüksek tabanlar |
+| `make coverage-library` | yalnızca `cargo test` ile ölçülen `splat-markdown`, `splat-preview`, `splat-file-state` ve `splat-i18n` crate’leri için daha yüksek tabanlar |
 
-Birim testleri test ettikleri kodun yanında durur. `tests/` kütüphaneye dışarıdan ulaşanları barındırır: `robustness.rs` içindeki rastgele testler (bunlar `src/fuzz.rs` içindeki üreteci `sync.rs` testleriyle paylaşır), `hostile.rs` içindeki zarar vermek için kurulmuş belgeler ve derlenmiş programı başlatan çözücü testi. `src/editor/` içinde pencere gerektirmeyen kararlar, kendi testleri olan serbest işlevlerde durur: denetleyicinin belge hakkında bildiği her şey ve bunun nasıl değiştiği `state.rs` içinde, görüntüleme kuralları `render_queue.rs` içinde, metin kopyası `sync.rs` içinde, paragraf biçemleri, yazı tipleri ve renkler değer olarak `render.rs` içinde, araç çubuğu tanımlayıcılarının neye karşılık geldiği `toolbar.rs` içinde, bir bağlantı tıklamasının ne anlama geldiği `navigation.rs` içinde.
+Birim testleri test ettikleri kodun yanında durur. `crates/splat-testkit/tests/` modele ve önizlemeye dışarıdan ulaşanları barındırır: `robustness.rs` içindeki rastgele testler (bunlar `splat-testkit` üretecini `sync.rs` testleriyle paylaşır), `hostile.rs` içindeki zarar vermek için kurulmuş belgeler ve `fuzz_seeds.rs` içindeki fuzz hedeflerinin tohumları. `tests/` programın tamamına bakanları barındırır: kaynakları, çevirileri ve derlenmiş programı başlatan çözücü testi. `src/editor/` içinde pencere gerektirmeyen kararlar, kendi testleri olan serbest işlevlerde durur: denetleyicinin belge hakkında bildiği her şey ve bunun nasıl değiştiği `state.rs` içinde, görüntüleme kuralları `render_queue.rs` içinde, metin kopyası `sync.rs` içinde, paragraf biçemleri, yazı tipleri ve renkler değer olarak `render.rs` içinde, araç çubuğu tanımlayıcılarının neye karşılık geldiği `toolbar.rs` içinde, bir bağlantı tıklamasının ne anlama geldiği `navigation.rs` içinde.
 
-Bir pencere öz-testi adımı zamanı değil, adlandırılmış bir koşulu bekler; yalnızca sinyal vermeyen şey, örneğin bir şeyin yokluğu, gerekçesiyle birlikte bir bekleme tutar. Boşuna beklemek, hiç gelmeyeni adlandıran başarısız bir denetimdir, paniğe düşen bir adım da başarısız bir denetimdir ve çalıştırma her iki durumda da sürer. Bu çalıştırmada bir şey söyleyemeyen bir denetim `SELFTEST SKIP` bildirir: xtask onu listeler, o ne geçer ne de başarısız olur. xtask her kipi ve ayrıca `--scenarios`’u denetimlerinin yaklaşık onda dokuzunda tutar. Pencere öz-testi, ana tıklama turundan sonra `src/editor/selftest/scenarios.rs` içinde ikinci bir bölüm çalıştırır: her biçimlendirme ve tablo komutu, iletişim kutuları, bağlantı tıklamaları, yapıştırma, bırakma, dışa aktarmalar, büyük bir değişiklik, diskte değişen görüntüler, bellek baskısı, devasa bir belge ve bir çökmeden sonra kurtarma.
+Bir pencere öz-testi adımı zamanı değil, adlandırılmış bir koşulu bekler; yalnızca sinyal vermeyen şey, örneğin bir şeyin yokluğu, gerekçesiyle birlikte bir bekleme tutar. Boşuna beklemek, hiç gelmeyeni adlandıran başarısız bir denetimdir, paniğe düşen bir adım da başarısız bir denetimdir ve çalıştırma her iki durumda da sürer. Bu çalıştırmada bir şey söyleyemeyen bir denetim `SELFTEST SKIP` bildirir: xtask onu listeler, o ne geçer ne de başarısız olur. xtask her kipi ve ayrıca `--scenarios`’u denetimlerinin yaklaşık onda dokuzunda tutar. Pencere öz-testi, ana tıklama turundan sonra `src/editor/selftest/scenarios.rs` içinde ikinci bir bölüm çalıştırır: her biçimlendirme ve tablo komutu, iletişim kutuları, bağlantı tıklamaları, yapıştırma, bırakma, dışa aktarmalar, başka bir programın değiştirdiği bir dosya, büyük bir değişiklik, diskte değişen görüntüler, bellek baskısı, devasa bir belge ve bir çökmeden sonra kurtarma. Her grubu kendi belgesini açar, böylece birindeki bir başarısızlık sonrakine ulaşmaz ve her biri `--only` ile tek başına çalışabilir. Pencere olmadan öz-test kaydetmeyi de bilerek bozar: hiçbir şey kabul etmeyen bir klasör, salt okunur bir dosya, kaybolmuş bir klasör, dolu bir disk ve bir kaydetmenin her geri çağrısında bir panic; bunların hiçbiri metne mal olmamalıdır.
 
 Kapsamın iki tabanı vardır: her modül satırlarının en az %84’i, tüm modüller birlikte en az %96’i. `make coverage`, `cargo test`’i öz-testlerle birlikte ölçer ve ikisinden birinin altında başarısız olur; `make coverage-library`, pencere gerektirmeyeni %90 ve %97’de tutar. Tabanlar ve yalnızca bir çökmede çalışan `main.rs` içindeki panik kancası gibi az sayıdaki istisna, gerekçeleriyle birlikte [xtask](../../../xtask/src/coverage.rs) içindedir. Ölçülen derlemeler `target/coverage/` içine gider, böylece ölçüm kodu asla `target/release/` ya da bir disk görüntüsüne ulaşmaz. Çözücü yardımcısı kendini kilitlemeden önce ölçüm dosyasını açar, bu yüzden o da ölçülür.
 
@@ -648,16 +655,20 @@ CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)), `main`’e y
 
 ### Proje yapısı
 
-`src/lib.rs`, pencere gerektirmeyen her şeyi kendi başına bir kütüphane olan `splat` haline getirir: `markdown/`, `preview/`, `i18n.rs` ve test üreteci `fuzz.rs`. macOS olmadan derlenir. `src/main.rs` içindeki uygulama onun üzerine kurulur.
+Pencere gerektirmeyen her şey, `crates/` altında kendi başına bir crate’tir ve macOS olmadan derlenir; böylece birbirlerine nasıl bağlı olduklarına derleyici uyulmasını sağlar. `src/` içindeki uygulama (`splat-app` paketi, `splat` programı) onların üzerine kurulur.
 
-- `src/markdown/`: her tüketicinin okuduğu ağaç, metnine sahip olan `doc/` içindeki `Doc`, ve ayrıştırıcıya tek bağlama `reader/` içinde: comrak başka hiçbir yerde anılmaz, `reader/assumptions.rs` ise kodun onun hakkında neyi varsaydığını tutar. Sözdizimi renkleri ve tüm komutlar `commands/` içinde saf metin düzenlemeleri (`Edit`) olarak. Ayrıca bir düzenlemeden sonra yeniden ayrıştırma (`incremental.rs`), gömülü HTML için okuyucu (`markup.rs`), akan metindeki tipografi, etiketler, başvurular ve alıntılar (`typography.rs`), metnin nasıl göründüğü ve hangi Markdown ile HTML’in onu öyle yaptığı (`style.rs`), bir adresin ne olabileceği (`url.rs`) ile HTML ve Word dışa aktarma (`html.rs`, `docx.rs` ile `docx/html.rs` ve `docx/xml.rs`). Bir konumun kendi türü vardır: kaynak metinde `Byte`, kaynak görünümünde `U16`, önizleme görünümünde `Shown` (`text.rs`). AppKit yok.
-- `src/preview/`: önizleme yerleşimi `layout/` içinde, gömülü HTML `layout/html.rs` içinde, ve önizleme ile kaynak arasındaki eşleme (`Bridge`, `Index`). Bir `Bridge`, `Doc`’un başka bir sürümüne ait yerleşimi reddeder. AppKit yok.
+- `crates/splat-markdown/`: her tüketicinin okuduğu ağaç, metnine sahip olan `doc/` içindeki `Doc`, ve ayrıştırıcıya tek bağlama `reader/` içinde: comrak başka hiçbir yerde anılmaz, `reader/assumptions.rs` ise kodun onun hakkında neyi varsaydığını tutar. Sözdizimi renkleri ve tüm komutlar `commands/` içinde saf metin düzenlemeleri (`Edit`) olarak. Ayrıca bir düzenlemeden sonra yeniden ayrıştırma (`incremental.rs`), gömülü HTML için okuyucu (`markup.rs`), akan metindeki tipografi, etiketler, başvurular ve alıntılar (`typography.rs`), metnin nasıl göründüğü ve hangi Markdown ile HTML’in onu öyle yaptığı (`style.rs`), bir adresin ne olabileceği (`url.rs`) ile HTML ve Word dışa aktarma (`html.rs`, `docx.rs` ile `docx/html.rs` ve `docx/xml.rs`). Bir konumun kendi türü vardır: kaynak metinde `Byte`, kaynak görünümünde `U16`, önizleme görünümünde `Shown` (`text.rs`).
+- `crates/splat-preview/`: önizleme yerleşimi `layout/` içinde, gömülü HTML `layout/html.rs` içinde, ve önizleme ile kaynak arasındaki eşleme (`Bridge`, `Index`). Bir `Bridge`, `Doc`’un başka bir sürümüne ait yerleşimi reddeder.
+- `crates/splat-file-state/`: bir dosyanın hangi metni, hangi biçimde tuttuğu ve ona bakmanın ne anlama geldiği.
+- `crates/splat-i18n/` ve `resources/*.lproj`: 35 dil; anahtarlar Almanca metinlerdir ve uygulama başlarken arayüz dilinin tablosunu kurar.
+- `crates/splat-testkit/`: rastgele testlerin üreteci ve fuzz hedeflerinin denetimleri.
 - `src/editor/`: pencere. Tek bir `EditorController` nesnesi AppKit’e her iki görünümün delegesi olarak hizmet eder ve işi bileşenlere devreder; bileşenler denetleyicinin üzerindeki küçük yapılardır ve sahip oldukları durumun alanlarına diğer modüller erişemez:
 
 | Modül | Sorumluluk |
 |---|---|
-| `mod.rs` | sınıf, işi ileten delege yöntemleri, `invalidate` |
+| `controller.rs` | sınıf, işi ileten delege yöntemleri, `invalidate` ve programın geri kalanının bir düzenleyiciye söyledikleri; bileşenlere yalnızca o ulaşır |
 | `panes.rs` | `Panes`: metin görünümleri, ana hat, bölmelerin gösterilmesi ve gizlenmesi ve görünümlere erişim veren şey |
+| `controller/layers.rs` | kim kime ulaşabilir: bir bileşen, altındakileri sunan bir denetleyici tutamacı alır ve derleyici buna uyulmasını sağlar |
 | `state.rs` | denetleyicinin belge hakkında bildikleri ve bunu değiştiren her yol; alanları özeldir ve hiçbir görünüme dokunmaz |
 | `model.rs` | durumu ve metin kopyasını bir görünüme erişemeyen closure’lara ödünç verir |
 | `actions.rs` | komut kaydı: seçici, başlık, kısayol, simge, komutun ne zaman geçerli olduğu |
@@ -669,17 +680,16 @@ CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)), `main`’e y
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: formül ve diyagram düzenleyicisi |
 | `navigation.rs`, `links.rs` | `Links`: bağlantılar, wiki bağlantıları, etiketler, görev onay kutuları, katlama, dipnotlar |
 | `env.rs` | önizlemenin metnin dışından okuduğu şeyler: tipografik noktalama, `@name` ve `#12` için depo, BibTeX dosyası, gömülü notlar |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | önizleme metni, yerel ve uzak görüntüler; `Pictures` `images.rs` içinde |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | önizleme metni, yerel ve uzak görüntüler; `Pictures` `images.rs` içinde |
 | `attributes.rs` | metin öznitelikleri; her anahtar yalnızca beklediği türde bir değer alır |
 | `shadow.rs` | bir çökmeden sonra kurtarma için kaydedilmemiş metnin kopyaları |
 | `decoder.rs` | görüntüleri ve grafikleri çözen korumalı yardımcı işlemler |
 | `export.rs`, `outline.rs` | `Sharing`: HTML ve Word dışa aktarma; ana hat kenar çubuğu |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | MathJax, Mermaid, Graphviz, PlantUML ve görsel formül düzenleyicisi için WebKit; WebKit’ten bağımsız olarak neyin ne zaman görüntüleneceğinin kuralları |
 | `webkit.rs` | WebKit’e çağrılar; yalnızca gezinme delegesinin ömrü `js.rs` ve `mathfield.rs` ile kalır |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | pencerenin kurulması, araç çubuğu, metin görünümleri, iletişim kutuları, renkler |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | pencerenin kurulması, araç çubuğu, metin görünümleri, iletişim kutuları, renkler |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menü çubuğu, uygulama delegesi, belge (`MDDocument`, bir `NSDocument` alt sınıfı).
-- `src/i18n.rs` ve `resources/*.lproj`: 35 dil; anahtarlar Almanca metinlerdir ve uygulama başlarken arayüz dilinin tablosunu kurar.
 - `src/util/`: işçi iş parçacıkları (`lanes.rs`), yanıt vermeyi bırakabilen birimler (`volumes.rs`), AppKit yardımcıları, dosyalar ve süreçler. `src/diag.rs`: kullanıcının görmediği yerde ters giden şey, bir belgenin hiçbir metni olmadan sistem günlüğüne gider.
 - `src/large_alloc.rs`: büyük bellek ayırmaları doğrudan çekirdekten gelir ve serbest bırakılınca ona geri döner; böylece büyük düzenlemelerden sonra bellek geri döner.
 - `resources/js/`: web sayfaları ve kütüphaneler; sürümler ve sağlama toplamları [vendor.lock](../../../vendor.lock) içinde.
@@ -691,11 +701,11 @@ Soldaki metin görünümündeki kaynak metin tek gerçek kaynaktır.
 
 1. Oradaki her karakter değişikliği, metni yeniden okumadan metin kopyasını (`Snapshot`) yerinde günceller.
 2. Bir güncelleme kopyayı ayrıştırır, kaynağı yalnızca renklerin değiştiği yerde yeniden renklendirir, önizlemeyi yerleştirir ve yalnızca içeriği değişen blokları değiştirir.
-3. Bir düzenlemeden sonra, komşuları aynı kaldığı sürece yalnızca etkilenen paragraflar yeniden ayrıştırılır, renklendirilir ve yerleştirilir; ne zaman kalmadıklarını `reparse_part_and_color` söyler. `%%` yorum blokları olan belgeler, front matter’daki değişiklikler ve bağlantı başvuru tanımları olan bir belgede köşeli parantez içeren bir parçadaki değişiklikler tümüyle işlenir. comrak bir dipnot başvurusunu yalnızca tanımı aynı ayrıştırmadaysa tanır ve tanımları metnin arkasına taşır; bu yüzden parça, etiket başına bir yer tutucu tanımla ayrıştırılır ve numaralarını eski ağaçtan alır; parçadaki başvurulara ya da tanımlara veya satır içi bir dipnotun yanına yapılan bir değişiklik tümüyle işlenir.
+3. Bir düzenlemeden sonra, komşuları aynı kaldığı sürece yalnızca etkilenen paragraflar yeniden ayrıştırılır, renklendirilir ve yerleştirilir; bunun neden tam ayrıştırmanın verdiğini verdiğini ve comrak değiştiğinde neye bakılacağını [docs/partial-parse.md](../../../docs/partial-parse.md) söyler. `%%` yorum blokları olan belgeler, front matter’daki değişiklikler ve bağlantı başvuru tanımları olan bir belgede köşeli parantez içeren bir parçadaki değişiklikler tümüyle işlenir. comrak bir dipnot başvurusunu yalnızca tanımı aynı ayrıştırmadaysa tanır ve tanımları metnin arkasına taşır; bu yüzden parça, etiket başına bir yer tutucu tanımla ayrıştırılır ve numaralarını eski ağaçtan alır; parçadaki başvurulara ya da tanımlara veya satır içi bir dipnotun yanına yapılan bir değişiklik tümüyle işlenir.
 4. `<details>` ya da `<div align>` açıp sonra kapatan HTML blokları, aradaki Markdown bloklarını etkiler; yeniden kullanılan bir blok aynı çevreye sahip olmalıdır.
 5. 2 MB’a kadar bir belgenin kaynağında yazarken kısmi güncelleme hemen çalışır; uygulanmıyorsa ya da belge daha büyükse ayrıştırma ve yerleşim arka planda çalışır. Önizlemede yazarken hemen çalışırlar, çünkü önizlemenin imleci sonuca bağlıdır.
 6. Önizlemedeki girdi `Bridge` tarafından kaynağın bir düzenlemesine çevrilir ve oradan sonra aynı yolu izler. Markdown metni sözdizimine çevirmenin yalnızca kurallarla başa çıkılamayacak kadar çok yolunu içerir; bu yüzden `preview/verify.rs` değişen parçayı yeniden ayrıştırır ve gösterdiğini yazılanla karşılaştırır; tutmayan bir düzenleme daha fazla öncelenir (escape edilir) ya da reddedilir.
-7. comrak’ın satır içi konumları birkaç yerde yanlış çıkar, örneğin bir bağlantı başvuru tanımının arkasında. `markdown/reader/positions.rs` bir bloğu okurken bunları kaynağa karşı denetler ve uymadıkları yerde kaynaktan yeniden okur.
+7. comrak’ın satır içi konumları birkaç yerde yanlış çıkar, örneğin bir bağlantı başvuru tanımının arkasında. `reader/positions.rs` bir bloğu okurken bunları kaynağa karşı denetler ve uymadıkları yerde kaynaktan yeniden okur.
 
 ### Denetleyicideki kurallar
 
@@ -704,16 +714,18 @@ Soldaki metin görünümündeki kaynak metin tek gerçek kaynaktır.
 3. Dışarıdan gelen iletiler (yüklenen bir görüntü, görüntülenen bir formül) `renders_arrived` ve `image_arrived` üzerinden gecikmeli olarak gelir, asla bir güncellemenin ortasında değil.
 4. Metin değişikliği olmadan yeniden çizim yalnızca `invalidate(reason)` üzerinden yapılır.
 5. Metin kopyası kaynağın bir değişikliği boyunca tutulmaz, yoksa o değişiklik tüm metni kopyalar: `with_text` onu yalnızca bir `Send` closure’ın süresince ödünç verir.
-6. Yeni bir komut `actions.rs` içinde bir girdi, `mod.rs` içinde bir yöntem ve `Editing::perform` içinde bir dal gerektirir.
+6. Yeni bir komut `actions.rs` içinde bir girdi, `controller.rs` içinde bir yöntem ve `Editing::perform` içinde bir dal gerektirir.
 7. Her `unsafe` bloğu gerekçesini bir `// SAFETY:` yorumu olarak taşır. Baytlar sistemin görüntü çözücülerine yalnızca yardımcı süreçte, `decoder::decode_native` üzerinden ulaşır; bir test kaynakları başka çağrılar için tarar.
 8. Ana iş parçacığındaki hiçbir şey kullanıcının klasörlerini beklemez, çünkü bir ağ birimi yanıt vermeyi bırakabilir: dosyalara `DISK` iş parçacığında bakılır ve önizleme yanıtları `Env::known` üzerinden okur. Yalnızca kullanıcının beklediği bir eylem, örneğin bir dışa aktarma ya da kaydetme, diske doğrudan dokunabilir.
+9. Bitmesi gereken, bir panic’ten sonra da biter, çünkü ana iş parçacığı panic’ten sağ çıkar: kaldırılmış bir bayrak `with_raised` üzerinden, metin deposunun düzenlenmesi `editing` üzerinden, geri almanın bilmemesi gerekenler de `without_undo` üzerinden geçer. Bir test, elle yazılanları bulur.
+10. Bir belgedeki adresin tek bir okunuşu vardır, `splat_markdown::url` içinde; bir test, elle karşılaştırılan şemaları bulur.
 
 ### Komut ekleme
 
 Menü çubuğu, araç çubuğu ve bağlam menüsü öğelerinin hepsini [src/editor/actions.rs](../../../src/editor/actions.rs) içindeki kayıttan kurar; menü doğrulaması bir komutun ne zaman geçerli olduğunu ve onay işareti gösterip göstermediğini oradan okur. Yeni bir komut için gerekenler:
 
 1. `Spec`’iyle bir `Action` varyantı: seçici, başlık, araç çubuğu etiketi, ipucu (bir fiille başlar, en fazla 75 karakter), kısayol, SF Symbol ve ne zaman geçerli olduğu
-2. `src/editor/mod.rs` içindeki yöntem
+2. `src/editor/controller.rs` içindeki yöntem
 3. `Editing::perform` içinde bir dal
 4. her `Localizable.strings` içindeki metinleri
 
@@ -735,7 +747,7 @@ Kod, anahtar olarak Almanca metni kullanır: `t("Fett")` onu çalışma anında 
 
 | Bileşen | Sürüm | Kullanım amacı | Lisans |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown ayrıştırıcısı | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59, [bir satırı değiştirilmiş](../../../vendor/comrak/PATCH.md) | Markdown ayrıştırıcısı | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C çalışma zamanı, Foundation, bloklar | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit, WebKit ve Grand Central Dispatch bağlayıcıları | Zlib, Apache-2.0 veya MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formüller ve SVG görüntüleri vektör PDF olarak | MIT veya Apache-2.0 |

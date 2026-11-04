@@ -7,7 +7,6 @@ use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use dispatch2::DispatchQueue;
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{NSObject, ProtocolObject};
 use objc2::{AnyThread, define_class, msg_send};
@@ -18,9 +17,9 @@ use objc2_foundation::{
 };
 
 use super::EditorController;
-use super::images::{Rendered, Sizing};
+use super::picture::{Rendered, Sizing};
 use super::safe_image::{Decoded, MAX_BYTES};
-use crate::util::ns;
+use crate::util::{guarded, main_soon, ns};
 
 #[derive(Default)]
 struct Remote {
@@ -30,6 +29,10 @@ struct Remote {
     /// slow host would otherwise run out of time in the queue.
     waiting: VecDeque<String>,
     running: usize,
+    /// The downloads under way, by address: nobody may be left to show what they bring.
+    tasks: HashMap<String, Retained<NSURLSessionDataTask>>,
+    /// The documents that wait for what is loading or waiting to load.
+    askers: HashMap<String, HashSet<usize>>,
     listeners: Vec<Weak<EditorController>>,
 }
 
@@ -64,7 +67,7 @@ pub fn idle() -> bool {
 }
 
 pub fn is_remote(url: &str) -> bool {
-    url.starts_with("https://")
+    crate::markdown::url::is_https(url)
 }
 
 /// A host on the public internet: requests to `localhost`, `.local` names or private, loopback and link-local
@@ -154,12 +157,21 @@ pub fn try_failed_again() {
     if due.is_empty() || listeners.is_empty() {
         return;
     }
-    let shown: HashSet<String> = listeners.iter().flat_map(|l| l.updater().web_images_shown()).collect();
+    let shown: Vec<(usize, Vec<String>)> = listeners.iter().map(|l| (asker(l), l.web_images_shown())).collect();
     let due: Vec<String> = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
-        due.into_iter()
-            .filter(|url| shown.contains(url) && r.loading.insert(url.clone()))
-            .collect()
+        let due: Vec<String> = due
+            .into_iter()
+            .filter(|url| shown.iter().any(|(_, urls)| urls.contains(url)) && r.loading.insert(url.clone()))
+            .collect();
+        for url in &due {
+            let owners = shown
+                .iter()
+                .filter(|(_, urls)| urls.contains(url))
+                .map(|(owner, _)| *owner);
+            r.askers.entry(url.clone()).or_default().extend(owners);
+        }
+        due
     });
     for url in due {
         load(&url);
@@ -177,9 +189,59 @@ pub fn forget_unused() {
     });
 }
 
+fn asker(controller: &EditorController) -> usize {
+    std::ptr::from_ref(controller) as usize
+}
+
+/// A document has closed, and a document decides which hosts hear from Splat.
+pub(super) fn stops_showing(controller: &EditorController) {
+    REMOTE.with(|r| {
+        let mut r = r.borrow_mut();
+        r.listeners
+            .retain(|w| w.load().is_some_and(|l| !std::ptr::eq(&*l, controller)));
+        forget_asker(&mut r, asker(controller));
+        if r.listeners.is_empty() {
+            release(&mut r);
+        }
+    });
+}
+
+/// What only `gone` waited for stops waiting for its turn or loading.
+fn forget_asker(r: &mut Remote, gone: usize) {
+    let mut nobody = HashSet::new();
+    r.askers.retain(|url, owners| {
+        owners.remove(&gone);
+        if owners.is_empty() {
+            nobody.insert(url.clone());
+        }
+        !owners.is_empty()
+    });
+    let Remote { waiting, loading, .. } = &mut *r;
+    waiting.retain(|url| {
+        let keep = !nobody.contains(url);
+        if !keep {
+            loading.remove(url);
+        }
+        keep
+    });
+    for url in &nobody {
+        if let Some(task) = r.tasks.get(url) {
+            task.cancel();
+        }
+    }
+}
+
 fn release(r: &mut Remote) {
     for (_, stored) in r.images.drain() {
-        super::images::count_decoded(-crate::util::to_isize(stored.bytes));
+        super::picture::count_decoded(-crate::util::to_isize(stored.bytes));
+    }
+    let Remote { waiting, loading, .. } = &mut *r;
+    for url in waiting.drain(..) {
+        loading.remove(&url);
+    }
+    r.askers.clear();
+    for task in r.tasks.values() {
+        task.cancel();
     }
 }
 
@@ -188,6 +250,8 @@ pub fn get(url: &str, requester: Option<&EditorController>) -> Option<Option<Ren
     if !NSURL::URLWithString(&ns(url)).is_some_and(|u| public_host(&u)) {
         return Some(None);
     }
+    let requester = requester.filter(|c| !c.has_closed());
+    let owner = requester.map(asker);
     let (found, start) = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         if let Some(c) = requester
@@ -201,7 +265,12 @@ pub fn get(url: &str, requester: Option<&EditorController>) -> Option<Option<Ren
         }
         match r.images.get(url) {
             Some(stored) => (Some(stored.found.clone()), false),
-            None => (None, requester.is_some() && r.loading.insert(url.to_string())),
+            None => {
+                if let Some(owner) = owner {
+                    r.askers.entry(url.to_string()).or_default().insert(owner);
+                }
+                (None, requester.is_some() && r.loading.insert(url.to_string()))
+            }
         }
     });
     if start {
@@ -218,7 +287,7 @@ pub(super) fn load(url: &str) {
 fn start(url: &str) {
     let Some(nsurl) = NSURL::URLWithString(&ns(url)).filter(|u| public_host(u)) else {
         let url = url.to_string();
-        DispatchQueue::main().exec_async(move || finish(url, None, Failure::Final));
+        main_soon(move || finish(url, None, Failure::Final));
         return;
     };
     let task = SESSION.with(|s| s.dataTaskWithURL(&nsurl));
@@ -227,6 +296,7 @@ fn start(url: &str) {
             .insert(task.taskIdentifier(), (url.to_string(), Vec::new()));
     }
     task.resume();
+    REMOTE.with(|r| r.borrow_mut().tasks.insert(url.to_string(), task));
 }
 
 fn session() -> Retained<NSURLSession> {
@@ -270,7 +340,7 @@ define_class!(
             request: &NSURLRequest,
             completion: &block2::DynBlock<dyn Fn(*mut NSURLRequest)>,
         ) {
-            let allowed = request.URL().is_some_and(|u| public_host(&u));
+            let allowed = guarded(false, || request.URL().is_some_and(|u| public_host(&u)));
             let next = if allowed {
                 request as *const NSURLRequest as *mut NSURLRequest
             } else {
@@ -281,27 +351,35 @@ define_class!(
 
         #[unsafe(method(URLSession:task:didCompleteWithError:))]
         fn completed(&self, _session: &NSURLSession, task: &NSURLSessionTask, error: Option<&NSError>) {
-            let Some((url, bytes)) = DOWNLOADS
-                .lock()
-                .ok()
-                .and_then(|mut d| d.as_mut()?.remove(&task.taskIdentifier()))
-            else {
-                return;
-            };
-            let status = task
-                .response()
-                .and_then(|r| r.downcast::<NSHTTPURLResponse>().ok())
-                .map(|r| r.statusCode());
-            let failure = failure_of(error.map(NSError::code), status);
-            if error.is_some() || bytes.len() > MAX_BYTES || !status.is_some_and(|s| (200..300).contains(&s)) {
-                DispatchQueue::main().exec_async(move || finish(url, None, failure));
-                return;
-            }
-            // The session's queue also delivers the data of all other downloads, so decoding must not hold it up.
-            super::images::load_in_background(move || {
-                let decoded =
-                    crate::util::contained(|| super::decoder::decode(&bytes, super::images::allowed_side())).flatten();
-                DispatchQueue::main().exec_async(move || finish(url, decoded, Failure::Final));
+            guarded((), || {
+                let Some((url, bytes)) = DOWNLOADS
+                    .lock()
+                    .ok()
+                    .and_then(|mut d| d.as_mut()?.remove(&task.taskIdentifier()))
+                else {
+                    return;
+                };
+                let status = task
+                    .response()
+                    .and_then(|r| r.downcast::<NSHTTPURLResponse>().ok())
+                    .map(|r| r.statusCode());
+                let failure = failure_of(error.map(NSError::code), status);
+                if error.is_some() || bytes.len() > MAX_BYTES || !status.is_some_and(|s| (200..300).contains(&s)) {
+                    main_soon(move || finish(url, None, failure));
+                    return;
+                }
+                // The session's queue also delivers the data of all other downloads, so decoding must not hold it up.
+                super::picture::load_in_background(move || {
+                    let room = super::picture::room_for_more();
+                    let decoded = room
+                        .then(|| {
+                            crate::util::contained(|| super::decoder::decode(&bytes, super::picture::allowed_side()))
+                        })
+                        .flatten()
+                        .flatten();
+                    let failure = if room { Failure::Final } else { Failure::Passing };
+                    main_soon(move || finish(url, decoded, failure));
+                });
             });
         }
     }
@@ -315,7 +393,9 @@ define_class!(
             response: &NSURLResponse,
             completion: &block2::DynBlock<dyn Fn(NSURLSessionResponseDisposition)>,
         ) {
-            let too_big = usize::try_from(response.expectedContentLength()).is_ok_and(|n| n > MAX_BYTES);
+            let too_big = guarded(true, || {
+                usize::try_from(response.expectedContentLength()).is_ok_and(|n| n > MAX_BYTES)
+            });
             completion.call((if too_big {
                 NSURLSessionResponseDisposition::Cancel
             } else {
@@ -325,13 +405,15 @@ define_class!(
 
         #[unsafe(method(URLSession:dataTask:didReceiveData:))]
         fn data(&self, _session: &NSURLSession, task: &NSURLSessionDataTask, data: &NSData) {
-            let over = DOWNLOADS.lock().ok().is_none_or(|mut d| {
-                d.as_mut()
-                    .and_then(|d| d.get_mut(&task.taskIdentifier()))
-                    .is_none_or(|(_, bytes)| {
-                        bytes.extend_from_slice(&data.to_vec());
-                        bytes.len() > MAX_BYTES
-                    })
+            let over = guarded(true, || {
+                DOWNLOADS.lock().ok().is_none_or(|mut d| {
+                    d.as_mut()
+                        .and_then(|d| d.get_mut(&task.taskIdentifier()))
+                        .is_none_or(|(_, bytes)| {
+                            bytes.extend_from_slice(&data.to_vec());
+                            bytes.len() > MAX_BYTES
+                        })
+                })
             });
             if over {
                 task.cancel();
@@ -360,11 +442,22 @@ fn failure_of(error: Option<isize>, status: Option<isize>) -> Failure {
 }
 
 fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
+    let shown = REMOTE.with(|r| {
+        let mut r = r.borrow_mut();
+        r.loading.remove(&url);
+        r.tasks.remove(&url);
+        r.running = r.running.saturating_sub(1);
+        r.askers.remove(&url).is_some()
+    });
+    if !shown {
+        start_waiting();
+        return;
+    }
     let bytes = match &decoded {
         Some(Decoded::Rgba { pixels, .. }) => pixels.len(),
         _ => 0,
     };
-    super::images::count_decoded(crate::util::to_isize(bytes));
+    super::picture::count_decoded(crate::util::to_isize(bytes));
     let rendered = decoded.and_then(super::decoder::image).map(|image| {
         let size = image.size();
         Rendered {
@@ -374,8 +467,6 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
     });
     let listeners = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
-        r.loading.remove(&url);
-        r.running = r.running.saturating_sub(1);
         let pause = r
             .images
             .get(&url)
@@ -388,19 +479,53 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
             retry,
         };
         if let Some(old) = r.images.insert(url.clone(), stored) {
-            super::images::count_decoded(-crate::util::to_isize(old.bytes));
+            super::picture::count_decoded(-crate::util::to_isize(old.bytes));
         }
         r.listeners.iter().filter_map(Weak::load).collect::<Vec<_>>()
     });
     start_waiting();
     for l in listeners {
-        l.updater().image_arrived(url.clone());
+        l.image_arrived(url.clone());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_document_that_closes_takes_back_only_what_nobody_else_waits_for() {
+        let mut remote = Remote::default();
+        for (url, owners) in [("nur eines", vec![1]), ("beide", vec![1, 2]), ("das andere", vec![2])] {
+            remote.loading.insert(url.to_string());
+            remote.waiting.push_back(url.to_string());
+            remote.askers.insert(url.to_string(), owners.into_iter().collect());
+        }
+        forget_asker(&mut remote, 1);
+        assert_eq!(remote.waiting, ["beide", "das andere"]);
+        assert!(!remote.loading.contains("nur eines") && remote.loading.contains("beide"));
+        assert!(!remote.askers.contains_key("nur eines"));
+        assert_eq!(remote.askers["beide"].len(), 1);
+    }
+
+    #[test]
+    fn what_nobody_shows_any_more_stops_waiting_for_its_turn() {
+        let mut remote = Remote::default();
+        for url in ["a", "b"] {
+            remote.loading.insert(url.to_string());
+            remote.waiting.push_back(url.to_string());
+        }
+        remote.loading.insert("unterwegs".to_string());
+        release(&mut remote);
+        assert!(remote.waiting.is_empty());
+        assert_eq!(remote.loading.into_iter().collect::<Vec<_>>(), ["unterwegs"]);
+    }
+
+    #[test]
+    fn an_address_on_the_web_is_one_however_its_scheme_is_written() {
+        assert!(is_remote("https://a.de/b.png") && is_remote("HTTPS://a.de/b.png"));
+        assert!(!is_remote("http://a.de/b.png") && !is_remote("b.png"));
+    }
 
     #[test]
     fn a_failure_is_due_once_its_pause_is_over() {

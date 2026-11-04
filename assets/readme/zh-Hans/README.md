@@ -120,7 +120,7 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 - **样样都有按钮。** 每种 Markdown 元素都有对应的工具栏按钮和菜单项，常用的还有键盘快捷键。表格有专属菜单，用于处理行、列和对齐。
 - **导出不丢内容。** 可导出为 PDF、单个自包含的 HTML 文件，或带有真正的标题、列表、表格、脚注和图像的 Word 文稿。
 - **彻头彻尾的原生。** 真正的 AppKit 窗口、标签页、菜单、弹出窗口、版本、自动存储、共享菜单、深色模式、拼写检查、听写和旁白。没有 Electron，文本本身也不用网页视图。
-- **大文件也很快。** 在 10 MB 的文稿中，渲染一次按键约需 25 毫秒（不含视图自身的工作）。
+- **大文件也很快。** 在 10 MB 的文稿中，渲染一次按键约需 10 毫秒（不含视图自身的工作）。
 - **私密而谨慎。** 来自网络的图像只有在你允许后才会载入，指向其他 App 的链接会先询问，所有解码不受信任的图像数据的操作都在沙盒化的辅助进程中运行。
 - **使用你的语言。** 界面和内置的 Markdown 快速参考提供 35 种语言版本：阿拉伯语、加泰罗尼亚语、简体中文、繁体中文、克罗地亚语、捷克语、丹麦语、荷兰语、英语、芬兰语、法语、德语、希腊语、希伯来语、印地语、匈牙利语、印度尼西亚语、意大利语、日语、韩语、马来语、挪威语、波兰语、葡萄牙语（巴西）、葡萄牙语（葡萄牙）、罗马尼亚语、俄语、斯洛伐克语、斯洛文尼亚语、西班牙语、瑞典语、泰语、土耳其语、乌克兰语和越南语。
 
@@ -504,7 +504,7 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 - **默认不联网。** Splat 没有遥测功能。只有在你同意或选取 **检查更新…** 之后，它才会检查更新：此时它会从 GitHub 载入一个小型订阅源文件，请求中除了 App 名称及其版本外不含任何信息。公式和图表在本地渲染；负责渲染的网页视图无法访问网络。
 - **来自网络的图像**只有在你许可之后才会载入，只通过 `https`，从不来自本地网络中的主机，每张最大 10 MB，并且在不带 Cookie 的隐私会话中进行。
 - **隔离解码。** 图像以及公式和图表的图形，在辅助进程中解码；这些进程会关闭继承的所有文件，并在读取第一个字节之前把自己锁进沙盒：无法访问文件，也无法联网。它们只交回像素，且会检查像素的尺寸，10 秒后即被终止。Apple 自带的图像解码器只处理 HEIC、TIFF、AVIF 和 PDF，而且仅当数据确实是该格式时才处理；它们在专属的辅助进程中运行，该进程另外可以读取系统的字体文件夹，并使用系统的视频解码器。SVG、公式和图表同样要经过这个辅助进程，因此它们在 Splat 中是分辨率固定的图片：每点四个像素，长边最多 2560 像素。
-- **本地文件**只能通过文稿中写明的路径进入文稿。嵌入会显示文稿所在文件夹及其下级文件夹中的 Markdown 笔记，缺失的图片也只在那里查找。其他位置的图像路径，无论是绝对路径还是以 `~` 开头，仍然会载入，HTML 和 Word 导出也会把它嵌入：转交不是你写的文稿之前，请先查看它的导出结果。
+- **本地文件**只能通过文稿中写明的路径进入文稿。嵌入会显示文稿所在文件夹及其下级文件夹中的 Markdown 笔记，缺失的图片也只在那里查找。其他位置的图像路径，无论是绝对路径还是以 `~` 开头，在预览中仍然会载入；HTML 和 Word 导出、打印和 PDF 只带上文稿所在文件夹或其 Git 仓库中的内容（除非该仓库同时包含你的个人文件夹），因此别人的文稿无法把你的文件拉进你转交的导出文件。
 - **未存储文本的拷贝**留在这台 Mac 的“资源库”文件夹中，用于崩溃后的恢复。存储或 Splat 正常结束后，它们就会消失；崩溃遗留的拷贝则会留在恢复文件夹中，直到你将其删除。
 - **链接**绝不会因点按而启动程序。网页和邮件链接照常打开；指向其他 App 的链接会先询问。
 - **文稿中的 HTML** 由 Splat 自己的解析器读取。脚本、样式、框架和表单绝不会运行。
@@ -516,13 +516,14 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 对于几兆字节的文稿，Splat 仍能保持响应：
 
 - 源文本使用 TextKit 2，它只对可见部分进行排版。
-- 在预览中输入时，以及在最大 2 MB 的文稿的源文本中输入时，只有受影响的段落会重新解析、着色和排版。在 10 MB 的文稿中，解析和着色约需 20 毫秒，渲染约需 25 毫秒，在其预览中完整的一次按键约需 60 毫秒（含视图自身的工作）。
+- 在预览中输入时，以及在最大 2 MB 的文稿的源文本中输入时，只有受影响的段落会重新解析、着色和排版。在 10 MB 的文稿中，解析和着色约需 3 毫秒，渲染约需 10 毫秒，在其预览中完整的一次按键约需 30 毫秒（含视图自身的工作）。
 - 大型预览先渲染可见部分，其余部分在 App 空闲时渲染。滚动到视野中的区块会在绘制之前先渲染。
 - 在较大文稿的源文本中，预览的解析会在你输入时于后台运行。
 - 文稿一旦需要约 4 GB 内存便保持为纯文本（普通 Markdown 约 50 到 120 MB，全是表格或标题时只需 10 到 20 MB）：源文本没有颜色，预览会说明它为何保持空白。导出仍然可用。
 - 从约 200 KB 起，文稿会在解析之前先打开窗口；到 5 MB 时，着色和预览约四分之一秒后才出现。
+- 所有图像加起来，包括公式和图表，最多占用 Mac 内存的四分之一，内存紧张时再减半。超出部分的图像会显示为占位符，直到再次有空间。
 
-有些更改需要完整处理，在 10 MB 时每次按键约 300 毫秒：对脚注的定义或引用的更改、行内脚注旁边的更改、紧挨脚注的文稿最末尾处的更改、对前置元数据或链接引用定义附近的更改，以及在含有 `%%` 注释块、或某个脚注被定义两次、或脚注位于引用或列表内的文稿中所做的每一处更改。内存随文件增长，1 MB 的 Markdown 约需 115–160 MB，10 MB 则约需 340–510 MB。
+有些更改需要完整处理，在 10 MB 时每次按键约 300 毫秒：对脚注的定义或引用的更改、行内脚注旁边的更改、紧挨脚注的文稿最末尾处的更改、对前置元数据或链接引用定义的更改，以及在含有 `%%` 注释块、或某个脚注被定义两次、或脚注位于引用或列表内的文稿中所做的每一处更改。内存随文件增长，1 MB 的 Markdown 约需 115–160 MB，10 MB 则约需 340–510 MB。
 
 ## 已知限制
 
@@ -577,6 +578,7 @@ make check                  # 格式、无警告的 clippy、全部测试、内�
 make test                   # 先执行 make check，再执行无窗口的自测
 make test-gui               # 带窗口的自测；它们会占用 Mac 约四分钟
 make test-long              # 更长的随机搜索，以及 10 MB 的局部更新检查
+make fuzz                   # 针对部分解析和所有输出的随机输入
 make coverage               # 全部测试和自测的行覆盖率，每个模块有下限
 make coverage-library       # 针对无窗口模块的同样下限，与 CI 中一致
 make bench FILE=<file.md>   # 打开、输入和滚动大文件的耗时
@@ -624,19 +626,24 @@ cargo xtask vendor fetch       # 修改 vendor.lock 中的版本后重新下载
 | `cargo xtask check-library` | 该库可为 Linux 构建，因此其中没有任何东西需要 macOS |
 | `cargo xtask vendor check` | JavaScript 库与 `vendor.lock` 逐字节一致 |
 | `cargo xtask selftest probe` | 无窗口，各自带有预期结果：公式、图表、对照进程内服务器的网络图像、被阻止的地址、每条命令写出的文本、每种图像格式经过两种导出、一个不再响应的页面，以及网页视图对没有防护的页面的防护。大约需要半分钟。需要 App 位于前台的部分在锁屏时会被跳过 |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | 运行中的 App，逐次点按。它会打开窗口并向其中输入；Mac 会被占用约四分钟。`--scenarios` 只运行第二部分，约一分半钟 |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | 运行中的 App，逐次点按。它会打开窗口并向其中输入；Mac 会被占用约四分钟。`--scenarios` 只运行第二部分，约一分半钟. `--only` 运行该部分的一个组，使用它自己的文稿，在锁屏时也可运行。`--in-back` 略过需要 App 在前台的内容；没有它，这类检查会失败 |
 | `cargo xtask selftest resize` | 拖移分隔线后加宽窗口：调整窗口大小时，源文本会重新换行。约需十秒 |
-| `cargo xtask selftest bench <file.md>` | 打开、输入和滚动大文件的耗时 |
+| `cargo xtask selftest typing [--by-hand]` | 在存储过程中持续输入，按键经由 App 的事件队列，或用 `--by-hand` 手动输入：输入的内容保留并显示为未存储。约需一分钟 |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | 打开、输入和滚动大文件的耗时。最快的按键耗时更长时，`--keystroke-ms` 失败 |
 | `cargo test --release -- --ignored partial_updates` | 10 MB 文稿中的一次按键：局部更新与完整更新的对比，结果相同，耗时至多四分之一 |
 | `cargo test --release --test hostile` | 专门构造来溢出栈或耗费二次方时间的文稿，每份有两种大小，其耗时必须随文本同比增长，经过解析、排版、两种导出、按键和命令 |
-| `make mutants` | 通过 [cargo-mutants](https://mutants.rs)（`cargo install cargo-mutants`）逐个向 `src/markdown/` 和 `src/preview/` 植入故障；指出哪些故障没有任何测试察觉。需要数小时；`FILE=src/preview/bridge.rs` 可缩小范围 |
+| `make mutants` | 通过 [cargo-mutants](https://mutants.rs)（`cargo install cargo-mutants`）逐个向 `crates/splat-markdown`、`crates/splat-preview` 和 `crates/splat-file-state` 植入故障；指出哪些故障没有任何测试察觉。需要数小时；`FILE=crates/splat-preview/src/bridge/mod.rs` 可缩小范围 |
+| `make fuzz` | 通过 [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) 提供随机输入，需要 rustup 的 nightly：按键结果必须与完整解析相同，并覆盖所有输出、预览中的编辑、所有命令，以及按打开时的样子存储的文件。`SECONDS=600` 搜索更久 |
+| `cargo test --release --test fuzz_seeds` | 让 `fuzz/seeds/` 中的种子在没有 fuzzer 的情况下通过这些 fuzz 目标的检查；是每次 `cargo test` 的一部分 |
+| `cargo test --profile checked --workspace` | 测试加上调试构建额外检查的内容：每次部分解析后，块都与文本相符，带下去的内容与文本所说一致。属于 `make test-long` |
+| `cargo test --release --test entry_points --test structure` | 从源代码检查：系统调用的一切都防范了 panic，模块只向下依赖 |
 | `cargo test --release --test decoder` | 解码器进程解码图像，既无法访问文件，也无法访问网络 |
 | `make coverage` | 通过 [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)（`brew install cargo-llvm-cov llvm`）统计 `cargo test` 和所有自测的行覆盖率；低于下限则失败。会占用 Mac 约五分钟 |
-| `make coverage-library` | `src/markdown/`、`src/preview/` 和 `i18n.rs` 对照其更高的下限，仅由 `cargo test` 测得 |
+| `make coverage-library` | crate `splat-markdown`、`splat-preview`、`splat-file-state` 和 `splat-i18n` 对照其更高的下限，仅由 `cargo test` 测得 |
 
-单元测试紧挨着被测代码。`tests/` 存放从外部访问库的测试：`robustness.rs` 中的随机测试（与 `sync.rs` 的测试共用 `src/fuzz.rs` 中的生成器）、`hostile.rs` 中专门用来刁难程序的文稿，以及启动已构建程序的解码器测试。`src/editor/` 中不需要窗口的决策放在带有各自测试的独立函数里：控制器所知道的一切及其变化方式在 `state.rs`，渲染规则在 `render_queue.rs`，文本拷贝在 `sync.rs`，段落样式、字体和颜色作为值在 `render.rs`，工具栏标识符的含义在 `toolbar.rs`，点按链接的含义在 `navigation.rs`。
+单元测试紧挨着被测代码。`crates/splat-testkit/tests/` 存放从外部访问模型和预览的测试：`robustness.rs` 中的随机测试（与 `sync.rs` 的测试共用 `splat-testkit` 的生成器）、`hostile.rs` 中专门用来刁难程序的文稿，以及 `fuzz_seeds.rs` 中 fuzz 目标的种子。`tests/` 存放检查整个程序的测试：它的源代码、它的翻译，以及启动已构建程序的解码器测试。`src/editor/` 中不需要窗口的决策放在带有各自测试的独立函数里：控制器所知道的一切及其变化方式在 `state.rs`，渲染规则在 `render_queue.rs`，文本拷贝在 `sync.rs`，段落样式、字体和颜色作为值在 `render.rs`，工具栏标识符的含义在 `toolbar.rs`，点按链接的含义在 `navigation.rs`。
 
-窗口自测中的一步等待的是具名条件，而不是时间；只有不给出信号的情形（例如某物不存在）才保留带理由的停顿。白白等待是一项失败的检查，并会指明始终没有出现的东西，某一步 panic 同样是一项失败的检查，两种情况下运行都会继续。在本次运行中无从判断的检查会报告 `SELFTEST SKIP`：xtask 会列出它，它既不通过也不失败。xtask 要求每种模式，以及单独的 `--scenarios`，约达到其检查数的九成。窗口自测在主要的点按流程之后还会运行第二部分，位于 `src/editor/selftest/scenarios.rs`：每个格式命令和表格命令、各种对话框、链接点按、粘贴、拖放、导出、大幅更改、磁盘上变化的图像、内存压力、超大文稿，以及崩溃后的恢复。
+窗口自测中的一步等待的是具名条件，而不是时间；只有不给出信号的情形（例如某物不存在）才保留带理由的停顿。白白等待是一项失败的检查，并会指明始终没有出现的东西，某一步 panic 同样是一项失败的检查，两种情况下运行都会继续。在本次运行中无从判断的检查会报告 `SELFTEST SKIP`：xtask 会列出它，它既不通过也不失败。xtask 要求每种模式，以及单独的 `--scenarios`，约达到其检查数的九成。窗口自测在主要的点按流程之后还会运行第二部分，位于 `src/editor/selftest/scenarios.rs`：每个格式命令和表格命令、各种对话框、链接点按、粘贴、拖放、导出、被其他程序更改的文件、大幅更改、磁盘上变化的图像、内存压力、超大文稿，以及崩溃后的恢复。它的每个组都打开自己的文稿，这样一个组的失败不会波及下一个组，并且每个组都可以用 `--only` 单独运行。无窗口的自测还会故意破坏存储：一个什么都不接受的文件夹、一个只读文件、一个已消失的文件夹、一个已满的磁盘，以及存储的每个回调中的 panic，这些都不得造成文本丢失。
 
 覆盖率有两条下限：每个模块至少覆盖 84 % 的行，所有模块合计至少 96 %。`make coverage` 把 `cargo test` 与自测合并测量，低于任一下限都会失败；`make coverage-library` 要求不需要窗口的部分达到 90 % 和 97 %。这些下限以及少数例外（如 `main.rs` 中只在崩溃时运行的 panic 钩子）连同理由都写在 [xtask](../../../xtask/src/coverage.rs) 中。测量用的构建会放进 `target/coverage/`，所以用于测量的代码绝不会进入 `target/release/` 或磁盘映像。解码器辅助进程在把自己锁起来之前就打开了它的测量文件，因此它也被计入。
 
@@ -646,16 +653,20 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 ### 项目结构
 
-`src/lib.rs` 把所有不需要窗口的部分做成一个独立的库 `splat`：`markdown/`、`preview/`、`i18n.rs` 和测试生成器 `fuzz.rs`。它的构建不需要 macOS。`src/main.rs` 中的 App 构建于其上。
+所有不需要窗口的部分都是 `crates/` 下各自独立的 crate，其构建不需要 macOS，因此由编译器保证它们之间的依赖方式。`src/` 中的 App（包 `splat-app`，程序 `splat`）构建于其上。
 
-- `src/markdown/`：所有使用方读取的树，即 `doc/` 中的 `Doc`，它拥有自己的文本，以及 `reader/` 中与解析器唯一的绑定：comrak 在其他地方都不出现，`reader/assumptions.rs` 记录了代码对它的假设。语法着色，以及 `commands/` 中所有作为纯文本编辑（`Edit`）的命令。还包括编辑后的重新解析（`incremental.rs`）、嵌入 HTML 的读取器（`markup.rs`）、排版、正文中的标签、引用和引文（`typography.rs`）、文本的外观以及由哪些 Markdown 和 HTML 实现该外观（`style.rs`）、地址可以是什么（`url.rs`），以及 HTML 和 Word 导出（`html.rs`、`docx.rs`，附带 `docx/html.rs` 和 `docx/xml.rs`）。位置有自己的类型：源文本中是 `Byte`，源视图中是 `U16`，预览视图中是 `Shown`（`text.rs`）。不涉及 AppKit。
-- `src/preview/`：`layout/` 中预览的排版、`layout/html.rs` 中嵌入的 HTML，以及预览与源文本之间的映射（`Bridge`、`Index`）。`Bridge` 会拒绝另一个版本的 `Doc` 的排版。不涉及 AppKit。
+- `crates/splat-markdown/`：所有使用方读取的树，即 `doc/` 中的 `Doc`，它拥有自己的文本，以及 `reader/` 中与解析器唯一的绑定：comrak 在其他地方都不出现，`reader/assumptions.rs` 记录了代码对它的假设。语法着色，以及 `commands/` 中所有作为纯文本编辑（`Edit`）的命令。还包括编辑后的重新解析（`incremental.rs`）、嵌入 HTML 的读取器（`markup.rs`）、排版、正文中的标签、引用和引文（`typography.rs`）、文本的外观以及由哪些 Markdown 和 HTML 实现该外观（`style.rs`）、地址可以是什么（`url.rs`），以及 HTML 和 Word 导出（`html.rs`、`docx.rs`，附带 `docx/html.rs` 和 `docx/xml.rs`）。位置有自己的类型：源文本中是 `Byte`，源视图中是 `U16`，预览视图中是 `Shown`（`text.rs`）。
+- `crates/splat-preview/`：`layout/` 中预览的排版、`layout/html.rs` 中嵌入的 HTML，以及预览与源文本之间的映射（`Bridge`、`Index`）。`Bridge` 会拒绝另一个版本的 `Doc` 的排版。
+- `crates/splat-file-state/`：文件包含什么文本、采用什么格式，以及查看文件的结果意味着什么。
+- `crates/splat-i18n/` 与 `resources/*.lproj`：35 种语言；键是德语文本，App 启动时会安装界面语言的表。
+- `crates/splat-testkit/`：随机测试的生成器和 fuzz 目标的检查。
 - `src/editor/`：窗口。一个 `EditorController` 对象作为两个视图的代理为 AppKit 服务，并转发给各组件；组件是建立在控制器及其所拥有状态之上的小型结构体，其字段其他模块无法触及：
 
 | 模块 | 职责 |
 |---|---|
-| `mod.rs` | 类、转发的代理方法、`invalidate` |
+| `controller.rs` | 类、转发的代理方法、`invalidate`，以及程序其他部分告知编辑器的内容；只有它能触及各个组件 |
 | `panes.rs` | `Panes`：文本视图、大纲、窗格的显示与隐藏，以及提供视图访问权的部分 |
+| `controller/layers.rs` | 谁能触及谁：组件得到一个控制器句柄，只提供它下面的内容，由编译器保证 |
 | `state.rs` | 控制器对文稿所知道的一切，以及改变它的所有途径；其字段是私有的，并且不接触任何视图 |
 | `model.rs` | 把状态和文本拷贝借给无法触及视图的闭包 |
 | `actions.rs` | 命令注册表：选择器、标题、快捷键、符号、命令何时适用 |
@@ -667,17 +678,16 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 | `atom.rs`、`atom/edit.rs` | `AtomEditor`：公式和图表编辑器 |
 | `navigation.rs`、`links.rs` | `Links`：链接、维基链接、标签、任务复选框、折叠、脚注 |
 | `env.rs` | 预览从文本之外读取的内容：排版标点、`@name` 和 `#12` 所对应的仓库、BibTeX 文件、嵌入的笔记 |
-| `render.rs`、`images.rs`、`remote.rs`、`safe_image.rs` | 预览文本、本地和远程图像；`Pictures` 位于 `images.rs` |
+| `render.rs`、`images.rs`、`picture.rs`、`remote.rs`、`safe_image.rs` | 预览文本、本地和远程图像；`Pictures` 位于 `images.rs` |
 | `attributes.rs` | 文本属性；每个键只能得到它所期望类型的值 |
 | `shadow.rs` | 用于崩溃后恢复的未存储文本拷贝 |
 | `decoder.rs` | 解码图像和图形的沙盒化辅助进程 |
 | `export.rs`、`outline.rs` | `Sharing`：HTML 和 Word 导出；大纲边栏 |
 | `js.rs`、`mathfield.rs`、`render_queue.rs` | 用于 MathJax、Mermaid、Graphviz、PlantUML 和可视化公式编辑器的 WebKit；与 WebKit 无关的、关于何时渲染什么的规则 |
 | `webkit.rs` | 对 WebKit 的调用；只有导航代理的生命周期仍由 `js.rs` 和 `mathfield.rs` 负责 |
-| `window.rs`、`toolbar.rs`、`views.rs`、`dialogs.rs`、`style.rs` | 构建窗口、工具栏、文本视图、对话框、颜色 |
+| `controller/window.rs`、`toolbar.rs`、`views.rs`、`dialogs.rs`、`style.rs` | 构建窗口、工具栏、文本视图、对话框、颜色 |
 
 - `src/menu.rs`、`src/app.rs`、`src/document.rs`：菜单栏、App 代理、文稿（`MDDocument`，一个 `NSDocument` 子类）。
-- `src/i18n.rs` 与 `resources/*.lproj`：35 种语言；键是德语文本，App 启动时会安装界面语言的表。
 - `src/util/`：工作线程（`lanes.rs`）、可能停止响应的卷（`volumes.rs`）、AppKit 辅助工具、文件和进程。`src/diag.rs`：用户看不到的出错情况会写入系统日志，且不含任何文稿文本。
 - `src/large_alloc.rs`：大块分配直接来自内核，释放时直接还给内核，因此大幅编辑之后内存会回落。
 - `resources/js/`：网页和库；版本和校验和见 [vendor.lock](../../../vendor.lock)。
@@ -689,11 +699,11 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 1. 那里的每次字符更改，都会就地更新文本拷贝（`Snapshot`），而无需再次读取文本。
 2. 一次更新会解析该拷贝，只在颜色有变化的地方为源文本重新着色，并对预览排版，只替换内容有变化的区块。
-3. 编辑之后，只要相邻段落保持不变，就只会重新解析、着色和排版受影响的段落；它们何时会变化，由 `reparse_part_and_color` 判断。含有 `%%` 注释块的文稿、对前置元数据的更改以及在含有链接引用定义的文稿中，对含有方括号的部分的更改，会被完整处理。comrak 只有在同一次解析中找到脚注的定义时才会识别脚注引用，并把定义移到文本后面，所以该部分会用每个标签一个替身定义来解析，并从旧的树中取得编号；对该部分中的引用或定义的更改，或对行内脚注旁边的更改，会被完整处理。
+3. 编辑之后，只要相邻段落保持不变，就只会重新解析、着色和排版受影响的段落；为什么这样得到的结果与完整解析相同，以及 comrak 变化时要检查什么，请参阅 [docs/partial-parse.md](../../../docs/partial-parse.md)。含有 `%%` 注释块的文稿、对前置元数据的更改以及在含有链接引用定义的文稿中，对含有方括号的部分的更改，会被完整处理。comrak 只有在同一次解析中找到脚注的定义时才会识别脚注引用，并把定义移到文本后面，所以该部分会用每个标签一个替身定义来解析，并从旧的树中取得编号；对该部分中的引用或定义的更改，或对行内脚注旁边的更改，会被完整处理。
 4. 以 `<details>` 或 `<div align>` 开头、之后才闭合的 HTML 块，会影响它们之间的 Markdown 块；被复用的块必须有相同的上下文。
 5. 在最大 2 MB 的文稿的源文本中输入时，局部更新会立即运行；若不适用，或文稿更大，解析和排版会在后台运行。在预览中输入时，它们会立即运行，因为预览的插入点取决于结果。
 6. 预览中的输入由 `Bridge` 转换为对源文本的编辑，此后走同一条路径。Markdown 把文本变成语法的方式太多，仅靠规则应付不了，所以 `preview/verify.rs` 会再次解析更改的部分，并把它显示的内容与输入的内容比较；站不住脚的编辑会被进一步转义或被拒绝。
-7. comrak 的行内位置在少数地方会出错，例如在链接引用定义后面。`markdown/reader/positions.rs` 在读取块时会对照源文本检查它们，对不吻合之处再从源文本重新读取。
+7. comrak 的行内位置在少数地方会出错，例如在链接引用定义后面。`reader/positions.rs` 在读取块时会对照源文本检查它们，对不吻合之处再从源文本重新读取。
 
 ### 控制器中的规则
 
@@ -702,16 +712,18 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 3. 来自外部的消息（图像已载入、公式已渲染）通过 `renders_arrived` 和 `image_arrived` 延迟到达，绝不会在更新进行到一半时到达。
 4. 没有文本更改的重绘只通过 `invalidate(reason)` 进行。
 5. 文本拷贝不会跨越源文本的更改而被持有，否则该更改会复制整个文本：`with_text` 只在一个 `Send` 闭包的存续期间把它借出。
-6. 新命令需要在 `actions.rs` 中添加一项，在 `mod.rs` 中添加一个方法，在 `Editing::perform` 中添加一个分支。
+6. 新命令需要在 `actions.rs` 中添加一项，在 `controller.rs` 中添加一个方法，在 `Editing::perform` 中添加一个分支。
 7. 每个 `unsafe` 块都以 `// SAFETY:` 注释的形式附上它的理由。字节只能在辅助进程中通过 `decoder::decode_native` 进入系统图像解码器；有一项测试会扫描源码中的其他调用。
 8. 主线程上的任何操作都不会等待用户的文件夹，因为网络卷可能停止响应：文件在线程 `DISK` 上查看，预览通过 `Env::known` 读取结果。只有用户正在等待的操作，如导出或存储，才可以直接访问磁盘。
+9. 必须结束的事情在 panic 之后也会结束，因为主线程能挺过 panic：设置的标志经过 `with_raised`，对文本存储的编辑经过 `editing`，不应让撤销知道的内容经过 `without_undo`。有一项测试会找出手写的这类代码。
+10. 文稿中的地址只有一种读法，在 `splat_markdown::url` 中；有一项测试会找出手工比较的 scheme。
 
 ### 添加命令
 
 菜单栏、工具栏和上下文菜单都从 [src/editor/actions.rs](../../../src/editor/actions.rs) 中的注册表构建各自的项目，菜单验证也在那里读取命令何时适用以及是否显示勾选标记。新命令需要：
 
 1. `Action` 的一个变体及其 `Spec`：选择器、标题、工具栏标签、提示（以动词开头，最多 75 个字符）、快捷键、SF Symbol 以及适用时机
-2. `src/editor/mod.rs` 中的方法
+2. `src/editor/controller.rs` 中的方法
 3. `Editing::perform` 中的一个分支
 4. 每个 `Localizable.strings` 中它的文本
 
@@ -733,7 +745,7 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 
 | 组件 | 版本 | 用途 | 许可证 |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown 解析器 | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59（[改动一行](../../../vendor/comrak/PATCH.md)） | Markdown 解析器 | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2)、objc2-foundation、block2 | 0.6 / 0.3 | Objective-C 运行时、Foundation、块 | MIT |
 | objc2-app-kit、objc2-web-kit、dispatch2 | 0.3 | AppKit、WebKit 和 Grand Central Dispatch 的绑定 | Zlib、Apache-2.0 或 MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | 将公式和 SVG 图像转为矢量 PDF | MIT 或 Apache-2.0 |

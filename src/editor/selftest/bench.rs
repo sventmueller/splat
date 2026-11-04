@@ -56,6 +56,7 @@ fn bench(mtm: MainThreadMarker) {
             &super::super::update::Images {
                 dark: false,
                 env: Default::default(),
+                macros: "".into(),
             },
             None,
         );

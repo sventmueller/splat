@@ -411,7 +411,7 @@ pub(super) fn segment_clicked(controller: &EditorController, sender: Option<&Any
             .popUpMenuPositioningItem_atLocation_inView(None, at, Some(control));
     } else if let Some(action) = item.action() {
         // Segments are not validated like toolbar buttons, so a command that does not apply here is refused.
-        if !controller.editing().validate(Some(action), 0, None) {
+        if !controller.command_applies(action) {
             NSBeep();
             return;
         }

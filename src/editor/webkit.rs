@@ -12,7 +12,7 @@ use objc2_web_kit::{
     WKScriptMessageHandler, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
 
-use crate::util::{ns, obj};
+use crate::util::{guarded, ns, obj};
 
 /// A script argument, of a type WebKit hands to the script as a plain value.
 pub(super) enum ScriptValue<'a> {
@@ -119,12 +119,20 @@ fn failure(error: *mut NSError, what: &'static str) -> Option<String> {
     // SAFETY: WebKit passes a valid error or null to the completion handler.
     let error = unsafe { error.as_ref() }?;
     crate::diag::report(what, error.code());
-    Some(error.localizedDescription().to_string())
+    Some(thrown_message(error).unwrap_or_else(|| error.localizedDescription().to_string()))
+}
+
+/// WebKit's description of an exception is the same for all of them, and only this key of its details says which it was.
+fn thrown_message(error: &NSError) -> Option<String> {
+    let message = error.userInfo().objectForKey(&ns("WKJavaScriptExceptionMessage"))?;
+    Some(message.downcast::<NSString>().ok()?.to_string())
 }
 
 pub(super) fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue)]) {
     let block = RcBlock::new(|_: *mut AnyObject, error: *mut NSError| {
-        failure(error, "a script failed");
+        guarded((), || {
+            failure(error, "a script failed");
+        });
     });
     send_script(web, body, args, &block);
 }
@@ -137,11 +145,11 @@ pub(super) fn call_script(
     done: impl Fn(Result<Option<&AnyObject>, String>) + 'static,
 ) {
     let block = RcBlock::new(move |result: *mut AnyObject, error: *mut NSError| {
-        match failure(error, "a script failed") {
+        guarded((), || match failure(error, "a script failed") {
             Some(message) => done(Err(message)),
             // SAFETY: WebKit passes a valid object or null to the completion handler.
             None => done(Ok(unsafe { result.as_ref() })),
-        }
+        });
     });
     send_script(web, body, args, &block);
 }
@@ -156,9 +164,11 @@ pub(super) fn transparent_pdf(web: &WKWebView, rect: NSRect, done: impl Fn(Optio
         config.setAllowTransparentBackground(true);
     }
     let block = RcBlock::new(move |data: *mut NSData, error: *mut NSError| {
-        failure(error, "a PDF of a diagram failed");
-        // SAFETY: WebKit passes valid data or null to the completion handler.
-        done(unsafe { data.as_ref() });
+        guarded((), || {
+            failure(error, "a PDF of a diagram failed");
+            // SAFETY: WebKit passes valid data or null to the completion handler.
+            done(unsafe { data.as_ref() });
+        });
     });
     // SAFETY: The configuration is set up above; the handler runs on the main thread.
     unsafe { web.createPDFWithConfiguration_completionHandler(Some(&config), &block) };
@@ -167,6 +177,19 @@ pub(super) fn transparent_pdf(web: &WKWebView, rect: NSRect, done: impl Fn(Optio
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_thrown_message_comes_from_the_details_of_the_error() {
+        let key = ns("WKJavaScriptExceptionMessage");
+        let message = obj(ns("Error: bad formula"));
+        let details = NSDictionary::from_retained_objects(&[&*key], &[message]);
+        // SAFETY: A domain, a number and details of a type the method documents.
+        let thrown = unsafe { NSError::errorWithDomain_code_userInfo(&ns("WKErrorDomain"), 4, Some(&details)) };
+        assert_eq!(thrown_message(&thrown).as_deref(), Some("Error: bad formula"));
+        // SAFETY: As above, without details.
+        let other = unsafe { NSError::errorWithDomain_code_userInfo(&ns("WKErrorDomain"), 1, None) };
+        assert_eq!(thrown_message(&other), None);
+    }
 
     #[test]
     fn script_arguments_are_plain_values() {

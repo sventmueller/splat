@@ -294,8 +294,8 @@ pub fn utf16_diff(old: &[u16], new: &[u16], caret: usize) -> (Range<usize>, Rang
 
 #[cfg(test)]
 mod tests {
-    use splat::fuzz::{Rng, rounds};
-    use splat::markdown::text::bytes;
+    use splat_markdown::text::bytes;
+    use splat_testkit::{Rng, rounds};
 
     use super::*;
 

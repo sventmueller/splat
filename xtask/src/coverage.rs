@@ -26,7 +26,13 @@ pub(crate) const LIBRARY_ONLY: Floors = Floors {
 };
 
 /// Measured along with the app, but held to no floor.
-pub(crate) const TEST_CODE: [&str; 4] = ["src/editor/selftest", "src/fuzz.rs", "tests/", "xtask/"];
+pub(crate) const TEST_CODE: [&str; 5] = [
+    "src/editor/selftest",
+    "crates/splat-testkit/",
+    "tests/",
+    "vendor/",
+    "xtask/",
+];
 
 /// Modules held to no floor of their own, and why.
 pub(crate) const NO_FLOOR: [(&str, &str); 1] = [(
@@ -35,7 +41,12 @@ pub(crate) const NO_FLOOR: [(&str, &str); 1] = [(
 )];
 
 /// The modules that need no window, which `cargo test` measures alone; CI holds them to the floors.
-pub(crate) const LIBRARY: [&str; 3] = ["src/markdown/", "src/preview/", "src/i18n.rs"];
+pub(crate) const LIBRARY: [&str; 4] = [
+    "crates/splat-file-state/",
+    "crates/splat-markdown/",
+    "crates/splat-preview/",
+    "crates/splat-i18n/",
+];
 
 /// Measures line coverage of `cargo test` and the self-tests, or with `library` of `cargo test` alone for the
 /// library modules, and fails when a module or the whole falls below its floor. The measured builds go to
@@ -80,14 +91,23 @@ pub(crate) fn coverage(library: bool) -> Result<(), String> {
     run(cargo(&["llvm-cov", "clean", "--workspace"], &env))?;
     run(cargo(&["test", "--release", "--workspace"], &env))?;
     if !library {
-        for mode in ["probe", "gui", "resize"] {
-            run(cargo(&["xtask", "selftest", mode], &env))?;
+        for mode in [&["probe"][..], &["gui", "--in-back"], &["resize"], &["typing"]] {
+            let args: Vec<&str> = ["xtask", "selftest"].iter().chain(mode).copied().collect();
+            run(cargo(&args, &env))?;
         }
     }
     let lcov = target.join("lcov.info");
     let lcov_path = lcov.to_str().ok_or("target path is not UTF-8")?;
     run(cargo(
-        &["llvm-cov", "report", "--release", "--lcov", "--output-path", lcov_path],
+        &[
+            "llvm-cov",
+            "report",
+            "--workspace",
+            "--release",
+            "--lcov",
+            "--output-path",
+            lcov_path,
+        ],
         &env,
     ))?;
     let text = fs::read_to_string(&lcov).map_err(|e| format!("{}: {e}", lcov.display()))?;
@@ -149,7 +169,7 @@ pub(crate) fn judge(files: &[(String, u64, u64)], library: bool) -> (String, Vec
     };
     let mut judged: Vec<&(String, u64, u64)> = files
         .iter()
-        .filter(|(path, ..)| !TEST_CODE.iter().any(|t| path.starts_with(t)))
+        .filter(|(path, ..)| !TEST_CODE.iter().any(|t| path.starts_with(t)) && !path.contains("/tests/"))
         .filter(|(path, ..)| !library || LIBRARY.iter().any(|l| path.starts_with(l)))
         .collect();
     judged.sort_by(|a, b| percent(a.1, a.2).total_cmp(&percent(b.1, b.2)));
@@ -212,19 +232,19 @@ mod tests {
     #[test]
     fn the_library_alone_is_held_to_higher_floors() {
         let judged = |lcov: &str, library: bool| judge(&measured_lines(lcov, "/r/"), library).1;
-        let full_marks = "SF:/r/src/markdown/x.rs\nLF:4\nLH:4\nend_of_record\n";
+        let full_marks = "SF:/r/crates/splat-markdown/src/x.rs\nLF:4\nLH:4\nend_of_record\n";
         assert!(judged(full_marks, true).is_empty());
-        let weak_module = "SF:/r/src/markdown/x.rs\nLF:100\nLH:89\nend_of_record\n\
-                           SF:/r/src/preview/y.rs\nLF:900\nLH:900\nend_of_record\n";
-        assert_eq!(judged(weak_module, true), ["src/markdown/x.rs 89.0 %"]);
+        let weak_module = "SF:/r/crates/splat-markdown/src/x.rs\nLF:100\nLH:89\nend_of_record\n\
+                           SF:/r/crates/splat-preview/src/y.rs\nLF:900\nLH:900\nend_of_record\n";
+        assert_eq!(judged(weak_module, true), ["crates/splat-markdown/src/x.rs 89.0 %"]);
         assert!(
             judged(weak_module, false).is_empty(),
             "the full measurement keeps its floors"
         );
-        let weak_total = "SF:/r/src/markdown/x.rs\nLF:100\nLH:96\nend_of_record\n";
+        let weak_total = "SF:/r/crates/splat-markdown/src/x.rs\nLF:100\nLH:96\nend_of_record\n";
         assert_eq!(judged(weak_total, true), ["all modules 96.0 % (floor 97 %)"]);
-        let at_the_floors = "SF:/r/src/markdown/x.rs\nLF:100\nLH:90\nend_of_record\n\
-                             SF:/r/src/preview/y.rs\nLF:900\nLH:880\nend_of_record\n";
+        let at_the_floors = "SF:/r/crates/splat-markdown/src/x.rs\nLF:100\nLH:90\nend_of_record\n\
+                             SF:/r/crates/splat-preview/src/y.rs\nLF:900\nLH:880\nend_of_record\n";
         assert!(judged(at_the_floors, true).is_empty());
         let window_code = "SF:/r/src/editor/w.rs\nLF:100\nLH:0\nend_of_record\n";
         assert_eq!(

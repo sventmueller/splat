@@ -22,10 +22,10 @@ const EVERY_SECONDS: f64 = 5.0;
 /// Not the disk thread: a network volume that stopped answering must not stop the copies.
 static WRITER: Lane = Lane::new("splat-copies");
 
-/// The file an editor's text was copied to, and the version of that text.
+/// The file an editor's text was copied to, and the version of that text; `None` until a copy reached the file.
 struct KeptCopy {
     file: PathBuf,
-    version: u64,
+    version: Option<u64>,
 }
 
 thread_local! {
@@ -94,6 +94,18 @@ fn clear_old_recovered(recovery: &Path, now: std::time::SystemTime) {
     }
 }
 
+/// `KEPT_FOR` and the offer to look at recovered texts both go by this date, and a move leaves that of the last copy, which
+/// may lie further back than the time a text is kept.
+fn start_keeping(recovered: &Path) {
+    let dated = std::fs::File::options()
+        .write(true)
+        .open(recovered)
+        .and_then(|file| file.set_modified(std::time::SystemTime::now()));
+    if let Err(error) = dated {
+        crate::diag::report("dating a recovered text failed", error);
+    }
+}
+
 /// Moves what ended runs left in `root` to `recovery`, and returns what it moved.
 fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Vec<PathBuf> {
     let mut adopted = Vec::new();
@@ -113,6 +125,7 @@ fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Ve
             let name = format!("{pid}-{}", file.file_name().to_string_lossy());
             let target = free_name(recovery, &name);
             if std::fs::create_dir_all(recovery).is_ok() && std::fs::rename(file.path(), &target).is_ok() {
+                start_keeping(&target);
                 adopted.push(target);
             } else {
                 left_behind = true;
@@ -137,7 +150,7 @@ pub(super) fn adopt_left_behind() {
 /// Takes over what ended runs left behind, and from now on copies unsaved text.
 pub fn keep_copies(_mtm: MainThreadMarker) {
     adopt_left_behind();
-    let block = RcBlock::new(move |_: NonNull<NSTimer>| copy_unsaved());
+    let block = RcBlock::new(move |_: NonNull<NSTimer>| crate::util::guarded((), copy_unsaved));
     // SAFETY: The block only touches main-thread objects, and the timer runs on the main run loop it is scheduled on.
     let timer = unsafe { NSTimer::scheduledTimerWithTimeInterval_repeats_block(EVERY_SECONDS, true, &block) };
     timer.setTolerance(EVERY_SECONDS / 2.0);
@@ -151,11 +164,11 @@ pub(super) fn copy_unsaved() {
     let mut unsaved = Vec::new();
     for editor in &editors {
         let edited = editor.document().is_some_and(|d| d.isDocumentEdited());
-        if edited && editor.panes().is_built() {
-            unsaved.push(editor);
+        if edited && let Some(version) = editor.version_of_shown_text() {
+            unsaved.push((editor, version));
         }
     }
-    let ids: Vec<usize> = unsaved.iter().map(|e| Retained::as_ptr(e) as usize).collect();
+    let ids: Vec<usize> = unsaved.iter().map(|(e, _)| Retained::as_ptr(e) as usize).collect();
     let outdated: Vec<PathBuf> = COPIES.with(|c| {
         let mut copies = c.borrow_mut();
         let gone: Vec<usize> = copies.keys().filter(|id| !ids.contains(id)).copied().collect();
@@ -165,14 +178,13 @@ pub(super) fn copy_unsaved() {
             .collect()
     });
     let mut writes = Vec::new();
-    for (editor, id) in unsaved.into_iter().zip(ids) {
-        let version = editor.model().text_version();
+    for ((editor, version), id) in unsaved.into_iter().zip(ids) {
         let file = COPIES.with(|c| {
             let mut copies = c.borrow_mut();
             match copies.get_mut(&id) {
-                Some(copy) if copy.version == version => None,
+                Some(copy) if copy.version == Some(version) => None,
                 Some(copy) => {
-                    copy.version = version;
+                    copy.version = Some(version);
                     Some(copy.file.clone())
                 }
                 None => {
@@ -186,7 +198,7 @@ pub(super) fn copy_unsaved() {
                         id,
                         KeptCopy {
                             file: file.clone(),
-                            version,
+                            version: Some(version),
                         },
                     );
                     Some(file)
@@ -194,7 +206,11 @@ pub(super) fn copy_unsaved() {
             }
         });
         if let Some(file) = file {
-            writes.push((file, editor.source_text()));
+            writes.push(CopyToWrite {
+                editor: id,
+                file,
+                text: editor.source_text(),
+            });
         }
     }
     if writes.is_empty() && outdated.is_empty() {
@@ -204,14 +220,45 @@ pub(super) fn copy_unsaved() {
         for file in outdated {
             let _ = std::fs::remove_file(file);
         }
-        if std::fs::create_dir_all(&folder).is_ok() {
-            keep_run_lock(&folder);
-            for (file, text) in writes {
-                // Through a second file, so a crash while writing leaves the last copy whole.
-                let partial = file.with_extension("partial");
-                if let Err(error) = std::fs::write(&partial, text).and_then(|()| std::fs::rename(&partial, &file)) {
-                    crate::diag::report("copying unsaved text failed", error);
-                }
+        let not_written = write_copies(&folder, writes);
+        if !not_written.is_empty() {
+            crate::util::main_soon(move || copy_again(&not_written));
+        }
+    });
+}
+
+struct CopyToWrite {
+    editor: usize,
+    file: PathBuf,
+    text: String,
+}
+
+/// Writes the copies and returns the editors whose copy did not reach its file.
+fn write_copies(folder: &Path, writes: Vec<CopyToWrite>) -> Vec<usize> {
+    if let Err(error) = std::fs::create_dir_all(folder) {
+        crate::diag::report("the folder for copies of unsaved text cannot be made", error);
+        return writes.iter().map(|write| write.editor).collect();
+    }
+    keep_run_lock(folder);
+    let mut not_written = Vec::new();
+    for write in writes {
+        // Through a second file, so a crash while writing leaves the last copy whole.
+        let partial = write.file.with_extension("partial");
+        if let Err(error) = std::fs::write(&partial, write.text).and_then(|()| std::fs::rename(&partial, &write.file)) {
+            crate::diag::report("copying unsaved text failed", error);
+            not_written.push(write.editor);
+        }
+    }
+    not_written
+}
+
+/// The next round of copies writes these again, though their text has not changed since.
+fn copy_again(editors: &[usize]) {
+    COPIES.with(|copies| {
+        let mut copies = copies.borrow_mut();
+        for editor in editors {
+            if let Some(copy) = copies.get_mut(editor) {
+                copy.version = None;
             }
         }
     });
@@ -244,11 +291,9 @@ pub(super) fn discard_share_file_later(file: &Path) {
     let Some(folder) = file.parent().map(Path::to_path_buf) else {
         return;
     };
-    if let Ok(later) = dispatch2::DispatchTime::try_from(SHARED_FOR) {
-        let _ = dispatch2::DispatchQueue::main().after(later, move || {
-            crate::util::DISK.run(move || remove_share_folder(&folder));
-        });
-    }
+    crate::util::main_after(SHARED_FOR, move || {
+        crate::util::DISK.run(move || remove_share_folder(&folder));
+    });
 }
 
 fn remove_share_folder(folder: &Path) {
@@ -289,9 +334,9 @@ pub fn discard_copies() {
     // Behind what the writer still has to do, or that would bring the folder back and a normal end would look like a crash
     // at the next start. A writer that hangs on a dead volume may not hold up the end of the app.
     let (done, finished) = std::sync::mpsc::channel();
-    let in_order = folder.clone();
+    let behind_the_writes = folder.clone();
     WRITER.run(move || {
-        let _ = std::fs::remove_dir_all(in_order);
+        let _ = std::fs::remove_dir_all(behind_the_writes);
         let _ = done.send(());
     });
     if finished.recv_timeout(std::time::Duration::from_secs(1)).is_err() {
@@ -384,6 +429,58 @@ mod tests {
         );
         assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "neuer");
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_text_is_kept_from_the_day_it_is_taken_over() {
+        let root = std::env::temp_dir().join(format!("splat-shadow-late-{}", std::process::id()));
+        let (unsaved, recovery) = (root.join("Unsaved"), root.join("Recovery"));
+        std::fs::create_dir_all(unsaved.join("111")).unwrap();
+        let copy = unsaved.join("111/1-Notiz.md");
+        std::fs::write(&copy, "Text").unwrap();
+        let long_ago = std::time::SystemTime::now() - KEPT_FOR - KEPT_FOR;
+        std::fs::File::options()
+            .write(true)
+            .open(&copy)
+            .unwrap()
+            .set_modified(long_ago)
+            .unwrap();
+        let adopted = adopt(&unsaved, &recovery, |_, _| false);
+        clear_old_recovered(&recovery, std::time::SystemTime::now());
+        assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "Text");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_copy_that_did_not_reach_its_file_is_named_and_leaves_nothing_half_written() {
+        let root = std::env::temp_dir().join(format!("splat-shadow-write-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let blocked = root.join("Datei");
+        std::fs::write(&blocked, "").unwrap();
+        let write = |folder: &Path, editor, name: &str| CopyToWrite {
+            editor,
+            file: folder.join(name),
+            text: "Text".to_string(),
+        };
+        let beneath = blocked.join("Ordner");
+        assert_eq!(write_copies(&beneath, vec![write(&beneath, 1, "1.md")]), [1]);
+        let folder = root.join("Ordner");
+        let writes = vec![write(&folder, 2, "2.md"), write(&folder.join("fehlt"), 3, "3.md")];
+        assert_eq!(write_copies(&folder, writes), [3]);
+        assert_eq!(std::fs::read_to_string(folder.join("2.md")).unwrap(), "Text");
+        assert!(!folder.join("2.partial").exists());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_copy_that_failed_is_written_again() {
+        let file = PathBuf::from("/kein/Pfad.md");
+        COPIES.with(|c| {
+            c.borrow_mut().insert(1, KeptCopy { file, version: Some(7) });
+        });
+        copy_again(&[1, 2]);
+        let version = COPIES.with(|c| c.borrow_mut().remove(&1).and_then(|copy| copy.version));
+        assert_eq!(version, None);
     }
 
     #[test]

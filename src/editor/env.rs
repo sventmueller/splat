@@ -193,7 +193,7 @@ fn send_to_look(question: Question, told: Option<Sender<()>>) {
             let _ = told.send(());
         }
         if changed == Some(true) {
-            dispatch2::DispatchQueue::main().exec_async(super::relayout_all);
+            crate::util::main_soon(super::relayout_all);
         }
     });
 }
@@ -254,6 +254,11 @@ impl Repository {
             _ => None,
         }
     }
+}
+
+/// The folder of the repository `dir` lies in.
+pub(super) fn repository_root(dir: &Path) -> Option<&Path> {
+    dir.ancestors().find(|d| d.join(".git").exists())
 }
 
 /// The repository the folder lies in, from the `origin` remote of its Git configuration.

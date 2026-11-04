@@ -4,8 +4,8 @@
 use std::ops::Range;
 
 use objc2::runtime::{AnyObject, Sel};
-use objc2::{MainThreadOnly, sel};
-use objc2_app_kit::{NSDocumentChangeType, NSTextView};
+use objc2::sel;
+use objc2_app_kit::NSTextView;
 use objc2_foundation::NSRect;
 
 use super::{AtomEditor, AtomKind};
@@ -13,7 +13,7 @@ use crate::editor::{State, mathfield};
 use crate::i18n::t;
 use crate::markdown::commands::{self, Edit};
 use crate::markdown::doc::{BlockKind, Doc, block_path, figure_at};
-use crate::markdown::text::{Byte, Shown, TextAt, U16, units};
+use crate::markdown::text::{Byte, Direction, Shown, TextAt, U16, units};
 use crate::preview::layout::{Atom, ParaKind, RunMap};
 use crate::util::{contained, ns, perform_later, storage, to_nsrange};
 
@@ -66,7 +66,7 @@ impl AtomEditor<'_> {
         } else {
             Some(start..start + edit.replacement.len())
         };
-        self.host.editing().apply_edit(edit, Some(t("Formel")), false);
+        self.host.updater().apply_edit(edit, Some(t("Formel")), false);
         let Some(atom) = atom else { return };
         self.state.forget_closed();
         self.open(atom, None);
@@ -82,7 +82,7 @@ impl AtomEditor<'_> {
             return;
         };
         if self.state.opens_at(range.start) {
-            perform_later(self.host, sel!(openAtomUnderCaret), 0.0, false);
+            perform_later(self.host.object(), sel!(openAtomUnderCaret), 0.0, false);
         }
     }
 
@@ -180,16 +180,11 @@ impl AtomEditor<'_> {
             return;
         };
         self.host.model().change(|st| st.clear_pending());
-        let undo = self.host.undo_manager();
-        if let Some(u) = &undo {
-            u.disableUndoRegistration();
-        }
-        self.host
-            .panes()
-            .silently(|views| storage(views.source).replaceCharactersInRange_withString(target, &ns(replacement)));
-        if let Some(u) = &undo {
-            u.enableUndoRegistration();
-        }
+        crate::util::without_undo(self.host.undo_manager().as_deref(), || {
+            self.host
+                .panes()
+                .silently(|views| storage(views.source).replaceCharactersInRange_withString(target, &ns(replacement)));
+        });
         self.host.updater().update_now();
     }
 
@@ -200,11 +195,6 @@ impl AtomEditor<'_> {
             let new = e.view.string().to_string();
             let range = e.start..e.start + e.len.get();
             e.len.set(new.len());
-            if !e.marked_edited.replace(true)
-                && let Some(document) = self.host.document()
-            {
-                document.updateChangeCount(NSDocumentChangeType::ChangeDone);
-            }
             (range, new)
         };
         self.mirror_into_source(range, &new);
@@ -218,7 +208,11 @@ impl AtomEditor<'_> {
             return true;
         }
         if command == sel!(insertTab:) || command == sel!(insertBacktab:) {
-            return self.tab(command == sel!(insertBacktab:));
+            return self.tab(if command == sel!(insertBacktab:) {
+                Direction::Backward
+            } else {
+                Direction::Forward
+            });
         }
         false
     }
@@ -230,7 +224,7 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            mathfield::field(self.host.mtm()).detach(self.host);
+            mathfield::field(self.host.mtm()).detach(self.host.object());
         }
         edit.popover.close();
     }
@@ -250,20 +244,15 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            mathfield::field(self.host.mtm()).detach(self.host);
+            mathfield::field(self.host.mtm()).detach(self.host.object());
         }
         self.state.closed.set(Some(edit.range_start));
-        if edit.marked_edited.get()
-            && let Some(document) = self.host.document()
-        {
-            document.updateChangeCount(NSDocumentChangeType::ChangeUndone);
-        }
         let current = edit.start..edit.start + edit.len.get();
         let final_text = edit.view.string().to_string();
         self.mirror_into_source(current, &edit.original);
         let outcome = outcome_of_closing(edit.cancelled.get(), &edit.original, edit.inserted.get(), &final_text);
         if let AtomOutcome::RemoveInserted(a, b) = outcome {
-            self.host.editing().apply_edit(
+            self.host.updater().apply_edit(
                 Edit {
                     range: a..b,
                     replacement: String::new(),
@@ -290,7 +279,7 @@ impl AtomEditor<'_> {
                 }
             });
             let end = edit.start + final_text.len() + closing;
-            self.host.editing().apply_edit(
+            self.host.updater().apply_edit(
                 Edit {
                     range,
                     replacement: final_text,

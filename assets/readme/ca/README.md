@@ -120,7 +120,7 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - **Un botó per a tot.** Cada construcció de Markdown té un botó a la barra d’eines i un element de menú, i les més habituals també una drecera de teclat. Les taules tenen el seu propi menú per a files, columnes i alineació.
 - **Exporta sense perdre res.** PDF, un únic fitxer HTML autònom o un document de Word amb capçaleres, llistes, taules, notes a peu de pàgina i imatges de debò.
 - **Natiu fins al moll de l’os.** Finestres, pestanyes, menús, finestres emergents, Versions, desament automàtic, el menú de compartir, mode fosc, correcció ortogràfica, dictat i VoiceOver autèntics d’AppKit. Sense Electron, i sense vista web per al text mateix.
-- **Àgil amb fitxers grans.** Renderitzar una pulsació de tecla en un document de 10 MB triga uns 25 ms, abans de la feina pròpia de la vista.
+- **Àgil amb fitxers grans.** Renderitzar una pulsació de tecla en un document de 10 MB triga uns 10 ms, abans de la feina pròpia de la vista.
 - **Privat i prudent.** Les imatges d’internet només es carreguen quan ho permets, els enllaços a altres apps demanen confirmació, i tot el que descodifica dades d’imatge no fiables s’executa en processos auxiliars aïllats en una caixa de proves.
 - **En el teu idioma.** La interfície i la referència ràpida de Markdown integrada estan disponibles en 35 idiomes: àrab, català, xinès (simplificat), xinès (tradicional), croat, txec, danès, neerlandès, anglès, finès, francès, alemany, grec, hebreu, hindi, hongarès, indonesi, italià, japonès, coreà, malai, noruec, polonès, portuguès (Brasil), portuguès (Portugal), romanès, rus, eslovac, eslovè, castellà, suec, tailandès, turc, ucraïnès i vietnamita.
 
@@ -503,7 +503,7 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 - **Sense xarxa per omissió.** El Splat no té telemetria. Només cerca actualitzacions quan hi estàs d’acord o tries **Cerca actualitzacions…**: llavors carrega un petit fitxer de canal de GitHub, i la sol·licitud no esmenta res més que l’app i la seva versió. Les fórmules i els diagrames es renderitzen en local; les vistes web que ho fan no poden accedir a la xarxa.
 - **Les imatges d’internet** només es carreguen amb el teu permís, només per `https`, mai des de servidors de la teva xarxa local, com a màxim de 10 MB cadascuna i en una sessió privada sense galetes.
 - **Descodificació aïllada.** Les imatges i els gràfics de fórmules i diagrames es descodifiquen en processos auxiliars que tanquen tots els fitxers que han heretat i es tanquen ells mateixos en una caixa de proves abans de llegir el primer byte: sense accés a fitxers ni a la xarxa. Només retornen píxels, la mida dels quals es comprova, i s’aturen als 10 segons. Els descodificadors d’imatge d’Apple només veuen HEIC, TIFF, AVIF i PDF, i només quan les dades són realment d’aquest format; s’executen en un procés auxiliar propi, que a més pot llegir les carpetes de tipus de lletra del sistema i fer servir el descodificador de vídeo del sistema. Els SVG, les fórmules i els diagrames també passen per aquest procés, de manera que al Splat són imatges amb una resolució fixa: quatre píxels per punt, fins a 2560 al costat més llarg.
-- **Els fitxers locals** només arriben a un document per la ruta que aquest anomena. Les incrustacions mostren notes Markdown de la carpeta del document i de sota, i una imatge que falta només es busca allà. Una ruta d’imatge a un altre lloc, absoluta o que comença per `~`, es carrega igualment, i les exportacions a HTML i a Word la incrusten: mira l’exportació d’un document que no has escrit tu abans de passar-lo a algú altre.
+- **Els fitxers locals** només arriben a un document per la ruta que aquest anomena. Les incrustacions mostren notes Markdown de la carpeta del document i de sota, i una imatge que falta només es busca allà. Una ruta d’imatge a un altre lloc, absoluta o que comença per `~`, es carrega igualment a la previsualització; les exportacions HTML i Word, la impressió i els PDF només s’emporten el que hi ha a la carpeta del document o al seu repositori Git, tret que aquest repositori també contingui la teva carpeta d’inici, de manera que un document d’una altra persona no pot arrossegar els teus fitxers a una exportació que passis a algú.
 - **Les còpies del text sense desar** es queden en aquest Mac, a la carpeta Library, per a la recuperació després d’una fallada. Desapareixen amb el desament o amb el tancament normal del Splat; les còpies que una fallada ha deixat es queden a la carpeta de recuperació fins que les eliminis.
 - **Els enllaços** mai inicien un programa amb un clic. Els enllaços web i de correu s’obren com sempre; els enllaços a altres apps demanen confirmació.
 - **L’HTML als documents** el llegeix l’analitzador propi del Splat. Els scripts, els estils, els marcs i els formularis no s’executen mai.
@@ -515,13 +515,14 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 El Splat continua responent amb documents de diversos megabytes:
 
 - El codi font fa servir TextKit 2, que només disposa la part visible.
-- Mentre escrius a la previsualització, i al codi font de documents de fins a 2 MB, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats. En un document de 10 MB, analitzar i colorejar triga uns 20 ms, renderitzar uns 25 ms, i una pulsació de tecla sencera a la seva previsualització uns 60 ms amb la feina pròpia de la vista.
+- Mentre escrius a la previsualització, i al codi font de documents de fins a 2 MB, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats. En un document de 10 MB, analitzar i colorejar triga uns 3 ms, renderitzar uns 10 ms, i una pulsació de tecla sencera a la seva previsualització uns 30 ms amb la feina pròpia de la vista.
 - Les previsualitzacions grans renderitzen primer la part visible i la resta mentre l’app està inactiva. Els blocs que es desplacen a la vista es renderitzen abans de dibuixar-se.
 - Al codi font dels documents més grans, l’anàlisi per a la previsualització s’executa en segon pla mentre escrius.
 - Un document es manté com a text pla quan necessitaria uns 4 GB de memòria, és a dir, uns 50 a 120 MB de Markdown habitual, però només de 10 a 20 MB si tot són taules o encapçalaments: el codi font no té colors i la previsualització diu per què es manté buida. Les exportacions continuen funcionant.
 - A partir d’uns 200 KB, un document obre la finestra abans d’analitzar-se; a 5 MB, els colors i la previsualització arriben aproximadament un quart de segon més tard.
+- Totes les imatges juntes, incloses les fórmules i els diagrames, ocupen com a màxim una quarta part de la memòria del Mac, i la meitat d’això mentre hi ha poca memòria. Més enllà d’això, les altres imatges es mostren com a marcadors de posició fins que torna a haver-hi espai.
 
-Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 MB: els de la definició o de les referències d’una nota a peu de pàgina, els que hi ha al costat d’una nota en línia, al final mateix d’un document al costat d’una nota a peu de pàgina, al front matter o a prop de definicions de referències d’enllaços, i tots els canvis en un document amb blocs de comentaris `%%` o amb una nota a peu de pàgina definida dues vegades o dins d’una cita o d’una llista. La memòria creix amb el fitxer, fins a uns 115–160 MB per a 1 MB de Markdown i 340–510 MB per a 10 MB.
+Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 MB: els de la definició o de les referències d’una nota a peu de pàgina, els que hi ha al costat d’una nota en línia, al final mateix d’un document al costat d’una nota a peu de pàgina, al front matter o a definicions de referències d’enllaços, i tots els canvis en un document amb blocs de comentaris `%%` o amb una nota a peu de pàgina definida dues vegades o dins d’una cita o d’una llista. La memòria creix amb el fitxer, fins a uns 115–160 MB per a 1 MB de Markdown i 340–510 MB per a 10 MB.
 
 ## Limitacions conegudes
 
@@ -576,6 +577,7 @@ make check                  # format, clippy sense avisos, tots els tests, bibli
 make test                   # make check, i després l’autotest sense finestra
 make test-gui               # autotests amb finestra; ocupen el Mac durant uns quatre minuts
 make test-long              # cerca aleatòria més llarga i la comprovació de l’actualització parcial a 10 MB
+make fuzz                   # entrada aleatòria per a l’anàlisi parcial i totes les sortides
 make coverage               # cobertura de línies de tots els tests i autotests, amb un mínim per mòdul
 make coverage-library       # els mateixos mínims per als mòduls sense finestra, com a la CI
 make bench FILE=<file.md>   # temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran
@@ -623,19 +625,24 @@ La imatge de disc és un binari universal per a Apple Silicon i Intel; les altre
 | `cargo xtask check-library` | la biblioteca es compila per a Linux, així que res no necessita macOS |
 | `cargo xtask vendor check` | les biblioteques de JavaScript coincideixen amb `vendor.lock` byte per byte |
 | `cargo xtask selftest probe` | sense finestra, cadascun amb el seu resultat esperat: fórmules, diagrames, imatges web contra un servidor dins del procés, adreces bloquejades, el text que escriu cada ordre, cada format d’imatge a través de les dues exportacions, una pàgina que deixa de respondre i les defenses de les vistes web contra una pàgina sense elles. Triga uns trenta segons. El que necessita l’app al davant se salta amb la pantalla bloquejada |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | l’app en execució, clic a clic. Obre una finestra i hi escriu; el Mac queda ocupat durant uns quatre minuts. `--scenarios` només executa la segona part, en aproximadament un minut i mig |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | l’app en execució, clic a clic. Obre una finestra i hi escriu; el Mac queda ocupat durant uns quatre minuts. `--scenarios` només executa la segona part, en aproximadament un minut i mig. `--only` executa un grup d’aquesta part, en el seu propi document, també amb la pantalla bloquejada. `--in-back` deixa de banda el que necessita l’app al davant; sense això, aquesta comprovació falla |
 | `cargo xtask selftest resize` | eixampla la finestra després de moure el separador: el codi font es torna a ajustar mentre es canvia la mida de la finestra. Triga uns deu segons |
-| `cargo xtask selftest bench <file.md>` | temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran |
+| `cargo xtask selftest typing [--by-hand]` | escriu travessant els desaments, amb tecles a través de la cua d’esdeveniments de l’app o, amb `--by-hand`, a mà: el que s’escriu es conserva i consta com a no desat. Triga aproximadament un minut |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran; `--keystroke-ms` falla quan la pulsació més ràpida triga més |
 | `cargo test --release -- --ignored partial_updates` | una pulsació de tecla en 10 MB: actualització parcial contra completa, el mateix resultat en una quarta part del temps com a màxim |
 | `cargo test --release --test hostile` | documents fets per desbordar la pila o trigar un temps quadràtic, cadascun en dues mides els temps de les quals han de créixer com el text, a través de l’anàlisi, la disposició, les dues exportacions, les pulsacions de tecla i les ordres |
-| `make mutants` | errors introduïts un per un a `src/markdown/` i `src/preview/`, mitjançant [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diu quins no els detecta cap test. Triga hores; `FILE=src/preview/bridge.rs` l’acota |
+| `make mutants` | errors introduïts un per un a `crates/splat-markdown`, `crates/splat-preview` i `crates/splat-file-state`, mitjançant [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diu quins no els detecta cap test. Triga hores; `FILE=crates/splat-preview/src/bridge/mod.rs` l’acota |
+| `make fuzz` | entrada aleatòria amb [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), que necessita la versió nightly de rustup: pulsacions que s’han de llegir com una anàlisi completa, totes les sortides, les edicions a la previsualització, totes les ordres i un fitxer que es desa tal com s’ha obert. `SECONDS=600` cerca més temps |
+| `cargo test --release --test fuzz_seeds` | les llavors de `fuzz/seeds/` a través de les comprovacions d’aquests objectius de fuzzing, sense fuzzer; part de cada `cargo test` |
+| `cargo test --profile checked --workspace` | les proves amb el que una compilació de depuració comprova a més: després de cada anàlisi parcial els blocs encaixen amb el text, i el que arrossega és el que diu el text. Forma part de `make test-long` |
+| `cargo test --release --test entry_points --test structure` | a partir del codi font: tot el que crida el sistema està protegit contra panics, i els mòduls només depenen cap avall |
 | `cargo test --release --test decoder` | el procés descodificador descodifica imatges i no arriba ni als fitxers ni a la xarxa |
 | `make coverage` | cobertura de línies de `cargo test` i de tots els autotests, mitjançant [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); falla per sota dels mínims. Ocupa el Mac durant uns cinc minuts |
-| `make coverage-library` | `src/markdown/`, `src/preview/` i `i18n.rs` contra els seus mínims més alts, mesurats només per `cargo test` |
+| `make coverage-library` | els crates `splat-markdown`, `splat-preview`, `splat-file-state` i `splat-i18n` contra els seus mínims més alts, mesurats només per `cargo test` |
 
-Els tests unitaris són al costat del codi que proven. `tests/` conté el que arriba a la biblioteca des de fora: els tests aleatoris a `robustness.rs`, que comparteixen el generador de `src/fuzz.rs` amb els de `sync.rs`, els documents fets per fer mal a `hostile.rs`, i el test del descodificador, que inicia el programa compilat. Les decisions de `src/editor/` que no necessiten finestra viuen en funcions lliures amb tests propis: tot el que sap el controlador i com canvia a `state.rs`, les regles de renderització a `render_queue.rs`, la còpia del text a `sync.rs`, els estils de paràgraf, els tipus de lletra i els colors com a valors a `render.rs`, què signifiquen els identificadors de la barra d’eines a `toolbar.rs`, què vol dir un clic en un enllaç a `navigation.rs`.
+Els tests unitaris són al costat del codi que proven. `crates/splat-testkit/tests/` conté el que arriba al model i a la previsualització des de fora: els tests aleatoris a `robustness.rs`, que comparteixen el generador de `splat-testkit` amb els de `sync.rs`, els documents fets per fer mal a `hostile.rs`, i les llavors dels objectius de fuzzing a `fuzz_seeds.rs`. `tests/` conté el que examina tot el programa: el seu codi font, les seves traduccions i el test del descodificador, que inicia el programa compilat. Les decisions de `src/editor/` que no necessiten finestra viuen en funcions lliures amb tests propis: tot el que sap el controlador i com canvia a `state.rs`, les regles de renderització a `render_queue.rs`, la còpia del text a `sync.rs`, els estils de paràgraf, els tipus de lletra i els colors com a valors a `render.rs`, què signifiquen els identificadors de la barra d’eines a `toolbar.rs`, què vol dir un clic en un enllaç a `navigation.rs`.
 
-Un pas de l’autotest de finestra espera una condició amb nom, no un temps; només el que no dóna cap senyal, com l’absència d’alguna cosa, conserva una pausa amb el seu motiu. Esperar en va és una comprovació fallida que diu què no va arribar mai, un pas que entra en pànic també és una comprovació fallida, i l’execució continua en tots dos casos. Una comprovació que en aquesta execució no pot dir res informa `SELFTEST SKIP`: xtask la llista, i ni passa ni falla. xtask exigeix a cada mode, i a `--scenarios` pel seu compte, uns nou dècims de les seves comprovacions. L’autotest de finestra executa una segona part després del seu recorregut principal de clics, a `src/editor/selftest/scenarios.rs`: totes les ordres de format i de taula, els diàlegs, els clics en enllaços, enganxar, deixar anar, les exportacions, un canvi gran, imatges que canvien al disc, la pressió de memòria, un document enorme i la recuperació després d’una fallada.
+Un pas de l’autotest de finestra espera una condició amb nom, no un temps; només el que no dóna cap senyal, com l’absència d’alguna cosa, conserva una pausa amb el seu motiu. Esperar en va és una comprovació fallida que diu què no va arribar mai, un pas que entra en pànic també és una comprovació fallida, i l’execució continua en tots dos casos. Una comprovació que en aquesta execució no pot dir res informa `SELFTEST SKIP`: xtask la llista, i ni passa ni falla. xtask exigeix a cada mode, i a `--scenarios` pel seu compte, uns nou dècims de les seves comprovacions. L’autotest de finestra executa una segona part després del seu recorregut principal de clics, a `src/editor/selftest/scenarios.rs`: totes les ordres de format i de taula, els diàlegs, els clics en enllaços, enganxar, deixar anar, les exportacions, un fitxer que ha canviat un altre programa, un canvi gran, imatges que canvien al disc, la pressió de memòria, un document enorme i la recuperació després d’una fallada. Cada grup obre un document propi, de manera que una fallada en un no arriba al següent, i cadascun es pot executar sol amb `--only`. L’autotest sense finestra també trenca el desament a propòsit: una carpeta que no accepta res, un fitxer de només lectura, una carpeta que ha desaparegut, un disc ple i un panic a cada callback d’un desament, i res d’això pot costar text.
 
 La cobertura té dos mínims: cada mòdul almenys el 84 % de les seves línies, tots els mòduls junts almenys el 96 %. `make coverage` mesura `cargo test` juntament amb els autotests i falla per sota de qualsevol dels dos; `make coverage-library` exigeix el 90 % i el 97 % al que no necessita finestra. Els mínims i les poques excepcions, com el panic hook de `main.rs` que només s’executa en una fallada, són a [xtask](../../../xtask/src/coverage.rs) al costat dels seus motius. Les compilacions mesurades van a `target/coverage/`, de manera que el codi de mesura no arriba mai a `target/release/` ni a una imatge de disc. El procés auxiliar descodificador obre el seu fitxer de mesura abans d’aïllar-se, així que també es mesura.
 
@@ -645,16 +652,20 @@ La sortida dels autotests va a `target/selftest/`. L’autotest compila una app 
 
 ### Estructura del projecte
 
-`src/lib.rs` fa de tot el que no necessita finestra una biblioteca pròpia, `splat`: `markdown/`, `preview/`, `i18n.rs` i el generador de proves `fuzz.rs`. Es compila sense macOS. L’app de `src/main.rs` s’hi recolza.
+Tot el que no necessita finestra és un crate propi a `crates/`, que es compila sense macOS, de manera que el compilador fa complir com depenen els uns dels altres. L’app de `src/` (paquet `splat-app`, programa `splat`) s’hi recolza.
 
-- `src/markdown/`: l’arbre que llegeix tothom, `Doc` a `doc/`, que és propietari del seu text, i l’única connexió amb l’analitzador a `reader/`: comrak no es nomena enlloc més, i `reader/assumptions.rs` recull el que el codi suposa d’ell. Els colors de sintaxi, i totes les ordres com a edicions de text pures (`Edit`) a `commands/`. També la reanàlisi després d’una edició (`incremental.rs`), el lector de l’HTML incrustat (`markup.rs`), la tipografia, les etiquetes, les referències i les cites dins del text corregut (`typography.rs`), com es veu el text i quin Markdown i HTML el fan així (`style.rs`), què pot ser una adreça (`url.rs`), i l’exportació a HTML i a Word (`html.rs`, `docx.rs` amb `docx/html.rs` i `docx/xml.rs`). Una posició té el seu tipus: `Byte` al text font, `U16` a la vista del codi font, `Shown` a la vista de previsualització (`text.rs`). Sense AppKit.
-- `src/preview/`: la disposició de la previsualització a `layout/`, amb l’HTML incrustat a `layout/html.rs`, i la correspondència entre previsualització i codi font (`Bridge`, `Index`). Un `Bridge` rebutja una disposició d’una altra versió del `Doc`. Sense AppKit.
+- `crates/splat-markdown/`: l’arbre que llegeix tothom, `Doc` a `doc/`, que és propietari del seu text, i l’única connexió amb l’analitzador a `reader/`: comrak no es nomena enlloc més, i `reader/assumptions.rs` recull el que el codi suposa d’ell. Els colors de sintaxi, i totes les ordres com a edicions de text pures (`Edit`) a `commands/`. També la reanàlisi després d’una edició (`incremental.rs`), el lector de l’HTML incrustat (`markup.rs`), la tipografia, les etiquetes, les referències i les cites dins del text corregut (`typography.rs`), com es veu el text i quin Markdown i HTML el fan així (`style.rs`), què pot ser una adreça (`url.rs`), i l’exportació a HTML i a Word (`html.rs`, `docx.rs` amb `docx/html.rs` i `docx/xml.rs`). Una posició té el seu tipus: `Byte` al text font, `U16` a la vista del codi font, `Shown` a la vista de previsualització (`text.rs`).
+- `crates/splat-preview/`: la disposició de la previsualització a `layout/`, amb l’HTML incrustat a `layout/html.rs`, i la correspondència entre previsualització i codi font (`Bridge`, `Index`). Un `Bridge` rebutja una disposició d’una altra versió del `Doc`.
+- `crates/splat-file-state/`: quin text conté un fitxer, en quin format i què significa mirar-lo.
+- `crates/splat-i18n/` amb `resources/*.lproj`: 35 idiomes; les claus són els textos en alemany, i l’app instal·la la taula de l’idioma de la interfície en iniciar-se.
+- `crates/splat-testkit/`: el generador dels tests aleatoris i les comprovacions dels objectius de fuzzing.
 - `src/editor/`: la finestra. Un únic objecte `EditorController` serveix AppKit com a delegat de totes dues vistes i reenvia a components, estructures petites sobre el controlador i l’estat que posseeixen, els camps de les quals els altres mòduls no poden tocar:
 
 | Mòdul | Responsabilitat |
 |---|---|
-| `mod.rs` | classe, mètodes del delegat que reenvien, `invalidate` |
+| `controller.rs` | classe, mètodes del delegat que reenvien, `invalidate`, i el que la resta del programa diu a un editor; només ell arriba als components |
 | `panes.rs` | `Panes`: les vistes de text, l’esquema, mostrar i amagar panells, i el que dóna accés a les vistes |
+| `controller/layers.rs` | qui pot arribar a qui: un component rep un accés al controlador que ofereix el que té a sota, i el compilador ho fa complir |
 | `state.rs` | el que el controlador sap del document i totes les maneres com canvia; els seus camps són privats i no toca cap vista |
 | `model.rs` | presta l’estat i la còpia del text a closures que no poden arribar a cap vista |
 | `actions.rs` | registre d’ordres: selector, títol, drecera, símbol, quan s’aplica l’ordre |
@@ -666,17 +677,16 @@ La sortida dels autotests va a `target/selftest/`. L’autotest compila una app 
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: l’editor de fórmules i de diagrames |
 | `navigation.rs`, `links.rs` | `Links`: enllaços, enllaços wiki, etiquetes, caselles de tasca, plegat, notes a peu de pàgina |
 | `env.rs` | el que la previsualització llegeix de fora del text: la puntuació tipogràfica, el dipòsit per a `@name` i `#12`, el fitxer BibTeX, les notes incrustades |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | text de la previsualització, imatges locals i remotes; `Pictures` a `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | text de la previsualització, imatges locals i remotes; `Pictures` a `images.rs` |
 | `attributes.rs` | atributs de text; cada clau només rep un valor del tipus que espera |
 | `shadow.rs` | còpies del text sense desar per a la recuperació després d’una fallada |
 | `decoder.rs` | processos auxiliars aïllats que descodifiquen imatges i gràfics |
 | `export.rs`, `outline.rs` | `Sharing`: exportació a HTML i a Word, el fitxer de compartició, la impressió; la barra lateral d’esquema |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit per a MathJax, Mermaid, Graphviz, PlantUML i l’editor visual de fórmules; les regles de què es renderitza quan, al marge de WebKit |
 | `webkit.rs` | crides a WebKit; només la vida del delegat de navegació es queda amb `js.rs` i `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construcció de la finestra, barra d’eines, vistes de text, diàlegs, colors |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construcció de la finestra, barra d’eines, vistes de text, diàlegs, colors |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: barra de menús, delegat de l’app, document (`MDDocument`, una subclasse de `NSDocument`).
-- `src/i18n.rs` amb `resources/*.lproj`: 35 idiomes; les claus són els textos en alemany, i l’app instal·la la taula de l’idioma de la interfície en iniciar-se.
 - `src/util/`: fils de treball (`lanes.rs`), volums que poden deixar de respondre (`volumes.rs`), ajudes d’AppKit, fitxers i processos. `src/diag.rs`: el que va malament fora de la vista de l’usuari va al registre del sistema, sense cap text d’un document.
 - `src/large_alloc.rs`: les assignacions grans vénen directament del nucli i hi tornen quan s’alliberen, de manera que la memòria torna després de grans edicions.
 - `resources/js/`: pàgines web i biblioteques; versions i sumes de verificació a [vendor.lock](../../../vendor.lock).
@@ -688,11 +698,11 @@ El text del codi font a la vista de text de l’esquerra és l’única font de 
 
 1. Cada canvi de caràcter hi actualitza al mateix lloc la còpia del text (`Snapshot`), sense tornar a llegir el text.
 2. Una actualització analitza la còpia, torna a acolorir el codi font només on els colors han canviat, disposa la previsualització i substitueix només els blocs el contingut dels quals ha canviat.
-3. Després d’una edició, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats, mentre els veïns es mantinguin iguals; `reparse_part_and_color` diu quan no és així. Els documents amb blocs de comentaris `%%`, els canvis al front matter i, en un document amb definicions de referències d’enllaços, els canvis en una part que conté un claudàtor es processen sencers. comrak només reconeix una referència de nota a peu de pàgina amb la seva definició en la mateixa anàlisi i mou les definicions darrere del text, de manera que la part s’analitza amb una definició substituta per etiqueta i pren els seus números de l’arbre antic; un canvi a les referències o a les definicions de la part, o al costat d’una nota en línia, es processa sencer.
+3. Després d’una edició, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats, mentre els veïns es mantinguin iguals; [docs/partial-parse.md](../../../docs/partial-parse.md) explica per què això dona el mateix que una anàlisi completa i què cal mirar quan canvia comrak. Els documents amb blocs de comentaris `%%`, els canvis al front matter i, en un document amb definicions de referències d’enllaços, els canvis en una part que conté un claudàtor es processen sencers. comrak només reconeix una referència de nota a peu de pàgina amb la seva definició en la mateixa anàlisi i mou les definicions darrere del text, de manera que la part s’analitza amb una definició substituta per etiqueta i pren els seus números de l’arbre antic; un canvi a les referències o a les definicions de la part, o al costat d’una nota en línia, es processa sencer.
 4. Els blocs HTML que obren `<details>` o `<div align>` i el tanquen més tard afecten els blocs Markdown d’entremig; un bloc reutilitzat ha de tenir el mateix entorn.
 5. Mentre escrius al codi font d’un document de fins a 2 MB, l’actualització parcial s’executa a l’instant; quan no es pot aplicar, o en un document més gran, l’anàlisi i la disposició s’executen en segon pla. Mentre escrius a la previsualització, s’executen a l’instant, perquè el cursor de la previsualització depèn del resultat.
 6. L’entrada a la previsualització la tradueix `Bridge` en una edició del codi font i d’allà segueix el mateix camí. Markdown té massa maneres de convertir text en sintaxi per bastar-hi només regles, així que `preview/verify.rs` torna a analitzar la part canviada i compara el que mostra amb el que s’ha escrit; una edició que no se sosté s’escapa més o es rebutja.
-7. Les posicions en línia de comrak fallen en uns pocs llocs, per exemple darrere d’una definició de referència d’enllaç. `markdown/reader/positions.rs` les comprova amb el codi font en llegir un bloc i les torna a llegir del codi font on no encaixen.
+7. Les posicions en línia de comrak fallen en uns pocs llocs, per exemple darrere d’una definició de referència d’enllaç. `reader/positions.rs` les comprova amb el codi font en llegir un bloc i les torna a llegir del codi font on no encaixen.
 
 ### Regles al controlador
 
@@ -701,16 +711,18 @@ El text del codi font a la vista de text de l’esquerra és l’única font de 
 3. Els missatges de fora (una imatge carregada, una fórmula renderitzada) arriben diferits mitjançant `renders_arrived` i `image_arrived`, mai enmig d’una actualització.
 4. Tornar a dibuixar sense un canvi de text passa només per `invalidate(reason)`.
 5. La còpia del text no es reté durant un canvi del codi font, o aquest canvi copia el text sencer: `with_text` la presta només mentre dura un closure `Send`.
-6. Una ordre nova necessita una entrada a `actions.rs`, un mètode a `mod.rs` i una branca a `Editing::perform`.
+6. Una ordre nova necessita una entrada a `actions.rs`, un mètode a `controller.rs` i una branca a `Editing::perform`.
 7. Cada bloc `unsafe` porta la seva justificació com a comentari `// SAFETY:`. Els bytes arriben als descodificadors d’imatge del sistema només al procés auxiliar, mitjançant `decoder::decode_native`; un test escaneja les fonts a la cerca d’altres crides.
 8. Res al fil principal espera les carpetes de l’usuari, ja que un volum de xarxa pot deixar de respondre: els fitxers es consulten al fil `DISK`, i la previsualització llegeix les respostes mitjançant `Env::known`. Només una acció que l’usuari espera, com una exportació o desar, pot tocar el disc directament.
+9. El que ha d’acabar també acaba després d’un panic, ja que el fil principal en sobreviu: una marca activada passa per `with_raised`, una edició de l’emmagatzematge de text per `editing`, i el que el desfer no ha de saber per `without_undo`. Un test troba els casos escrits a mà.
+10. Una adreça en un document té una sola lectura, a `splat_markdown::url`; un test troba els esquemes comparats a mà.
 
 ### Afegir una ordre
 
 La barra de menús, la barra d’eines i el menú contextual construeixen els seus elements a partir del registre de [src/editor/actions.rs](../../../src/editor/actions.rs), i la validació de menús hi llegeix quan s’aplica una ordre i si mostra una marca de selecció. Una ordre nova necessita:
 
 1. una variant d’`Action` amb el seu `Spec`: selector, títol, etiqueta de la barra d’eines, indicador (que comenci amb un verb, de 75 caràcters com a màxim), drecera, SF Symbol i quan s’aplica
-2. el mètode a `src/editor/mod.rs`
+2. el mètode a `src/editor/controller.rs`
 3. una branca a `Editing::perform`
 4. els seus textos a cada `Localizable.strings`
 
@@ -732,7 +744,7 @@ El codi fa servir el text en alemany com a clau: `t("Fett")` el cerca en temps d
 
 | Component | Versió | Ús | Llicència |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | analitzador de Markdown | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 amb [una línia canviada](../../../vendor/comrak/PATCH.md) | analitzador de Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | entorn d’execució d’Objective-C, Foundation, blocs | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | enllaços amb AppKit, WebKit i Grand Central Dispatch | Zlib, Apache-2.0 o MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | fórmules i imatges SVG com a PDF vectorial | MIT o Apache-2.0 |

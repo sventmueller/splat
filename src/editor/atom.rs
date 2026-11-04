@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, sel};
+use objc2::{MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
     NSAccessibility, NSAutoresizingMaskOptions, NSBezelStyle, NSButton, NSColor, NSControlSize, NSFont,
     NSFontWeightRegular, NSLineBreakMode, NSPopUpButton, NSPopover, NSPopoverBehavior, NSScrollView,
@@ -15,14 +15,15 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSPoint, NSRange, NSRect, NSRectEdge, NSSize, NSUndoManager, NSUserDefaults};
 
 use super::attributes::{Attribute, add_attribute};
+use super::layers::ForAtoms;
 use super::style::token_color;
 use super::update::render_key;
-use super::{EditorController, js, mathfield};
+use super::{js, mathfield};
 use crate::i18n::t;
 use crate::markdown::code;
 use crate::markdown::doc::figure_at;
 use crate::markdown::snippets::{self, DIRECTIONS, DiagramAction, MermaidKind, Shape};
-use crate::markdown::text::{Byte, TextAt, U16, Utf16Map, bytes, units};
+use crate::markdown::text::{Byte, Direction, TextAt, U16, Utf16Map, bytes, units};
 use crate::preview::map::preview_offset;
 use crate::util::constant;
 use crate::util::{byte_range_to_ns, from_nsrange, insert_text, ns, storage};
@@ -89,8 +90,6 @@ struct AtomEdit {
     visual: Cell<bool>,
     /// Text just inserted for a new formula, removed again if the editor closes without one.
     inserted: Cell<Option<(Byte, Byte)>>,
-    /// The document counts as edited while the editor holds changes, so quitting saves them.
-    marked_edited: Cell<bool>,
     /// Steps within the editor, which end with it. In the document's undo history they would point at a text that the
     /// editor mirrors into the source without a step of its own.
     undo: Retained<NSUndoManager>,
@@ -115,16 +114,13 @@ impl Atoms {
 }
 
 pub(super) struct AtomEditor<'a> {
-    host: &'a EditorController,
+    host: ForAtoms<'a>,
     state: &'a Atoms,
 }
 
-impl EditorController {
-    pub(super) fn atom_editor(&self) -> AtomEditor<'_> {
-        AtomEditor {
-            host: self,
-            state: &self.ivars().atoms,
-        }
+impl<'a> AtomEditor<'a> {
+    pub(super) fn new(host: ForAtoms<'a>, state: &'a Atoms) -> Self {
+        AtomEditor { host, state }
     }
 }
 
@@ -371,7 +367,7 @@ impl AtomEditor<'_> {
         let size = NSSize::new(width, 30.0 + editor_height + 26.0);
         let root = NSView::initWithFrame(NSView::alloc(mtm), NSRect::new(NSPoint::new(0.0, 0.0), size));
 
-        let target: &AnyObject = self.host;
+        let target: &AnyObject = self.host.object();
         let mut row = Row {
             view: NSView::initWithFrame(
                 NSView::alloc(mtm),
@@ -429,7 +425,6 @@ impl AtomEditor<'_> {
             editor_frame,
             visual: Cell::new(false),
             inserted: Cell::new(None),
-            marked_edited: Cell::new(false),
             undo: NSUndoManager::new(mtm),
         });
         self.color_code();
@@ -462,7 +457,7 @@ impl AtomEditor<'_> {
         popover.setBehavior(NSPopoverBehavior::Transient);
         popover.setContentViewController(Some(&controller));
         popover.setContentSize(size);
-        popover.setDelegate(Some(ProtocolObject::from_ref(self.host)));
+        popover.setDelegate(Some(ProtocolObject::from_ref(self.host.object())));
         popover
     }
 
@@ -522,7 +517,7 @@ impl AtomEditor<'_> {
         } else {
             t("LaTeX-Formel")
         })));
-        view.setDelegate(Some(ProtocolObject::from_ref(self.host)));
+        view.setDelegate(Some(ProtocolObject::from_ref(self.host.object())));
         scroll.setDocumentView(Some(&view));
         (scroll, view)
     }
@@ -556,12 +551,12 @@ impl AtomEditor<'_> {
                 root.addSubview(&field.web);
             }
             field.web.setHidden(false);
-            field.attach(self.host, &latex);
+            field.attach(self.host.object(), &latex);
             if let Some(w) = field.web.window() {
                 w.makeFirstResponder(Some(&field.web));
             }
         } else {
-            field.detach(self.host);
+            field.detach(self.host.object());
             if let Some(w) = view.window() {
                 w.makeFirstResponder(Some(&view));
             }
@@ -653,7 +648,7 @@ impl AtomEditor<'_> {
     }
 
     /// Tab and Shift-Tab in the formula code jump between placeholders.
-    pub(super) fn tab(&self, backwards: bool) -> bool {
+    pub(super) fn tab(&self, way: Direction) -> bool {
         let view = {
             let edit = self.state.edit.borrow();
             match edit.as_ref() {
@@ -664,8 +659,8 @@ impl AtomEditor<'_> {
         let code = view.string().to_string();
         let map = Utf16Map::new(&code);
         let sel = from_nsrange(view.selectedRange());
-        let from = map.to_byte(if backwards { sel.start } else { sel.end });
-        let Some(next) = snippets::next_placeholder(&code, from.get(), backwards) else {
+        let from = map.to_byte(if way == Direction::Backward { sel.start } else { sel.end });
+        let Some(next) = snippets::next_placeholder(&code, from.get(), way) else {
             return false;
         };
         view.setSelectedRange(byte_range_to_ns(&map, &bytes(next)));
@@ -693,17 +688,17 @@ impl AtomEditor<'_> {
             return;
         }
         let all = NSRange::new(0, store.length());
-        store.beginEditing();
-        add_attribute(&store, &Attribute::font(&code_font()), all);
-        add_attribute(&store, &Attribute::foreground(&NSColor::textColor()), all);
-        for (range, token) in code::tokens(lang, &text) {
-            add_attribute(
-                &store,
-                &Attribute::foreground(&token_color(token.into())),
-                byte_range_to_ns(&map, &bytes(range)),
-            );
-        }
-        store.endEditing();
+        crate::util::editing(&store, || {
+            add_attribute(&store, &Attribute::font(&code_font()), all);
+            add_attribute(&store, &Attribute::foreground(&NSColor::textColor()), all);
+            for (range, token) in code::tokens(lang, &text) {
+                add_attribute(
+                    &store,
+                    &Attribute::foreground(&token_color(token.into())),
+                    byte_range_to_ns(&map, &bytes(range)),
+                );
+            }
+        });
     }
 
     /// Shows the MathJax or Mermaid error for the current code, or a hint when there is none.
@@ -745,9 +740,10 @@ impl AtomEditor<'_> {
     fn render_key(&self) -> Option<js::Key> {
         let start = self.state.edit.borrow().as_ref()?.start;
         let dark = self.host.is_dark();
+        let macros = self.host.model().read(|st| st.macros());
         self.host
             .model()
-            .read(move |st| figure_at(st.doc(), start).map(|(_, figure)| render_key(&figure, dark)))
+            .read(move |st| figure_at(st.doc(), start).map(|(_, figure)| render_key(&figure, dark, &macros)))
     }
 }
 

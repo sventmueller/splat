@@ -5,12 +5,13 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use objc2::{MainThreadOnly, sel};
+use objc2::sel;
 use objc2_foundation::{NSMutableAttributedString, NSRange};
 
+use super::State;
+use super::layers::ForProgressive;
 use super::panes::Side;
 use super::render::RenderCtx;
-use super::{EditorController, State};
 use crate::markdown::text::Shown;
 use crate::preview::layout::TopBlock;
 use crate::util::{perform_later, storage};
@@ -50,26 +51,26 @@ fn window_around(top: usize, bottom: usize, count: usize) -> Range<usize> {
 }
 
 pub(super) struct Progressive<'a> {
-    host: &'a EditorController,
+    host: ForProgressive<'a>,
 }
 
-impl EditorController {
-    pub(super) fn progressive(&self) -> Progressive<'_> {
-        Progressive { host: self }
+impl<'a> Progressive<'a> {
+    pub(super) fn new(host: ForProgressive<'a>) -> Self {
+        Progressive { host }
     }
 }
 
 impl Progressive<'_> {
     pub(super) fn schedule_pending_blocks(&self) {
         // Common modes, so rendering goes on while the scroller is dragged.
-        perform_later(self.host, sel!(renderPendingBlocks), 0.0, true);
+        perform_later(self.host.object(), sel!(renderPendingBlocks), 0.0, true);
     }
 
     /// Renders the placeholder blocks in view right away, so scrolling never shows them unformatted.
     pub(super) fn render_visible_blocks(&self) {
         // Rendered blocks change height and can pull further placeholders into view.
         for _ in 0..3 {
-            if self.host.panes().is_silent() || self.host.editing().preview_editing() {
+            if self.host.under_way().holds_back_what_can_wait() {
                 return;
             }
             let view = self.host.panes().preview();
@@ -101,7 +102,7 @@ impl Progressive<'_> {
     /// Blocks further away wait until scrolled near: in a large document, TextKit takes longer for every edit the
     /// further the rendered part reaches beyond the visible one.
     pub(super) fn render_pending_blocks(&self) {
-        if self.host.panes().is_silent() || self.host.editing().preview_editing() {
+        if self.host.under_way().holds_back_what_can_wait() {
             self.schedule_pending_blocks();
             return;
         }
@@ -124,7 +125,7 @@ impl Progressive<'_> {
         let in_time = || budget.is_none_or(|b| started.elapsed() < b);
         let dark = self.host.is_dark();
         let doc_dir = self.host.doc_dir();
-        let max_width = (self.host.panes().preview().bounds().size.width - 60.0).max(200.0);
+        let max_width = self.host.panes().preview_image_width();
         let shown_len = self.host.panes().preview().length();
         let wanted = window.clone();
         let Some((zoom, waiting)) = self.host.model().read(move |st| waiting_blocks(st, wanted, from)) else {
@@ -137,8 +138,10 @@ impl Progressive<'_> {
             images: self.host.pictures().store(),
             max_image_width: max_width,
             dark,
-            controller: Some(self.host),
+            controller: Some(self.host.object()),
             remote_images: self.host.pictures().remote_allowed(),
+            leaves_the_mac: false,
+            macros: self.host.model().read(|st| st.macros()),
         };
         // Consecutive blocks go in as one replacement: every single edit of a large text storage has a fixed cost.
         let mut chunks = Vec::new();
@@ -167,11 +170,11 @@ impl Progressive<'_> {
         if !chunks.is_empty() {
             self.host.panes().silently(|views| {
                 let storage = storage(views.preview);
-                storage.beginEditing();
-                for (range, chunk) in &chunks {
-                    storage.replaceCharactersInRange_withAttributedString(*range, chunk);
-                }
-                storage.endEditing();
+                crate::util::editing(&storage, || {
+                    for (range, chunk) in &chunks {
+                        storage.replaceCharactersInRange_withAttributedString(*range, chunk);
+                    }
+                });
             });
         }
         // Replacing a block drops the highlight on it.

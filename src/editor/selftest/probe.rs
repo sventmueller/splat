@@ -17,7 +17,7 @@ use objc2_web_kit::WKWebView;
 
 use super::super::EditorController;
 use super::super::decoder;
-use super::super::js::{self, Key};
+use super::super::js::{self, Key, PageAnswer};
 use super::super::mathfield::{self, MathField};
 use super::super::safe_image::Decoded;
 use super::super::webkit;
@@ -45,6 +45,11 @@ fn url_in_probe(path: &str) -> String {
     format!("{HOST}{path}")
 }
 
+/// A scheme in capitals is the same scheme.
+fn in_capitals() -> String {
+    url_in_probe("/badge.svg").replacen("https", "HTTPS", 1)
+}
+
 struct Probe {
     mtm: MainThreadMarker,
     keys: Vec<(&'static str, Key)>,
@@ -58,7 +63,7 @@ struct Probe {
 
 pub(super) fn run(mtm: MainThreadMarker) {
     let keys = render_keys();
-    js::renderer(mtm).request(keys.iter().map(|(_, k)| k.clone()).collect());
+    js::renderer(mtm).request(0, keys.iter().map(|(_, k)| k.clone()).collect());
     let field = mathfield::field(mtm);
     let local = std::env::temp_dir().join(format!("splat-probe-{}.bmp", std::process::id()));
     let _ = std::fs::write(&local, two_pixel_bmp());
@@ -78,6 +83,7 @@ pub(super) fn run(mtm: MainThreadMarker) {
     for path in REMOTE_PICTURES {
         super::super::remote::get(&url_in_probe(path), editor.as_deref());
     }
+    super::super::remote::get(&in_capitals(), editor.as_deref());
     let documents = NSDocumentController::sharedDocumentController(mtm);
     let recent = std::env::temp_dir().join("splat-probe-recent.md");
     let _ = std::fs::write(&recent, "# Recent\n");
@@ -104,6 +110,7 @@ fn render_keys() -> Vec<(&'static str, Key)> {
                 tex: "E = mc^2".into(),
                 display: false,
                 dark: false,
+                macros: "".into(),
             },
         ),
         (
@@ -318,8 +325,39 @@ fn report(probe: &Probe) {
         guarded("the outline and web permission", || outline_and_web_permission(e));
         guarded("pasting a picture", || pasting_a_picture(e, &probe.document));
     }
+    guarded("a closed document", || a_closed_document_stops_asking(probe.mtm));
     super::controller::checks(probe.mtm);
     formula_editor(probe);
+}
+
+/// A document decides which hosts hear from Splat, so one that closes takes back what it still waits for.
+fn a_closed_document_stops_asking(mtm: MainThreadMarker) {
+    const IMAGES: usize = 40;
+    let text: String = (0..IMAGES)
+        .map(|n| {
+            format!(
+                "![{n}]({})\n\n",
+                url_in_probe(&format!("{}-{n}.svg", super::mock_web::SLOW))
+            )
+        })
+        .collect();
+    let (document, e) = super::documents::untitled(mtm, &text);
+    e.pictures().allow_remote_images();
+    let asked = super::controller::until(|| super::mock_web::requests_holding(super::mock_web::SLOW) > 0);
+    document.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeCleared);
+    e.stop_showing_for_a_check();
+    document.close();
+    let quiet = super::controller::until(js_free_of_downloads);
+    let requests = super::mock_web::requests_holding(super::mock_web::SLOW);
+    check(
+        "a closed document stops asking hosts for the images it waited for",
+        asked && quiet && requests < IMAGES,
+        &format!("asked {asked}, ended {quiet}, {requests} of {IMAGES} requests"),
+    );
+}
+
+fn js_free_of_downloads() -> bool {
+    super::super::remote::idle()
 }
 
 /// What a person compares by eye after changing a renderer.
@@ -372,6 +410,11 @@ fn remote_answers() {
         "",
     );
     check(
+        "an address with its scheme in capitals loads",
+        matches!(super::super::remote::get(&in_capitals(), None), Some(Some(_))),
+        "",
+    );
+    check(
         "a lost connection passes: the picture loads on the next try",
         shown("/ohne-netz.svg"),
         "",
@@ -390,8 +433,8 @@ fn remote_answers() {
 
 fn exports(e: &EditorController) {
     let page = e
-        .sharing()
         .export_source()
+        .beside(std::env::temp_dir())
         .html("Probe", &std::env::temp_dir().join("probe.html"));
     check(
         "the HTML export embeds the local image and the formula",
@@ -399,7 +442,11 @@ fn exports(e: &EditorController) {
         "",
     );
     check("the HTML export holds no script", !page.contains("<script"), "");
-    let word = e.sharing().export_source().word().expect("a small document");
+    let word = e
+        .export_source()
+        .beside(std::env::temp_dir())
+        .word()
+        .expect("a small document");
     let listing = String::from_utf8_lossy(&word);
     check(
         "the Word export holds its document and pictures",
@@ -407,25 +454,36 @@ fn exports(e: &EditorController) {
         &format!("{} bytes", word.len()),
     );
     // The 2 × 1 px image shrinks with the text to 0.75 pt per pixel, on paper and in Word.
-    let printed = e.sharing().printable(400.0);
-    let mut sizes = Vec::new();
-    let mut at = 0;
-    while at < printed.length() {
-        let mut range = NSRange::new(0, 0);
-        // SAFETY: `at` lies inside the text and `range` outlives the call.
-        let value = unsafe { printed.attribute_atIndex_effectiveRange(NSAttachmentAttributeName, at, &mut range) };
-        if let Some(attachment) = value.and_then(|v| v.downcast::<NSTextAttachment>().ok()) {
-            sizes.push(attachment.bounds().size);
+    let the_image_on_paper = |doc_dir: PathBuf| {
+        let printed = e.sharing().printable_from(Some(doc_dir), 400.0);
+        let mut sizes = Vec::new();
+        let mut at = 0;
+        while at < printed.length() {
+            let mut range = NSRange::new(0, 0);
+            // SAFETY: `at` lies inside the text and `range` outlives the call.
+            let value = unsafe { printed.attribute_atIndex_effectiveRange(NSAttachmentAttributeName, at, &mut range) };
+            if let Some(attachment) = value.and_then(|v| v.downcast::<NSTextAttachment>().ok()) {
+                sizes.push(attachment.bounds().size);
+            }
+            at = (range.location + range.length).max(at + 1);
         }
-        at = (range.location + range.length).max(at + 1);
-    }
-    check(
-        "an image is scaled like the text on paper",
         sizes
             .iter()
-            .any(|s| (s.width - 1.5).abs() < 0.01 && (s.height - 0.75).abs() < 0.01),
-        &format!("{sizes:?}"),
+            .any(|s| (s.width - 1.5).abs() < 0.01 && (s.height - 0.75).abs() < 0.01)
+    };
+    check(
+        "an image is scaled like the text on paper",
+        the_image_on_paper(std::env::temp_dir()),
+        "",
     );
+    let elsewhere = std::env::temp_dir().join(format!("splat-probe-anderswo-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&elsewhere);
+    check(
+        "paper takes along no image from outside the folder of its document",
+        !the_image_on_paper(elsewhere.clone()),
+        "",
+    );
+    let _ = std::fs::remove_dir_all(elsewhere);
     check(
         "an image is scaled like the text in Word",
         listing.contains("<wp:extent cx=\"19050\" cy=\"9525\"/>"),
@@ -500,7 +558,8 @@ fn pasting_a_picture(e: &EditorController, document: &MdDocument) {
     let pasteboard = NSPasteboard::pasteboardWithUniqueName();
     pasteboard.clearContents();
     pasteboard.setData_forType(Some(&NSData::with_bytes(&png)), constant!(NSPasteboardTypePNG));
-    let handled = e.editing().paste_image(&pasteboard);
+    let handled = e.paste_image(&pasteboard);
+    super::controller::until(|| e.source_text().contains("![Bild "));
     let written = std::fs::read_dir(&dir).map_or(0, |d| {
         d.flatten()
             .filter(|f| f.path().extension().is_some_and(|x| x == "png"))
@@ -569,7 +628,7 @@ const FORMULA_STYLES: &str = "const svg = async (tex, color) => (await renderMat
 
 /// Of a formula's picture, the share of pixels that are drawn, and of those the share that is dark.
 fn drawn_and_dark(svg: &str) -> Option<(f64, f64)> {
-    let Some(Decoded::Rgba { pixels, .. }) = decoder::svg_to_pixels(svg) else {
+    let Some(Decoded::Rgba { pixels, .. }) = decoder::svg_to_pixels(svg, crate::editor::safe_image::SHOWN_SIDE) else {
         return None;
     };
     let (pixels, _) = pixels.as_chunks::<4>();
@@ -727,7 +786,62 @@ fn formula_packages(mtm: MainThreadMarker) {
     let name = "a formula finds its packages and fonts in the app and stays one picture";
     ask(&js::renderer(mtm).web(), name, FORMULA_PACKAGES, move |text| {
         check(name, text == "false /  / true / true", &text);
-        formula_styles(mtm);
+        formulas_stand_alone(mtm);
+    });
+}
+
+/// What one formula does to MathJax's labels and definitions stays out of the next, and a document's definitions reach its
+/// other formulas in whatever order they render.
+const FORMULAS_ALONE: &str = "const draw = (tex, macros = '') => renderMath(tex, true, '#000000', macros); \
+    await draw('a\\\\label{same}'); \
+    const again = await draw('a\\\\label{same}'); \
+    const alpha = (await draw('\\\\alpha')).w; \
+    await draw('\\\\renewcommand{\\\\alpha}{xxxxxxxx}\\\\alpha'); \
+    const after = (await draw('\\\\alpha')).w; \
+    const own = (await draw('\\\\Rr', '\\\\newcommand{\\\\Rr}{xxxxxxxx}')).w; \
+    const eight = (await draw('xxxxxxxx')).w; \
+    const unknown = (await draw('\\\\dv{f}{x}')).w; \
+    const known = (await draw('\\\\require{physics}\\\\dv{f}{x}')).w; \
+    const unknownAgain = (await draw('\\\\dv{f}{x}')).w; \
+    const fromDocument = (await draw('\\\\dv{f}{x}', '\\\\require{physics}')).w; \
+    const notFromIt = (await draw('\\\\dv{f}{x}')).w; \
+    const brokenMacros = await draw('\\\\alpha', '\\\\require{nosuchpackage}'); \
+    return [again.error === '', alpha === after, own === eight, known < unknown, unknownAgain === unknown, \
+        fromDocument === known, notFromIt === unknown, brokenMacros.w === alpha].join(' / ');";
+
+/// A tag asks for the whole width of a container this page does not have.
+const TAGGED_FORMULA: &str = "const draw = (tex) => renderMath(tex, true, '#000000', ''); \
+    const plain = await draw('E = mc^2'); \
+    const tagged = await draw('E = mc^2 \\\\tag{1}'); \
+    const opens = tagged.svg.match(/<svg[^>]*>/)[0]; \
+    return [tagged.w > plain.w, tagged.w < plain.w + 30, !opens.includes('100%')].join(' / ');";
+
+const MATH_FIELDS: &str = "return Object.keys(await renderMath('a', false, '#000000', '')).sort().join();";
+const DIAGRAM_FIELDS: &str =
+    "return Object.keys(await renderDiagram('graphviz', 'digraph { a }', false)).sort().join();";
+
+/// What the app reads of the page's answers is what the page answers.
+fn answers_of_the_page(mtm: MainThreadMarker) {
+    let name = "the page answers a formula with the fields the app reads";
+    ask(&js::renderer(mtm).web(), name, MATH_FIELDS, move |text| {
+        check(name, text == js::MathAnswer::FIELDS.join(","), &text);
+        let name = "the page answers a diagram with the fields the app reads";
+        ask(&js::renderer(mtm).web(), name, DIAGRAM_FIELDS, move |text| {
+            check(name, text == js::PlacedPicture::FIELDS.join(","), &text);
+            formula_styles(mtm);
+        });
+    });
+}
+
+fn formulas_stand_alone(mtm: MainThreadMarker) {
+    let name = "a formula depends on nothing but itself and the definitions of its document";
+    ask(&js::renderer(mtm).web(), name, FORMULAS_ALONE, move |text| {
+        check(name, text == ["true"; 8].join(" / "), &text);
+        let name = "a formula with a tag is as wide as it needs to be";
+        ask(&js::renderer(mtm).web(), name, TAGGED_FORMULA, move |text| {
+            check(name, text == "true / true / true", &text);
+            answers_of_the_page(mtm);
+        });
     });
 }
 
@@ -779,8 +893,8 @@ fn the_defaults_of_a_graph_find_its_brace(mtm: MainThreadMarker) {
 fn a_page_that_stops_answering(mtm: MainThreadMarker) {
     let renderer = js::renderer(mtm);
     webkit::run_script(&renderer.web(), "while (true) {}", &[]);
-    let formula = || Key::math("a^2 + b^2 = c^2", false, false);
-    renderer.request(vec![formula()]);
+    let formula = || Key::math("a^2 + b^2 = c^2", false, false, &"".into());
+    renderer.request(1, vec![formula()]);
     let limit = js::RENDER_TIMEOUT.as_secs_f64();
     let started = std::time::Instant::now();
     let answered = move || js::outcome(&formula()).is_some();

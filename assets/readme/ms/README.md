@@ -120,7 +120,7 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - **Butang untuk setiap perkara.** Setiap binaan Markdown mempunyai butang bar alat dan item menu, dan yang biasa digunakan juga mempunyai pintasan papan kekunci. Jadual mendapat menunya sendiri untuk baris, lajur dan penjajaran.
 - **Eksport tanpa kehilangan apa-apa.** PDF, satu fail HTML yang berdiri sendiri, atau dokumen Word dengan tajuk, senarai, jadual, nota kaki dan imej yang sebenar.
 - **Natif sepenuhnya.** Tetingkap, tab, menu, popover, Versi, Simpan Auto, menu kongsi, mod gelap, semakan ejaan, dikte dan VoiceOver yang sebenar daripada AppKit. Tiada Electron, tiada paparan web untuk teks itu sendiri.
-- **Pantas dengan fail besar.** Merender satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 25 ms, sebelum kerja paparan itu sendiri.
+- **Pantas dengan fail besar.** Merender satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 10 ms, sebelum kerja paparan itu sendiri.
 - **Peribadi dan berhati-hati.** Imej dari web dimuatkan hanya selepas anda membenarkannya, pautan ke app lain bertanya dahulu, dan semua yang menyahkod data imej yang tidak dipercayai berjalan dalam proses pembantu berkotak pasir.
 - **Dalam bahasa anda.** Antara muka dan rujukan pantas Markdown terbina dalam tersedia dalam 35 bahasa: Arab, Katalan, Cina (Ringkas), Cina (Tradisional), Croatia, Czech, Denmark, Belanda, Inggeris, Finland, Perancis, Jerman, Yunani, Ibrani, Hindi, Hungary, Indonesia, Itali, Jepun, Korea, Melayu, Norway, Poland, Portugis (Brazil), Portugis (Portugal), Romania, Rusia, Slovak, Slovenia, Sepanyol, Sweden, Thai, Turki, Ukraine dan Vietnam.
 
@@ -503,7 +503,7 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 - **Tiada rangkaian secara lalai.** Splat tidak mempunyai telemetri. Ia mencari kemas kini hanya apabila anda bersetuju atau memilih **Semak Kemas Kini…**: ia kemudian memuatkan fail suapan kecil daripada GitHub, dan permintaan itu tidak menamakan apa-apa selain app dan versinya. Formula dan rajah dipaparkan secara setempat; paparan web yang melakukannya tidak dapat mencapai rangkaian.
 - **Imej dari web** dimuatkan hanya selepas kebenaran anda, hanya melalui `https`, tidak pernah daripada hos dalam rangkaian setempat anda, paling banyak 10 MB setiap satu, dan dalam sesi persendirian tanpa kuki.
 - **Penyahkodan terasing.** Imej dan grafik formula serta rajah dinyahkod dalam proses pembantu yang menutup setiap fail yang diwarisinya dan mengunci dirinya dalam kotak pasir sebelum membaca bait pertama: tiada akses fail, tiada rangkaian. Ia hanya menyerahkan semula piksel, yang saiznya disemak, dan dihentikan selepas 10 saat. Penyahkod imej Apple sendiri hanya melihat HEIC, TIFF, AVIF dan PDF, dan hanya apabila data itu benar-benar format tersebut; ia berjalan dalam pembantu tersendiri, yang di samping itu boleh membaca folder fon sistem dan menggunakan penyahkod video sistem. SVG, formula dan rajah turut melalui pembantu itu, jadi ia ialah gambar dengan resolusi tetap dalam Splat: empat piksel setiap titik, sehingga 2560 pada sisi yang lebih panjang.
-- **Fail setempat** sampai kepada dokumen hanya melalui laluan yang dinamakannya. Benam menunjukkan nota Markdown daripada folder dokumen dan ke bawah, dan gambar yang tiada dicari di situ sahaja. Laluan imej di tempat lain, mutlak atau bermula dengan `~`, tetap dimuatkan, dan eksport HTML serta Word membenamkannya: lihat eksport dokumen yang bukan anda tulis sebelum anda menyerahkannya.
+- **Fail setempat** sampai kepada dokumen hanya melalui laluan yang dinamakannya. Benam menunjukkan nota Markdown daripada folder dokumen dan ke bawah, dan gambar yang tiada dicari di situ sahaja. Laluan imej di tempat lain, mutlak atau bermula dengan `~`, tetap dimuatkan dalam pratonton; eksport HTML dan Word, pencetakan dan PDF hanya membawa apa yang ada dalam folder dokumen atau repositori Gitnya, melainkan repositori itu juga menyimpan folder Utama anda, supaya dokumen daripada orang lain tidak dapat menarik fail anda ke dalam eksport yang anda hantar.
 - **Salinan teks yang belum disimpan** kekal pada Mac ini, dalam folder Library anda, untuk pemulihan selepas ranap. Ia hilang dengan penyimpanan atau penamatan biasa Splat; salinan yang ditinggalkan ranap kekal dalam folder pemulihan sehingga anda memadamnya.
 - **Pautan** tidak pernah memulakan program dengan satu klik. Pautan web dan mel dibuka seperti biasa; pautan ke app lain bertanya dahulu.
 - **HTML dalam dokumen** dibaca oleh penghurai Splat sendiri. Skrip, gaya, bingkai dan borang tidak pernah dijalankan.
@@ -515,13 +515,14 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 Splat kekal responsif dengan dokumen beberapa megabait:
 
 - Sumber menggunakan TextKit 2, yang hanya menyusun atur bahagian yang kelihatan.
-- Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula. Dalam dokumen 10 MB, penghuraian dan pewarnaan mengambil kira-kira 20 ms, perenderan kira-kira 25 ms, dan satu ketukan kekunci penuh dalam pratontonnya kira-kira 60 ms termasuk kerja paparan itu sendiri.
+- Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula. Dalam dokumen 10 MB, penghuraian dan pewarnaan mengambil kira-kira 3 ms, perenderan kira-kira 10 ms, dan satu ketukan kekunci penuh dalam pratontonnya kira-kira 30 ms termasuk kerja paparan itu sendiri.
 - Pratonton besar memaparkan bahagian yang kelihatan dahulu dan selebihnya semasa app terbiar. Blok yang digulung ke paparan dipaparkan sebelum dilukis.
 - Dalam sumber dokumen yang lebih besar, penghuraian untuk pratonton berjalan di latar belakang semasa anda menaip.
 - Dokumen kekal sebagai teks biasa apabila ia akan memerlukan kira-kira 4 GB memori, iaitu kira-kira 50 hingga 120 MB Markdown biasa, tetapi hanya 10 hingga 20 MB jika isinya hanya jadual atau tajuk: sumber tiada warna dan pratonton menyatakan sebab ia kekal kosong. Eksport masih berfungsi.
 - Mulai kira-kira 200 KB, dokumen membuka tetingkapnya sebelum dihuraikan; pada 5 MB, warna dan pratonton menyusul kira-kira suku saat kemudian.
+- Semua imej bersama-sama, termasuk formula dan rajah, mengambil paling banyak satu perempat memori Mac, dan separuh daripadanya semasa memori kurang. Selebihnya, imej seterusnya dipaparkan sebagai pemegang tempat sehingga ada ruang semula.
 
-Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan kekunci pada 10 MB: perubahan pada takrifan atau rujukan nota kaki, di sebelah nota kaki sebaris, di hujung dokumen sebelah nota kaki, pada front matter atau berhampiran takrifan rujukan pautan, dan setiap perubahan dalam dokumen dengan blok ulasan `%%` atau dengan nota kaki yang ditakrifkan dua kali atau di dalam petikan atau senarai. Memori bertambah bersama fail, kepada kira-kira 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
+Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan kekunci pada 10 MB: perubahan pada takrifan atau rujukan nota kaki, di sebelah nota kaki sebaris, di hujung dokumen sebelah nota kaki, pada front matter atau pada takrifan rujukan pautan, dan setiap perubahan dalam dokumen dengan blok ulasan `%%` atau dengan nota kaki yang ditakrifkan dua kali atau di dalam petikan atau senarai. Memori bertambah bersama fail, kepada kira-kira 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
 
 ## Had yang diketahui
 
@@ -576,6 +577,7 @@ make check                  # pemformatan, clippy tanpa amaran, semua ujian, pus
 make test                   # make check, kemudian ujian kendiri tanpa tetingkap
 make test-gui               # ujian kendiri dengan tetingkap; ia menduduki Mac selama kira-kira empat minit
 make test-long              # carian rawak yang lebih panjang dan semakan kemas kini separa 10 MB
+make fuzz                   # input rawak untuk hurai separa dan semua output
 make coverage               # liputan baris semua ujian dan ujian kendiri, dengan paras minimum bagi setiap modul
 make coverage-library       # paras minimum yang sama untuk modul tanpa tetingkap, seperti dalam CI
 make bench FILE=<file.md>   # masa untuk membuka, menaip dan menggulung fail besar
@@ -625,19 +627,24 @@ App di dalamnya membawa tandatangan yang berbeza daripada binaan setempat, jadi 
 | `cargo xtask check-library` | pustaka boleh dibina untuk Linux, jadi tiada apa-apa di dalamnya memerlukan macOS |
 | `cargo xtask vendor check` | pustaka JavaScript sepadan dengan `vendor.lock` bait demi bait |
 | `cargo xtask selftest probe` | tanpa tetingkap, masing-masing dengan keputusan yang dijangka: formula, rajah, imej web terhadap pelayan di dalam proses, alamat yang disekat, teks yang ditulis oleh setiap arahan, setiap format imej melalui kedua-dua eksport, halaman yang berhenti menjawab, dan pertahanan paparan web terhadap halaman tanpanya. Mengambil masa kira-kira setengah minit. Apa yang memerlukan app di hadapan skrin dilangkau pada skrin yang dikunci |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | app yang berjalan, klik demi klik. Membuka tetingkap dan menaip di dalamnya; Mac sibuk selama kira-kira empat minit. `--scenarios` hanya menjalankan bahagian kedua, dalam kira-kira satu setengah minit |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | app yang berjalan, klik demi klik. Membuka tetingkap dan menaip di dalamnya; Mac sibuk selama kira-kira empat minit. `--scenarios` hanya menjalankan bahagian kedua, dalam kira-kira satu setengah minit. `--only` menjalankan satu kumpulan bahagian itu, dalam dokumennya sendiri, juga pada skrin yang dikunci. `--in-back` meninggalkan apa yang memerlukan apl di hadapan; tanpanya semakan begitu gagal |
 | `cargo xtask selftest resize` | melebarkan tetingkap selepas menggerakkan pembahagi: sumber dibungkus semula semasa tetingkap diubah saiz. Mengambil masa kira-kira sepuluh saat |
-| `cargo xtask selftest bench <file.md>` | masa untuk membuka, menaip dan menggulung fail besar |
+| `cargo xtask selftest typing [--by-hand]` | menaip merentasi simpanan, dengan kekunci melalui baris gilir acara apl atau, dengan `--by-hand`, secara manual: apa yang ditaip kekal dan dikira belum disimpan. Mengambil kira-kira seminit |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | masa untuk membuka, menaip dan menggulung fail besar; `--keystroke-ms` gagal apabila ketukan terpantas mengambil masa lebih lama |
 | `cargo test --release -- --ignored partial_updates` | satu ketukan kekunci dalam 10 MB: kemas kini separa berbanding penuh, keputusan yang sama dalam suku masa paling lama |
 | `cargo test --release --test hostile` | dokumen yang dibina untuk melimpahkan tindanan atau mengambil masa kuadratik, masing-masing dalam dua saiz yang masanya mesti bertambah seperti teks, melalui penghuraian, susun atur, kedua-dua eksport, ketukan kekunci dan arahan |
-| `make mutants` | kesalahan dibina ke dalam `src/markdown/` dan `src/preview/` satu demi satu, melalui [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); menyatakan yang mana tiada ujian menyedarinya. Mengambil masa berjam-jam; `FILE=src/preview/bridge.rs` mengecilkan skop |
+| `make mutants` | kesalahan dibina ke dalam `crates/splat-markdown`, `crates/splat-preview` dan `crates/splat-file-state` satu demi satu, melalui [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); menyatakan yang mana tiada ujian menyedarinya. Mengambil masa berjam-jam; `FILE=crates/splat-preview/src/bridge/mod.rs` mengecilkan skop |
+| `make fuzz` | input rawak melalui [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), yang memerlukan nightly rustup: ketukan kekunci yang mesti terbaca seperti hurai penuh, semua output, suntingan dalam pratonton, semua arahan dan fail yang disimpan seperti ia dibuka. `SECONDS=600` mencari lebih lama |
+| `cargo test --release --test fuzz_seeds` | benih dalam `fuzz/seeds/` melalui semakan sasaran fuzz itu, tanpa fuzzer; sebahagian daripada setiap `cargo test` |
+| `cargo test --profile checked --workspace` | ujian dengan apa yang diperiksa binaan nyahpepijat sebagai tambahan: selepas setiap hurai separa, blok sepadan dengan teksnya, dan apa yang dibawanya ialah apa yang dikatakan teks. Sebahagian daripada `make test-long` |
+| `cargo test --release --test entry_points --test structure` | daripada sumber: semua yang dipanggil sistem dilindungi daripada panic, dan modul hanya bergantung ke bawah |
 | `cargo test --release --test decoder` | proses penyahkod menyahkod imej dan tidak mencapai fail mahupun rangkaian |
 | `make coverage` | liputan baris `cargo test` dan semua ujian kendiri, melalui [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); gagal di bawah paras minimum. Menduduki Mac selama kira-kira lima minit |
-| `make coverage-library` | `src/markdown/`, `src/preview/` dan `i18n.rs` terhadap paras minimum yang lebih tinggi, diukur oleh `cargo test` sahaja |
+| `make coverage-library` | crate `splat-markdown`, `splat-preview`, `splat-file-state` dan `splat-i18n` terhadap paras minimum yang lebih tinggi, diukur oleh `cargo test` sahaja |
 
-Ujian unit terletak di sebelah kod yang diujinya. `tests/` menyimpan apa yang mencapai pustaka dari luar: ujian rawak dalam `robustness.rs`, yang berkongsi penjana dalam `src/fuzz.rs` dengan ujian `sync.rs`, dokumen yang dibina untuk mencederakan dalam `hostile.rs`, dan ujian penyahkod, yang memulakan program yang dibina. Keputusan dalam `src/editor/` yang tidak memerlukan tetingkap terletak dalam fungsi bebas dengan ujian tersendiri: segala yang diketahui pengawal dan cara ia berubah dalam `state.rs`, peraturan pemaparan dalam `render_queue.rs`, salinan teks dalam `sync.rs`, gaya perenggan, fon dan warna sebagai nilai dalam `render.rs`, maksud pengecam bar alat dalam `toolbar.rs`, maksud klik pada pautan dalam `navigation.rs`.
+Ujian unit terletak di sebelah kod yang diujinya. `crates/splat-testkit/tests/` menyimpan apa yang mencapai model dan pratonton dari luar: ujian rawak dalam `robustness.rs`, yang berkongsi penjana `splat-testkit` dengan ujian `sync.rs`, dokumen yang dibina untuk mencederakan dalam `hostile.rs`, dan benih sasaran fuzz dalam `fuzz_seeds.rs`. `tests/` menyimpan apa yang melihat keseluruhan program: sumbernya, terjemahannya dan ujian penyahkod, yang memulakan program yang dibina. Keputusan dalam `src/editor/` yang tidak memerlukan tetingkap terletak dalam fungsi bebas dengan ujian tersendiri: segala yang diketahui pengawal dan cara ia berubah dalam `state.rs`, peraturan pemaparan dalam `render_queue.rs`, salinan teks dalam `sync.rs`, gaya perenggan, fon dan warna sebagai nilai dalam `render.rs`, maksud pengecam bar alat dalam `toolbar.rs`, maksud klik pada pautan dalam `navigation.rs`.
 
-Langkah ujian kendiri tetingkap menunggu syarat yang bernama, bukan masa; hanya yang tidak memberi isyarat, seperti ketiadaan sesuatu, mengekalkan jeda beserta sebabnya. Menunggu dengan sia-sia ialah semakan yang gagal dan menamakan apa yang tidak pernah tiba, langkah yang panik juga semakan yang gagal, dan larian diteruskan dalam kedua-dua kes. Semakan yang tidak dapat menyatakan apa-apa dalam larian ini melaporkan `SELFTEST SKIP`: xtask menyenaraikannya, dan ia tidak lulus mahupun gagal. xtask mengikat setiap mod, dan `--scenarios` secara tersendiri, kepada kira-kira sembilan persepuluh daripada semakannya. Ujian kendiri tetingkap menjalankan bahagian kedua selepas klik-lalu utamanya, dalam `src/editor/selftest/scenarios.rs`: setiap arahan pemformatan dan jadual, dialog, klik pautan, menampal, melepas, eksport, perubahan besar, imej yang berubah pada cakera, tekanan memori, dokumen yang sangat besar dan pemulihan selepas ranap.
+Langkah ujian kendiri tetingkap menunggu syarat yang bernama, bukan masa; hanya yang tidak memberi isyarat, seperti ketiadaan sesuatu, mengekalkan jeda beserta sebabnya. Menunggu dengan sia-sia ialah semakan yang gagal dan menamakan apa yang tidak pernah tiba, langkah yang panik juga semakan yang gagal, dan larian diteruskan dalam kedua-dua kes. Semakan yang tidak dapat menyatakan apa-apa dalam larian ini melaporkan `SELFTEST SKIP`: xtask menyenaraikannya, dan ia tidak lulus mahupun gagal. xtask mengikat setiap mod, dan `--scenarios` secara tersendiri, kepada kira-kira sembilan persepuluh daripada semakannya. Ujian kendiri tetingkap menjalankan bahagian kedua selepas klik-lalu utamanya, dalam `src/editor/selftest/scenarios.rs`: setiap arahan pemformatan dan jadual, dialog, klik pautan, menampal, melepas, eksport, fail yang diubah oleh program lain, perubahan besar, imej yang berubah pada cakera, tekanan memori, dokumen yang sangat besar dan pemulihan selepas ranap. Setiap kumpulannya membuka dokumen sendiri, supaya kegagalan dalam satu kumpulan tidak sampai ke kumpulan seterusnya, dan setiap satu boleh dijalankan bersendirian dengan `--only`. Ujian kendiri tanpa tetingkap juga merosakkan penyimpanan dengan sengaja: folder yang tidak menerima apa-apa, fail baca sahaja, folder yang telah hilang, cakera penuh dan panic dalam setiap callback penyimpanan, dan tiada satu pun boleh menghilangkan teks.
 
 Liputan mempunyai dua paras minimum: setiap modul sekurang-kurangnya 84 % barisnya, semua modul bersama sekurang-kurangnya 96 %. `make coverage` mengukur `cargo test` bersama ujian kendiri dan gagal di bawah mana-mana satu; `make coverage-library` mengekalkan apa yang tidak memerlukan tetingkap pada 90 % dan 97 %. Paras minimum dan beberapa pengecualian, seperti cangkuk panik dalam `main.rs` yang hanya berjalan semasa ranap, terdapat dalam [xtask](../../../xtask/src/coverage.rs) di sebelah sebabnya. Binaan yang diukur masuk ke `target/coverage/`, jadi kod pengukuran tidak pernah sampai ke `target/release/` atau imej cakera. Pembantu penyahkod membuka fail pengukurannya sebelum ia mengunci dirinya, jadi ia diukur juga.
 
@@ -647,16 +654,20 @@ Output ujian kendiri masuk ke `target/selftest/`. Ujian kendiri membina app bera
 
 ### Susun atur projek
 
-`src/lib.rs` menjadikan segala yang tidak memerlukan tetingkap sebuah pustaka tersendiri, `splat`: `markdown/`, `preview/`, `i18n.rs` dan penjana ujian `fuzz.rs`. Ia dibina tanpa macOS. App dalam `src/main.rs` dibina di atasnya.
+Segala yang tidak memerlukan tetingkap ialah crate tersendiri di bawah `crates/`, yang dibina tanpa macOS, jadi pengkompil menguatkuasakan cara ia bergantung antara satu sama lain. App dalam `src/` (pakej `splat-app`, program `splat`) dibina di atasnya.
 
-- `src/markdown/`: pepohon yang dibaca setiap pengguna, `Doc` dalam `doc/`, yang memiliki teksnya sendiri, dan satu-satunya pengikatan kepada penghurai dalam `reader/`: comrak tidak dinamakan di tempat lain, dan `reader/assumptions.rs` memuatkan apa yang diandaikan kod tentangnya. Warna sintaks, dan semua arahan sebagai suntingan teks tulen (`Edit`) dalam `commands/`. Juga penghuraian semula selepas suntingan (`incremental.rs`), pembaca untuk HTML terbenam (`markup.rs`), tipografi, teg, rujukan dan petikan dalam teks berjalan (`typography.rs`), rupa teks dan Markdown serta HTML yang menjadikannya begitu (`style.rs`), apa yang boleh menjadi alamat (`url.rs`), serta eksport HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Kedudukan mempunyai jenisnya sendiri: `Byte` dalam teks sumber, `U16` dalam paparan sumber, `Shown` dalam paparan pratonton (`text.rs`). Tiada AppKit.
-- `src/preview/`: susun atur pratonton dalam `layout/`, dengan HTML terbenam dalam `layout/html.rs`, dan pemetaan antara pratonton dan sumber (`Bridge`, `Index`). `Bridge` menolak susun atur daripada versi `Doc` yang lain. Tiada AppKit.
+- `crates/splat-markdown/`: pepohon yang dibaca setiap pengguna, `Doc` dalam `doc/`, yang memiliki teksnya sendiri, dan satu-satunya pengikatan kepada penghurai dalam `reader/`: comrak tidak dinamakan di tempat lain, dan `reader/assumptions.rs` memuatkan apa yang diandaikan kod tentangnya. Warna sintaks, dan semua arahan sebagai suntingan teks tulen (`Edit`) dalam `commands/`. Juga penghuraian semula selepas suntingan (`incremental.rs`), pembaca untuk HTML terbenam (`markup.rs`), tipografi, teg, rujukan dan petikan dalam teks berjalan (`typography.rs`), rupa teks dan Markdown serta HTML yang menjadikannya begitu (`style.rs`), apa yang boleh menjadi alamat (`url.rs`), serta eksport HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Kedudukan mempunyai jenisnya sendiri: `Byte` dalam teks sumber, `U16` dalam paparan sumber, `Shown` dalam paparan pratonton (`text.rs`).
+- `crates/splat-preview/`: susun atur pratonton dalam `layout/`, dengan HTML terbenam dalam `layout/html.rs`, dan pemetaan antara pratonton dan sumber (`Bridge`, `Index`). `Bridge` menolak susun atur daripada versi `Doc` yang lain.
+- `crates/splat-file-state/`: teks apa yang disimpan oleh fail, dalam format apa, dan apa maksud melihatnya.
+- `crates/splat-i18n/` dengan `resources/*.lproj`: 35 bahasa; kuncinya ialah teks bahasa Jerman, dan app memasang jadual bahasa antara muka semasa bermula.
+- `crates/splat-testkit/`: penjana ujian rawak dan semakan sasaran fuzz.
 - `src/editor/`: tetingkap. Satu objek `EditorController` melayani AppKit sebagai delegasi kedua-dua paparan dan meneruskan kepada komponen, struct kecil di atas pengawal dan keadaan yang dimilikinya, yang medannya tidak dapat dicapai modul lain:
 
 | Modul | Tanggungjawab |
 |---|---|
-| `mod.rs` | kelas, kaedah delegasi yang meneruskan, `invalidate` |
+| `controller.rs` | kelas, kaedah delegasi yang meneruskan, `invalidate`, dan apa yang bahagian lain program beritahu editor; hanya ia yang mencapai komponen |
 | `panes.rs` | `Panes`: paparan teks, rangka, memaparkan dan menyembunyikan anak tetingkap, dan apa yang memberi akses kepada paparan |
+| `controller/layers.rs` | siapa boleh mencapai siapa: komponen mendapat pemegang pengawal yang menawarkan apa yang di bawahnya, dan pengkompil menguatkuasakannya |
 | `state.rs` | apa yang diketahui pengawal tentang dokumen dan setiap cara ia berubah; medannya persendirian, dan ia tidak menyentuh paparan |
 | `model.rs` | meminjamkan keadaan dan salinan teks kepada closure yang tidak dapat mencapai paparan |
 | `actions.rs` | daftar arahan: pemilih, tajuk, pintasan, simbol, bila arahan terpakai |
@@ -668,17 +679,16 @@ Output ujian kendiri masuk ke `target/selftest/`. Ujian kendiri membina app bera
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: penyunting formula dan rajah |
 | `navigation.rs`, `links.rs` | `Links`: pautan, pautan wiki, teg, kotak semak tugas, pelipatan, nota kaki |
 | `env.rs` | apa yang dibaca pratonton dari luar teks: tanda baca tipografi, repositori untuk `@name` dan `#12`, fail BibTeX, nota terbenam |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | teks pratonton, imej setempat dan jauh; `Pictures` dalam `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | teks pratonton, imej setempat dan jauh; `Pictures` dalam `images.rs` |
 | `attributes.rs` | atribut teks; setiap kunci hanya mendapat nilai jenis yang dijangkanya |
 | `shadow.rs` | salinan teks yang belum disimpan untuk pemulihan selepas ranap |
 | `decoder.rs` | proses pembantu berkotak pasir yang menyahkod imej dan grafik |
 | `export.rs`, `outline.rs` | `Sharing`: eksport HTML dan Word, fail kongsi, pencetakan; bar sisi rangka |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit untuk MathJax, Mermaid, Graphviz, PlantUML dan penyunting formula visual; peraturan apa yang dipaparkan bila, selain WebKit |
 | `webkit.rs` | panggilan ke dalam WebKit; hanya hayat delegasi navigasi kekal pada `js.rs` dan `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | membina tetingkap, bar alat, paparan teks, dialog, warna |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | membina tetingkap, bar alat, paparan teks, dialog, warna |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: bar menu, delegasi app, dokumen (`MDDocument`, subkelas `NSDocument`).
-- `src/i18n.rs` dengan `resources/*.lproj`: 35 bahasa; kuncinya ialah teks bahasa Jerman, dan app memasang jadual bahasa antara muka semasa bermula.
 - `src/util/`: thread pekerja (`lanes.rs`), volum yang boleh berhenti menjawab (`volumes.rs`), pembantu AppKit, fail dan proses. `src/diag.rs`: apa yang tersilap di luar penglihatan pengguna pergi ke log sistem, tanpa sebarang teks dokumen.
 - `src/large_alloc.rs`: peruntukan besar datang terus daripada kernel dan dikembalikan kepadanya apabila dibebaskan, supaya memori kembali selepas suntingan besar.
 - `resources/js/`: halaman web dan pustaka; versi dan checksum dalam [vendor.lock](../../../vendor.lock).
@@ -690,11 +700,11 @@ Teks sumber dalam paparan teks kiri ialah satu-satunya sumber kebenaran.
 
 1. Setiap perubahan aksara di sana mengemas kini salinan teks (`Snapshot`) di tempatnya, tanpa membaca teks itu semula.
 2. Satu kemas kini menghuraikan salinan, mewarnakan semula sumber hanya di tempat warna berubah, menyusun atur pratonton dan menggantikan hanya blok yang kandungannya berubah.
-3. Selepas suntingan, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula, selagi jirannya kekal sama; `reparse_part_and_color` menyatakan bila ia tidak sama. Dokumen dengan blok ulasan `%%`, perubahan pada front matter dan, dalam dokumen yang mempunyai takrifan rujukan pautan, perubahan pada bahagian yang mengandungi kurungan siku diproses sepenuhnya. comrak mengenali rujukan nota kaki hanya dengan takrifannya dalam penghuraian yang sama dan mengalihkan takrifan ke belakang teks, jadi bahagian itu dihuraikan dengan takrifan gantian bagi setiap label dan mengambil nombornya daripada pepohon lama; perubahan pada rujukan atau takrifan dalam bahagian itu, atau di sebelah nota kaki sebaris, diproses sepenuhnya.
+3. Selepas suntingan, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula, selagi jirannya kekal sama; [docs/partial-parse.md](../../../docs/partial-parse.md) menyatakan mengapa itu memberikan hasil yang sama dengan hurai penuh, dan apa yang perlu dilihat apabila comrak berubah. Dokumen dengan blok ulasan `%%`, perubahan pada front matter dan, dalam dokumen yang mempunyai takrifan rujukan pautan, perubahan pada bahagian yang mengandungi kurungan siku diproses sepenuhnya. comrak mengenali rujukan nota kaki hanya dengan takrifannya dalam penghuraian yang sama dan mengalihkan takrifan ke belakang teks, jadi bahagian itu dihuraikan dengan takrifan gantian bagi setiap label dan mengambil nombornya daripada pepohon lama; perubahan pada rujukan atau takrifan dalam bahagian itu, atau di sebelah nota kaki sebaris, diproses sepenuhnya.
 4. Blok HTML yang membuka `<details>` atau `<div align>` dan menutupnya kemudian menjejaskan blok Markdown di antaranya; blok yang digunakan semula mesti mempunyai persekitaran yang sama.
 5. Semasa anda menaip dalam sumber dokumen sehingga 2 MB, kemas kini separa berjalan serta-merta; apabila ia tidak terpakai, atau dalam dokumen yang lebih besar, penghuraian dan susun atur berjalan di latar belakang. Semasa anda menaip dalam pratonton, ia berjalan serta-merta, kerana kursor pratonton bergantung pada hasilnya.
 6. Input dalam pratonton diterjemahkan oleh `Bridge` menjadi suntingan sumber dan mengambil laluan yang sama selepas itu. Markdown mempunyai terlalu banyak cara untuk menukar teks menjadi sintaks bagi peraturan sahaja, jadi `preview/verify.rs` menghuraikan bahagian yang berubah sekali lagi dan membandingkan apa yang ditunjukkannya dengan apa yang ditaip; suntingan yang tidak bertahan di-escape lebih jauh atau ditolak.
-7. Kedudukan sebaris comrak tersasar di beberapa tempat, contohnya di belakang takrifan rujukan pautan. `markdown/reader/positions.rs` menyemaknya terhadap sumber semasa membaca blok dan membacanya semula daripada sumber di tempat ia tidak sepadan.
+7. Kedudukan sebaris comrak tersasar di beberapa tempat, contohnya di belakang takrifan rujukan pautan. `reader/positions.rs` menyemaknya terhadap sumber semasa membaca blok dan membacanya semula daripada sumber di tempat ia tidak sepadan.
 
 ### Peraturan dalam pengawal
 
@@ -703,16 +713,18 @@ Teks sumber dalam paparan teks kiri ialah satu-satunya sumber kebenaran.
 3. Mesej dari luar (imej dimuatkan, formula dipaparkan) tiba tertunda melalui `renders_arrived` dan `image_arrived`, tidak pernah di tengah-tengah kemas kini.
 4. Lukisan semula tanpa perubahan teks hanya melalui `invalidate(reason)`.
 5. Salinan teks tidak dipegang merentasi perubahan sumber, atau perubahan itu menyalin seluruh teks: `with_text` meminjamkannya hanya selama satu closure `Send`.
-6. Arahan baharu memerlukan entri dalam `actions.rs`, kaedah dalam `mod.rs` dan cabang dalam `Editing::perform`.
+6. Arahan baharu memerlukan entri dalam `actions.rs`, kaedah dalam `controller.rs` dan cabang dalam `Editing::perform`.
 7. Setiap blok `unsafe` membawa justifikasinya sebagai ulasan `// SAFETY:`. Bait sampai ke penyahkod imej sistem dalam proses pembantu sahaja, melalui `decoder::decode_native`; satu ujian mengimbas sumber untuk panggilan lain.
 8. Tiada apa-apa pada urutan utama menunggu folder pengguna, kerana volum rangkaian boleh berhenti menjawab: fail dilihat pada urutan `DISK`, dan pratonton membaca jawapannya melalui `Env::known`. Hanya tindakan yang ditunggu pengguna, seperti eksport atau menyimpan, boleh menyentuh cakera secara langsung.
+9. Apa yang mesti berakhir juga berakhir selepas panic, kerana urutan utama terselamat daripadanya: bendera yang dinaikkan melalui `with_raised`, suntingan storan teks melalui `editing`, dan apa yang tidak patut diketahui oleh buat asal melalui `without_undo`. Satu ujian mencari yang ditulis dengan tangan.
+10. Alamat dalam dokumen mempunyai satu bacaan, dalam `splat_markdown::url`; satu ujian mencari skema yang dibandingkan dengan tangan.
 
 ### Menambah arahan
 
 Bar menu, bar alat dan menu konteks semuanya membina itemnya daripada daftar dalam [src/editor/actions.rs](../../../src/editor/actions.rs), dan pengesahan menu membaca di sana bila arahan terpakai dan sama ada ia menunjukkan tanda semak. Arahan baharu memerlukan:
 
 1. varian `Action` dengan `Spec`-nya: pemilih, tajuk, label bar alat, tip alat (bermula dengan kata kerja, paling banyak 75 aksara), pintasan, SF Symbol dan bila ia terpakai
-2. kaedah dalam `src/editor/mod.rs`
+2. kaedah dalam `src/editor/controller.rs`
 3. cabang dalam `Editing::perform`
 4. teksnya dalam setiap `Localizable.strings`
 
@@ -734,7 +746,7 @@ Kod menggunakan teks bahasa Jerman sebagai kunci: `t("Fett")` mencarinya semasa 
 
 | Komponen | Versi | Digunakan untuk | Lesen |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | penghurai Markdown | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 dengan [satu baris diubah](../../../vendor/comrak/PATCH.md) | penghurai Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime Objective-C, Foundation, blok | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | pengikatan AppKit, WebKit dan Grand Central Dispatch | Zlib, Apache-2.0 atau MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formula dan imej SVG sebagai PDF vektor | MIT atau Apache-2.0 |

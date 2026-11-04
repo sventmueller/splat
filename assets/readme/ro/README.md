@@ -120,7 +120,7 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - **Un buton pentru orice.** Fiecare construcție Markdown are un buton în bara de instrumente și un element de meniu, iar cele uzuale au și o scurtătură de tastatură. Tabelele au propriul meniu pentru rânduri, coloane și aliniere.
 - **Export fără pierderi.** PDF, un singur fișier HTML autonom sau un document Word cu titluri, liste, tabele, note de subsol și imagini reale.
 - **Nativ până în măduva oaselor.** Ferestre, file, meniuri, popovere, Versiuni, Salvare automată, meniul de partajare, modul întunecat, verificarea ortografică, dictarea și VoiceOver autentice AppKit. Fără Electron, fără vizualizare web pentru textul propriu-zis.
-- **Rapid cu fișiere mari.** Randarea unei apăsări de tastă într-un document de 10 MB durează circa 25 ms, înainte de munca proprie a vizualizării.
+- **Rapid cu fișiere mari.** Randarea unei apăsări de tastă într-un document de 10 MB durează circa 10 ms, înainte de munca proprie a vizualizării.
 - **Privat și atent.** Imaginile de pe web se încarcă doar după ce permiteți, linkurile către alte aplicații cer mai întâi confirmare, iar tot ce decodează date de imagine nesigure rulează în procese ajutătoare izolate într-un sandbox.
 - **În limba dumneavoastră.** Interfața și referința rapidă Markdown integrată există în 35 de limbi: arabă, catalană, chineză (simplificată), chineză (tradițională), croată, cehă, daneză, olandeză, engleză, finlandeză, franceză, germană, greacă, ebraică, hindi, maghiară, indoneziană, italiană, japoneză, coreeană, malaeză, norvegiană, poloneză, portugheză (Brazilia), portugheză (Portugalia), română, rusă, slovacă, slovenă, spaniolă, suedeză, thailandeză, turcă, ucraineană și vietnameză.
 
@@ -504,7 +504,7 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 - **Fără rețea implicit.** Splat nu are telemetrie. Caută actualizări doar după ce sunteți de acord sau alegeți **Căutați actualizări…**: atunci încarcă de pe GitHub un mic fișier de flux, iar cererea nu numește decât aplicația și versiunea ei. Formulele și diagramele se randează local; vizualizările web care o fac nu pot ajunge la rețea.
 - **Imaginile de pe web** se încarcă doar cu permisiunea dumneavoastră, doar prin `https`, niciodată de la gazde din rețeaua locală, de cel mult 10 MB fiecare și într-o sesiune privată, fără cookie-uri.
 - **Decodare izolată.** Imaginile și graficele formulelor și ale diagramelor sunt decodate în procese ajutătoare care închid toate fișierele moștenite și se blochează într-un sandbox înainte de a citi primul octet: fără acces la fișiere, fără rețea. Ele returnează doar pixeli, a căror dimensiune este verificată, și sunt oprite după 10 secunde. Decodoarele de imagini ale Apple văd doar HEIC, TIFF, AVIF și PDF, și numai când datele sunt într-adevăr în acel format; ele rulează într-un proces ajutător propriu, care poate în plus să citească dosarele de fonturi ale sistemului și să folosească decodorul video al sistemului. SVG-urile, formulele și diagramele trec și ele prin acel proces ajutător, deci în Splat sunt imagini cu rezoluție fixă: patru pixeli pe punct, până la 2560 pe latura mai lungă.
-- **Fișierele locale** ajung într-un document doar prin calea pe care o numește. Încorporările afișează note Markdown din dosarul documentului și de mai jos, iar o imagine lipsă este căutată doar acolo. O cale de imagine în altă parte, absolută sau care începe cu `~`, se încarcă totuși, iar exporturile HTML și Word o încorporează: priviți exportul unui document pe care nu l-ați scris dumneavoastră înainte de a-l da mai departe.
+- **Fișierele locale** ajung într-un document doar prin calea pe care o numește. Încorporările afișează note Markdown din dosarul documentului și de mai jos, iar o imagine lipsă este căutată doar acolo. O cale de imagine în altă parte, absolută sau care începe cu `~`, se încarcă totuși în previzualizare; exporturile HTML și Word, tipărirea și fișierele PDF iau cu ele doar ce se află în dosarul documentului sau în depozitul său Git, cu excepția cazului în care acel depozit conține și dosarul tău de reședință, ca un document de la altcineva să nu poată trage fișierele tale într-un export pe care îl dai mai departe.
 - **Copiile textului nesalvat** rămân pe acest Mac, în dosarul Bibliotecă, pentru recuperarea după o închidere forțată. Ele dispar odată cu salvarea sau cu închiderea normală a Splat; copiile lăsate de o închidere forțată rămân în dosarul de recuperare până le ștergeți.
 - **Linkurile** nu pornesc niciodată un program printr-un clic. Linkurile web și de e-mail se deschid ca de obicei; linkurile către alte aplicații întreabă mai întâi.
 - **HTML-ul din documente** este citit de parserul propriu al Splat. Scripturile, stilurile, cadrele și formularele nu rulează niciodată.
@@ -516,13 +516,14 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 Splat rămâne receptiv cu documente de câțiva megaocteți:
 
 - Sursa folosește TextKit 2, care așază în pagină doar partea vizibilă.
-- Cât timp tastați în previzualizare, și în sursa documentelor de până la 2 MB, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină. Într-un document de 10 MB, analiza și colorarea durează circa 20 ms, randarea circa 25 ms, iar o apăsare de tastă completă în previzualizarea lui circa 60 ms, cu tot cu munca proprie a vizualizării.
+- Cât timp tastați în previzualizare, și în sursa documentelor de până la 2 MB, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină. Într-un document de 10 MB, analiza și colorarea durează circa 3 ms, randarea circa 10 ms, iar o apăsare de tastă completă în previzualizarea lui circa 30 ms, cu tot cu munca proprie a vizualizării.
 - Previzualizările mari randează mai întâi partea vizibilă, iar restul cât timp aplicația este inactivă. Blocurile derulate în câmpul vizual sunt randate înainte de a fi desenate.
 - În sursa documentelor mai mari, analiza pentru previzualizare rulează în fundal cât timp tastați.
 - Un document rămâne text simplu când ar necesita circa 4 GB de memorie, adică circa 50–120 MB de Markdown obișnuit, dar doar 10–20 MB dacă are numai tabele sau titluri: sursa nu are culori, iar previzualizarea spune de ce rămâne goală. Exporturile funcționează în continuare.
 - De la circa 200 KB, un document își deschide fereastra înainte de a fi analizat; la 5 MB, culorile și previzualizarea urmează după circa un sfert de secundă.
+- Toate imaginile la un loc, inclusiv formulele și diagramele, ocupă cel mult un sfert din memoria Mac-ului și jumătate din atât cât timp memoria este insuficientă. Peste această limită, celelalte imagini apar ca substituenți până când există din nou loc.
 
-Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă la 10 MB: cele la definiția sau la referințele unei note de subsol, lângă o notă de subsol în linie, chiar la sfârșitul unui document lângă o notă de subsol, la front matter sau aproape de definițiile de referințe pentru linkuri, precum și orice modificare într-un document cu blocuri de comentarii `%%` sau cu o notă de subsol definită de două ori sau în interiorul unui citat sau al unei liste. Memoria crește odată cu fișierul, până la circa 115–160 MB pentru 1 MB de Markdown și 340–510 MB pentru 10 MB.
+Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă la 10 MB: cele la definiția sau la referințele unei note de subsol, lângă o notă de subsol în linie, chiar la sfârșitul unui document lângă o notă de subsol, la front matter sau la definițiile de referințe pentru linkuri, precum și orice modificare într-un document cu blocuri de comentarii `%%` sau cu o notă de subsol definită de două ori sau în interiorul unui citat sau al unei liste. Memoria crește odată cu fișierul, până la circa 115–160 MB pentru 1 MB de Markdown și 340–510 MB pentru 10 MB.
 
 ## Limitări cunoscute
 
@@ -577,6 +578,7 @@ make check                  # formatare, clippy fără avertismente, toate teste
 make test                   # make check, apoi autotestul fără fereastră
 make test-gui               # autoteste cu fereastră; ocupă Mac-ul circa patru minute
 make test-long              # căutare aleatorie mai lungă și verificarea actualizării parțiale la 10 MB
+make fuzz                   # intrare aleatorie pentru analiza parțială și toate ieșirile
 make coverage               # acoperirea liniilor pentru toate testele și autotestele, cu un prag pe modul
 make coverage-library       # aceleași praguri pentru modulele fără fereastră, ca în CI
 make bench FILE=<file.md>   # durate pentru deschiderea, tastarea și derularea unui fișier mare
@@ -626,19 +628,24 @@ Aplicația din ea poartă o semnătură diferită de cea a unei versiuni locale,
 | `cargo xtask check-library` | biblioteca se compilează pentru Linux, deci nimic din ea nu are nevoie de macOS |
 | `cargo xtask vendor check` | bibliotecile JavaScript corespund cu `vendor.lock` octet cu octet |
 | `cargo xtask selftest probe` | fără fereastră, fiecare cu rezultatul așteptat: formule, diagrame, imagini web față de un server din interiorul procesului, adrese blocate, textul pe care îl scrie fiecare comandă, fiecare format de imagine prin ambele exporturi, o pagină care nu mai răspunde și apărările vizualizărilor web față de o pagină fără ele. Durează circa o jumătate de minut. Ce are nevoie de aplicația în față este sărit pe un ecran blocat |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | aplicația în funcțiune, clic cu clic. Deschide o fereastră și scrie în ea; Mac-ul este ocupat circa patru minute. `--scenarios` rulează doar a doua parte, în circa un minut și jumătate |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | aplicația în funcțiune, clic cu clic. Deschide o fereastră și scrie în ea; Mac-ul este ocupat circa patru minute. `--scenarios` rulează doar a doua parte, în circa un minut și jumătate. `--only` rulează un singur grup din acea parte, în propriul document, și pe un ecran blocat. `--in-back` lasă deoparte ce are nevoie de aplicație în față; fără el, o astfel de verificare eșuează |
 | `cargo xtask selftest resize` | lărgește fereastra după mutarea separatorului: sursa își reface rândurile cât timp fereastra este redimensionată. Durează circa zece secunde |
-| `cargo xtask selftest bench <file.md>` | durate pentru deschiderea, tastarea și derularea unui fișier mare |
+| `cargo xtask selftest typing [--by-hand]` | tastează în timpul salvărilor, cu taste prin coada de evenimente a aplicației sau, cu `--by-hand`, de mână: ce se tastează rămâne și apare ca nesalvat. Durează cam un minut |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | durate pentru deschiderea, tastarea și derularea unui fișier mare; `--keystroke-ms` eșuează când cea mai rapidă apăsare durează mai mult |
 | `cargo test --release -- --ignored partial_updates` | o apăsare de tastă la 10 MB: actualizare parțială față de cea completă, același rezultat în cel mult un sfert din timp |
 | `cargo test --release --test hostile` | documente construite să depășească stiva sau să ia timp pătratic, fiecare la două dimensiuni ale căror durate trebuie să crească odată cu textul, prin analiză, aranjare în pagină, ambele exporturi, apăsări de taste și comenzi |
-| `make mutants` | defecte introduse una câte una în `src/markdown/` și `src/preview/`, prin [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); arată pe care nu le observă niciun test. Durează ore; `FILE=src/preview/bridge.rs` îl restrânge |
+| `make mutants` | defecte introduse una câte una în `crates/splat-markdown`, `crates/splat-preview` și `crates/splat-file-state`, prin [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); arată pe care nu le observă niciun test. Durează ore; `FILE=crates/splat-preview/src/bridge/mod.rs` îl restrânge |
+| `make fuzz` | intrare aleatorie prin [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), care are nevoie de nightly din rustup: apăsări de taste care trebuie să se citească la fel ca o analiză completă, toate ieșirile, editările din previzualizare, toate comenzile și un fișier care se salvează așa cum s-a deschis. `SECONDS=600` caută mai mult |
+| `cargo test --release --test fuzz_seeds` | semințele din `fuzz/seeds/` prin verificările acelor ținte de fuzzing, fără fuzzer; parte din fiecare `cargo test` |
+| `cargo test --profile checked --workspace` | testele cu ce mai verifică o compilare de depanare: după fiecare analiză parțială blocurile se potrivesc cu textul, iar ce duce mai departe este ce spune textul. Parte din `make test-long` |
+| `cargo test --release --test entry_points --test structure` | din surse: tot ce apelează sistemul este protejat de panics, iar modulele depind doar în jos |
 | `cargo test --release --test decoder` | procesul decodor decodează imagini și nu ajunge nici la fișiere, nici la rețea |
 | `make coverage` | acoperirea liniilor pentru `cargo test` și toate autotestele, prin [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); eșuează sub praguri. Ocupă Mac-ul circa cinci minute |
-| `make coverage-library` | `src/markdown/`, `src/preview/` și `i18n.rs` față de pragurile lor mai ridicate, măsurate numai de `cargo test` |
+| `make coverage-library` | crate-urile `splat-markdown`, `splat-preview`, `splat-file-state` și `splat-i18n` față de pragurile lor mai ridicate, măsurate numai de `cargo test` |
 
-Testele unitare stau lângă codul pe care îl testează. `tests/` conține ce ajunge la bibliotecă din exterior: testele aleatorii din `robustness.rs`, care împart generatorul din `src/fuzz.rs` cu cele din `sync.rs`, documentele construite să facă rău din `hostile.rs` și testul decodorului, care pornește programul compilat. Deciziile din `src/editor/` care nu au nevoie de fereastră se află în funcții libere cu teste proprii: tot ce știe controllerul și cum se schimbă aceasta în `state.rs`, regulile de randare în `render_queue.rs`, copia textului în `sync.rs`, stilurile de paragraf, fonturile și culorile ca valori în `render.rs`, ce înseamnă identificatorii barei de instrumente în `toolbar.rs`, ce înseamnă un clic pe un link în `navigation.rs`.
+Testele unitare stau lângă codul pe care îl testează. `crates/splat-testkit/tests/` conține ce ajunge la model și la previzualizare din exterior: testele aleatorii din `robustness.rs`, care împart generatorul din `splat-testkit` cu cele din `sync.rs`, documentele construite să facă rău din `hostile.rs` și semințele țintelor de fuzzing din `fuzz_seeds.rs`. `tests/` conține ce privește întregul program: sursele sale, traducerile sale și testul decodorului, care pornește programul compilat. Deciziile din `src/editor/` care nu au nevoie de fereastră se află în funcții libere cu teste proprii: tot ce știe controllerul și cum se schimbă aceasta în `state.rs`, regulile de randare în `render_queue.rs`, copia textului în `sync.rs`, stilurile de paragraf, fonturile și culorile ca valori în `render.rs`, ce înseamnă identificatorii barei de instrumente în `toolbar.rs`, ce înseamnă un clic pe un link în `navigation.rs`.
 
-Un pas al autotestului ferestrei așteaptă o condiție numită, nu un timp; doar ce nu dă niciun semnal, precum absența a ceva, păstrează o pauză cu motivul ei. A aștepta în zadar este o verificare eșuată care spune ce nu a venit niciodată, iar un pas care intră în panică este de asemenea o verificare eșuată, iar rularea continuă în ambele cazuri. O verificare care nu poate spune nimic în această rulare raportează `SELFTEST SKIP`: xtask o listează, iar ea nu trece și nu eșuează. xtask ține fiecare mod, iar `--scenarios` separat, la circa nouă zecimi din verificările sale. Autotestul ferestrei rulează o a doua parte după parcurgerea principală prin clicuri, în `src/editor/selftest/scenarios.rs`: fiecare comandă de formatare și de tabel, dialogurile, clicurile pe linkuri, lipirea, plasarea, exporturile, o modificare mare, imaginile care se schimbă pe disc, presiunea asupra memoriei, un document uriaș și recuperarea după o închidere forțată.
+Un pas al autotestului ferestrei așteaptă o condiție numită, nu un timp; doar ce nu dă niciun semnal, precum absența a ceva, păstrează o pauză cu motivul ei. A aștepta în zadar este o verificare eșuată care spune ce nu a venit niciodată, iar un pas care intră în panică este de asemenea o verificare eșuată, iar rularea continuă în ambele cazuri. O verificare care nu poate spune nimic în această rulare raportează `SELFTEST SKIP`: xtask o listează, iar ea nu trece și nu eșuează. xtask ține fiecare mod, iar `--scenarios` separat, la circa nouă zecimi din verificările sale. Autotestul ferestrei rulează o a doua parte după parcurgerea principală prin clicuri, în `src/editor/selftest/scenarios.rs`: fiecare comandă de formatare și de tabel, dialogurile, clicurile pe linkuri, lipirea, plasarea, exporturile, un fișier modificat de alt program, o modificare mare, imaginile care se schimbă pe disc, presiunea asupra memoriei, un document uriaș și recuperarea după o închidere forțată. Fiecare grup al ei deschide un document propriu, astfel încât un eșec într-unul să nu ajungă la următorul, și fiecare poate rula singur cu `--only`. Autotestul fără fereastră strică și salvarea intenționat: un dosar care nu acceptă nimic, un fișier doar pentru citire, un dosar care a dispărut, un disc plin și un panic în fiecare callback al unei salvări, și nimic din toate acestea nu are voie să coste text.
 
 Acoperirea are două praguri: fiecare modul cel puțin 84% din rândurile sale, toate modulele împreună cel puțin 96%. `make coverage` măsoară `cargo test` împreună cu autotestele și eșuează sub oricare dintre ele; `make coverage-library` ține ce nu are nevoie de fereastră la 90% și 97%. Pragurile și puținele excepții, precum panic hook-ul din `main.rs`, care rulează doar la o închidere forțată, se află în [xtask](../../../xtask/src/coverage.rs), alături de motivele lor. Versiunile măsurate merg în `target/coverage/`, astfel că măsurarea codului nu ajunge niciodată în `target/release/` sau într-o imagine de disc. Procesul ajutător decodor își deschide fișierul de măsurare înainte de a se bloca, deci este măsurat și el.
 
@@ -648,16 +655,20 @@ Ieșirea autotestelor merge în `target/selftest/`. Autotestul compilează o apl
 
 ### Structura proiectului
 
-`src/lib.rs` face din tot ce nu are nevoie de fereastră o bibliotecă proprie, `splat`: `markdown/`, `preview/`, `i18n.rs` și generatorul de teste `fuzz.rs`. Se compilează fără macOS. Aplicația din `src/main.rs` se bazează pe ea.
+Tot ce nu are nevoie de fereastră este un crate propriu în `crates/`, care se compilează fără macOS, astfel încât compilatorul impune felul în care depind unele de altele. Aplicația din `src/` (pachetul `splat-app`, programul `splat`) se bazează pe ele.
 
-- `src/markdown/`: arborele pe care îl citesc toți consumatorii, `Doc` în `doc/`, care își deține textul, și singura legătură cu parserul în `reader/`: comrak nu este numit nicăieri altundeva, iar `reader/assumptions.rs` conține ce presupune codul despre el. Culorile de sintaxă și toate comenzile ca editări pure de text (`Edit`) în `commands/`. De asemenea reanalizarea după o editare (`incremental.rs`), cititorul pentru HTML-ul încorporat (`markup.rs`), tipografia, etichetele, referințele și citările în textul curent (`typography.rs`), cum arată textul și ce Markdown și HTML îl fac să arate așa (`style.rs`), ce poate fi o adresă (`url.rs`) și exportul HTML și Word (`html.rs`, `docx.rs` cu `docx/html.rs` și `docx/xml.rs`). O poziție are tipul ei: `Byte` în textul sursă, `U16` în vizualizarea sursei, `Shown` în vizualizarea previzualizării (`text.rs`). Fără AppKit.
-- `src/preview/`: aranjarea în pagină a previzualizării în `layout/`, cu HTML-ul încorporat în `layout/html.rs`, și corespondența dintre previzualizare și sursă (`Bridge`, `Index`). Un `Bridge` refuză o aranjare a altei versiuni a lui `Doc`. Fără AppKit.
+- `crates/splat-markdown/`: arborele pe care îl citesc toți consumatorii, `Doc` în `doc/`, care își deține textul, și singura legătură cu parserul în `reader/`: comrak nu este numit nicăieri altundeva, iar `reader/assumptions.rs` conține ce presupune codul despre el. Culorile de sintaxă și toate comenzile ca editări pure de text (`Edit`) în `commands/`. De asemenea reanalizarea după o editare (`incremental.rs`), cititorul pentru HTML-ul încorporat (`markup.rs`), tipografia, etichetele, referințele și citările în textul curent (`typography.rs`), cum arată textul și ce Markdown și HTML îl fac să arate așa (`style.rs`), ce poate fi o adresă (`url.rs`) și exportul HTML și Word (`html.rs`, `docx.rs` cu `docx/html.rs` și `docx/xml.rs`). O poziție are tipul ei: `Byte` în textul sursă, `U16` în vizualizarea sursei, `Shown` în vizualizarea previzualizării (`text.rs`).
+- `crates/splat-preview/`: aranjarea în pagină a previzualizării în `layout/`, cu HTML-ul încorporat în `layout/html.rs`, și corespondența dintre previzualizare și sursă (`Bridge`, `Index`). Un `Bridge` refuză o aranjare a altei versiuni a lui `Doc`.
+- `crates/splat-file-state/`: ce text conține un fișier, în ce format și ce înseamnă o privire asupra lui.
+- `crates/splat-i18n/` cu `resources/*.lproj`: 35 de limbi; cheile sunt textele în germană, iar aplicația instalează la pornire tabelul limbii interfeței.
+- `crates/splat-testkit/`: generatorul testelor aleatorii și verificările țintelor de fuzzing.
 - `src/editor/`: fereastra. Un singur obiect `EditorController` servește AppKit ca delegat al ambelor vizualizări și deleagă către componente, structuri mici peste controller și starea pe care o dețin, ale căror câmpuri celelalte module nu le pot atinge:
 
 | Modul | Responsabilitate |
 |---|---|
-| `mod.rs` | clasa, metodele delegatului care deleagă mai departe, `invalidate` |
+| `controller.rs` | clasa, metodele delegatului care deleagă mai departe, `invalidate` și ce îi spune restul programului unui editor; numai el ajunge la componente |
 | `panes.rs` | `Panes`: vizualizările de text, structura, afișarea și ascunderea panourilor și ce dă acces la vizualizări |
+| `controller/layers.rs` | cine poate ajunge la cine: o componentă primește un acces la controler care oferă ce se află sub ea, iar compilatorul impune asta |
 | `state.rs` | ce știe controllerul despre document și toate modurile în care se schimbă; câmpurile sunt private și nu atinge nicio vizualizare |
 | `model.rs` | împrumută starea și copia textului unor closure-uri care nu pot atinge o vizualizare |
 | `actions.rs` | registrul de comenzi: selector, titlu, scurtătură, simbol, când se aplică comanda |
@@ -669,17 +680,16 @@ Ieșirea autotestelor merge în `target/selftest/`. Autotestul compilează o apl
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: editorul de formule și de diagrame |
 | `navigation.rs`, `links.rs` | `Links`: linkuri, linkuri wiki, etichete, casete de sarcini, pliere, note de subsol |
 | `env.rs` | ce citește previzualizarea din afara textului: punctuația tipografică, depozitul pentru `@name` și `#12`, fișierul BibTeX, notele încorporate |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | textul previzualizării, imagini locale și la distanță; `Pictures` în `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | textul previzualizării, imagini locale și la distanță; `Pictures` în `images.rs` |
 | `attributes.rs` | atributele textului; fiecare cheie primește doar o valoare de tipul pe care îl așteaptă |
 | `shadow.rs` | copii ale textului nesalvat pentru recuperarea după o închidere forțată |
 | `decoder.rs` | procese ajutătoare izolate într-un sandbox care decodează imagini și grafice |
 | `export.rs`, `outline.rs` | `Sharing`: exportul HTML și Word; bara laterală cu structura |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit pentru MathJax, Mermaid, Graphviz, PlantUML și editorul vizual de formule; regulile despre ce se randează când, separat de WebKit |
 | `webkit.rs` | apeluri în WebKit; doar durata de viață a delegatului de navigare rămâne la `js.rs` și `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construirea ferestrei, bară de instrumente, vizualizări de text, dialoguri, culori |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construirea ferestrei, bară de instrumente, vizualizări de text, dialoguri, culori |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: bara de meniuri, delegatul aplicației, documentul (`MDDocument`, o subclasă `NSDocument`).
-- `src/i18n.rs` cu `resources/*.lproj`: 35 de limbi; cheile sunt textele în germană, iar aplicația instalează la pornire tabelul limbii interfeței.
 - `src/util/`: fire de lucru (`lanes.rs`), volume care pot înceta să răspundă (`volumes.rs`), ajutoare AppKit, fișiere și procese. `src/diag.rs`: ce merge prost fără ca utilizatorul să vadă merge în jurnalul sistemului, fără niciun text dintr-un document.
 - `src/large_alloc.rs`: alocările mari vin direct de la nucleu și se întorc la el când sunt eliberate, astfel că memoria se întoarce după editări mari.
 - `resources/js/`: pagini web și biblioteci; versiunile și sumele de control în [vendor.lock](../../../vendor.lock).
@@ -691,11 +701,11 @@ Textul sursă din vizualizarea de text din stânga este singura sursă de adevă
 
 1. Fiecare modificare de caracter de acolo actualizează pe loc copia textului (`Snapshot`), fără a citi din nou textul.
 2. O actualizare analizează copia, recolorează sursa doar acolo unde s-au schimbat culorile, așază în pagină previzualizarea și înlocuiește doar blocurile al căror conținut s-a schimbat.
-3. După o editare, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină, atât timp cât vecinii lor rămân la fel; `reparse_part_and_color` spune când nu rămân. Documentele cu blocuri de comentarii `%%`, modificările front matter și, într-un document cu definiții de referințe pentru linkuri, modificările unei părți care conține o paranteză pătrată sunt procesate integral. comrak recunoaște o referință la o notă de subsol doar cu definiția ei în aceeași analiză și mută definițiile după text, așa că partea este analizată cu o definiție de substituție pentru fiecare etichetă și își ia numerele din arborele vechi; o modificare a referințelor sau a definițiilor din parte, sau lângă o notă de subsol în linie, este procesată integral.
+3. După o editare, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină, atât timp cât vecinii lor rămân la fel; [docs/partial-parse.md](../../../docs/partial-parse.md) spune de ce asta dă ce dă o analiză completă și la ce să te uiți când se schimbă comrak. Documentele cu blocuri de comentarii `%%`, modificările front matter și, într-un document cu definiții de referințe pentru linkuri, modificările unei părți care conține o paranteză pătrată sunt procesate integral. comrak recunoaște o referință la o notă de subsol doar cu definiția ei în aceeași analiză și mută definițiile după text, așa că partea este analizată cu o definiție de substituție pentru fiecare etichetă și își ia numerele din arborele vechi; o modificare a referințelor sau a definițiilor din parte, sau lângă o notă de subsol în linie, este procesată integral.
 4. Blocurile HTML care deschid `<details>` sau `<div align>` și îl închid mai târziu afectează blocurile Markdown dintre ele; un bloc reutilizat trebuie să aibă aceleași împrejurimi.
 5. Cât timp tastați în sursa unui document de până la 2 MB, actualizarea parțială rulează imediat; când nu se aplică, sau într-un document mai mare, analiza și aranjarea în pagină rulează în fundal. Cât timp tastați în previzualizare, rulează imediat, pentru că cursorul previzualizării depinde de rezultat.
 6. Intrarea din previzualizare este tradusă de `Bridge` într-o editare a sursei și urmează de acolo același drum. Markdown are prea multe moduri de a transforma textul în sintaxă pentru a ajunge doar regulile, așa că `preview/verify.rs` analizează din nou partea modificată și compară ce afișează cu ce s-a tastat; o editare care nu se susține este protejată mai departe prin escape sau refuzată.
-7. Pozițiile în linie din comrak greșesc în câteva locuri, de exemplu după o definiție de referință pentru link. `markdown/reader/positions.rs` le verifică față de sursă la citirea unui bloc și le citește din nou din sursă acolo unde nu se potrivesc.
+7. Pozițiile în linie din comrak greșesc în câteva locuri, de exemplu după o definiție de referință pentru link. `reader/positions.rs` le verifică față de sursă la citirea unui bloc și le citește din nou din sursă acolo unde nu se potrivesc.
 
 ### Reguli în controller
 
@@ -704,16 +714,18 @@ Textul sursă din vizualizarea de text din stânga este singura sursă de adevă
 3. Mesajele din exterior (o imagine încărcată, o formulă randată) sosesc cu întârziere prin `renders_arrived` și `image_arrived`, niciodată în mijlocul unei actualizări.
 4. Redesenarea fără modificare de text trece doar prin `invalidate(reason)`.
 5. Copia textului nu este ținută peste o modificare a sursei, altfel acea modificare copiază tot textul: `with_text` o împrumută doar pe durata unui closure `Send`.
-6. O comandă nouă are nevoie de o intrare în `actions.rs`, o metodă în `mod.rs` și o ramură în `Editing::perform`.
+6. O comandă nouă are nevoie de o intrare în `actions.rs`, o metodă în `controller.rs` și o ramură în `Editing::perform`.
 7. Fiecare bloc `unsafe` poartă justificarea sub forma unui comentariu `// SAFETY:`. Octeții ajung la decodoarele de imagini ale sistemului doar în procesul ajutător, prin `decoder::decode_native`; un test scanează sursele după alte apeluri.
 8. Nimic pe firul principal nu așteaptă dosarele utilizatorului, deoarece un volum de rețea poate înceta să răspundă: fișierele sunt consultate pe firul `DISK`, iar previzualizarea citește răspunsurile prin `Env::known`. Doar o acțiune pe care utilizatorul o așteaptă, precum un export sau o salvare, poate atinge direct discul.
+9. Ce trebuie să se încheie se încheie și după un panic, deoarece firul principal supraviețuiește unuia: un indicator ridicat trece prin `with_raised`, o editare a stocării de text prin `editing`, iar ce nu trebuie să știe anularea prin `without_undo`. Un test le găsește pe cele scrise de mână.
+10. O adresă dintr-un document are o singură citire, în `splat_markdown::url`; un test găsește schemele comparate de mână.
 
 ### Adăugarea unei comenzi
 
 Bara de meniuri, bara de instrumente și meniul contextual își construiesc toate elementele din registrul din [src/editor/actions.rs](../../../src/editor/actions.rs), iar validarea meniurilor citește de acolo când se aplică o comandă și dacă afișează o bifă. O comandă nouă are nevoie de:
 
 1. o variantă de `Action` cu `Spec`-ul ei: selector, titlu, etichetă pentru bara de instrumente, tooltip (care începe cu un verb, cel mult 75 de caractere), scurtătură, SF Symbol și când se aplică
-2. metoda din `src/editor/mod.rs`
+2. metoda din `src/editor/controller.rs`
 3. o ramură în `Editing::perform`
 4. textele ei în fiecare `Localizable.strings`
 
@@ -735,7 +747,7 @@ Codul folosește textul german drept cheie: `t("Fett")` îl caută la rulare, `n
 
 | Componentă | Versiune | Folosită pentru | Licență |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | parser Markdown | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 cu [o linie modificată](../../../vendor/comrak/PATCH.md) | parser Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime Objective-C, Foundation, blocuri | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | legături pentru AppKit, WebKit și Grand Central Dispatch | Zlib, Apache-2.0 sau MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formule și imagini SVG ca PDF vectorial | MIT sau Apache-2.0 |

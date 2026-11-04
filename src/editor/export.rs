@@ -2,9 +2,10 @@
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use objc2::rc::{Retained, Weak};
-use objc2::{AnyThread, DefinedClass, MainThreadMarker, MainThreadOnly, Message};
+use objc2::{AnyThread, MainThreadMarker, MainThreadOnly, Message};
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSBitmapImageFileType, NSBitmapImageRep,
     NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSPrintInfo, NSPrintOperation, NSPrintingPaginationMode,
@@ -13,11 +14,13 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSDictionary, NSError, NSMutableAttributedString, NSPoint, NSRect, NSSize, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 
-use super::images::{Sizing, native_only, resolve_path};
+use super::images::{native_only, resolve_path};
+use super::layers::ForSharing;
+use super::picture::Sizing;
 use super::render::RenderCtx;
 use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
-use super::{EditorController, decoder, js, links, remote, views};
+use super::{decoder, js, links, remote, views};
 use crate::i18n::t;
 use crate::markdown::doc::Figure;
 use crate::markdown::docx::{Picture, TooLarge, WordExport, to_docx};
@@ -63,16 +66,13 @@ fn reusable(previous: Option<PathBuf>, name: &str) -> Option<PathBuf> {
 }
 
 pub(super) struct Sharing<'a> {
-    host: &'a EditorController,
+    host: ForSharing<'a>,
     state: &'a ShareState,
 }
 
-impl EditorController {
-    pub(super) fn sharing(&self) -> Sharing<'_> {
-        Sharing {
-            host: self,
-            state: &self.ivars().sharing,
-        }
+impl<'a> Sharing<'a> {
+    pub(super) fn new(host: ForSharing<'a>, state: &'a ShareState) -> Self {
+        Sharing { host, state }
     }
 }
 
@@ -100,12 +100,23 @@ impl Sharing<'_> {
 
     /// The document as printed: light appearance, smaller type, images no wider than `width`.
     pub(super) fn printable(&self, width: f64) -> Retained<NSMutableAttributedString> {
-        let doc_dir = self.host.doc_dir();
+        self.printable_from(self.host.doc_dir(), width)
+    }
+
+    /// `printable` for a document that lies in `doc_dir`.
+    pub(super) fn printable_from(&self, doc_dir: Option<PathBuf>, width: f64) -> Retained<NSMutableAttributedString> {
         let dir = doc_dir.clone();
+        let macros = self.host.model().read(|st| st.macros());
+        let for_layout = macros.clone();
         let print_layout = self.host.on_source_text(|text| {
             // Printing runs on the main thread, and what the disk thread knows does not wait for a volume.
             let env = super::env::Env::known(dir, text);
-            contained(|| layout(&parse(text), &Images { dark: false, env }, None))
+            let images = Images {
+                dark: false,
+                env,
+                macros: for_layout,
+            };
+            contained(|| layout(&parse(text), &images, None))
         });
         let Some(print_layout) = print_layout else {
             return NSMutableAttributedString::from_nsstring(&ns(&self.host.source_text()));
@@ -119,6 +130,8 @@ impl Sharing<'_> {
             dark: false,
             controller: None,
             remote_images: self.host.pictures().remote_allowed(),
+            leaves_the_mac: true,
+            macros,
         };
         let out = NSMutableAttributedString::new();
         for block in &print_layout.blocks {
@@ -138,29 +151,31 @@ impl Sharing<'_> {
         let stem = doc.displayName().to_string();
         let stem = stem.rsplit_once('.').map_or(stem.as_str(), |(s, _)| s).to_string();
         panel.setNameFieldStringValue(&ns(&format!("{stem}.{}", format.extension())));
-        let this = self.host.retain();
+        let this = self.host.object().retain();
         let chosen = panel.clone();
         let handler = block2::RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
-            if response != objc2_app_kit::NSModalResponseOK {
-                return;
-            }
-            let Some(path) = chosen.URL().and_then(|u| u.path()) else {
-                return;
-            };
-            let path = std::path::PathBuf::from(path.to_string());
-            chosen.orderOut(None);
-            let (source, title) = (this.sharing().export_source(), stem.clone());
-            let me = dispatch2::MainThreadBound::new(Weak::from(&*this), this.mtm());
-            // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
-            std::thread::spawn(move || {
-                let Err(reason) = source.write(format, &title, &path) else {
+            crate::util::guarded((), || {
+                if response != objc2_app_kit::NSModalResponseOK {
+                    return;
+                }
+                let Some(path) = chosen.URL().and_then(|u| u.path()) else {
                     return;
                 };
-                dispatch2::DispatchQueue::main().exec_async(move || {
-                    let Some(mtm) = MainThreadMarker::new() else { return };
-                    if let Some(c) = me.get(mtm).load() {
-                        c.sharing().report_export_failure(&reason);
-                    }
+                let path = std::path::PathBuf::from(path.to_string());
+                chosen.orderOut(None);
+                let (source, title) = (this.export_source(), stem.clone());
+                let me = dispatch2::MainThreadBound::new(Weak::from(&*this), this.mtm());
+                // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
+                std::thread::spawn(move || {
+                    let Err(failure) = source.write(format, &title, &path) else {
+                        return;
+                    };
+                    crate::util::main_soon(move || {
+                        let Some(mtm) = MainThreadMarker::new() else { return };
+                        if let Some(c) = me.get(mtm).load() {
+                            c.report_export_failure(&failure);
+                        }
+                    });
                 });
             });
         });
@@ -171,15 +186,16 @@ impl Sharing<'_> {
         ExportSource {
             text: self.host.source_text(),
             doc_dir: self.host.doc_dir(),
+            macros: self.host.model().read(|st| st.macros()),
             remote: self.host.pictures().remote_allowed(),
         }
     }
 
-    pub(super) fn report_export_failure(&self, reason: &str) {
+    pub(super) fn report_export_failure(&self, failure: &ExportFailure) {
         let Some(window) = self.host.window() else { return };
         let alert = objc2_app_kit::NSAlert::new(self.host.mtm());
         alert.setMessageText(&ns(t("Export fehlgeschlagen")));
-        alert.setInformativeText(&ns(reason));
+        alert.setInformativeText(&ns(&failure.reason()));
         alert.beginSheetModalForWindow_completionHandler(&window, None);
     }
 
@@ -201,24 +217,28 @@ impl Sharing<'_> {
                 &handler,
             )
         };
-        let document = self.host.ivars().document.clone();
+        let document = self.host.weak_document();
         let mut services = vec![service(
             t("Als PDF exportieren …"),
             block2::RcBlock::new(move || {
-                if let Some(doc) = document.load() {
-                    // SAFETY: The export action accepts a missing sender.
-                    unsafe { doc.saveDocumentToPDF(None) };
-                }
+                crate::util::guarded((), || {
+                    if let Some(doc) = document.load() {
+                        // SAFETY: The export action accepts a missing sender.
+                        unsafe { doc.saveDocumentToPDF(None) };
+                    }
+                });
             }),
         )];
         for action in [super::Action::ExportHtml, super::Action::ExportWord] {
-            let me = Weak::from(self.host);
+            let me = Weak::from(self.host.object());
             services.push(service(
                 t(action.spec().title),
                 block2::RcBlock::new(move || {
-                    if let Some(c) = me.load() {
-                        c.editing().perform(action, None);
-                    }
+                    crate::util::guarded((), || {
+                        if let Some(c) = me.load() {
+                            c.perform(action);
+                        }
+                    });
                 }),
             ));
         }
@@ -274,30 +294,58 @@ impl Sharing<'_> {
     }
 }
 
+/// Why an export did not reach its file.
+#[derive(Debug)]
+pub(super) enum ExportFailure {
+    /// A bug in making the export, which the panic hook has reported.
+    NotConverted,
+    TooLargeForWord,
+    NotWritten(std::io::Error),
+}
+
+impl ExportFailure {
+    fn reason(&self) -> String {
+        match self {
+            ExportFailure::NotConverted => t("Das Dokument ließ sich nicht umwandeln.").to_string(),
+            ExportFailure::TooLargeForWord => t("Das Dokument ist zu groß für eine Word-Datei.").to_string(),
+            ExportFailure::NotWritten(error) => described(error),
+        }
+    }
+}
+
 /// What an export takes from the window, so that the rest can wait for the volumes on another thread.
 pub(super) struct ExportSource {
     text: String,
     doc_dir: Option<PathBuf>,
     remote: bool,
+    macros: Arc<str>,
 }
 
 impl ExportSource {
-    /// Writes the document in `format` to `path`; the reason when that failed.
-    pub(super) fn write(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), String> {
-        let failed = || t("Das Dokument ließ sich nicht umwandeln.").to_string();
+    /// As if the document lay in `dir`, for a check without a file.
+    #[cfg(feature = "selftest")]
+    pub(super) fn beside(mut self, dir: PathBuf) -> ExportSource {
+        self.doc_dir = Some(dir);
+        self
+    }
+
+    /// Writes the document in `format` to `path`.
+    pub(super) fn write(&self, format: ExportKind, title: &str, path: &Path) -> Result<(), ExportFailure> {
         let data = match format {
-            ExportKind::Html => contained(|| self.html(title, path)).ok_or_else(failed)?.into_bytes(),
+            ExportKind::Html => contained(|| self.html(title, path))
+                .ok_or(ExportFailure::NotConverted)?
+                .into_bytes(),
             ExportKind::Word => contained(|| self.word())
-                .ok_or_else(failed)?
-                .map_err(|TooLarge| t("Das Dokument ist zu groß für eine Word-Datei.").to_string())?,
+                .ok_or(ExportFailure::NotConverted)?
+                .map_err(|TooLarge| ExportFailure::TooLargeForWord)?,
         };
-        std::fs::write(path, data).map_err(|e| described(&e))
+        std::fs::write(path, data).map_err(ExportFailure::NotWritten)
     }
 
     pub(super) fn html(&self, title: &str, target: &Path) -> String {
         let doc_dir = self.doc_dir.as_deref();
         let export_dir = target.parent().map(Path::to_path_buf);
-        let figure = |f: &Figure| on_main(|| figure_image(f)).flatten();
+        let figure = |f: &Figure| on_main(|| figure_image(f, &self.macros)).flatten();
         let embed = |url: &str| embedded(url, doc_dir);
         let rebase = |link: &str| rebased(link, doc_dir, export_dir.as_deref());
         let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
@@ -321,7 +369,7 @@ impl ExportSource {
         let doc_dir = self.doc_dir.as_deref();
         let figure = |f: &Figure| {
             on_main(|| {
-                let rendered = js::cached(&render_key(f, false))?;
+                let rendered = js::cached(&render_key(f, false, &self.macros))?;
                 // One ex is about half the 11 pt body text.
                 let size = match rendered.sizing {
                     Sizing::Ex { width, height, .. } => NSSize::new(width * 5.5, height * 5.5),
@@ -363,7 +411,6 @@ impl ExportSource {
     }
 }
 
-/// A rendered formula or diagram as embedded PNG, at twice its size for sharp display.
 /// The system's wording of a failure, in the language of the app.
 fn described(e: &std::io::Error) -> String {
     let Some(code) = e.raw_os_error().and_then(|code| isize::try_from(code).ok()) else {
@@ -374,8 +421,9 @@ fn described(e: &std::io::Error) -> String {
     error.localizedDescription().to_string()
 }
 
-fn figure_image(figure: &Figure) -> Option<String> {
-    let rendered = js::cached(&render_key(figure, false))?;
+/// A rendered formula or diagram as embedded PNG, at twice its size for sharp display.
+fn figure_image(figure: &Figure, macros: &Arc<str>) -> Option<String> {
+    let rendered = js::cached(&render_key(figure, false, macros))?;
     // One ex is about half the 16 px body text of the page.
     let (size, attributes) = match rendered.sizing {
         Sizing::Ex { width, height, valign } => (
@@ -426,6 +474,9 @@ fn png_of_pixels(width: u32, height: u32, pixels: Vec<u8>) -> Option<Vec<u8>> {
 /// A local image for Word: PNG and JPEG as they are, other formats converted to PNG.
 fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
     let path = &super::images::locate(path, doc_dir);
+    if !super::images::may_carry_along(path, doc_dir) {
+        return None;
+    }
     let bytes = crate::util::read_regular_file(path, MAX_FILE_BYTES as u64)?;
     let Decoded::Rgba {
         width,
@@ -457,10 +508,13 @@ fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
 
 /// A local image as `data:` URL: web formats as they are, others converted to PNG. Images from the web stay links.
 fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
-    if url.contains("://") && !url.starts_with("file://") {
+    if url.contains("://") && crate::markdown::url::behind_file_scheme(url).is_none() {
         return None;
     }
     let path = super::images::locate(&resolve_path(url, doc_dir)?, doc_dir);
+    if !super::images::may_carry_along(&path, doc_dir) {
+        return None;
+    }
     let bytes = crate::util::read_regular_file(&path, MAX_FILE_BYTES as u64)?;
     if let Some(mime) = web_image_type(&bytes) {
         return Some(data_url(mime, &bytes));
@@ -489,8 +543,27 @@ fn rebased(link: &str, doc_dir: Option<&Path>, export_dir: Option<&Path>) -> Str
     let split = link.find(['#', '?']).unwrap_or(link.len());
     let (path, suffix) = link.split_at(split);
     let target = doc_dir.join(links::percent_decode(path));
-    let relative = super::editing::relative_path(Some(export_dir), &target);
-    format!("{}{suffix}", relative.replace('%', "%25").replace(' ', "%20"))
+    let relative = super::links::relative_path(Some(export_dir), &target);
+    // Without a folder in common the only way there is an absolute path, which would show the user's folders to the reader.
+    if Path::new(&relative).is_absolute() {
+        return link.to_string();
+    }
+    format!("{}{suffix}", in_an_address(&relative))
+}
+
+/// A path as a link can name it: the characters that would end the path or start an escape are escaped themselves.
+fn in_an_address(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for c in path.chars() {
+        match c {
+            '%' => out.push_str("%25"),
+            ' ' => out.push_str("%20"),
+            '#' => out.push_str("%23"),
+            '?' => out.push_str("%3F"),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 /// Draws an image into a bitmap of `size` points at `scale` and encodes it as PNG.
@@ -570,5 +643,22 @@ mod tests {
         );
         assert_eq!(rebased("#kopf", Some(docs), Some(Path::new("/tmp"))), "#kopf");
         assert_eq!(rebased("a.md", None, Some(Path::new("/tmp"))), "a.md");
+    }
+
+    #[test]
+    fn a_rebased_link_leads_to_the_same_file() {
+        let docs = Some(Path::new("/Users/a/Notizen"));
+        let export = Some(Path::new("/Users/a/Export"));
+        assert_eq!(rebased("a%23b.md", docs, export), "../Notizen/a%23b.md");
+        assert_eq!(rebased("a%3Fb.md#ende", docs, export), "../Notizen/a%3Fb.md#ende");
+        assert_eq!(rebased("100%25.md", docs, export), "../Notizen/100%25.md");
+    }
+
+    #[test]
+    fn a_link_without_a_folder_in_common_shows_no_folders() {
+        assert_eq!(
+            rebased("a.md", Some(Path::new("/Users/a/Notizen")), Some(Path::new("/tmp"))),
+            "a.md"
+        );
     }
 }

@@ -120,7 +120,7 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 - **Mindenre van gomb.** Minden Markdown-elemhez tartozik eszközsorgomb és menüpont, a gyakoriakhoz billentyűparancs is. A táblázatoknak saját menüjük van a sorokhoz, oszlopokhoz és az igazításhoz.
 - **Exportálás veszteség nélkül.** PDF, egyetlen önálló HTML-fájl vagy Word-dokumentum valódi címsorokkal, listákkal, táblázatokkal, lábjegyzetekkel és képekkel.
 - **Tősgyökeresen natív.** Valódi AppKit-ablakok, lapok, menük, előugró panelek, Verziók, Automatikus mentés, a megosztási menü, sötét mód, helyesírás-ellenőrzés, diktálás és VoiceOver. Nincs Electron, és magához a szöveghez sem webnézet tartozik.
-- **Gyors nagy fájloknál is.** Egy billentyűleütés megjelenítése egy 10 MB-os dokumentumban nagyjából 25 ms, a nézet saját munkája előtt.
+- **Gyors nagy fájloknál is.** Egy billentyűleütés megjelenítése egy 10 MB-os dokumentumban nagyjából 10 ms, a nézet saját munkája előtt.
 - **Diszkrét és körültekintő.** Az internetes képek csak az Ön engedélye után töltődnek be, a más appokra mutató linkek előbb rákérdeznek, és minden, ami megbízhatatlan képadatot dekódol, elszigetelt segédfolyamatokban fut.
 - **Az Ön nyelvén.** A felület és a beépített Markdown-gyorsreferencia 35 nyelven érhető el: angol, arab, katalán, kínai (egyszerűsített), kínai (hagyományos), horvát, cseh, dán, holland, finn, francia, német, görög, héber, hindi, magyar, indonéz, olasz, japán, koreai, maláj, norvég, lengyel, portugál (Brazília), portugál (Portugália), román, orosz, szlovák, szlovén, spanyol, svéd, thai, török, ukrán és vietnami.
 
@@ -504,11 +504,7 @@ Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot me
 - **Alapból nincs hálózat.** A Splat nem küld telemetriát. Csak akkor keres frissítéseket, ha beleegyezik, vagy a **Frissítések keresése…** parancsot választja: ilyenkor egy kis hírcsatorna-fájlt tölt be a GitHubról, és a kérés csak az appot és a verzióját nevezi meg. A képletek és a diagramok helyben jelennek meg; az ezt végző webnézetek nem érik el a hálózatot.
 - Az **internetes képek** csak az Ön engedélye után töltődnek be, csak `https` felett, soha nem a helyi hálózat gépeiről, egyenként legfeljebb 10 MB méretig, és sütik nélküli privát munkamenetben.
 - **Elszigetelt dekódolás.** A képeket, valamint a képletek és a diagramok grafikáit segédfolyamatok dekódolják, amelyek az első bájt beolvasása előtt bezárnak minden örökölt fájlt, és homokozóba zárják magukat: nincs fájlhozzáférés, nincs hálózat. Csak képpontokat adnak vissza, amelyek méretét ellenőrzik, és 10 másodperc után leállítják őket. Az Apple saját képdekódolói csak a HEIC, TIFF, AVIF és PDF adatokat látják, és csak ha az adat valóban ilyen formátumú; ezek külön segédfolyamatban futnak, amely emellett olvashatja a rendszer betűtípus-mappáit, és használhatja a rendszer videódekódolóját. Az SVG-k, a képletek és a diagramok is ezen a segédfolyamaton haladnak át, ezért a Splatban rögzített felbontású képek: pontonként négy képpont, a hosszabb oldalon legfeljebb 2560.
-- A **helyi fájlok** csak a dokumentum által megnevezett útvonalon jutnak el hozzá. A beágyazások a dokumentum mappájából és az alatta lévőkből mutatnak Markdown-jegyzeteket, és a hiányzó képet is csak ott keresik. Máshol lévő, abszolút vagy `~` jellel kezdődő képútvonal továbbra is betöltődik, és a HTML- és Word-exportok beágyazzák: egy nem Ön által írt dokumentum exportját nézze át, mielőtt továbbadja.
-- A **mentetlen szöveg másolatai** ezen a Macen maradnak, a Könyvtár mappájában, az összeomlás utáni helyreállításhoz. A mentéssel vagy a Splat normális kilépésével törlődnek; az összeomlás után maradt másolatok a helyreállítási mappában maradnak, amíg Ön nem törli őket.
-- A **linkek** kattintásra soha nem indítanak programot. A web- és levelezőlinkek a megszokott módon nyílnak; a más appokra mutató linkek előbb rákérdeznek.
-- A **dokumentumokban lévő HTML-t** a Splat saját értelmezője olvassa. A szkriptek, stílusok, keretek és űrlapok soha nem futnak.
-- Az **exportok** nem tartalmaznak szkripteket. A HTML-oldalak csak ártalmatlan címkék és attribútumok rögzített listáját tartják meg, mint a GitHub, valamint egy tartalombiztonsági szabályzatot. A Word-fájlok csak `http`, `https` és `mailto` címeket linkelnek.
+- A **helyi fájlok** csak a dokumentum által megnevezett útvonalon jutnak el hozzá. A beágyazások a dokumentum mappájából és az alatta lévőkből mutatnak Markdown-jegyzeteket, és a hiányzó képet is csak ott keresik. Máshol lévő, abszolút vagy `~` jellel kezdődő képútvonal az előnézetben továbbra is betöltődik; a HTML- és Word-exportok, a nyomtatás és a PDF-ek csak azt viszik magukkal, ami a dokumentum mappájában vagy Git-tárolójában van, hacsak ez a tároló nem tartalmazza a Saját mappádat is, így egy idegen dokumentum nem húzhatja bele a fájljaidat egy továbbadott exportba.
 - **Kódaláírás** Hardened Runtime-mal. A Splat az App Sandbox nélkül fut, hogy a dokumentumok melletti képeket minden mappa külön engedélyezése nélkül mutathassa; ezt az összes dekódolás elszigetelése ellensúlyozza.
 
 ## Nagy dokumentumok
@@ -516,13 +512,14 @@ Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot me
 A Splat több megabájtos dokumentumoknál is reszponzív marad:
 
 - A forráskód a TextKit 2-t használja, amely csak a látható részt tördeli.
-- Amíg az előnézetben gépel, valamint a legfeljebb 2 MB-os dokumentumok forráskódjában csak az érintett bekezdéseket elemzi, színezi és tördeli újra. Egy 10 MB-os dokumentumban az elemzés és a színezés nagyjából 20 ms, a megjelenítés nagyjából 25 ms, egy teljes billentyűleütés pedig az előnézetében nagyjából 60 ms, a nézet saját munkájával együtt.
+- Amíg az előnézetben gépel, valamint a legfeljebb 2 MB-os dokumentumok forráskódjában csak az érintett bekezdéseket elemzi, színezi és tördeli újra. Egy 10 MB-os dokumentumban az elemzés és a színezés nagyjából 3 ms, a megjelenítés nagyjából 10 ms, egy teljes billentyűleütés pedig az előnézetében nagyjából 30 ms, a nézet saját munkájával együtt.
 - A nagy előnézetek előbb a látható részt jelenítik meg, a többit akkor, amikor az app tétlen. A látótérbe görgetett blokkok a kirajzolás előtt megjelenítésre kerülnek.
 - Nagyobb dokumentumok forráskódjában az előnézet elemzése a háttérben fut, miközben gépel.
 - A dokumentum egyszerű szöveg marad, ha körülbelül 4 GB memóriát igényelne, ami nagyjából 50–120 MB szokásos Markdown, de csak 10–20 MB, ha kizárólag táblázatokból vagy címsorokból áll: a forráskódnak nincsenek színei, az előnézet pedig megmondja, miért marad üres. Az exportok továbbra is működnek.
 - Nagyjából 200 KB-tól a dokumentum az elemzés előtt megnyitja az ablakát; 5 MB-nál a színek és az előnézet nagyjából negyed másodperccel később követik.
+- Az összes kép együtt, a képleteket és a diagramokat is beleértve, legfeljebb a Mac memóriájának negyedét foglalja el, és ennek a felét, amíg kevés a memória. Ezen felül a további képek helyőrzőként jelennek meg, amíg újra nem lesz hely.
 
-Néhány módosítást teljes egészében feldolgoz, 10 MB-nál nagyjából 300 ms-ot igényelve billentyűleütésenként. Ilyen, ha a módosítás egy lábjegyzet definícióját vagy hivatkozásait, egy szövegközi lábjegyzet környékét, egy lábjegyzet melletti dokumentumvéget, a front mattert vagy a linkhivatkozás-definíciók közelét érinti, továbbá minden módosítás egy olyan dokumentumban, amelyben `%%` megjegyzésblokkok vannak, vagy egy lábjegyzet kétszer, illetve idézeten vagy listán belül van definiálva. A memória a fájllal együtt nő: 1 MB Markdownnál nagyjából 115–160 MB-ra, 10 MB-nál 340–510 MB-ra.
+Néhány módosítást teljes egészében feldolgoz, 10 MB-nál nagyjából 300 ms-ot igényelve billentyűleütésenként. Ilyen, ha a módosítás egy lábjegyzet definícióját vagy hivatkozásait, egy szövegközi lábjegyzet környékét, egy lábjegyzet melletti dokumentumvéget, a front mattert vagy a linkhivatkozás-definíciókat érinti, továbbá minden módosítás egy olyan dokumentumban, amelyben `%%` megjegyzésblokkok vannak, vagy egy lábjegyzet kétszer, illetve idézeten vagy listán belül van definiálva. A memória a fájllal együtt nő: 1 MB Markdownnál nagyjából 115–160 MB-ra, 10 MB-nál 340–510 MB-ra.
 
 ## Ismert korlátozások
 
@@ -577,6 +574,7 @@ make check                  # formázás, clippy figyelmeztetések nélkül, min
 make test                   # make check, majd az ablak nélküli önellenőrzés
 make test-gui               # ablakos önellenőrzések; nagyjából négy percig lefoglalják a Macet
 make test-long              # hosszabb véletlenszerű keresés és a 10 MB-os részleges frissítés ellenőrzése
+make fuzz                   # véletlen bemenet a részleges elemzéshez és minden kimenethez
 make coverage               # az összes teszt és önellenőrzés sorlefedettsége, moduloként küszöbbel
 make coverage-library       # ugyanezek a küszöbök az ablak nélküli modulokra, mint a CI-ban
 make bench FILE=<file.md>   # idők egy nagy fájl megnyitásához, gépeléséhez és görgetéséhez
@@ -626,19 +624,24 @@ Az abban lévő app aláírása eltér a helyi fordításétól, ezért a macOS 
 | `cargo xtask check-library` | a könyvtár Linuxra is lefordul, vagyis semmi nem igényel benne macOS-t |
 | `cargo xtask vendor check` | a JavaScript-könyvtárak bájtra pontosan egyeznek a `vendor.lock` fájllal |
 | `cargo xtask selftest probe` | ablak nélkül, mindegyik a várt eredménnyel: képletek, diagramok, internetes képek a folyamaton belüli szerverrel szemben, blokkolt címek, a szöveg, amelyet minden parancs ír, minden képformátum mindkét exporton át, egy oldal, amely nem válaszol többé, és a webnézetek védelmei egy védelem nélküli oldallal szemben. Nagyjából fél percig tart. Amihez az app a képernyő előtt kell, azt zárolt képernyőn kihagyja |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | a futó app, kattintásról kattintásra. Ablakot nyit és gépel bele; a Mac nagyjából négy percig foglalt. A `--scenarios` csak a második részt futtatja, nagyjából másfél perc alatt |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | a futó app, kattintásról kattintásra. Ablakot nyit és gépel bele; a Mac nagyjából négy percig foglalt. A `--scenarios` csak a második részt futtatja, nagyjából másfél perc alatt. Az `--only` ennek a résznek egy csoportját futtatja, a saját dokumentumában, zárolt képernyőn is. a `--in-back` kihagyja, ami az appot az előtérben igényli; nélküle az ilyen ellenőrzés hibát jelez |
 | `cargo xtask selftest resize` | kiszélesíti az ablakot az elválasztó mozgatása után: a forráskód újratörik, miközben az ablak átméretezés alatt áll. Nagyjából tíz másodpercig tart |
-| `cargo xtask selftest bench <file.md>` | idők egy nagy fájl megnyitásához, gépeléséhez és görgetéséhez |
+| `cargo xtask selftest typing [--by-hand]` | mentések közben gépel, az app eseménysorán át küldött billentyűkkel, vagy `--by-hand` esetén kézzel: a begépelt szöveg megmarad, és nem mentettként látszik. Körülbelül egy percig tart |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | idők egy nagy fájl megnyitásához, gépeléséhez és görgetéséhez; a `--keystroke-ms` hibát jelez, ha a leggyorsabb leütés tovább tart |
 | `cargo test --release -- --ignored partial_updates` | egy billentyűleütés 10 MB-ban: részleges a teljes frissítéssel szemben, ugyanaz az eredmény legfeljebb negyed idő alatt |
 | `cargo test --release --test hostile` | a vermet túlcsordítani vagy négyzetes időt igénybe venni szánt dokumentumok, mindegyik két méretben, amelyeknek az idejének a szöveggel arányosan kell nőnie, az elemzésen, a tördelésen, mindkét exporton, a billentyűleütéseken és a parancsokon át |
-| `make mutants` | a `src/markdown/` és a `src/preview/` könyvtárba egyenként épített hibák a [cargo-mutants](https://mutants.rs) segítségével (`cargo install cargo-mutants`); megmondja, melyiket nem veszi észre egyik teszt sem. Órákig tart; a `FILE=src/preview/bridge.rs` szűkíti |
+| `make mutants` | a `crates/splat-markdown`, a `crates/splat-preview` és a `crates/splat-file-state` könyvtárba egyenként épített hibák a [cargo-mutants](https://mutants.rs) segítségével (`cargo install cargo-mutants`); megmondja, melyiket nem veszi észre egyik teszt sem. Órákig tart; a `FILE=crates/splat-preview/src/bridge/mod.rs` szűkíti |
+| `make fuzz` | véletlen bemenet a [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) segítségével, amelyhez a rustup nightly kell: billentyűleütések, amelyeknek teljes elemzésként kell olvashatónak lenniük, minden kimenet, szerkesztések az előnézetben, minden parancs és egy fájl, amely úgy mentődik, ahogy megnyílt. A `SECONDS=600` tovább keres |
+| `cargo test --release --test fuzz_seeds` | a `fuzz/seeds/` magjai ezeknek a fuzz-céloknak az ellenőrzésein át, fuzzer nélkül; minden `cargo test` része |
+| `cargo test --profile checked --workspace` | a tesztek azzal, amit egy debug build még ellenőriz: minden részleges elemzés után a blokkok illenek a szövegükhöz, és amit továbbvisz, az az, amit a szöveg mond. A `make test-long` része |
+| `cargo test --release --test entry_points --test structure` | a forrásokból: minden, amit a rendszer hív, védve van a panic ellen, és a modulok csak lefelé függenek |
 | `cargo test --release --test decoder` | a dekódolófolyamat dekódolja a képeket, és sem fájlokat, sem a hálózatot nem éri el |
 | `make coverage` | a `cargo test` és az összes önellenőrzés sorlefedettsége a [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) segítségével (`brew install cargo-llvm-cov llvm`); a küszöbök alatt hibával leáll. Nagyjából öt percig foglalja a Macet |
-| `make coverage-library` | a `src/markdown/`, a `src/preview/` és az `i18n.rs` magasabb küszöbei, egyedül a `cargo test` által mérve |
+| `make coverage-library` | a `splat-markdown`, a `splat-preview`, a `splat-file-state` és a `splat-i18n` crate magasabb küszöbei, egyedül a `cargo test` által mérve |
 
-Az egységtesztek a tesztelt kód mellett állnak. A `tests/` azt tartalmazza, ami kívülről éri el a könyvtárat: a `robustness.rs` véletlenszerű tesztjeit, amelyek a `src/fuzz.rs` generátoron osztoznak a `sync.rs` teszteivel, a `hostile.rs` ártásra szánt dokumentumait, valamint a dekódolótesztet, amely elindítja a lefordított programot. A `src/editor/` ablak nélküli döntései önálló tesztekkel rendelkező szabad függvényekben élnek: mindaz, amit a vezérlő tud, és ahogy ez változik, a `state.rs` fájlban, a megjelenítés szabályai a `render_queue.rs` fájlban, a szövegmásolat a `sync.rs` fájlban, a bekezdésstílusok, betűtípusok és színek értékekként a `render.rs` fájlban, az, hogy mit jelentenek az eszközsor azonosítói, a `toolbar.rs` fájlban, az, hogy mit jelent egy linkkattintás, a `navigation.rs` fájlban.
+Az egységtesztek a tesztelt kód mellett állnak. A `crates/splat-testkit/tests/` azt tartalmazza, ami kívülről éri el a modellt és az előnézetet: a `robustness.rs` véletlenszerű tesztjeit, amelyek a `splat-testkit` generátorán osztoznak a `sync.rs` teszteivel, a `hostile.rs` ártásra szánt dokumentumait, valamint a fuzz-célok magjait a `fuzz_seeds.rs` fájlban. A `tests/` azt tartalmazza, ami az egész programot vizsgálja: a forrásait, a fordításait és a dekódolótesztet, amely elindítja a lefordított programot. A `src/editor/` ablak nélküli döntései önálló tesztekkel rendelkező szabad függvényekben élnek: mindaz, amit a vezérlő tud, és ahogy ez változik, a `state.rs` fájlban, a megjelenítés szabályai a `render_queue.rs` fájlban, a szövegmásolat a `sync.rs` fájlban, a bekezdésstílusok, betűtípusok és színek értékekként a `render.rs` fájlban, az, hogy mit jelentenek az eszközsor azonosítói, a `toolbar.rs` fájlban, az, hogy mit jelent egy linkkattintás, a `navigation.rs` fájlban.
 
-Az ablakos önellenőrzés egy lépése megnevezett feltételre vár, nem időre; csak az, ami nem ad jelet, például valaminek a hiánya, tart meg egy szünetet az indoklásával együtt. A hiába várás olyan hibás ellenőrzés, amely megnevezi, mi nem jött el, a pánikoló lépés szintén hibás ellenőrzés, és a futás mindkét esetben folytatódik. Az az ellenőrzés, amely ebben a futásban semmit nem tud mondani, `SELFTEST SKIP` jelzést ad: az xtask felsorolja, és sem nem sikerül, sem nem bukik meg. Az xtask minden módot, és külön a `--scenarios` részt is, az ellenőrzései nagyjából kilenctizedéhez köti. Az ablakos önellenőrzés a fő végigkattintás után egy második részt futtat, a `src/editor/selftest/scenarios.rs` fájlban: minden formázási és táblázatparancsot, a párbeszédablakokat, a linkkattintásokat, a beillesztést, az ejtést, az exportokat, egy nagy módosítást, a lemezen változó képeket, a memóriaterhelést, egy hatalmas dokumentumot és az összeomlás utáni helyreállítást.
+Az ablakos önellenőrzés egy lépése megnevezett feltételre vár, nem időre; csak az, ami nem ad jelet, például valaminek a hiánya, tart meg egy szünetet az indoklásával együtt. A hiába várás olyan hibás ellenőrzés, amely megnevezi, mi nem jött el, a pánikoló lépés szintén hibás ellenőrzés, és a futás mindkét esetben folytatódik. Az az ellenőrzés, amely ebben a futásban semmit nem tud mondani, `SELFTEST SKIP` jelzést ad: az xtask felsorolja, és sem nem sikerül, sem nem bukik meg. Az xtask minden módot, és külön a `--scenarios` részt is, az ellenőrzései nagyjából kilenctizedéhez köti. Az ablakos önellenőrzés a fő végigkattintás után egy második részt futtat, a `src/editor/selftest/scenarios.rs` fájlban: minden formázási és táblázatparancsot, a párbeszédablakokat, a linkkattintásokat, a beillesztést, az ejtést, az exportokat, egy fájlt, amelyet egy másik program módosított, egy nagy módosítást, a lemezen változó képeket, a memóriaterhelést, egy hatalmas dokumentumot és az összeomlás utáni helyreállítást. Minden csoportja saját dokumentumot nyit, hogy az egyikben történő hiba ne érje el a következőt, és mindegyik futtatható önmagában az `--only` kapcsolóval. Az ablak nélküli önellenőrzés szándékosan el is rontja a mentést: egy mappa, amely semmit sem fogad el, egy csak olvasható fájl, egy eltűnt mappa, egy megtelt lemez és egy panic a mentés minden visszahívásában, és egyik sem járhat szövegvesztéssel.
 
 A lefedettségnek két küszöbe van: minden modul soronként legalább 84 %, az összes modul együtt legalább 96 %. A `make coverage` a `cargo test` és az önellenőrzések együttes lefedettségét méri, és bármelyik küszöb alatt hibával leáll; a `make coverage-library` azt, ami nem igényel ablakot, 90 és 97 %-hoz köti. A küszöbök és a kevés kivétel, például a `main.rs` pánikkezelője, amely csak összeomláskor fut, az [xtask](../../../xtask/src/coverage.rs) fájlban állnak az indokaik mellett. A mért fordítások a `target/coverage/` mappába kerülnek, így a mérőkód soha nem jut el a `target/release/` mappába vagy egy lemezképbe. A dekódoló segédfolyamat a bezárkózás előtt megnyitja a mérési fájlját, így ez is mérhető.
 
@@ -648,16 +651,20 @@ Az önellenőrzés kimenete a `target/selftest/` mappába kerül. Az önellenőr
 
 ### A projekt felépítése
 
-A `src/lib.rs` mindent, ami nem igényel ablakot, önálló könyvtárrá, a `splat` crate-té tesz: `markdown/`, `preview/`, `i18n.rs` és a `fuzz.rs` tesztgenerátor. macOS nélkül is lefordul. A `src/main.rs` appja erre épül.
+Minden, ami nem igényel ablakot, önálló crate a `crates/` alatt, amely macOS nélkül is lefordul, így a fordító betartatja, hogyan függenek egymástól. A `src/` appja (`splat-app` csomag, `splat` program) ezekre épül.
 
-- `src/markdown/`: a fa, amelyet minden fogyasztó olvas, a `Doc` a `doc/` mappában, amely a saját szövegét birtokolja, és az elemző egyetlen kötése a `reader/` mappában: a comrak sehol máshol nincs megnevezve, a `reader/assumptions.rs` pedig azt tartalmazza, amit a kód feltételez róla. A szintaxiskiemelés és az összes parancs tiszta szövegmódosításként (`Edit`) a `commands/` mappában. Továbbá a módosítás utáni újraelemzés (`incremental.rs`), a beágyazott HTML olvasója (`markup.rs`), a tipográfia, a címkék, a hivatkozások és az idézetek a folyó szövegben (`typography.rs`), hogy hogyan néz ki a szöveg, és mely Markdown és HTML teszi ilyenné (`style.rs`), mi lehet egy cím (`url.rs`), valamint a HTML- és Word-export (`html.rs`, `docx.rs` a `docx/html.rs` és `docx/xml.rs` fájllal). A pozíciónak saját típusa van: `Byte` a forrásszövegben, `U16` a forrásnézetben, `Shown` az előnézeti nézetben (`text.rs`). Nincs AppKit.
-- `src/preview/`: az előnézet tördelése a `layout/` mappában, a beágyazott HTML-lel a `layout/html.rs` fájlban, valamint az előnézet és a forráskód közti leképezés (`Bridge`, `Index`). A `Bridge` visszautasítja a `Doc` más verziójához tartozó tördelést. Nincs AppKit.
+- `crates/splat-markdown/`: a fa, amelyet minden fogyasztó olvas, a `Doc` a `doc/` mappában, amely a saját szövegét birtokolja, és az elemző egyetlen kötése a `reader/` mappában: a comrak sehol máshol nincs megnevezve, a `reader/assumptions.rs` pedig azt tartalmazza, amit a kód feltételez róla. A szintaxiskiemelés és az összes parancs tiszta szövegmódosításként (`Edit`) a `commands/` mappában. Továbbá a módosítás utáni újraelemzés (`incremental.rs`), a beágyazott HTML olvasója (`markup.rs`), a tipográfia, a címkék, a hivatkozások és az idézetek a folyó szövegben (`typography.rs`), hogy hogyan néz ki a szöveg, és mely Markdown és HTML teszi ilyenné (`style.rs`), mi lehet egy cím (`url.rs`), valamint a HTML- és Word-export (`html.rs`, `docx.rs` a `docx/html.rs` és `docx/xml.rs` fájllal). A pozíciónak saját típusa van: `Byte` a forrásszövegben, `U16` a forrásnézetben, `Shown` az előnézeti nézetben (`text.rs`).
+- `crates/splat-preview/`: az előnézet tördelése a `layout/` mappában, a beágyazott HTML-lel a `layout/html.rs` fájlban, valamint az előnézet és a forráskód közti leképezés (`Bridge`, `Index`). A `Bridge` visszautasítja a `Doc` más verziójához tartozó tördelést.
+- `crates/splat-file-state/`: milyen szöveget tartalmaz egy fájl, milyen formátumban, és mit jelent egy rápillantás.
+- `crates/splat-i18n/` a `resources/*.lproj` mappákkal: 35 nyelv; a kulcsok a német szövegek, és az app indításkor telepíti a felületi nyelv táblázatát.
+- `crates/splat-testkit/`: a véletlenszerű tesztek generátora és a fuzz-célok ellenőrzései.
 - `src/editor/`: az ablak. Egyetlen `EditorController` objektum szolgálja ki az AppKitet mindkét nézet delegáltjaként, és továbbad az összetevőknek, a vezérlő feletti kis structoknak és az általuk birtokolt állapotnak, amelynek mezőit a többi modul nem éri el:
 
 | Modul | Felelősség |
 |---|---|
-| `mod.rs` | osztály, továbbító delegált metódusok, `invalidate` |
+| `controller.rs` | osztály, továbbító delegált metódusok, `invalidate`, valamint az, amit a program többi része egy szerkesztőnek mond; csak ez éri el a komponenseket |
 | `panes.rs` | `Panes`: a szövegnézetek, a vázlat, a panelek megjelenítése és elrejtése, valamint ami hozzáférést ad a nézetekhez |
+| `controller/layers.rs` | ki kit érhet el: egy komponens olyan fogantyút kap a vezérlőhöz, amely azt kínálja, ami alatta van, és ezt a fordító betartatja |
 | `state.rs` | amit a vezérlő a dokumentumról tud, és minden módja, ahogy ez változik; a mezői privátak, és nem érint nézetet |
 | `model.rs` | kölcsönadja az állapotot és a szövegmásolatot olyan lezárásoknak, amelyek nem érnek el nézetet |
 | `actions.rs` | parancsnyilvántartás: szelektor, cím, billentyűparancs, szimbólum, mikor alkalmazható a parancs |
@@ -669,17 +676,16 @@ A `src/lib.rs` mindent, ami nem igényel ablakot, önálló könyvtárrá, a `sp
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: a képlet- és diagramszerkesztő |
 | `navigation.rs`, `links.rs` | `Links`: linkek, wikilinkek, címkék, feladat-jelölőnégyzetek, összecsukás, lábjegyzetek |
 | `env.rs` | amit az előnézet a szövegen kívülről olvas: tipográfiai írásjelek, a `@name` és `#12` tárolója, a BibTeX-fájl, beágyazott jegyzetek |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | előnézeti szöveg, helyi és távoli képek; `Pictures` a `images.rs` fájlban |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | előnézeti szöveg, helyi és távoli képek; `Pictures` a `images.rs` fájlban |
 | `attributes.rs` | szövegattribútumok; minden kulcs csak a várt típusú értéket kapja |
 | `shadow.rs` | a mentetlen szöveg másolatai az összeomlás utáni helyreállításhoz |
 | `decoder.rs` | homokozóba zárt segédfolyamatok, amelyek képeket és grafikákat dekódolnak |
 | `export.rs`, `outline.rs` | `Sharing`: HTML- és Word-export, a megosztási fájl, nyomtatás; a vázlat az oldalsávon |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit a MathJaxhoz, a Mermaidhez, a Graphvizhez, a PlantUML-hez és a vizuális képletszerkesztőhöz; a szabályok arról, mi mikor jelenik meg, a WebKittől függetlenül |
 | `webkit.rs` | hívások a WebKitbe; csak a navigációs delegált élettartama marad a `js.rs` és a `mathfield.rs` fájlnál |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | az ablak felépítése, eszközsor, szövegnézetek, párbeszédablakok, színek |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | az ablak felépítése, eszközsor, szövegnézetek, párbeszédablakok, színek |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menüsor, appdelegált, dokumentum (`MDDocument`, egy `NSDocument` alosztály).
-- `src/i18n.rs` a `resources/*.lproj` mappákkal: 35 nyelv; a kulcsok a német szövegek, és az app indításkor telepíti a felületi nyelv táblázatát.
 - `src/util/`: munkaszálak (`lanes.rs`), kötetek, amelyek leállhatnak a válaszadással (`volumes.rs`), AppKit-segédek, fájlok és folyamatok. `src/diag.rs`: ami a felhasználó szeme előtt rejtve megy félre, a rendszernaplóba kerül, a dokumentum szövegének bármilyen részlete nélkül.
 - `src/large_alloc.rs`: a nagy foglalások közvetlenül a kernelből jönnek, és felszabadításkor oda térnek vissza, így a memória a nagy módosítások után visszakerül.
 - `resources/js/`: weboldalak és könyvtárak; a verziók és az ellenőrzőösszegek a [vendor.lock](../../../vendor.lock) fájlban.
@@ -691,11 +697,11 @@ A bal oldali szövegnézet forráskódja az egyetlen igazságforrás.
 
 1. Minden ottani karaktermódosítás helyben frissíti a szövegmásolatot (`Snapshot`), a szöveg újraolvasása nélkül.
 2. A frissítés elemzi a másolatot, a forráskódot csak ott színezi újra, ahol a színek változtak, tördeli az előnézetet, és csak azokat a blokkokat cseréli, amelyek tartalma megváltozott.
-3. Módosítás után csak az érintett bekezdéseket elemzi, színezi és tördeli újra, amennyiben a szomszédaik változatlanok maradnak; a `reparse_part_and_color` megmondja, mikor nem. A `%%` megjegyzésblokkot tartalmazó dokumentumokat, a front matter módosításait és egy linkhivatkozás-definíciókat tartalmazó dokumentumban a szögletes zárójelet tartalmazó rész módosításait teljes egészében feldolgozza. A comrak egy lábjegyzet-hivatkozást csak az ugyanabban az elemzésben szereplő definícióval ismer fel, és a definíciókat a szöveg mögé helyezi, ezért a részt címkénként egy helyettesítő definícióval elemzi, és a számait a régi fából veszi; a részben lévő hivatkozások vagy definíciók, illetve egy szövegközi lábjegyzet melletti módosítás teljes feldolgozást jelent.
+3. Módosítás után csak az érintett bekezdéseket elemzi, színezi és tördeli újra, amennyiben a szomszédaik változatlanok maradnak; a [docs/partial-parse.md](../../../docs/partial-parse.md) megmondja, miért adja ez ugyanazt, amit egy teljes elemzés, és mit kell megnézni, ha a comrak változik. A `%%` megjegyzésblokkot tartalmazó dokumentumokat, a front matter módosításait és egy linkhivatkozás-definíciókat tartalmazó dokumentumban a szögletes zárójelet tartalmazó rész módosításait teljes egészében feldolgozza. A comrak egy lábjegyzet-hivatkozást csak az ugyanabban az elemzésben szereplő definícióval ismer fel, és a definíciókat a szöveg mögé helyezi, ezért a részt címkénként egy helyettesítő definícióval elemzi, és a számait a régi fából veszi; a részben lévő hivatkozások vagy definíciók, illetve egy szövegközi lábjegyzet melletti módosítás teljes feldolgozást jelent.
 4. A `<details>` vagy `<div align>` elemet megnyitó, majd később lezáró HTML-blokkok hatnak a közöttük lévő Markdown-blokkokra; az újrahasznosított blokknak ugyanazzal a környezettel kell rendelkeznie.
 5. Amíg legfeljebb 2 MB-os dokumentum forráskódjában gépel, a részleges frissítés azonnal fut; ha nem alkalmazható, vagy nagyobb dokumentumnál, az elemzés és a tördelés a háttérben fut. Amíg az előnézetben gépel, azonnal futnak, mert az előnézet kurzora az eredménytől függ.
 6. Az előnézeti bevitelt a `Bridge` a forráskód módosításává alakítja, és onnantól ugyanazt az utat járja. A Markdownnak túl sok módja van a szöveg szintaxissá alakítására ahhoz, hogy csak szabályok elégségesek legyenek, ezért a `preview/verify.rs` újraelemzi a módosított részt, és összeveti, amit mutat, azzal, amit begépeltek; a módosítást, amely nem áll meg, tovább védőkarakterezi vagy elutasítja.
-7. A comrak szövegközi pozíciói néhány helyen hibásak, például egy linkhivatkozás-definíció mögött. A `markdown/reader/positions.rs` egy blokk olvasásakor összeveti őket a forráskóddal, és ahol nem illeszkednek, újra beolvassa őket a forráskódból.
+7. A comrak szövegközi pozíciói néhány helyen hibásak, például egy linkhivatkozás-definíció mögött. A `reader/positions.rs` egy blokk olvasásakor összeveti őket a forráskóddal, és ahol nem illeszkednek, újra beolvassa őket a forráskódból.
 
 ### Szabályok a vezérlőben
 
@@ -704,16 +710,18 @@ A bal oldali szövegnézet forráskódja az egyetlen igazságforrás.
 3. A kívülről érkező üzenetek (egy kép betöltődött, egy képlet megjelent) késleltetve, a `renders_arrived` és az `image_arrived` útján érkeznek, soha nem egy frissítés közepén.
 4. Szövegmódosítás nélküli újrarajzolás csak az `invalidate(reason)` útján történik.
 5. A szövegmásolat nincs megtartva a forráskód módosításán át, különben a módosítás az egész szöveget lemásolja: a `with_text` csak egy `Send` lezárás idejére adja kölcsön.
-6. Egy új parancshoz bejegyzés kell az `actions.rs` fájlban, metódus a `mod.rs` fájlban és ág az `Editing::perform` függvényben.
+6. Egy új parancshoz bejegyzés kell az `actions.rs` fájlban, metódus a `controller.rs` fájlban és ág az `Editing::perform` függvényben.
 7. Minden `unsafe` blokk `// SAFETY:` megjegyzésként hordozza az indoklását. A bájtok a rendszer képdekódolóihoz csak a segédfolyamatban jutnak el, a `decoder::decode_native` útján; egy teszt átvizsgálja a forrásokat más hívásokért.
 8. A főszálon semmi nem vár a felhasználó mappáira, mert egy hálózati kötet leállhat a válaszadással: a fájlokat a `DISK` szál vizsgálja, az előnézet pedig az `Env::known` útján olvassa a válaszokat. Csak olyan művelet érintheti közvetlenül a lemezt, amelyre a felhasználó vár, például egy export vagy a mentés.
+9. Aminek véget kell érnie, az egy panic után is véget ér, mivel a főszál túléli azt: egy felemelt jelző a `with_raised` függvényen, a szövegtároló szerkesztése az `editing` függvényen, az pedig, amiről a visszavonásnak nem kell tudnia, a `without_undo` függvényen megy át. Egy teszt megtalálja az ilyen kézzel írt eseteket.
+10. Egy dokumentumban lévő címnek egyetlen olvasata van, a `splat_markdown::url` modulban; egy teszt megtalálja a kézzel összehasonlított sémákat.
 
 ### Parancs hozzáadása
 
 A menüsor, az eszközsor és a helyi menü is az [src/editor/actions.rs](../../../src/editor/actions.rs) nyilvántartásából építi az elemeit, és a menüérvényesítés ott olvassa, mikor alkalmazható egy parancs, és mutat-e pipát. Egy új parancshoz kell:
 
 1. az `Action` egy változata a hozzá tartozó `Spec` típussal: szelektor, cím, eszközsorfelirat, buboréksúgó (igével kezdve, legfeljebb 75 karakter), billentyűparancs, SF Symbol és hogy mikor alkalmazható
-2. a metódus az `src/editor/mod.rs` fájlban
+2. a metódus az `src/editor/controller.rs` fájlban
 3. egy ág az `Editing::perform` függvényben
 4. a szövegei minden `Localizable.strings` fájlban
 
@@ -735,7 +743,7 @@ Az `assets/readme/<language>/` ezt a README-t tartalmazza az adott nyelven, a k�
 
 | Összetevő | Verzió | Mire szolgál | Licenc |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown-elemző | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 [egy módosított sorral](../../../vendor/comrak/PATCH.md) | Markdown-elemző | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C futtatókörnyezet, Foundation, blokkok | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit-, WebKit- és Grand Central Dispatch-kötések | Zlib, Apache-2.0 vagy MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | képletek és SVG-képek vektoros PDF-ként | MIT vagy Apache-2.0 |

@@ -1,0 +1,2 @@
+a pane can open and close with the source scrolled off its selection
+the source re-wraps while the window is resized

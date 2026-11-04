@@ -1,5 +1,6 @@
 use std::path::Path;
-use std::time::SystemTime;
+
+use splat_file_state::Stamp;
 
 /// The bytes of a regular file of at most `limit` bytes. A path from a document may name anything: a device has no end,
 /// and opening a named pipe blocks until someone writes to it.
@@ -17,9 +18,6 @@ pub fn read_regular_file(path: &Path, limit: u64) -> Option<Vec<u8>> {
         .ok()?;
     (bytes.len() as u64 <= limit).then_some(bytes)
 }
-
-/// Modification time and size of a file; `None` when it cannot be reached.
-pub type Stamp = Option<(SystemTime, u64)>;
 
 pub fn stamp(path: &Path) -> Stamp {
     let meta = std::fs::metadata(path).ok()?;

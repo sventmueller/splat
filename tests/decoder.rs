@@ -4,6 +4,11 @@
 use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
 
+/// A helper that hangs on a blocking pipe would otherwise hang the whole test run.
+fn limited() -> splat_testkit::TimeLimit {
+    splat_testkit::time_limit(std::time::Duration::from_secs(60))
+}
+
 fn helper() -> Child {
     Command::new(env!("CARGO_BIN_EXE_splat"))
         .arg("--splat-decoder")
@@ -53,6 +58,7 @@ fn image(side: u32, bytes: &[u8]) -> Vec<u8> {
 
 #[test]
 fn images_decode_to_pixels_and_svgs_to_pdf() {
+    let _limit = limited();
     let mut child = helper();
     send(&mut child, 1, &image(2560, &bmp()));
     let head = read(&mut child, 17);
@@ -82,6 +88,7 @@ fn images_decode_to_pixels_and_svgs_to_pdf() {
 /// MathJax leaves characters outside its fonts as text, and only the system fonts have glyphs for them.
 #[test]
 fn text_in_a_formula_reaches_the_pdf_as_outlines_in_every_script() {
+    let _limit = limited();
     const FORMULA_SVG: u8 = 2;
     let mut child = helper();
     let mut pdf = |text: &str| {
@@ -122,6 +129,7 @@ unsafe extern "C" {
 
 #[test]
 fn the_helper_can_neither_read_files_nor_connect() {
+    let _limit = limited();
     const F_SETFD: i32 = 2;
     let path = std::env::temp_dir().join(format!("splat-secret-{}", std::process::id()));
     std::fs::write(&path, "secret").unwrap();
@@ -170,6 +178,7 @@ fn pixels_of(child: &mut Child, bytes: &[u8], side: u32) -> Option<Picture> {
 /// without any of it having been read yet.
 #[test]
 fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
+    let _limit = limited();
     let mut child = native_helper();
     for (name, bytes) in [
         ("TIFF", include_bytes!("../src/editor/warmup/sample.tiff").as_slice()),
@@ -189,6 +198,7 @@ fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
 /// A pasted TIFF becomes a PNG of the full size, which pixels drawn for the preview would not be.
 #[test]
 fn a_pasted_tiff_becomes_a_png_inside_the_sandbox() {
+    let _limit = limited();
     const PASTED_TIFF: u8 = 5;
     let tiff = include_bytes!("../src/editor/warmup/sample.tiff").as_slice();
     let mut child = native_helper();
@@ -207,6 +217,7 @@ fn a_pasted_tiff_becomes_a_png_inside_the_sandbox() {
 /// A PDF has no pixels of its own, so it is drawn sharp, within what was asked for and as large as it says it is.
 #[test]
 fn a_vector_picture_is_drawn_at_four_pixels_per_point_within_the_limit() {
+    let _limit = limited();
     let mut child = native_helper();
     let pdf = include_bytes!("../src/editor/warmup/sample.pdf");
     let (w, h, natural, _) = pixels_of(&mut child, pdf, 2560).unwrap();
@@ -222,6 +233,7 @@ fn a_vector_picture_is_drawn_at_four_pixels_per_point_within_the_limit() {
 /// Half transparent colours arrive with straight alpha, as all pixels from a helper do.
 #[test]
 fn colours_come_apart_from_their_alpha() {
+    let _limit = limited();
     let mut child = native_helper();
     let tiff = include_bytes!("../src/editor/warmup/sample.tiff");
     let (.., pixels) = pixels_of(&mut child, tiff, 2560).unwrap();
@@ -233,6 +245,7 @@ fn colours_come_apart_from_their_alpha() {
 /// The sandbox of this helper is wider than the other's by what the system's decoders need, and by nothing else.
 #[test]
 fn the_helper_for_the_system_decoders_reads_no_files_and_opens_no_connections() {
+    let _limit = limited();
     const SELF_CHECK: u8 = 3;
     let secret = std::env::temp_dir().join(format!("splat-native-secret-{}", std::process::id()));
     std::fs::write(&secret, "secret").unwrap();

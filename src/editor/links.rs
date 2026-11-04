@@ -161,9 +161,57 @@ pub fn percent_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
+/// Relative path from `dir` to `target`, falling back to the absolute path.
+pub(super) fn relative_path(dir: Option<&Path>, target: &Path) -> String {
+    let Some(dir) = dir else {
+        return target.to_string_lossy().into_owned();
+    };
+    let from: Vec<_> = dir.components().collect();
+    let to: Vec<_> = target.components().collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    if common <= 1 {
+        return target.to_string_lossy().into_owned();
+    }
+    let mut out = PathBuf::new();
+    for _ in common..from.len() {
+        out.push("..");
+    }
+    for c in &to[common..] {
+        out.push(c);
+    }
+    out.to_string_lossy().into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paths_with_only_the_root_in_common_stay_absolute() {
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/c/d.png")),
+            "/c/d.png"
+        );
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/a/d.png")),
+            "../d.png"
+        );
+        assert_eq!(relative_path(Some(Path::new("/a")), Path::new("/a/b/d.png")), "b/d.png");
+        assert_eq!(relative_path(None, Path::new("/a/d.png")), "/a/d.png");
+    }
+
+    #[test]
+    fn relative_paths() {
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/a/b/img/x.png")),
+            "img/x.png"
+        );
+        assert_eq!(
+            relative_path(Some(Path::new("/a/b")), Path::new("/a/c/x.png")),
+            "../c/x.png"
+        );
+        assert_eq!(relative_path(None, Path::new("/a/x.png")), "/a/x.png");
+    }
 
     #[test]
     fn only_web_links_open_directly() {

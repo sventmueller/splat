@@ -1,0 +1,10 @@
+a cancelled composition does not leave the preview waiting for its edit
+a last save writes all that was typed
+every Command-S on unsaved text starts a save
+text no file holds shows as unsaved after every key
+the app is in front for the keys
+the caret mirrors to the source after a cancelled composition
+the file was written while typing went on
+what is typed stays through every save
+what is typed through saves can still be undone
+what was undone comes back

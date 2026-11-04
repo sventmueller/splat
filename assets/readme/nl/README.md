@@ -134,7 +134,7 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 - **Door en door native.** Echte AppKit-vensters, tabbladen, menu's, pop-overs, Versies, automatisch bewaren, het
   deelmenu, donkere modus, spellingcontrole, dicteren en VoiceOver. Geen Electron en geen webweergave voor de tekst
   zelf.
-- **Snel met grote bestanden.** Het renderen van een toetsaanslag in een document van 10 MB kost ongeveer 25 ms, vóór het eigen werk van de weergave.
+- **Snel met grote bestanden.** Het renderen van een toetsaanslag in een document van 10 MB kost ongeveer 10 ms, vóór het eigen werk van de weergave.
 - **Privé en zorgvuldig.** Afbeeldingen van internet laden pas nadat je dat toestaat, links naar andere apps vragen
   eerst om bevestiging en alles wat onbetrouwbare afbeeldingsdata decodeert, draait in hulpprocessen in een sandbox.
 - **In jouw taal.** De interface en de ingebouwde beknopte Markdown-naslag zijn er in 35 talen: Arabisch, Catalaans,
@@ -641,8 +641,9 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
   punt, tot 2560 langs de langste zijde.
 - **Lokale bestanden** bereiken een document alleen via het pad dat het noemt. Insluitingen tonen Markdown-notities uit
   de map van het document en daaronder, en een ontbrekende afbeelding wordt alleen daar gezocht. Een afbeeldingspad
-  elders, absoluut of beginnend met `~`, laadt nog steeds, en HTML- en Word-exports sluiten haar in: bekijk de export van
-  een document dat je niet zelf hebt geschreven voordat je het doorgeeft.
+  elders, absoluut of beginnend met `~`, laadt in de voorvertoning nog steeds; HTML- en Word-exports, afdrukken en pdf's
+  nemen alleen mee wat in de map van het document of in zijn Git-repository staat, tenzij die repository ook je thuismap
+  bevat, zodat een document van iemand anders je bestanden niet in een export kan trekken die je doorgeeft.
 - **Kopieën van niet-bewaarde tekst** blijven op deze Mac, in je map Library, voor het herstel na een crash. Ze
   verdwijnen bij het bewaren of het normaal afsluiten van Splat; de kopieën die een crash heeft achtergelaten, blijven in
   de herstelmap staan totdat je ze verwijdert.
@@ -661,8 +662,8 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
 
 - De bron gebruikt TextKit 2, dat alleen het zichtbare deel opmaakt.
 - Tijdens het typen in de voorvertoning, en in de bron van documenten tot 2 MB, worden alleen de betrokken alinea's
-  opnieuw geparseerd, gekleurd en opgemaakt. In een document van 10 MB kosten parseren en kleuren ongeveer 20 ms,
-  renderen ongeveer 25 ms en een hele toetsaanslag in de voorvertoning ongeveer 60 ms, met het eigen werk van de
+  opnieuw geparseerd, gekleurd en opgemaakt. In een document van 10 MB kosten parseren en kleuren ongeveer 3 ms,
+  renderen ongeveer 10 ms en een hele toetsaanslag in de voorvertoning ongeveer 30 ms, met het eigen werk van de
   weergave.
 - Grote voorvertoningen geven eerst het zichtbare deel weer en de rest zodra de app niets te doen heeft. Blokken die in
   beeld scrollen, worden weergegeven voordat ze worden getekend.
@@ -672,10 +673,13 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
   voorvertoning zegt waarom ze leeg blijft. Exports werken nog steeds.
 - Vanaf ongeveer 200 KB opent een document zijn venster voordat het is geparseerd; bij 5 MB volgen de kleuren en de
   voorvertoning ongeveer een kwart seconde later.
+- Alle afbeeldingen samen, inclusief formules en diagrammen, nemen hoogstens een kwart van het geheugen van de Mac in,
+  en de helft daarvan zolang het geheugen krap is. Daarboven verschijnen verdere afbeeldingen als tijdelijke
+  aanduidingen totdat er weer ruimte is.
 
 Sommige wijzigingen worden volledig verwerkt, met ongeveer 300 ms per toetsaanslag bij 10 MB: die aan de definitie of
 de verwijzingen van een voetnoot, naast een inline voetnoot, helemaal aan het eind van een document naast een voetnoot, aan de
-front matter of vlak bij definities van linkverwijzingen, en elke wijziging in een document met `%%`-opmerkingsblokken of met een
+front matter of aan definities van linkverwijzingen, en elke wijziging in een document met `%%`-opmerkingsblokken of met een
 tweemaal gedefinieerde voetnoot of een voetnoot binnen een citaat of lijst. Het geheugen groeit met het bestand, tot ongeveer 115–160 MB voor 1 MB Markdown en 340–510 MB voor 10 MB.
 
 ## Bekende beperkingen
@@ -750,6 +754,7 @@ make check                  # opmaak, clippy zonder waarschuwingen, alle tests, 
 make test                   # make check, daarna de zelftest zonder venster
 make test-gui               # zelftests met een venster; ze houden de Mac ongeveer vier minuten bezet
 make test-long              # langer willekeurig zoeken en de gedeeltelijke-update-controle met 10 MB
+make fuzz                   # willekeurige invoer voor de gedeeltelijke parse en alle uitvoer
 make coverage               # regeldekking van alle tests en zelftests, met een ondergrens per module
 make coverage-library       # dezelfde ondergrenzen voor de modules zonder venster, zoals in CI
 make bench FILE=<file.md>   # tijden voor openen, typen en scrollen in een groot bestand
@@ -831,25 +836,36 @@ maptoestemmingen bij.
 | `cargo xtask check-library` | de bibliotheek bouwt voor Linux, dus niets erin heeft macOS nodig |
 | `cargo xtask vendor check` | de JavaScript-bibliotheken komen byte voor byte overeen met `vendor.lock` |
 | `cargo xtask selftest probe` | zonder venster, elk met zijn verwachte resultaat: formules, diagrammen, webafbeeldingen tegen een server binnen het proces, geblokkeerde adressen, de tekst die elke opdracht schrijft, elk afbeeldingsformaat via beide exports, een pagina die niet meer antwoordt en de verdediging van de webweergaven tegen een pagina zonder die verdediging. Duurt ongeveer een halve minuut. Wat de app op het scherm nodig heeft, wordt bij een vergrendeld scherm overgeslagen |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | de draaiende app, klik voor klik. Opent een venster en typt erin; de Mac is ongeveer vier minuten bezet. `--scenarios` draait alleen het tweede deel, in ongeveer anderhalve minuut |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | de draaiende app, klik voor klik. Opent een venster en typt erin; de Mac is ongeveer vier minuten bezet. `--scenarios` draait alleen het tweede deel, in ongeveer anderhalve minuut. `--only` draait één groep van dat deel, in een eigen document, ook bij een vergrendeld scherm. `--in-back` laat weg wat de app vooraan nodig heeft; zonder dat faalt zo’n controle |
 | `cargo xtask selftest resize` | maakt het venster breder na het verplaatsen van de scheiding: de bron breekt opnieuw af terwijl het venster van grootte verandert. Duurt ongeveer tien seconden |
-| `cargo xtask selftest bench <file.md>` | tijden voor openen, typen en scrollen in een groot bestand |
+| `cargo xtask selftest typing [--by-hand]` | typt door bewaarmomenten heen, met toetsen via de gebeurtenissenwachtrij van de app of, met `--by-hand`, met de hand: wat getypt is blijft staan en geldt als niet bewaard. Duurt ongeveer een minuut |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | tijden voor openen, typen en scrollen in een groot bestand; `--keystroke-ms` faalt als de snelste toetsaanslag langer duurt |
 | `cargo test --release -- --ignored partial_updates` | een toetsaanslag in 10 MB: gedeeltelijke tegen volledige update, hetzelfde resultaat in hooguit een kwart van de tijd |
 | `cargo test --release --test hostile` | documenten die een stackoverflow of kwadratische rekentijd uitlokken, elk in twee groottes waarvan de tijden net zo moeten groeien als de tekst, via parseren, opmaak, beide exports, toetsaanslagen en opdrachten |
-| `make mutants` | fouten die één voor één in `src/markdown/` en `src/preview/` worden ingebouwd, via [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); zegt welke geen enkele test opmerkt. Duurt uren; `FILE=src/preview/bridge.rs` beperkt het |
+| `make mutants` | fouten die één voor één in `crates/splat-markdown`, `crates/splat-preview` en `crates/splat-file-state` worden ingebouwd, via [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); zegt welke geen enkele test opmerkt. Duurt uren; `FILE=crates/splat-preview/src/bridge/mod.rs` beperkt het |
+| `make fuzz` | willekeurige invoer via [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), dat de nightly van rustup nodig heeft: toetsaanslagen die als een volledige parse moeten lezen, alle uitvoer, bewerkingen in de voorvertoning, elke opdracht en een bestand dat bewaard wordt zoals het geopend is. `SECONDS=600` zoekt langer |
+| `cargo test --release --test fuzz_seeds` | de seeds in `fuzz/seeds/` door de controles van die fuzz-doelen, zonder fuzzer; onderdeel van elke `cargo test` |
+| `cargo test --profile checked --workspace` | de tests met wat een debug-build daarbovenop controleert: na elke gedeeltelijke parse passen de blokken bij hun tekst, en wat ze meeneemt is wat de tekst zegt. Onderdeel van `make test-long` |
+| `cargo test --release --test entry_points --test structure` | uit de broncode: alles wat het systeem aanroept is beschermd tegen panics, en modules hangen alleen naar beneden af |
 | `cargo test --release --test decoder` | het decoderproces decodeert afbeeldingen en bereikt noch bestanden noch het netwerk |
 | `make coverage` | regeldekking van `cargo test` en alle zelftests, via [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); mislukt onder de ondergrenzen. Houdt de Mac ongeveer vijf minuten bezet |
-| `make coverage-library` | `src/markdown/`, `src/preview/` en `i18n.rs` tegen hun hogere ondergrenzen, alleen gemeten door `cargo test` |
+| `make coverage-library` | de crates `splat-markdown`, `splat-preview`, `splat-file-state` en `splat-i18n` tegen hun hogere ondergrenzen, alleen gemeten door `cargo test` |
 
-Unittests staan naast de code die ze testen. `tests/` bevat wat de bibliotheek van buitenaf bereikt: de willekeurige tests
-in `robustness.rs`, die de generator in `src/fuzz.rs` delen met die van `sync.rs`, de documenten die schade moeten aanrichten in
-`hostile.rs` en de decodertest, die het gebouwde programma start. Beslissingen in `src/editor/` die geen venster nodig hebben, staan in losse functies met eigen
+Unittests staan naast de code die ze testen. `crates/splat-testkit/tests/` bevat wat het model en de voorvertoning van
+buitenaf bereikt: de willekeurige tests in `robustness.rs`, die de generator van `splat-testkit` delen met die van
+`sync.rs`, de documenten die schade moeten aanrichten in `hostile.rs` en de seeds van de fuzz-doelen in `fuzz_seeds.rs`.
+`tests/` bevat wat naar het hele programma kijkt: de broncode, de vertalingen en de decodertest, die het gebouwde
+programma start. Beslissingen in `src/editor/` die geen venster nodig hebben, staan in losse functies met eigen
 tests: alles wat de controller weet en hoe dat verandert in `state.rs`, de regels van het weergeven in `render_queue.rs`, de tekstkopie in `sync.rs`, alinea-stijlen, lettertypen en kleuren als waarden in `render.rs`, waar de ID's van de knoppenbalk voor staan in `toolbar.rs`, wat een linkklik betekent in `navigation.rs`.
 
 Een stap van de venster-zelftest wacht op een benoemde voorwaarde, niet op een tijd; alleen wat geen signaal geeft, zoals de afwezigheid van iets, houdt een pauze met haar reden. Vergeefs wachten is een mislukte controle die benoemt wat nooit kwam, een stap die panic veroorzaakt is ook een mislukte controle, en de run gaat in beide gevallen door. Een controle die in deze run niets kan zeggen, meldt `SELFTEST SKIP`: xtask somt ze op, en ze slaagt noch mislukt. xtask houdt elke modus, en `--scenarios` apart, aan ongeveer negen tiende van zijn controles. De venster-zelftest
 draait na zijn hoofdklikreeks een tweede deel, in `src/editor/selftest/scenarios.rs`: elke opmaak- en
-tabelopdracht, de dialogen, linkklikken, plakken, neerzetten, exports, een grote wijziging, afbeeldingen die op schijf
-veranderen, geheugendruk, een enorm document en het herstel na een crash.
+tabelopdracht, de dialogen, linkklikken, plakken, neerzetten, exports, een bestand dat een ander programma heeft
+gewijzigd, een grote wijziging, afbeeldingen die op schijf
+veranderen, geheugendruk, een enorm document en het herstel na een crash. Elke groep daarvan opent een eigen document,
+zodat een fout in de ene de volgende niet bereikt, en elke groep kan los draaien met `--only`. De zelftest zonder
+venster maakt bovendien het bewaren met opzet stuk: een map die niets aanneemt, een alleen-lezenbestand, een map die
+verdwenen is, een volle schijf en een panic in elke callback van een bewaaractie, en niets daarvan mag tekst kosten.
 
 Dekking kent twee ondergrenzen: elke module minstens 84 % van zijn regels, alle modules samen minstens 96 %. `make coverage`
 meet `cargo test` samen met de zelftests en mislukt onder een van beide; `make coverage-library` houdt wat geen venster nodig heeft aan 90 % en 97 %. De ondergrenzen en de weinige uitzonderingen, zoals
@@ -868,21 +884,26 @@ ongemoeid.
 
 ### Projectindeling
 
-`src/lib.rs` maakt van alles wat geen venster nodig heeft een eigen bibliotheek, `splat`: `markdown/`, `preview/`,
-`i18n.rs` en de testgenerator `fuzz.rs`. Ze bouwt zonder macOS. De app in `src/main.rs` bouwt erop voort.
+Alles wat geen venster nodig heeft is een eigen crate onder `crates/`, die zonder macOS bouwt, zodat de compiler zich
+houdt aan de manier waarop ze van elkaar afhangen. De app in `src/` (pakket `splat-app`, programma `splat`) bouwt erop
+voort.
 
-- `src/markdown/`: de boom die elke afnemer leest, `Doc` in `doc/`, die zijn eigen tekst bezit, en de enige koppeling met de parser in `reader/`: comrak wordt nergens anders genoemd, en `reader/assumptions.rs` bevat wat de code over comrak aanneemt. Syntaxiskleuren, en alle opdrachten als zuivere tekstbewerkingen (`Edit`) in `commands/`. Ook
+- `crates/splat-markdown/`: de boom die elke afnemer leest, `Doc` in `doc/`, die zijn eigen tekst bezit, en de enige koppeling met de parser in `reader/`: comrak wordt nergens anders genoemd, en `reader/assumptions.rs` bevat wat de code over comrak aanneemt. Syntaxiskleuren, en alle opdrachten als zuivere tekstbewerkingen (`Edit`) in `commands/`. Ook
   het opnieuw parseren na een bewerking (`incremental.rs`), de lezer voor ingebedde HTML (`markup.rs`), typografie, tags,
   verwijzingen en citaten in lopende tekst (`typography.rs`), hoe tekst eruitziet en welke Markdown en HTML dat bewerkstelligen
   (`style.rs`), wat een adres mag zijn (`url.rs`) en de HTML- en Word-export (`html.rs`, `docx.rs` met `docx/html.rs`
-  en `docx/xml.rs`). Een positie heeft een eigen type: `Byte` in de brontekst, `U16` in de bronweergave, `Shown` in de voorvertoningsweergave (`text.rs`). Geen AppKit.
-- `src/preview/`: de opmaak van de voorvertoning in `layout/`, met ingebedde HTML in `layout/html.rs`, en de afbeelding tussen voorvertoning en bron (`Bridge`, `Index`). Een `Bridge` weigert een opmaak van een andere versie van de `Doc`. Geen AppKit.
+  en `docx/xml.rs`). Een positie heeft een eigen type: `Byte` in de brontekst, `U16` in de bronweergave, `Shown` in de voorvertoningsweergave (`text.rs`).
+- `crates/splat-preview/`: de opmaak van de voorvertoning in `layout/`, met ingebedde HTML in `layout/html.rs`, en de afbeelding tussen voorvertoning en bron (`Bridge`, `Index`). Een `Bridge` weigert een opmaak van een andere versie van de `Doc`.
+- `crates/splat-file-state/`: welke tekst een bestand bevat, in welke indeling en wat een blik erop betekent.
+- `crates/splat-i18n/` met `resources/*.lproj`: 35 talen; de sleutels zijn de Duitse teksten, en de app installeert bij het starten de tabel van de interfacetaal.
+- `crates/splat-testkit/`: de generator van de willekeurige tests en de controles van de fuzz-doelen.
 - `src/editor/`: het venster. Eén `EditorController`-object bedient AppKit als delegate van beide weergaven en stuurt door naar componenten, kleine structs boven de controller en de toestand die ze bezitten, waarvan de andere modules de velden niet kunnen bereiken:
 
 | Module | Verantwoordelijkheid |
 |---|---|
-| `mod.rs` | klasse, delegate-methoden die doorsturen, `invalidate` |
+| `controller.rs` | klasse, delegate-methoden die doorsturen, `invalidate` en wat de rest van het programma een editor vertelt; alleen dit bereikt de componenten |
 | `panes.rs` | `Panes`: de tekstweergaven, de structuur, deelvensters tonen en verbergen, en wat toegang tot de weergaven geeft |
+| `controller/layers.rs` | wie wie mag bereiken: een component krijgt een handvat van de controller dat biedt wat eronder ligt, en de compiler houdt zich daaraan |
 | `state.rs` | wat de controller over het document weet en elke manier waarop dat verandert; de velden zijn privé en het raakt geen weergave aan |
 | `model.rs` | leent de toestand en de tekstkopie uit aan closures die geen weergave kunnen bereiken |
 | `actions.rs` | opdrachtenregister: selector, titel, toetscombinatie, symbool, wanneer de opdracht geldt |
@@ -894,18 +915,17 @@ ongemoeid.
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: de formule- en diagrameditor |
 | `navigation.rs`, `links.rs` | `Links`: links, wikilinks, tags, takenvakjes, vouwen, voetnoten |
 | `env.rs` | wat de voorvertoning van buiten de tekst leest: typografische leestekens, de repository voor `@name` en `#12`, het BibTeX-bestand, ingesloten notities |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | voorvertoningstekst, lokale en externe afbeeldingen; `Pictures` in `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | voorvertoningstekst, lokale en externe afbeeldingen; `Pictures` in `images.rs` |
 | `attributes.rs` | tekstattributen; elke sleutel krijgt alleen een waarde van het type dat hij verwacht |
 | `shadow.rs` | kopieën van niet-bewaarde tekst voor het herstel na een crash |
 | `decoder.rs` | hulpprocessen in een sandbox die afbeeldingen en grafische data decoderen |
 | `export.rs`, `outline.rs` | `Sharing`: HTML- en Word-export, het deelbestand, afdrukken; de structuurzijbalk |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit voor MathJax, Mermaid, Graphviz, PlantUML en de visuele formule-editor; de regels van wat wanneer wordt weergegeven, los van WebKit |
 | `webkit.rs` | aanroepen naar WebKit; alleen de levensduur van de navigatiedelegate blijft bij `js.rs` en `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | het venster opbouwen, knoppenbalk, tekstweergaven, dialogen, kleuren |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | het venster opbouwen, knoppenbalk, tekstweergaven, dialogen, kleuren |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menubalk, app-delegate, document (`MDDocument`, een subklasse van
   `NSDocument`).
-- `src/i18n.rs` met `resources/*.lproj`: 35 talen; de sleutels zijn de Duitse teksten, en de app installeert bij het starten de tabel van de interfacetaal.
 - `src/util/`: werkthreads (`lanes.rs`), volumes die kunnen ophouden te antwoorden (`volumes.rs`), AppKit-hulpjes, bestanden en processen. `src/diag.rs`: wat buiten het zicht van de gebruiker misgaat, gaat naar het systeemlogboek, zonder enige tekst van een document.
 - `src/large_alloc.rs`: grote toewijzingen komen rechtstreeks van de kernel en gaan er bij vrijgave naar terug, zodat het geheugen
   na grote bewerkingen terugkeert.
@@ -920,7 +940,10 @@ De brontekst in de tekstweergave links is de enige bron van waarheid.
 2. Een update parseert de kopie, kleurt de bron alleen opnieuw waar kleuren zijn veranderd, maakt de voorvertoning op en
    vervangt alleen de blokken waarvan de inhoud is veranderd.
 3. Na een bewerking worden alleen de betrokken alinea's opnieuw geparseerd, gekleurd en opgemaakt, zolang hun buren
-   gelijk blijven; `reparse_part_and_color` zegt wanneer dat niet zo is. Documenten met `%%`-opmerkingsblokken, wijzigingen aan de front matter en, in een document met definities van linkverwijzingen, wijzigingen aan een deel met een vierkante haak worden volledig verwerkt. comrak herkent een voetnootverwijzing
+   gelijk blijven; [docs/partial-parse.md](../../../docs/partial-parse.md) zegt waarom dat hetzelfde oplevert als een
+   volledige parse, en waar je naar moet kijken als comrak verandert. Documenten met `%%`-opmerkingsblokken, wijzigingen
+   aan de front matter en, in een document met definities van linkverwijzingen, wijzigingen aan een deel met een
+   vierkante haak worden volledig verwerkt. comrak herkent een voetnootverwijzing
    alleen met haar definitie in dezelfde parse en verplaatst definities achter de tekst, dus het deel wordt geparseerd
    met een vervangende definitie per label en neemt zijn nummers uit de oude boom; een wijziging aan de verwijzingen of
    definities in het deel, of naast een inline voetnoot, wordt volledig verwerkt.
@@ -932,7 +955,7 @@ De brontekst in de tekstweergave links is de enige bron van waarheid.
 6. Invoer in de voorvertoning wordt door `Bridge` vertaald naar een bewerking van de bron en volgt vanaf daar hetzelfde pad.
    Markdown kent te veel manieren om tekst in syntaxis te veranderen voor regels alleen, dus `preview/verify.rs` parseert het gewijzigde deel
    opnieuw en vergelijkt wat het toont met wat is getypt; een bewerking die niet standhoudt, wordt verder ge-escaped of geweigerd.
-7. De inline posities van comrak kloppen op een paar plekken niet, bijvoorbeeld achter een definitie van een linkverwijzing. `markdown/reader/positions.rs`
+7. De inline posities van comrak kloppen op een paar plekken niet, bijvoorbeeld achter een definitie van een linkverwijzing. `reader/positions.rs`
    controleert ze bij het lezen van een blok tegen de bron en leest ze opnieuw uit de bron waar ze niet passen.
 
 ### Regels in de controller
@@ -943,11 +966,16 @@ De brontekst in de tekstweergave links is de enige bron van waarheid.
    midden in een update.
 4. Opnieuw tekenen zonder tekstwijziging loopt alleen via `invalidate(reason)`.
 5. De tekstkopie wordt niet vastgehouden over een wijziging van de bron heen, anders kopieert die wijziging de hele tekst: `with_text` leent haar alleen uit voor de duur van een `Send`-closure.
-6. Een nieuwe opdracht vraagt een item in `actions.rs`, een methode in `mod.rs` en een tak in `Editing::perform`.
+6. Een nieuwe opdracht vraagt een item in `actions.rs`, een methode in `controller.rs` en een tak in `Editing::perform`.
 7. Elk `unsafe`-blok draagt zijn verantwoording als `// SAFETY:`-commentaar. Bytes bereiken de afbeeldingsdecoders van het systeem alleen in het hulpproces, via `decoder::decode_native`; een test doorzoekt de bronnen op andere aanroepen.
 8. Niets op de hoofdthread wacht op de mappen van de gebruiker, omdat een netwerkvolume kan ophouden te antwoorden: bestanden worden
    bekeken op de thread `DISK` en de voorvertoning leest de antwoorden via `Env::known`. Alleen een actie waarop de gebruiker
    wacht, zoals een export of bewaren, mag de schijf rechtstreeks aanraken.
+9. Wat moet eindigen, eindigt ook na een panic, want de hoofdthread overleeft er een: een gehesen vlag loopt via
+   `with_raised`, een bewerking van de tekstopslag via `editing`, en wat ongedaan maken niet mag weten via
+   `without_undo`. Een test vindt wat daarvan met de hand is geschreven.
+10. Een adres in een document heeft één lezing, in `splat_markdown::url`; een test vindt schema's die met de hand worden
+    vergeleken.
 
 ### Een opdracht toevoegen
 
@@ -957,7 +985,7 @@ een vinkje toont. Een nieuwe opdracht vraagt:
 
 1. een variant van `Action` met zijn `Spec`: selector, titel, label voor de knoppenbalk, tooltip (beginnend met een werkwoord, hooguit 75
    tekens), toetscombinatie, SF Symbol en wanneer ze geldt
-2. de methode in `src/editor/mod.rs`
+2. de methode in `src/editor/controller.rs`
 3. een tak in `Editing::perform`
 4. de teksten ervan in elke `Localizable.strings`
 
@@ -984,7 +1012,7 @@ toont. Een wijziging in deze README hoort ook in die kopieën.
 
 | Component | Versie | Gebruikt voor | Licentie |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown-parser | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 met [één gewijzigde regel](../../../vendor/comrak/PATCH.md) | Markdown-parser | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C-runtime, Foundation, blocks | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | koppelingen voor AppKit, WebKit en Grand Central Dispatch | Zlib, Apache-2.0 of MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formules en SVG-afbeeldingen als vector-pdf | MIT of Apache-2.0 |

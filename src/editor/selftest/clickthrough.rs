@@ -65,7 +65,7 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
             check(
                 "return creates a paragraph",
                 s.starts_with("# Markdown-Kurzreferenz X\n\nNeuer Absatz"),
-                &head(&s, 60),
+                &format!("{:?}, typed at byte {:?}", head(&s, 60), s.find("Neuer Absatz")),
             );
         }),
         applied(|c| {
@@ -916,7 +916,7 @@ pub(super) fn building_block_steps() -> Vec<Step> {
                 &view.string().to_string(),
             );
             view.setSelectedRange(NSRange::new(0, 0));
-            let jumped = e.atom_editor().tab(false);
+            let jumped = e.atom_editor().tab(crate::markdown::text::Direction::Forward);
             let sel = view.selectedRange();
             check(
                 "tab selects the next placeholder",
@@ -1088,10 +1088,6 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
                 let e = &c.e;
                 let s = source(e);
                 set_source_caret(e, s.find("## Tabellen").unwrap_or(0));
-                let path = std::env::var("SPLAT_SELFTEST_FILE").unwrap_or_default();
-                let on_disk = std::fs::read_to_string(&path).unwrap_or_default();
-                // Written without file coordination, as Git or a shell would.
-                let _ = std::fs::write(&path, format!("{on_disk}\nVon außen geändert\n"));
             },
         ),
     ]
@@ -1106,6 +1102,12 @@ const PANES_STILL: &str = "the panes to stop moving";
 
 pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
     vec![
+        applied(|_| {
+            let path = std::env::var("SPLAT_SELFTEST_FILE").unwrap_or_default();
+            let on_disk = std::fs::read_to_string(&path).unwrap_or_default();
+            // Written without file coordination, as Git or a shell would.
+            let _ = std::fs::write(&path, format!("{on_disk}\nVon außen geändert\n"));
+        }),
         when(
             "the file another program changed to reload",
             |c| source(&c.e).contains("Von außen geändert"),
@@ -1149,7 +1151,7 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 c.e.document().is_some_and(|d| !d.isDocumentEdited()),
                 "",
             );
-            c.e.panes().toggle_preview();
+            c.e.toggle_preview();
         }),
         when(
             PANES_STILL,
@@ -1160,7 +1162,7 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 type_in_source(e, "Äußerst übersichtlich: ");
             },
         ),
-        applied(|c| c.e.panes().toggle_preview()),
+        applied(|c| c.e.toggle_preview()),
         settle(|c| {
             let e = &c.e;
             let preview = storage(e.preview()).string().to_string();
@@ -1169,13 +1171,16 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 preview.starts_with("Äußerst übersichtlich: "),
                 &head(&preview, 40),
             );
+            let spans = e.scroll_sync().scroll_spans();
+            let reach = spans.last().map_or(0, |span| span.source_end());
+            let whole = e.source().string().length();
             check(
                 "scroll positions follow the text typed while the preview was hidden",
-                !e.scroll_sync().scroll_spans().is_empty(),
-                "",
+                reach + 200 > whole && reach <= whole,
+                &format!("up to {reach} of {whole}"),
             );
         }),
-        applied(|c| c.e.panes().toggle_preview()),
+        applied(|c| c.e.toggle_preview()),
         when(
             PANES_STILL,
             |c| !c.e.panes().is_moving(),
@@ -1198,8 +1203,8 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
         applied(|c| {
             let e = &c.e;
             PANES_BEFORE.set((e.panes().preview_visible(), e.panes().outline_visible()));
-            e.panes().toggle_preview();
-            e.panes().toggle_preview();
+            e.toggle_preview();
+            e.toggle_preview();
             e.panes().toggle_outline();
             e.panes().toggle_outline();
         }),
@@ -1213,14 +1218,14 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                     now == PANES_BEFORE.get(),
                     &format!("{:?} -> {now:?}", PANES_BEFORE.get()),
                 );
-                c.e.panes().toggle_preview();
+                c.e.toggle_preview();
             },
         ),
         pause(
             0.05,
             "the second request has to land while the first one's animation runs",
             |c| {
-                c.e.panes().toggle_preview();
+                c.e.toggle_preview();
             },
         ),
         when(

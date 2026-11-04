@@ -13,7 +13,7 @@ use objc2_foundation::{
 };
 
 use super::EditorController;
-use crate::util::constant;
+use crate::util::{constant, guarded};
 
 #[derive(Default)]
 pub struct ViewIvars {
@@ -41,18 +41,22 @@ define_class!(
         fn become_first_responder(&self) -> bool {
             // SAFETY: The superclass's implementation, with this method's signature.
             let accepted: bool = unsafe { msg_send![super(self), becomeFirstResponder] };
-            if accepted && let Some(c) = controller(self.ivars()) {
-                c.selection().source_became_focused();
-            }
+            guarded((), || {
+                if accepted && let Some(c) = controller(self.ivars()) {
+                    c.source_became_focused();
+                }
+            });
             accepted
         }
 
         #[unsafe(method(performDragOperation:))]
         fn perform_drag(&self, sender: &ProtocolObject<dyn NSDraggingInfo>) -> bool {
-            let pasteboard = sender.draggingPasteboard();
-            let point = self.convertPoint_fromView(sender.draggingLocation(), None);
-            let index = self.characterIndexForInsertionAtPoint(point);
-            let handled = controller(self.ivars()).is_some_and(|c| c.editing().handle_source_drop(&pasteboard, index));
+            let handled = guarded(false, || {
+                let pasteboard = sender.draggingPasteboard();
+                let point = self.convertPoint_fromView(sender.draggingLocation(), None);
+                let index = self.characterIndexForInsertionAtPoint(point);
+                controller(self.ivars()).is_some_and(|c| c.handle_source_drop(&pasteboard, index))
+            });
             // SAFETY: The superclass's implementation, with this method's signature.
             handled || unsafe { msg_send![super(self), performDragOperation: sender] }
         }
@@ -60,7 +64,7 @@ define_class!(
         #[unsafe(method(paste:))]
         fn paste(&self, sender: Option<&AnyObject>) {
             let pasteboard = NSPasteboard::generalPasteboard();
-            if controller(self.ivars()).is_some_and(|c| c.editing().paste_image(&pasteboard)) {
+            if guarded(false, || controller(self.ivars()).is_some_and(|c| c.paste_image(&pasteboard))) {
                 return;
             }
             // SAFETY: The superclass's implementation, with this method's signature.
@@ -83,16 +87,18 @@ define_class!(
         fn set_frame_size(&self, size: NSSize) {
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), setFrameSize: size] };
-            // SAFETY: `owner` keeps the container alive; reading it does not switch the view to TextKit 1, unlike its
-            // layout manager.
-            let Some(container) = (unsafe { self.textContainer() }) else {
-                return;
-            };
-            if self.inLiveResize()
-                && let Some(width) = followed_width(size.width, self.textContainerInset().width, container.size().width)
-            {
-                container.setSize(NSSize::new(width, container.size().height));
-            }
+            guarded((), || {
+                // SAFETY: `owner` keeps the container alive; reading it does not switch the view to TextKit 1, unlike its
+                // layout manager.
+                let Some(container) = (unsafe { self.textContainer() }) else {
+                    return;
+                };
+                if self.inLiveResize()
+                    && let Some(width) = followed_width(size.width, self.textContainerInset().width, container.size().width)
+                {
+                    container.setSize(NSSize::new(width, container.size().height));
+                }
+            });
         }
     }
 );
@@ -111,9 +117,11 @@ define_class!(
         fn become_first_responder(&self) -> bool {
             // SAFETY: The superclass's implementation, with this method's signature.
             let accepted: bool = unsafe { msg_send![super(self), becomeFirstResponder] };
-            if accepted && let Some(c) = controller(self.ivars()) {
-                c.selection().preview_became_focused();
-            }
+            guarded((), || {
+                if accepted && let Some(c) = controller(self.ivars()) {
+                    c.preview_became_focused();
+                }
+            });
             accepted
         }
 
@@ -129,7 +137,9 @@ define_class!(
         #[unsafe(method(paste:))]
         fn paste(&self, sender: Option<&AnyObject>) {
             let pasteboard = NSPasteboard::generalPasteboard();
-            if controller(self.ivars()).is_some_and(|c| c.updater().preview_takes_input() && c.editing().paste_image(&pasteboard)) {
+            if guarded(false, || {
+                controller(self.ivars()).is_some_and(|c| c.preview_takes_input() && c.paste_image(&pasteboard))
+            }) {
                 return;
             }
             // SAFETY: The superclass's implementation, with this method's signature.
@@ -143,7 +153,7 @@ define_class!(
 
         #[unsafe(method(draggingEntered:))]
         fn dragging_entered(&self, sender: &ProtocolObject<dyn NSDraggingInfo>) -> NSDragOperation {
-            if !offers_text(&sender.draggingPasteboard()) {
+            if !guarded(false, || offers_text(&sender.draggingPasteboard())) {
                 NSDragOperation::None
             } else {
                 // SAFETY: The superclass's implementation, with this method's signature.
@@ -161,9 +171,11 @@ define_class!(
         fn appearance_changed(&self) {
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), viewDidChangeEffectiveAppearance] };
-            if let Some(c) = controller(self.ivars()) {
-                c.updater().appearance_changed();
-            }
+            guarded((), || {
+                if let Some(c) = controller(self.ivars()) {
+                    c.appearance_changed();
+                }
+            });
         }
     }
 );
@@ -180,12 +192,12 @@ define_class!(
     impl PreviewLayoutManager {
         #[unsafe(method(invalidateDisplayForCharacterRange:))]
         fn invalidate_characters(&self, _range: NSRange) {
-            self.redraw_view();
+            guarded((), || self.redraw_view());
         }
 
         #[unsafe(method(invalidateDisplayForGlyphRange:))]
         fn invalidate_glyphs(&self, _range: NSRange) {
-            self.redraw_view();
+            guarded((), || self.redraw_view());
         }
     }
 );

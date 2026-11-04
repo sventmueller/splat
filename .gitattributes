@@ -6,3 +6,6 @@ resources/js/mathlive.min.js linguist-vendored -diff
 resources/js/plantuml.js linguist-vendored -diff
 resources/js/viz-global.js linguist-vendored -diff
 resources/js/mathlive-fonts/** linguist-vendored
+vendor/comrak/** linguist-vendored
+# Inputs of the fuzz targets, byte for byte.
+fuzz/seeds/** -text -diff linguist-vendored

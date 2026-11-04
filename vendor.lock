@@ -31,6 +31,7 @@ resources/js/mathjax/tex-mml-svg-mathjax-tex.js	mathjax	4.1.3	https://cdn.jsdeli
 resources/js/mathjax/input/tex/extensions/action.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/action.js	7c46fc1ef8118723bf2f386d704ab289e5dd683471e0ad4e1e717244959b565b
 resources/js/mathjax/input/tex/extensions/amscd.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/amscd.js	81d6115aa4358a98da5e6d477ac4198cbc11c2c2752745b3529a8b6e2761202f
 resources/js/mathjax/input/tex/extensions/bbox.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/bbox.js	9d9ff6d1c592d2a4fe728412d2d5ec29379f4721bfa3b8356ad2045eb939b848
+resources/js/mathjax/input/tex/extensions/begingroup.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/begingroup.js	0f606d5a71301992e92d8697ccbf8318736110691d8a94303f3f254cd589421a
 resources/js/mathjax/input/tex/extensions/boldsymbol.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/boldsymbol.js	baaabd9fb430fe4fdbfa9db74aa60b118dd650a68239280368abfd1bc30a0e10
 resources/js/mathjax/input/tex/extensions/braket.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/braket.js	d401832d91ca89fc8f76cf1ea67ce25b21c4a2b1d9da0db605204f262c8d69ee
 resources/js/mathjax/input/tex/extensions/bussproofs.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/bussproofs.js	87451074cc17e2c8064d630b91cc56171182cc5a46c1313006014f56c498d8d4

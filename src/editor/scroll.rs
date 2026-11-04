@@ -5,21 +5,27 @@ use std::rc::Rc;
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{DefinedClass, sel};
+use objc2::sel;
 use objc2_app_kit::{
     NSTextContentManager, NSTextElementProvider, NSTextLayoutManager, NSTextLayoutManagerSegmentOptions,
     NSTextLayoutManagerSegmentType, NSTextLocation, NSTextRange, NSTextView,
 };
 use objc2_foundation::{NSNotification, NSPoint, NSRange, NSRect, NSSize};
 
-use super::EditorController;
-use super::panes::with_raised;
+use super::layers::ForScroll;
 use crate::util::{layout_manager, perform_later, storage};
 
 #[derive(Clone, Copy)]
 pub(super) struct ScrollSpan {
     source: (usize, usize),
     preview: (usize, usize),
+}
+
+#[cfg(feature = "selftest")]
+impl ScrollSpan {
+    pub(super) fn source_end(&self) -> usize {
+        self.source.1
+    }
 }
 
 #[derive(Default)]
@@ -47,16 +53,13 @@ impl ScrollState {
 }
 
 pub(super) struct ScrollSync<'a> {
-    host: &'a EditorController,
+    host: ForScroll<'a>,
     state: &'a ScrollState,
 }
 
-impl EditorController {
-    pub(super) fn scroll_sync(&self) -> ScrollSync<'_> {
-        ScrollSync {
-            host: self,
-            state: &self.ivars().scroll,
-        }
+impl<'a> ScrollSync<'a> {
+    pub(super) fn new(host: ForScroll<'a>, state: &'a ScrollState) -> Self {
+        ScrollSync { host, state }
     }
 }
 
@@ -88,7 +91,7 @@ impl ScrollSync<'_> {
         // Not from here: the scroll may be AppKit's own, from a block it runs when layout is done, and laying out the view
         // again inside it frees that block while it runs.
         if self.state.view_scrolled(from_preview) {
-            perform_later(self.host, sel!(syncScroll), 0.0, true);
+            perform_later(self.host.object(), sel!(syncScroll), 0.0, true);
         }
         if self.host.model().read(|st| st.blocks().pending()) {
             self.host.progressive().schedule_pending_blocks();
@@ -140,7 +143,7 @@ impl ScrollSync<'_> {
             return;
         }
         // Asking either view for positions can lay it out and resize it, which posts another bounds change.
-        with_raised(&self.state.syncing, || self.follow(from, to, from_source, &spans));
+        crate::util::with_raised(&self.state.syncing, || self.follow(from, to, from_source, &spans));
     }
 
     fn follow(&self, from: &NSTextView, to: &NSTextView, from_source: bool, spans: &[ScrollSpan]) {
@@ -267,9 +270,9 @@ pub(super) fn offset_at(view: &NSTextView, y: f64) -> Option<usize> {
     Some(crate::util::to_usize(offset.max(0)))
 }
 
-/// Scrolls a TextKit 2 view until the character at `index` is laid out and returns its top in view coordinates.
-/// TextKit 2 knows positions only around the laid-out part, and `relocateViewportToTextLocation:` takes up to
-/// seconds in a 10 MB document; laying out at an estimated position and correcting it costs no more than scrolling.
+/// Scrolls a TextKit 2 view until the character at `index` is laid out and returns its top in view coordinates. TextKit 2
+/// knows positions only around the laid-out part, and `relocateViewportToTextLocation:` takes up to seconds in a 10 MB
+/// document; laying out at an estimated position and correcting it costs no more than scrolling.
 fn reach(view: &NSTextView, index: usize) -> Option<f64> {
     let tlm = view.textLayoutManager()?;
     let viewport = tlm.textViewportLayoutController();
@@ -379,7 +382,7 @@ mod tests {
     fn the_syncs_own_scrolling_neither_asks_for_a_sync_nor_turns_it_around() {
         let state = ScrollState::default();
         assert!(state.view_scrolled(true));
-        let asked = with_raised(&state.syncing, || state.view_scrolled(false));
+        let asked = crate::util::with_raised(&state.syncing, || state.view_scrolled(false));
         assert!(!asked);
         assert!(state.scrolled_preview.get(), "the preview still leads");
         assert!(

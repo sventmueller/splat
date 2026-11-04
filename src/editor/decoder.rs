@@ -16,7 +16,7 @@ use objc2_app_kit::{
 use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSSize};
 use svg2pdf::usvg::fontdb;
 
-use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES, MAX_SIDE, SHOWN_SIDE};
+use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES, MAX_SIDE};
 
 /// Command line argument that turns the process into a decoding helper.
 pub const ARG: &str = "--splat-decoder";
@@ -26,6 +26,10 @@ pub const NATIVE_ARG: &str = "--splat-native-decoder";
 
 /// A decode that takes longer ends its helper, which then counts as failed.
 const TIMEOUT: Duration = Duration::from_secs(10);
+
+/// What a decode can take in the worst case: both tries reach their limit.
+#[cfg(feature = "selftest")]
+pub const LONGEST_WAIT: Duration = Duration::from_secs(21);
 const MAX_PDF: usize = 128 << 20;
 /// Beyond the `MAX_SIDE` of `safe_image`; the helper is trusted for no more than a sane number.
 const NATURAL_SIDE: u32 = 1 << 20;
@@ -426,12 +430,21 @@ impl Helper {
         self.input.write_all(prefix)?;
         self.input.write_all(payload)?;
         self.input.flush()?;
-        read_answer(&mut self.output, side)
+        read_answer(&mut self.output, kind, side)
     }
 }
 
-/// The answer of a helper, which may have been taken over: nothing it sends is trusted beyond these bounds.
-fn read_answer(input: &mut impl Read, side: Option<u32>) -> std::io::Result<Option<Decoded>> {
+/// Which kind of answer a request can have, so that a helper gets only as much memory out of the app as that kind takes.
+fn may_answer(kind: u8, tag: u8) -> bool {
+    matches!(
+        (kind, tag),
+        (_, NOTHING) | (IMAGE, PDF | RGBA) | (FORMULA_SVG, PDF) | (NATIVE_IMAGE, RGBA) | (PASTED_TIFF, PNG)
+    )
+}
+
+/// The answer of a helper to a request of `kind`. It may have been taken over: nothing it sends is trusted beyond these
+/// bounds.
+fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::Result<Option<Decoded>> {
     let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidData);
     let u32_from = |input: &mut dyn Read| -> std::io::Result<u32> {
         let mut b = [0u8; 4];
@@ -440,6 +453,9 @@ fn read_answer(input: &mut impl Read, side: Option<u32>) -> std::io::Result<Opti
     };
     let mut tag = [0u8; 1];
     input.read_exact(&mut tag)?;
+    if !may_answer(kind, tag[0]) {
+        return Err(invalid());
+    }
     match tag[0] {
         NOTHING => Ok(None),
         PDF => {
@@ -523,9 +539,64 @@ pub fn release_idle() {
     }
 }
 
-fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
+/// Why a helper was stopped during a request.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Overrun {
+    Time,
+    Memory,
+}
+
+/// What a helper may take of the memory while it decodes: enough for a pasted picture at `MAX_PASTED_BYTES` and its pixels.
+fn most_memory() -> u64 {
+    (objc2_foundation::NSProcessInfo::processInfo().physicalMemory() / 4).max(3 << 30)
+}
+
+/// The memory a process holds as the system counts it, or `None` once it has gone.
+fn memory_of(pid: i32) -> Option<u64> {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage_info_v4>::uninit();
+    // SAFETY: The buffer has the size of the kind of answer asked for.
+    let read = unsafe { libc::proc_pid_rusage(pid, libc::RUSAGE_INFO_V4, usage.as_mut_ptr().cast()) };
+    // SAFETY: On success the call has filled the buffer.
+    (read == 0).then(|| unsafe { usage.assume_init() }.ri_phys_footprint)
+}
+
+/// Waits for the end of a request and says what a helper went beyond, if anything. A limit from the outside: macOS refuses
+/// `setrlimit` for memory, and in a process that can be taken over nothing inside it counts.
+fn overrun(
+    finished: &std::sync::mpsc::Receiver<()>,
+    time: Duration,
+    memory: u64,
+    memory_now: impl Fn() -> Option<u64>,
+) -> Option<Overrun> {
+    const LOOK_EVERY: Duration = Duration::from_millis(50);
+    let start = std::time::Instant::now();
+    loop {
+        let Some(left) = time.checked_sub(start.elapsed()) else {
+            return Some(Overrun::Time);
+        };
+        match finished.recv_timeout(left.min(LOOK_EVERY)) {
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            _ => return None,
+        }
+        if memory_now().is_some_and(|now| now > memory) {
+            return Some(Overrun::Memory);
+        }
+    }
+}
+
+/// Why a request came back without an answer of its helper.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum HelperFailure {
+    TooLarge,
+    NotStarted,
+    Stopped(Overrun),
+    /// Twice, so that the file ends every helper.
+    Ended,
+}
+
+fn asked(kind: u8, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>, HelperFailure> {
     if payload.len() > MAX_FILE_BYTES && kind != PASTED_TIFF || payload.len() > MAX_PASTED_BYTES {
-        return None;
+        return Err(HelperFailure::TooLarge);
     }
     let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if matches!(kind, NATIVE_IMAGE | PASTED_TIFF) {
         (&NATIVE_HELPERS, NATIVE_ARG)
@@ -539,30 +610,38 @@ fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
         if guard.is_none() {
             *guard = Helper::start(arg);
         }
-        let helper = guard.as_mut()?;
-        let pid = i32::try_from(helper.child.id()).ok()?;
-        let timed_out = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let helper = guard.as_mut().ok_or(HelperFailure::NotStarted)?;
+        let pid = i32::try_from(helper.child.id()).map_err(|_| HelperFailure::NotStarted)?;
         let (done, finished) = std::sync::mpsc::channel::<()>();
-        let noted = timed_out.clone();
-        std::thread::spawn(move || {
-            if finished.recv_timeout(TIMEOUT) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
-                noted.store(true, std::sync::atomic::Ordering::SeqCst);
+        let watch = std::thread::spawn(move || {
+            let overrun = overrun(&finished, TIMEOUT, most_memory(), || memory_of(pid));
+            if overrun.is_some() {
                 crate::util::end_process(pid);
             }
+            overrun
         });
         let answer = helper.exchange(kind, side, payload);
         let _ = done.send(());
+        let overrun = watch.join().ok().flatten();
         match answer {
-            Ok(decoded) => return decoded,
+            Ok(decoded) => return Ok(decoded),
             Err(_) => {
                 *guard = None;
-                if timed_out.load(std::sync::atomic::Ordering::SeqCst) {
-                    return None;
+                if let Some(overrun) = overrun {
+                    return Err(HelperFailure::Stopped(overrun));
                 }
             }
         }
     }
-    None
+    Err(HelperFailure::Ended)
+}
+
+/// What a helper answers; why there is none goes to the log, as a picture that does not show says nothing about that.
+fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
+    asked(kind, side, payload).unwrap_or_else(|failure| {
+        crate::diag::report("a decoder helper gave no answer", format!("{failure:?}"));
+        None
+    })
 }
 
 /// An image file or download as pixels no wider or higher than `side`: PNG, JPEG, GIF, WebP and BMP from one helper, an
@@ -589,8 +668,8 @@ pub fn png_of_pasted_tiff(tiff: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// A diagram as WebKit drew it.
-pub fn pdf_to_pixels(pdf: &[u8]) -> Option<Decoded> {
-    decode_native(pdf, SHOWN_SIDE)
+pub fn pdf_to_pixels(pdf: &[u8], side: u32) -> Option<Decoded> {
+    decode_native(pdf, side)
 }
 
 /// A formula as rendered by WebKit: MathJax draws the glyphs of its fonts as paths and leaves other characters as text.
@@ -602,8 +681,8 @@ pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
 }
 
 /// A formula as pixels.
-pub fn svg_to_pixels(svg: &str) -> Option<Decoded> {
-    pdf_to_pixels(&svg_to_pdf(svg)?)
+pub fn svg_to_pixels(svg: &str, side: u32) -> Option<Decoded> {
+    pdf_to_pixels(&svg_to_pdf(svg)?, side)
 }
 
 /// Asks a helper to read `path` and to open a network connection; `Some(false)` when both were refused.
@@ -617,6 +696,31 @@ pub fn self_check(arg: &str, path: &str) -> Option<bool> {
     let mut answer = [0u8; 2];
     helper.output.read_exact(&mut answer).ok()?;
     (answer[0] == SELF_CHECK).then_some(answer[1] != 0)
+}
+
+/// Ends the helpers as a crash would, without telling the pool.
+#[cfg(feature = "selftest")]
+pub fn end_helpers() {
+    signal_helpers(libc::SIGKILL);
+}
+
+/// Stops the helpers as a hang would: they stay around and answer nothing.
+#[cfg(feature = "selftest")]
+pub fn stop_helpers() {
+    signal_helpers(libc::SIGSTOP);
+}
+
+#[cfg(feature = "selftest")]
+fn signal_helpers(signal: i32) {
+    for slot in HELPERS.iter().chain(&NATIVE_HELPERS) {
+        if let Ok(guard) = slot.lock()
+            && let Some(helper) = guard.as_ref()
+            && let Ok(pid) = i32::try_from(helper.child.id())
+        {
+            // SAFETY: A plain system call on a child this process started and has not yet waited for.
+            unsafe { libc::kill(pid, signal) };
+        }
+    }
 }
 
 /// An image from decoded pixels. A PDF stays out: it has to pass the other helper first.
@@ -717,7 +821,7 @@ mod tests {
     }
 
     fn read(answer: &[u8], side: Option<u32>) -> std::io::Result<Option<Decoded>> {
-        read_answer(&mut std::io::Cursor::new(answer), side)
+        read_answer(&mut std::io::Cursor::new(answer), IMAGE, side)
     }
 
     #[test]
@@ -760,6 +864,56 @@ mod tests {
             read(&no_pdf, None).unwrap().is_none(),
             "what is no PDF stays out of the system's decoders"
         );
+    }
+
+    #[test]
+    fn a_helper_is_stopped_at_its_limits_and_only_there() {
+        let (done, finished) = std::sync::mpsc::channel::<()>();
+        let long = Duration::from_secs(60);
+        assert_eq!(overrun(&finished, long, 100, || Some(101)), Some(Overrun::Memory));
+        let short = Duration::from_millis(120);
+        assert_eq!(overrun(&finished, short, 100, || Some(100)), Some(Overrun::Time));
+        assert_eq!(
+            overrun(&finished, short, 100, || None),
+            Some(Overrun::Time),
+            "gone already"
+        );
+        done.send(()).unwrap();
+        assert_eq!(
+            overrun(&finished, long, 100, || Some(101)),
+            None,
+            "a request that has ended"
+        );
+    }
+
+    #[test]
+    fn the_memory_of_a_process_can_be_read_and_of_one_that_is_gone_not() {
+        let own = i32::try_from(std::process::id()).unwrap();
+        assert!(memory_of(own).is_some_and(|bytes| bytes > 1 << 20));
+        let mut child = std::process::Command::new("/usr/bin/true").spawn().unwrap();
+        let pid = i32::try_from(child.id()).unwrap();
+        child.wait().unwrap();
+        assert_eq!(memory_of(pid), None);
+    }
+
+    #[test]
+    fn a_helper_answers_only_in_the_kind_its_request_has() {
+        let mut huge_png = vec![PNG];
+        huge_png.extend_from_slice(&(MAX_PASTED_BYTES as u64).to_le_bytes());
+        for kind in [IMAGE, FORMULA_SVG, NATIVE_IMAGE] {
+            let read = read_answer(&mut std::io::Cursor::new(&huge_png), kind, Some(10));
+            let error = read.err().expect("no room is made for it");
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData, "{kind}");
+        }
+        let mut png = vec![PNG];
+        png.extend_from_slice(&4u64.to_le_bytes());
+        png.extend_from_slice(b"\x89PNG");
+        let pasted = read_answer(&mut std::io::Cursor::new(&png), PASTED_TIFF, None);
+        assert!(matches!(pasted.unwrap(), Some(Decoded::Png(_))));
+        let pixels = read_answer(&mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)), PASTED_TIFF, None);
+        assert!(pixels.is_err(), "pixels are no answer to a pasted picture");
+        let pdf_of_formula = read_answer(&mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)), FORMULA_SVG, None);
+        assert!(pdf_of_formula.is_err(), "and none to a formula");
     }
 
     #[test]

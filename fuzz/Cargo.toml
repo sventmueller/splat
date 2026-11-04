@@ -1,0 +1,56 @@
+[package]
+name = "splat-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[patch.crates-io]
+comrak = { path = "../vendor/comrak" }
+
+[dependencies]
+libfuzzer-sys = "0.4"
+splat-testkit = { path = "../crates/splat-testkit" }
+
+[profile.release]
+debug = 1
+overflow-checks = true
+
+[[bin]]
+name = "reparse"
+path = "fuzz_targets/reparse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "outputs"
+path = "fuzz_targets/outputs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bridge"
+path = "fuzz_targets/bridge.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "commands"
+path = "fuzz_targets/commands.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "encoding"
+path = "fuzz_targets/encoding.rs"
+test = false
+doc = false
+bench = false

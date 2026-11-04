@@ -2,15 +2,15 @@
 
 use std::path::Path;
 
-use objc2::MainThreadOnly;
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSApplication, NSBeep, NSDocumentController, NSEventModifierFlags, NSTextView, NSWorkspace};
 use objc2_foundation::{NSArray, NSRange, NSString, NSURL};
 
+use super::State;
 use super::editing::bridge;
+use super::layers::ForLinks;
 use super::links::{self, LinkTarget};
-use super::{EditorController, State};
 use crate::i18n::{t, tf};
 use crate::markdown::commands;
 use crate::markdown::text::Byte;
@@ -31,15 +31,17 @@ fn open_place(mtm: objc2::MainThreadMarker, place: Option<(std::path::PathBuf, b
     if markdown {
         let done = block2::RcBlock::new(
             |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, error: *mut objc2_foundation::NSError| {
-                // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
-                let Some(error) = (unsafe { Retained::retain(error) }) else {
-                    return;
-                };
-                crate::diag::report("opening a linked document failed", error.code());
-                dispatch2::DispatchQueue::main().exec_async(move || {
-                    if let Some(mtm) = objc2::MainThreadMarker::new() {
-                        objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
-                    }
+                crate::util::guarded((), || {
+                    // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
+                    let Some(error) = (unsafe { Retained::retain(error) }) else {
+                        return;
+                    };
+                    crate::diag::report("opening a linked document failed", error.code());
+                    crate::util::main_soon(move || {
+                        if let Some(mtm) = objc2::MainThreadMarker::new() {
+                            objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
+                        }
+                    });
                 });
             },
         );
@@ -65,7 +67,7 @@ fn open_found_in_background(place: Option<&Path>, find: impl FnOnce() -> LinkTar
     place.map_or(&DISK, lane_of).ask(
         move || found_place(find()),
         move |opened| {
-            dispatch2::DispatchQueue::main().exec_async(move || {
+            crate::util::main_soon(move || {
                 if let Some(mtm) = objc2::MainThreadMarker::new() {
                     open_place(mtm, opened.flatten());
                 }
@@ -144,12 +146,12 @@ fn decoded_anchor(anchor: &str) -> String {
 }
 
 pub(super) struct Links<'a> {
-    host: &'a EditorController,
+    host: ForLinks<'a>,
 }
 
-impl EditorController {
-    pub(super) fn links(&self) -> Links<'_> {
-        Links { host: self }
+impl<'a> Links<'a> {
+    pub(super) fn new(host: ForLinks<'a>) -> Self {
+        Links { host }
     }
 }
 
@@ -293,9 +295,11 @@ impl Links<'_> {
         alert.addButtonWithTitle(&ns(t("Abbrechen")));
         alert.addButtonWithTitle(&ns(t("Öffnen")));
         let handler = block2::RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
-            if response == objc2_app_kit::NSAlertSecondButtonReturn {
-                NSWorkspace::sharedWorkspace().openURL(&url);
-            }
+            crate::util::guarded((), || {
+                if response == objc2_app_kit::NSAlertSecondButtonReturn {
+                    NSWorkspace::sharedWorkspace().openURL(&url);
+                }
+            });
         });
         alert.beginSheetModalForWindow_completionHandler(&window, Some(&handler));
     }
@@ -304,7 +308,8 @@ impl Links<'_> {
     pub(super) fn reveal_heading(&self, anchor: &str) {
         let anchor = decoded_anchor(anchor);
         let start = self.host.model().read(|st| {
-            commands::heading_anchors(st.doc())
+            contained(|| commands::heading_anchors(st.doc()))
+                .unwrap_or_default()
                 .into_iter()
                 .find(|h| h.anchor == anchor)
                 .map(|heading| heading.range.start)

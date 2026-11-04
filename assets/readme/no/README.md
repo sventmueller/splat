@@ -120,7 +120,7 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 - **En knapp for alt.** Hver Markdown-konstruksjon har en verktøylinjeknapp og et menyvalg, de vanligste også en hurtigtast. Tabeller har en egen meny for rader, kolonner og justering.
 - **Eksport uten tap.** PDF, én enkelt selvstendig HTML-fil eller et Word-dokument med ekte overskrifter, lister, tabeller, fotnoter og bilder.
 - **Native helt inn i margen.** Ekte AppKit-vinduer, faner, menyer, popovere, Versjoner, Lagre automatisk, delingsmenyen, mørk modus, stavekontroll, diktering og VoiceOver. Ingen Electron, ingen nettvisning for selve teksten.
-- **Rask med store filer.** Å gjengi et tastetrykk i et dokument på 10 MB tar rundt 25 ms, før visningens eget arbeid.
+- **Rask med store filer.** Å gjengi et tastetrykk i et dokument på 10 MB tar rundt 10 ms, før visningens eget arbeid.
 - **Privat og varsom.** Bilder fra nettet lastes først etter at du har tillatt det, lenker til andre apper spør først, og alt som dekoder upålitelige bildedata, kjører i helperprosesser i en sandkasse.
 - **På ditt språk.** Grensesnittet og den innebygde Markdown-hurtigreferansen finnes på 35 språk: arabisk, katalansk, kinesisk (forenklet), kinesisk (tradisjonelt), kroatisk, tsjekkisk, dansk, nederlandsk, engelsk, finsk, fransk, tysk, gresk, hebraisk, hindi, ungarsk, indonesisk, italiensk, japansk, koreansk, malayisk, norsk, polsk, portugisisk (Brasil), portugisisk (Portugal), rumensk, russisk, slovakisk, slovensk, spansk, svensk, thai, tyrkisk, ukrainsk og vietnamesisk.
 
@@ -504,7 +504,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 - **Ingen nettverksbruk som standard.** Splat har ingen telemetri. Appen søker etter oppdateringer først når du har samtykket eller velger **Søk etter oppdateringer…**: da laster den en liten feedfil fra GitHub, og forespørselen nevner ikke annet enn appen og versjonen. Formler og diagrammer gjengis lokalt; nettvisningene som gjør det, kan ikke nå nettverket.
 - **Bilder fra nettet** lastes først etter at du har gitt tillatelse, bare over `https`, aldri fra verter i det lokale nettverket ditt, på maksimalt 10 MB hver og i en privat økt uten informasjonskapsler.
 - **Isolert dekoding.** Bilder og grafikken til formler og diagrammer dekodes i helperprosesser som lukker alle filer de har arvet og låser seg inn i en sandkasse før de leser den første byten: ingen filtilgang, ingen nettverk. De leverer bare tilbake piksler, hvis størrelse kontrolleres, og stoppes etter 10 sekunder. Apples egne bildedekodere ser bare HEIC, TIFF, AVIF og PDF, og bare når dataene faktisk har det formatet; de kjører i en helper for seg, som i tillegg kan lese systemets fontmapper og bruke systemets videodekoder. SVG-er, formler og diagrammer går også gjennom denne helperen, så de er bilder med fast oppløsning i Splat: fire piksler per punkt, opptil 2560 på den lengste siden.
-- **Lokale filer** når et dokument bare via stien det navngir. Innbygginger viser Markdown-notater fra dokumentets mappe og nedover, og et manglende bilde letes det bare etter der. En bildesti andre steder, absolutt eller som begynner med `~`, lastes fortsatt, og HTML- og Word-eksporter bygger det inn: se over eksporten av et dokument du ikke har skrevet selv før du gir den videre.
+- **Lokale filer** når et dokument bare via stien det navngir. Innbygginger viser Markdown-notater fra dokumentets mappe og nedover, og et manglende bilde letes det bare etter der. En bildesti andre steder, absolutt eller som begynner med `~`, lastes fortsatt i forhåndsvisningen; HTML- og Word-eksporter, utskrift og PDF-er tar bare med det som ligger i dokumentets mappe eller Git-repositoriet, med mindre det repositoriet også inneholder Hjem-mappen din, så et dokument fra noen andre ikke kan dra filene dine inn i en eksport du gir videre.
 - **Kopier av ulagret tekst** blir på denne Macen, i Bibliotek-mappen din, for gjenopprettingen etter et krasj. De forsvinner ved lagring eller når Splat avsluttes normalt; kopiene et krasj etterlot, blir liggende i gjenopprettingsmappen til du sletter dem.
 - **Lenker** starter aldri et program ved et klikk. Web- og e-postlenker åpnes som vanlig; lenker til andre apper spør først.
 - **HTML i dokumenter** leses av Splats egen parser. Skript, stiler, rammer og skjemaer kjører aldri.
@@ -516,13 +516,14 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 Splat holder seg responsiv med dokumenter på flere megabyte:
 
 - Kildeteksten bruker TextKit 2, som bare legger ut den synlige delen.
-- Mens du skriver i forhåndsvisningen, og i kildeteksten i dokumenter på opptil 2 MB, blir bare de berørte avsnittene tolket, fargelagt og lagt ut på nytt. I et dokument på 10 MB tar tolking og fargelegging rundt 20 ms, gjengivelse rundt 25 ms, og et helt tastetrykk i forhåndsvisningen rundt 60 ms med visningens eget arbeid.
+- Mens du skriver i forhåndsvisningen, og i kildeteksten i dokumenter på opptil 2 MB, blir bare de berørte avsnittene tolket, fargelagt og lagt ut på nytt. I et dokument på 10 MB tar tolking og fargelegging rundt 3 ms, gjengivelse rundt 10 ms, og et helt tastetrykk i forhåndsvisningen rundt 30 ms med visningens eget arbeid.
 - Store forhåndsvisninger gjengir den synlige delen først og resten mens appen er ledig. Blokker som rulles inn i synsfeltet, gjengis før de tegnes.
 - I kildeteksten til større dokumenter kjører tolkingen for forhåndsvisningen i bakgrunnen mens du skriver.
 - Et dokument forblir ren tekst når det ville bruke omtrent 4 GB minne, som tilsvarer rundt 50 til 120 MB vanlig Markdown, men bare 10 til 20 MB hvis det bare består av tabeller eller overskrifter: kildeteksten har ingen farger, og forhåndsvisningen sier hvorfor den er tom. Eksport fungerer fortsatt.
 - Fra rundt 200 KB åpner et dokument vinduet sitt før det er tolket; ved 5 MB følger fargene og forhåndsvisningen om lag et kvart sekund senere.
+- Alle bilder til sammen, inkludert formler og diagrammer, tar høyst en fjerdedel av minnet til Macen og halvparten av det mens det er lite minne. Utover det vises flere bilder som plassholdere til det igjen er plass.
 
-Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB: endringer i definisjonen av en fotnote eller i referansene til den, ved siden av en fotnote i teksten, helt på slutten av et dokument ved siden av en fotnote, i front matter eller nær lenkereferansedefinisjoner, og hver endring i et dokument med `%%`-kommentarblokker eller med en fotnote som er definert to ganger eller inne i et sitat eller en liste. Minnebruken vokser med filen, til omtrent 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
+Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB: endringer i definisjonen av en fotnote eller i referansene til den, ved siden av en fotnote i teksten, helt på slutten av et dokument ved siden av en fotnote, i front matter eller i lenkereferansedefinisjoner, og hver endring i et dokument med `%%`-kommentarblokker eller med en fotnote som er definert to ganger eller inne i et sitat eller en liste. Minnebruken vokser med filen, til omtrent 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
 
 ## Kjente begrensninger
 
@@ -577,6 +578,7 @@ make check                  # formatering, clippy uten advarsler, alle tester, m
 make test                   # make check, deretter selvtesten uten vindu
 make test-gui               # selvtester med vindu; de opptar Macen i omtrent fire minutter
 make test-long              # lengre tilfeldig søk og kontrollen av 10 MB delvis oppdatering
+make fuzz                   # tilfeldig inndata for delvis parsing og alle utdata
 make coverage               # linjedekning for alle tester og selvtester, med en nedre grense per modul
 make coverage-library       # de samme grensene for modulene uten vindu, som i CI
 make bench FILE=<file.md>   # tidtaking for åpning, skriving og rulling i en stor fil
@@ -626,19 +628,24 @@ Appen i det har en annen signatur enn et lokalt bygg, så macOS fører separate 
 | `cargo xtask check-library` | biblioteket bygger for Linux, så ingenting i det trenger macOS |
 | `cargo xtask vendor check` | JavaScript-bibliotekene stemmer byte for byte med `vendor.lock` |
 | `cargo xtask selftest probe` | uten vindu, hver med forventet resultat: formler, diagrammer, nettbilder mot en server inne i prosessen, blokkerte adresser, teksten hver kommando skriver, hvert bildeformat gjennom begge eksportene, en side som slutter å svare, og forsvaret til nettvisningene mot en side uten det. Tar omtrent et halvt minutt. Det som trenger appen foran seg, hoppes over på en låst skjerm |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | den kjørende appen, klikk for klikk. Åpner et vindu og skriver inn i det; Macen er opptatt i omtrent fire minutter. `--scenarios` kjører bare den andre delen, på rundt halvannet minutt |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | den kjørende appen, klikk for klikk. Åpner et vindu og skriver inn i det; Macen er opptatt i omtrent fire minutter. `--scenarios` kjører bare den andre delen, på rundt halvannet minutt. `--only` kjører én gruppe av den delen, i sitt eget dokument, også på en låst skjerm. `--in-back` utelater det som trenger appen foran; uten det feiler en slik sjekk |
 | `cargo xtask selftest resize` | gjør vinduet bredere etter at skillelinjen er flyttet: kildeteksten brytes om mens vinduet endrer størrelse. Tar rundt ti sekunder |
-| `cargo xtask selftest bench <file.md>` | tidtaking for åpning, skriving og rulling i en stor fil |
+| `cargo xtask selftest typing [--by-hand]` | skriver gjennom lagringer, med taster via appens hendelseskø eller, med `--by-hand`, for hånd: det som skrives, blir stående og vises som ulagret. Tar omtrent ett minutt |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | tidtaking for åpning, skriving og rulling i en stor fil; `--keystroke-ms` feiler når det raskeste tastetrykket tar lengre tid |
 | `cargo test --release -- --ignored partial_updates` | et tastetrykk i 10 MB: delvis mot full oppdatering, samme resultat på høyst en fjerdedel av tiden |
 | `cargo test --release --test hostile` | dokumenter bygd for å fylle opp stakken eller ta kvadratisk tid, hvert i to størrelser der tidene må vokse som teksten, gjennom tolking, utlegging, begge eksportene, tastetrykk og kommandoer |
-| `make mutants` | feil som bygges inn i `src/markdown/` og `src/preview/` én etter én, gjennom [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); sier hvilke ingen test merker. Tar timer; `FILE=src/preview/bridge.rs` snevrer det inn |
+| `make mutants` | feil som bygges inn i `crates/splat-markdown`, `crates/splat-preview` og `crates/splat-file-state` én etter én, gjennom [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); sier hvilke ingen test merker. Tar timer; `FILE=crates/splat-preview/src/bridge/mod.rs` snevrer det inn |
+| `make fuzz` | tilfeldig inndata gjennom [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), som trenger rustups nightly: tastetrykk som må leses som en full parsing, alle utdata, redigeringer i forhåndsvisningen, alle kommandoer og en fil som lagres slik den ble åpnet. `SECONDS=600` søker lenger |
+| `cargo test --release --test fuzz_seeds` | frøene i `fuzz/seeds/` gjennom kontrollene til disse fuzz-målene, uten fuzzer; en del av hver `cargo test` |
+| `cargo test --profile checked --workspace` | testene med det en feilsøkingsbygg sjekker i tillegg: etter hver delvise parsing passer blokkene til teksten, og det den bærer videre er det teksten sier. Del av `make test-long` |
+| `cargo test --release --test entry_points --test structure` | fra kildene: alt systemet kaller er beskyttet mot panics, og moduler avhenger bare nedover |
 | `cargo test --release --test decoder` | dekoderprosessen dekoder bilder og når verken filer eller nettverket |
 | `make coverage` | linjedekning for `cargo test` og alle selvtester, gjennom [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); feiler under grensene. Opptar Macen i omtrent fem minutter |
-| `make coverage-library` | `src/markdown/`, `src/preview/` og `i18n.rs` mot de høyere grensene sine, målt av `cargo test` alene |
+| `make coverage-library` | cratene `splat-markdown`, `splat-preview`, `splat-file-state` og `splat-i18n` mot de høyere grensene sine, målt av `cargo test` alene |
 
-Enhetstester ligger ved siden av koden de tester. `tests/` inneholder det som når biblioteket utenfra: tilfeldighetstestene i `robustness.rs`, som deler generatoren i `src/fuzz.rs` med dem i `sync.rs`, dokumentene som er bygd for å skade i `hostile.rs`, og dekodertesten, som starter det bygde programmet. Beslutninger i `src/editor/` som ikke trenger noe vindu, ligger i frie funksjoner med egne tester: alt kontrolleren vet og hvordan det endrer seg i `state.rs`, reglene for gjengivelse i `render_queue.rs`, tekstkopien i `sync.rs`, avsnittsstiler, skrifter og farger som verdier i `render.rs`, hva verktøylinjens identifikatorer står for i `toolbar.rs`, hva et klikk på en lenke betyr i `navigation.rs`.
+Enhetstester ligger ved siden av koden de tester. `crates/splat-testkit/tests/` inneholder det som når modellen og forhåndsvisningen utenfra: tilfeldighetstestene i `robustness.rs`, som deler generatoren i `splat-testkit` med dem i `sync.rs`, dokumentene som er bygd for å skade i `hostile.rs`, og frøene til fuzz-målene i `fuzz_seeds.rs`. `tests/` inneholder det som ser på hele programmet: kildene, oversettelsene og dekodertesten, som starter det bygde programmet. Beslutninger i `src/editor/` som ikke trenger noe vindu, ligger i frie funksjoner med egne tester: alt kontrolleren vet og hvordan det endrer seg i `state.rs`, reglene for gjengivelse i `render_queue.rs`, tekstkopien i `sync.rs`, avsnittsstiler, skrifter og farger som verdier i `render.rs`, hva verktøylinjens identifikatorer står for i `toolbar.rs`, hva et klikk på en lenke betyr i `navigation.rs`.
 
-Et trinn i vindusselvtesten venter på en navngitt betingelse, ikke på en tid; bare det som ikke gir noe signal, som at noe uteblir, beholder en pause med begrunnelsen sin. Å vente forgjeves er en mislykket kontroll som navngir det som aldri kom, et trinn som går i panikk er også en mislykket kontroll, og kjøringen fortsetter i begge tilfeller. En kontroll som ikke kan si noe i denne kjøringen, melder `SELFTEST SKIP`: xtask lister den, og den verken består eller feiler. xtask holder hver modus, og `--scenarios` for seg, til omtrent ni tiendedeler av kontrollene sine. Vindusselvtesten kjører en andre del etter den første klikkrunden, i `src/editor/selftest/scenarios.rs`: hver formaterings- og tabellkommando, dialogene, lenkeklikk, innliming, slipping, eksporter, en stor endring, bilder som endres på disken, minnepress, et enormt dokument og gjenopprettingen etter et krasj.
+Et trinn i vindusselvtesten venter på en navngitt betingelse, ikke på en tid; bare det som ikke gir noe signal, som at noe uteblir, beholder en pause med begrunnelsen sin. Å vente forgjeves er en mislykket kontroll som navngir det som aldri kom, et trinn som går i panikk er også en mislykket kontroll, og kjøringen fortsetter i begge tilfeller. En kontroll som ikke kan si noe i denne kjøringen, melder `SELFTEST SKIP`: xtask lister den, og den verken består eller feiler. xtask holder hver modus, og `--scenarios` for seg, til omtrent ni tiendedeler av kontrollene sine. Vindusselvtesten kjører en andre del etter den første klikkrunden, i `src/editor/selftest/scenarios.rs`: hver formaterings- og tabellkommando, dialogene, lenkeklikk, innliming, slipping, eksporter, en fil som et annet program har endret, en stor endring, bilder som endres på disken, minnepress, et enormt dokument og gjenopprettingen etter et krasj. Hver gruppe i den åpner sitt eget dokument, slik at en feil i én ikke når den neste, og hver kan kjøre alene med `--only`. Selvtesten uten vindu ødelegger også lagringen med vilje: en mappe som ikke tar imot noe, en skrivebeskyttet fil, en mappe som er borte, en full disk og en panic i hver callback under en lagring, og ingenting av dette får koste tekst.
 
 Dekningen har to grenser: hver modul minst 84 % av linjene sine, alle moduler til sammen minst 96 %. `make coverage` måler `cargo test` sammen med selvtestene og feiler under begge; `make coverage-library` holder det som ikke trenger noe vindu, til 90 % og 97 %. Grensene og de få unntakene, som panikk-hooken i `main.rs` som bare kjører ved et krasj, står i [xtask](../../../xtask/src/coverage.rs) ved siden av begrunnelsene sine. Målte bygg går til `target/coverage/`, så målekode når aldri `target/release/` eller et diskbilde. Dekoderhelperen åpner målefilen sin før den låser seg inne, så den måles også.
 
@@ -648,16 +655,20 @@ Selvtestresultatene går til `target/selftest/`. Selvtesten bygger en egen app (
 
 ### Prosjektstruktur
 
-`src/lib.rs` gjør alt som ikke trenger noe vindu, til et eget bibliotek, `splat`: `markdown/`, `preview/`, `i18n.rs` og testgeneratoren `fuzz.rs`. Det bygger uten macOS. Appen i `src/main.rs` bygger på det.
+Alt som ikke trenger noe vindu, er en egen crate under `crates/`, som bygger uten macOS, så kompilatoren holder fast ved hvordan de avhenger av hverandre. Appen i `src/` (pakken `splat-app`, programmet `splat`) bygger på dem.
 
-- `src/markdown/`: treet som alle brukere leser, `Doc` i `doc/`, som eier sin egen tekst, og den eneste bindingen til parseren i `reader/`: comrak nevnes ingen andre steder, og `reader/assumptions.rs` rommer det koden antar om den. Syntaksfarger, og alle kommandoer som rene tekstendringer (`Edit`) i `commands/`. Også ny tolking etter en redigering (`incremental.rs`), leseren for innebygd HTML (`markup.rs`), typografi, tagger, referanser og siteringer i løpende tekst (`typography.rs`), hvordan tekst ser ut og hvilken Markdown og HTML som gir det (`style.rs`), hva en adresse kan være (`url.rs`), og HTML- og Word-eksporten (`html.rs`, `docx.rs` med `docx/html.rs` og `docx/xml.rs`). En posisjon har sin egen type: `Byte` i kildeteksten, `U16` i kildevisningen, `Shown` i forhåndsvisningen (`text.rs`). Ingen AppKit.
-- `src/preview/`: utleggingen av forhåndsvisningen i `layout/`, med innebygd HTML i `layout/html.rs`, og koblingen mellom forhåndsvisning og kildetekst (`Bridge`, `Index`). En `Bridge` avviser en utlegging av en annen versjon av `Doc`. Ingen AppKit.
+- `crates/splat-markdown/`: treet som alle brukere leser, `Doc` i `doc/`, som eier sin egen tekst, og den eneste bindingen til parseren i `reader/`: comrak nevnes ingen andre steder, og `reader/assumptions.rs` rommer det koden antar om den. Syntaksfarger, og alle kommandoer som rene tekstendringer (`Edit`) i `commands/`. Også ny tolking etter en redigering (`incremental.rs`), leseren for innebygd HTML (`markup.rs`), typografi, tagger, referanser og siteringer i løpende tekst (`typography.rs`), hvordan tekst ser ut og hvilken Markdown og HTML som gir det (`style.rs`), hva en adresse kan være (`url.rs`), og HTML- og Word-eksporten (`html.rs`, `docx.rs` med `docx/html.rs` og `docx/xml.rs`). En posisjon har sin egen type: `Byte` i kildeteksten, `U16` i kildevisningen, `Shown` i forhåndsvisningen (`text.rs`).
+- `crates/splat-preview/`: utleggingen av forhåndsvisningen i `layout/`, med innebygd HTML i `layout/html.rs`, og koblingen mellom forhåndsvisning og kildetekst (`Bridge`, `Index`). En `Bridge` avviser en utlegging av en annen versjon av `Doc`.
+- `crates/splat-file-state/`: hvilken tekst en fil inneholder, i hvilket format, og hva en titt på den betyr.
+- `crates/splat-i18n/` med `resources/*.lproj`: 35 språk; nøklene er de tyske tekstene, og appen installerer tabellen for grensesnittspråket ved oppstart.
+- `crates/splat-testkit/`: generatoren for tilfeldighetstestene og kontrollene til fuzz-målene.
 - `src/editor/`: vinduet. Ett `EditorController`-objekt betjener AppKit som delegat for begge visningene og videresender til komponenter, små structer over kontrolleren og tilstanden de eier, hvis felter de andre modulene ikke kan nå:
 
 | Modul | Ansvar |
 |---|---|
-| `mod.rs` | klasse, delegatmetoder som videresender, `invalidate` |
+| `controller.rs` | klasse, delegatmetoder som videresender, `invalidate` og det resten av programmet forteller en editor; bare den når komponentene |
 | `panes.rs` | `Panes`: tekstvisningene, disposisjonen, å vise og skjule panelene, og det som gir tilgang til visningene |
+| `controller/layers.rs` | hvem som kan nå hvem: en komponent får et håndtak til kontrolleren som tilbyr det som ligger under den, og kompilatoren holder fast ved det |
 | `state.rs` | det kontrolleren vet om dokumentet og alle måter det endrer seg på; feltene er private, og den rører ingen visning |
 | `model.rs` | låner ut tilstanden og tekstkopien til closures som ikke kan nå en visning |
 | `actions.rs` | kommandoregister: selector, tittel, hurtigtast, symbol, når kommandoen gjelder |
@@ -669,17 +680,16 @@ Selvtestresultatene går til `target/selftest/`. Selvtesten bygger en egen app (
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: formel- og diagramredigereren |
 | `navigation.rs`, `links.rs` | `Links`: lenker, wikilenker, tagger, oppgavebokser, sammenfolding, fotnoter |
 | `env.rs` | det forhåndsvisningen leser utenfra teksten: typografisk tegnsetting, repositoriet for `@name` og `#12`, BibTeX-filen, innebygde notater |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | forhåndsvisningstekst, lokale og eksterne bilder; `Pictures` i `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | forhåndsvisningstekst, lokale og eksterne bilder; `Pictures` i `images.rs` |
 | `attributes.rs` | tekstattributter; hver nøkkel får bare en verdi av den typen den forventer |
 | `shadow.rs` | kopier av ulagret tekst for gjenopprettingen etter et krasj |
 | `decoder.rs` | helperprosesser i sandkasse som dekoder bilder og grafikk |
 | `export.rs`, `outline.rs` | `Sharing`: HTML- og Word-eksport, delingsfilen, utskrift; disposisjonssidefeltet |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML og den visuelle formelredigereren; reglene for hva som gjengis når, atskilt fra WebKit |
 | `webkit.rs` | kall inn i WebKit; bare levetiden til navigasjonsdelegaten blir hos `js.rs` og `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | bygging av vinduet, verktøylinje, tekstvisninger, dialoger, farger |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | bygging av vinduet, verktøylinje, tekstvisninger, dialoger, farger |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menylinje, app-delegat, dokument (`MDDocument`, en underklasse av `NSDocument`).
-- `src/i18n.rs` med `resources/*.lproj`: 35 språk; nøklene er de tyske tekstene, og appen installerer tabellen for grensesnittspråket ved oppstart.
 - `src/util/`: arbeidstråder (`lanes.rs`), volumer som kan slutte å svare (`volumes.rs`), AppKit-hjelpere, filer og prosesser. `src/diag.rs`: det som går galt utenfor brukerens syn, går til systemloggen, uten noen tekst fra et dokument.
 - `src/large_alloc.rs`: store allokeringer kommer rett fra kjernen og går tilbake til den når de frigjøres, så minnet kommer tilbake etter store redigeringer.
 - `resources/js/`: nettsider og biblioteker; versjoner og sjekksummer i [vendor.lock](../../../vendor.lock).
@@ -691,11 +701,11 @@ Kildeteksten i den venstre tekstvisningen er den eneste sannhetskilden.
 
 1. Hver tegnendring der oppdaterer tekstkopien (`Snapshot`) på stedet, uten å lese teksten på nytt.
 2. En oppdatering tolker kopien, fargelegger kildeteksten på nytt bare der fargene har endret seg, legger ut forhåndsvisningen og erstatter bare blokkene hvis innhold har endret seg.
-3. Etter en redigering blir bare de berørte avsnittene tolket, fargelagt og lagt ut på nytt, så lenge naboene deres forblir like; `reparse_part_and_color` sier fra når de ikke gjør det. Dokumenter med `%%`-kommentarblokker, endringer i front matter og, i et dokument med lenkereferansedefinisjoner, endringer i en del som inneholder en hakeparentes behandles i sin helhet. comrak gjenkjenner en fotnotereferanse bare med definisjonen i samme tolking og flytter definisjoner bak teksten, så delen tolkes med en stedfortredende definisjon per etikett og henter numrene sine fra det gamle treet; en endring i referansene eller definisjonene i delen, eller ved siden av en fotnote i teksten, behandles i sin helhet.
+3. Etter en redigering blir bare de berørte avsnittene tolket, fargelagt og lagt ut på nytt, så lenge naboene deres forblir like; [docs/partial-parse.md](../../../docs/partial-parse.md) sier hvorfor det gir det samme som en full parsing, og hva man må se på når comrak endres. Dokumenter med `%%`-kommentarblokker, endringer i front matter og, i et dokument med lenkereferansedefinisjoner, endringer i en del som inneholder en hakeparentes behandles i sin helhet. comrak gjenkjenner en fotnotereferanse bare med definisjonen i samme tolking og flytter definisjoner bak teksten, så delen tolkes med en stedfortredende definisjon per etikett og henter numrene sine fra det gamle treet; en endring i referansene eller definisjonene i delen, eller ved siden av en fotnote i teksten, behandles i sin helhet.
 4. HTML-blokker som åpner `<details>` eller `<div align>` og lukker det senere, påvirker Markdown-blokkene imellom; en gjenbrukt blokk må ha de samme omgivelsene.
 5. Mens du skriver i kildeteksten til et dokument på opptil 2 MB, kjører den delvise oppdateringen umiddelbart; når den ikke kan brukes, eller i et større dokument, kjører tolking og utlegging i bakgrunnen. Mens du skriver i forhåndsvisningen, kjører de umiddelbart, fordi markøren i forhåndsvisningen avhenger av resultatet.
 6. Inndata i forhåndsvisningen oversettes av `Bridge` til en redigering av kildeteksten og tar den samme veien derfra. Markdown har for mange måter å gjøre tekst om til syntaks på til at regler alene rekker, så `preview/verify.rs` tolker den endrede delen på nytt og sammenligner det den viser, med det som ble skrevet; en redigering som ikke holder, escapes videre eller avvises.
-7. comraks posisjoner i teksten blir feil noen få steder, for eksempel bak en lenkereferansedefinisjon. `markdown/reader/positions.rs` kontrollerer dem mot kildeteksten når en blokk leses, og leser dem på nytt fra kildeteksten der de ikke passer.
+7. comraks posisjoner i teksten blir feil noen få steder, for eksempel bak en lenkereferansedefinisjon. `reader/positions.rs` kontrollerer dem mot kildeteksten når en blokk leses, og leser dem på nytt fra kildeteksten der de ikke passer.
 
 ### Regler i kontrolleren
 
@@ -704,16 +714,18 @@ Kildeteksten i den venstre tekstvisningen er den eneste sannhetskilden.
 3. Meldinger utenfra (et bilde er lastet, en formel er gjengitt) kommer forsinket gjennom `renders_arrived` og `image_arrived`, aldri midt i en oppdatering.
 4. Ny tegning uten tekstendring går bare gjennom `invalidate(reason)`.
 5. Tekstkopien holdes ikke over en endring av kildeteksten, ellers kopierer endringen hele teksten: `with_text` låner den ut bare så lenge en `Send`-closure varer.
-6. En ny kommando trenger en oppføring i `actions.rs`, en metode i `mod.rs` og en gren i `Editing::perform`.
+6. En ny kommando trenger en oppføring i `actions.rs`, en metode i `controller.rs` og en gren i `Editing::perform`.
 7. Hver `unsafe`-blokk har begrunnelsen sin som en `// SAFETY:`-kommentar. Byte når systemets bildedekodere bare i hjelpeprosessen, gjennom `decoder::decode_native`; en test skanner kildene etter andre kall.
 8. Ingenting på hovedtråden venter på brukerens mapper, siden et nettverksvolum kan slutte å svare: filer undersøkes på tråden `DISK`, og forhåndsvisningen leser svarene gjennom `Env::known`. Bare en handling brukeren venter på, som en eksport eller lagring, kan berøre disken direkte.
+9. Det som må ta slutt, tar også slutt etter en panic, siden hovedtråden overlever en: et hevet flagg går gjennom `with_raised`, en redigering av tekstlageret gjennom `editing`, og det angre ikke skal vite om gjennom `without_undo`. En test finner de som er skrevet for hånd.
+10. En adresse i et dokument har én lesning, i `splat_markdown::url`; en test finner skjemaer som sammenlignes for hånd.
 
 ### Legge til en kommando
 
 Menylinjen, verktøylinjen og kontekstmenyen bygger alle sine valg fra registeret i [src/editor/actions.rs](../../../src/editor/actions.rs), og menyvalideringen leser der når en kommando gjelder og om den viser et hakemerke. En ny kommando trenger:
 
 1. en variant av `Action` med sin `Spec`: selector, tittel, verktøylinjeetikett, verktøytips (som begynner med et verb, på høyst 75 tegn), hurtigtast, SF-symbol og når den gjelder
-2. metoden i `src/editor/mod.rs`
+2. metoden i `src/editor/controller.rs`
 3. en gren i `Editing::perform`
 4. tekstene sine i hver `Localizable.strings`
 
@@ -735,7 +747,7 @@ Koden bruker den tyske teksten som nøkkel: `t("Fett")` slår den opp ved kjøri
 
 | Komponent | Versjon | Brukt til | Lisens |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | Markdown-parser | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 med [én endret linje](../../../vendor/comrak/PATCH.md) | Markdown-parser | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C-kjøretid, Foundation, blokker | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | bindinger til AppKit, WebKit og Grand Central Dispatch | Zlib, Apache-2.0 eller MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formler og SVG-bilder som vektor-PDF | MIT eller Apache-2.0 |

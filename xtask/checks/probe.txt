@@ -1,0 +1,237 @@
+Save As leaves the old file as it was
+Save As writes the text to its new file and clears the mark
+Save stays available during an autosave
+a Gantt chart is undone in one step
+a Gantt chart writes exactly its text
+a Graphviz diagram renders
+a Mermaid diagram renders
+a PlantUML diagram renders
+a bulleted list is undone in one step
+a bulleted list writes exactly its text
+a changed file reloads
+a click on a task the preview shows from before the last keystroke changes nothing
+a closed document lets go of its editor and all it holds
+a closed document stops asking hosts for the images it waited for
+a code block is undone in one step
+a code block writes exactly its text
+a command with the editor open commits the formula first
+a copy elsewhere is written with the text
+a copy elsewhere leaves the document marked and its file alone
+a deleted file leaves its text open
+a discarded formula leaves text and document as they were
+a document whose editor is gone cannot empty its file
+a draft can be saved
+a failed save keeps no copy of the text
+a failed save leaves the file as it was
+a failed save leaves the text marked as unsaved
+a failure no document shows any more is not asked for again
+a far line of a preview of many tables has its place at once
+a file changed right after Splat saved it reloads
+a file moved by another program takes its document along
+a file that can be read again reloads
+a file that can be read again reloads
+a file that cannot be read for a moment keeps the text
+a file that cannot be read keeps the text it replaced
+a file with an older date reloads
+a final failure is not asked for again
+a flowchart is undone in one step
+a flowchart writes exactly its text
+a footnote is undone in one step
+a footnote writes exactly its text
+a formula arriving during a composition leaves the composition alone
+a formula depends on nothing but itself and the definitions of its document
+a formula finds its packages and fonts in the app and stays one picture
+a formula keeps text that joins its letters in one piece
+a formula renders
+a formula renders in a new page after the old one stopped answering
+a formula with a tag is as wide as it needs to be
+a full disk leaves the file whole and the text unsaved
+a graph behind a comment with a brace takes the colors of the page
+a heading is undone in one step
+a heading writes exactly its text
+a helper decodes a picture
+a helper that died is replaced for the next picture
+a helper that stopped answering ends at its time limit
+a keystroke in the notice of a huge document changes nothing
+a local image is decoded in a helper
+a look at a file whose folder has gone keeps the text
+a look at its file leaves a draft alone
+a look at the file after a save leaves what was typed since
+a look at the file leaves the undo steps
+a look that came too late leaves the other program's file alone
+a lost connection passes: the picture loads on the next try
+a numbered list is undone in one step
+a numbered list writes exactly its text
+a panic does not copy a document without changes
+a panic in a reload leaves one whole text
+a panic in the bytes a save writes ends the save and keeps the text
+a panic in the end of a save ends the save and keeps the text
+a panic in the mark after a save ends the save and keeps the text
+a panic in the start of a save ends the save and keeps the text
+a panic in the text a save takes ends the save and keeps the text
+a panic saves the text of an edited document
+a pasted picture lies next to the document and is linked
+a quote is undone in one step
+a quote writes exactly its text
+a redirect to a private host is not followed
+a remote answer that is no picture counts as failed
+a remote picture loads
+a remote picture over the size limit is not loaded
+a remote picture that is missing counts as failed
+a restored draft is marked
+a rule is undone in one step
+a rule writes exactly its text
+a save after a failed one works
+a save after a failed one writes the text
+a save after a panic in the bytes a save writes writes all there is
+a save after a panic in the end of a save writes all there is
+a save after a panic in the mark after a save writes all there is
+a save after a panic in the start of a save writes all there is
+a save after a panic in the text a save takes writes all there is
+a save asked for during an autosave writes all there is
+a save clears the mark
+a save into a folder that has gone reports its failure and keeps the text unsaved
+a save into a folder that takes nothing reports its failure
+a save over a read-only file fails and keeps the text unsaved
+a save that the folder refuses leaves file, text and mark as they were
+a save to a folder that does not exist reports its failure
+a save with a new line keeps UTF-16 BE
+a save with a new line keeps UTF-16 LE
+a save with a new line keeps Windows line ends
+a save with a new line keeps a byte order mark
+a save with a new line keeps line feeds
+a save with a new line keeps mixed line ends
+a save with a new line keeps old Mac line ends
+a save without a change keeps UTF-16 BE
+a save without a change keeps UTF-16 LE
+a save without a change keeps Windows line ends
+a save without a change keeps a byte order mark
+a save without a change keeps line feeds
+a save without a change keeps mixed line ends
+a save without a change keeps old Mac line ends
+a save works once the file may be written
+a save works once the folder takes files again
+a save works once the text fits on the disk
+a save writes it
+a saved and reloaded document holds its text in its editor only
+a sequence diagram is undone in one step
+a sequence diagram writes exactly its text
+a server error passes: the picture loads on the next try
+a space typed behind bold shows no markers
+a table draws its lines in the color of the text and an error draws no black block
+a table of contents is undone in one step
+a table of contents writes exactly its text
+a task list is undone in one step
+a task list writes exactly its text
+after Save As the document is its new file
+aligning the table is undone in one step
+aligning the table writes exactly its text
+allowing web images hides the question
+an address with its scheme in capitals loads
+an alert box is undone in one step
+an alert box writes exactly its text
+an autosave that the folder refuses leaves file, text and mark as they were
+an earlier version brought back by another program reloads
+an image is scaled like the text in Word
+an image is scaled like the text on paper
+bold is undone in one step
+bold writes exactly its text
+centred alignment is undone in one step
+centred alignment writes exactly its text
+closing the editor commits the formula
+column left is undone in one step
+column left writes exactly its text
+column right is undone in one step
+column right writes exactly its text
+deleting a column is undone in one step
+deleting a column writes exactly its text
+deleting a row is undone in one step
+deleting a row writes exactly its text
+deleting back to the text of a restored draft keeps the mark
+half transparent white over black comes out grey
+highlight is undone in one step
+highlight writes exactly its text
+images on private hosts count as failed at once
+injected content in the formula editor can do nothing
+injected content in the renderer can do nothing
+inline code is undone in one step
+inline code writes exactly its text
+italic is undone in one step
+italic writes exactly its text
+left alignment is undone in one step
+left alignment writes exactly its text
+nothing reaches the private host a redirect names
+one undo takes the formula back
+paper takes along no image from outside the folder of its document
+removing formatting is undone in one step
+removing formatting writes exactly its text
+right alignment is undone in one step
+right alignment writes exactly its text
+row above is undone in one step
+row above writes exactly its text
+row below is undone in one step
+row below writes exactly its text
+saving a draft writes it and clears its mark
+strikethrough is undone in one step
+strikethrough writes exactly its text
+subscript is undone in one step
+subscript writes exactly its text
+superscript is undone in one step
+superscript writes exactly its text
+the HTML export embeds the jpg image as image/jpeg
+the HTML export embeds the local image and the formula
+the HTML export embeds the pdf image as image/png
+the HTML export embeds the png image as image/png
+the HTML export embeds the svg image as image/svg+xml
+the HTML export embeds the tif image as image/png
+the HTML export holds no script
+the HTML export is written
+the Word export carries the jpg image as jpeg
+the Word export carries the pdf image as png
+the Word export carries the png image as png
+the Word export carries the svg image as png
+the Word export carries the tif image as png
+the Word export has a file for each image
+the Word export holds its document and pictures
+the Word export is written
+the decoder helper reads no files and reaches no network
+the defaults of a graph go behind its brace, not into a comment or name
+the draft of a named document stays marked until it is saved
+the first save of a new document writes its text and clears the mark
+the formula editor has an undo history of its own
+the formula editor shows its formula again after its web process ended
+the formula editor's page loads
+the formula editor's script runs
+the formula editor's web view draws no background
+the helper for the system's decoders reads no files and reaches no network
+the look after a panic in a reload reads the file
+the outline lists two nested headings
+the page answers a diagram with the fields the app reads
+the page answers a formula with the fields the app reads
+the picture after a helper that stopped answering decodes
+the preview takes input again once the text is small enough
+the recent documents list a document just noted
+the reloaded document can be saved
+the save after Save As goes to the new file
+the save after a move goes to where the file is now
+the save after a panic in a reload writes all there is
+the save after the first goes to the same file
+the share item stands in the file menu once, right before the exports
+the share menu offers the three exports
+the source shows the formula as it is typed
+the text of a folder that has gone can be saved elsewhere
+the word behind that space is bold as well
+those saves were asked for while an autosave was under way
+underline is undone in one step
+underline writes exactly its text
+undoing back to the text of a restored draft keeps the mark
+undoing in the document with the editor open closes it
+undoing marks a document after a copy just when the text is not the one on file
+undoing marks the document just when the text is not the one on file
+web images wait for permission
+what a composition ends with lands where it was typed
+what is typed after a panic in a reload marks the document
+what is typed after a save marks the document at once
+what is typed marks the document
+what is typed while a look is on its way stays
+without the policy, injected content can fetch and run its handler

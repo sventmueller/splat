@@ -14,7 +14,8 @@ use objc2_foundation::{
 };
 
 use super::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
-use super::images::{ImageStore, Rendered, Sizing};
+use super::images::{ImageStore, locate, may_carry_along, resolve_path};
+use super::picture::{Rendered, Sizing};
 use super::style::{PREVIEW_SIZE, token_color};
 use super::{js, remote};
 use crate::markdown::code;
@@ -38,6 +39,10 @@ pub struct RenderCtx<'a> {
     pub controller: Option<&'a super::EditorController>,
     /// Images from the web load only once the user allowed it for the document.
     pub remote_images: bool,
+    /// What leaves the Mac as a file shows only the local images `may_carry_along` allows.
+    pub leaves_the_mac: bool,
+    /// What the formulas of the document define for each other.
+    pub macros: std::sync::Arc<str>,
 }
 
 struct TextBlocks {
@@ -608,6 +613,8 @@ impl RenderCtx<'_> {
                         .flatten()
                         .flatten()
                         .map(|r| self.images.borrow_mut().for_appearance(url, r, self.dark))
+                } else if self.leaves_the_mac && !may_leave_with_the_document(url, self.doc_dir) {
+                    None
                 } else {
                     self.images
                         .borrow_mut()
@@ -621,7 +628,7 @@ impl RenderCtx<'_> {
                     .setAccessibilityDescription(Some(&ns(if alt.is_empty() { url } else { alt })));
                 r
             }
-            Atom::Math { tex, display } => js::cached(&js::Key::math(tex, *display, self.dark))?,
+            Atom::Math { tex, display } => js::cached(&js::Key::math(tex, *display, self.dark, &self.macros))?,
             Atom::Diagram { source, kind } => js::cached(&js::Key::diagram(source, *kind, self.dark))?,
             Atom::AlertIcon(kind) => {
                 let r = placeholder(alert_symbol(*kind), font)?;
@@ -637,6 +644,10 @@ impl RenderCtx<'_> {
         att.setBounds(attachment_bounds(rendered.sizing, font.xHeight(), self.max_image_width));
         Some(att)
     }
+}
+
+fn may_leave_with_the_document(url: &str, doc_dir: Option<&Path>) -> bool {
+    resolve_path(url, doc_dir).is_some_and(|path| may_carry_along(&locate(&path, doc_dir), doc_dir))
 }
 
 /// Where an attachment stands against its line and how large it is, no wider than `max_width`.

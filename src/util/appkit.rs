@@ -7,7 +7,7 @@ use objc2_app_kit::{
     NSEventModifierFlags, NSLayoutManager, NSMenu, NSMenuItem, NSTextContainer, NSTextInputClient, NSTextStorage,
     NSTextView,
 };
-use objc2_foundation::{NSRange, NSString};
+use objc2_foundation::{NSRange, NSString, NSUndoManager};
 
 use crate::markdown::text::{Byte, Shown, U16, Utf16Map};
 
@@ -165,6 +165,41 @@ pub fn text_container(view: &NSTextView) -> Option<Retained<NSTextContainer>> {
     unsafe { view.textContainer() }
 }
 
+/// Runs `f`, then `end`, also when `f` panics, as the main thread survives that.
+fn with_end<R>(end: impl FnOnce(), f: impl FnOnce() -> R) -> R {
+    struct End<E: FnOnce()>(Option<E>);
+    impl<E: FnOnce()> Drop for End<E> {
+        fn drop(&mut self) {
+            if let Some(end) = self.0.take() {
+                end();
+            }
+        }
+    }
+    let _end = End(Some(end));
+    f()
+}
+
+/// The changes `f` makes to `storage`, as one. A storage left in editing tells nobody of any change from then on.
+pub fn editing<R>(storage: &NSTextStorage, f: impl FnOnce() -> R) -> R {
+    storage.beginEditing();
+    with_end(|| storage.endEditing(), f)
+}
+
+/// What `f` does, which undoing is not to know of. A manager left disabled would leave every later change without an undo.
+pub fn without_undo<R>(undo: Option<&NSUndoManager>, f: impl FnOnce() -> R) -> R {
+    if let Some(undo) = undo {
+        undo.disableUndoRegistration();
+    }
+    with_end(
+        || {
+            if let Some(undo) = undo {
+                undo.enableUndoRegistration();
+            }
+        },
+        f,
+    )
+}
+
 /// Replaces `range` like typing would.
 pub fn insert_text(view: &NSTextView, text: &NSString, range: NSRange) {
     // SAFETY: The inserted object is an NSString, one of the two types this method accepts.
@@ -185,6 +220,38 @@ mod exception_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_storage_ends_its_editing_when_what_edits_it_panics() {
+        let storage = NSTextStorage::new();
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            editing(&storage, || {
+                storage.replaceCharactersInRange_withString(NSRange::new(0, 0), &NSString::from_str("a"));
+                assert!(
+                    !storage.editedMask().is_empty(),
+                    "the change waits for the end of the editing"
+                );
+                panic!("in the editing");
+            });
+        }));
+        assert!(panicked.is_err());
+        assert!(storage.editedMask().is_empty(), "the change went out");
+    }
+
+    #[test]
+    fn undo_is_back_on_when_what_ran_without_it_panics() {
+        // SAFETY: Nothing else in this test binary touches an undo manager, and this one stays on this thread.
+        let undo = NSUndoManager::new(unsafe { MainThreadMarker::new_unchecked() });
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            without_undo(Some(&undo), || {
+                assert!(!undo.isUndoRegistrationEnabled());
+                panic!("without undo");
+            });
+        }));
+        assert!(panicked.is_err());
+        assert!(undo.isUndoRegistrationEnabled());
+        assert_eq!(without_undo(None, || 1), 1);
+    }
 
     #[test]
     fn a_selector_has_one_argument_for_each_colon() {

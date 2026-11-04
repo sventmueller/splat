@@ -120,7 +120,7 @@ Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntax
 - **Tlačítko pro všechno.** Každý prvek Markdownu má tlačítko na panelu nástrojů a položku v nabídce, ty běžné také klávesovou zkratku. Tabulky mají vlastní nabídku pro řádky, sloupce a zarovnání.
 - **Export bez ztrát.** PDF, jediný samostatný soubor HTML nebo dokument Word se skutečnými nadpisy, seznamy, tabulkami, poznámkami pod čarou a obrázky.
 - **Nativní do posledního detailu.** Skutečná okna AppKit, panely, nabídky, popovery, Verze, Automatické ukládání, nabídka Sdílet, tmavý režim, kontrola pravopisu, diktování a VoiceOver. Žádný Electron, žádné webové zobrazení pro samotný text.
-- **Rychlý i u velkých souborů.** Vykreslení stisku klávesy v dokumentu o velikosti 10 MB trvá zhruba 25 ms, před vlastní prací zobrazení.
+- **Rychlý i u velkých souborů.** Vykreslení stisku klávesy v dokumentu o velikosti 10 MB trvá zhruba 10 ms, před vlastní prací zobrazení.
 - **Soukromí a opatrnost.** Obrázky z webu se načtou, až když to povolíte, odkazy do jiných aplikací se nejdřív zeptají a vše, co dekóduje nedůvěryhodná obrazová data, běží v izolovaných pomocných procesech.
 - **Ve vašem jazyce.** Rozhraní i vestavěný stručný přehled Markdownu jsou ve 35 jazycích: arabština, katalánština, čínština (zjednodušená), čínština (tradiční), chorvatština, čeština, dánština, nizozemština, angličtina, finština, francouzština, němčina, řečtina, hebrejština, hindština, maďarština, indonéština, italština, japonština, korejština, malajština, norština, polština, portugalština (Brazílie), portugalština (Portugalsko), rumunština, ruština, slovenština, slovinština, španělština, švédština, thajština, turečtina, ukrajinština a vietnamština.
 
@@ -504,7 +504,7 @@ Soubor Markdown může pocházet od kohokoli, proto Splat považuje každý doku
 - **Ve výchozím stavu bez sítě.** Splat nemá žádnou telemetrii. Aktualizace vyhledává, až když s tím souhlasíte nebo zvolíte **Vyhledat aktualizace…**: načte pak malý soubor kanálu z GitHubu a požadavek uvádí jen aplikaci a její verzi. Vzorce a diagramy se vykreslují lokálně; webová zobrazení, která to dělají, nemají přístup k síti.
 - **Obrázky z webu** se načtou až s vaším svolením, jen přes `https`, nikdy z hostitelů ve vaší místní síti, nejvýše 10 MB každý a v soukromé relaci bez cookies.
 - **Izolované dekódování.** Obrázky a grafika vzorců a diagramů se dekódují v pomocných procesech, které zavřou všechny zděděné soubory a před přečtením prvního bajtu se uzamknou v sandboxu: žádný přístup k souborům, žádná síť. Vracejí jen pixely, jejichž velikost se kontroluje, a po 10 sekundách se zastaví. Dekodéry obrazu přímo od Applu vidí jen HEIC, TIFF, AVIF a PDF, a to jen když data opravdu mají tento formát; běží ve vlastním pomocném procesu, který navíc smí číst systémové složky s písmy a používat systémový video dekodér. Přes tento proces procházejí i SVG, vzorce a diagramy, takže jsou ve Splatu obrázky s pevným rozlišením: čtyři pixely na bod, nejvýše 2560 na delší straně.
-- **Místní soubory** se k dokumentu dostanou jen cestou, kterou uvádí. Vložení zobrazují poznámky Markdown ze složky dokumentu a z podsložek a chybějící obrázek se hledá jen tam. Cesta k obrázku jinde, absolutní nebo začínající `~`, se přesto načte a exporty do HTML a Wordu ji vloží: export dokumentu, který jste nenapsali, si prohlédněte, než ho předáte dál.
+- **Místní soubory** se k dokumentu dostanou jen cestou, kterou uvádí. Vložení zobrazují poznámky Markdown ze složky dokumentu a z podsložek a chybějící obrázek se hledá jen tam. Cesta k obrázku jinde, absolutní nebo začínající `~`, se v náhledu přesto načte; exporty do HTML a Wordu, tisk a PDF berou jen to, co leží ve složce dokumentu nebo v jeho repozitáři Git, pokud tento repozitář neobsahuje i vaši domovskou složku, takže cizí dokument nemůže vtáhnout vaše soubory do exportu, který předáte dál.
 - **Kopie neuloženého textu** zůstávají v tomto Macu, ve vaší složce Knihovna, pro obnovení po pádu. Zmizí s uložením nebo s normálním ukončením Splatu; kopie, které zanechal pád, zůstávají ve složce pro obnovení, dokud je nesmažete.
 - **Odkazy** nikdy nespustí program kliknutím. Odkazy na web a e-mail se otevřou jako obvykle; odkazy do jiných aplikací se nejdřív zeptají.
 - **HTML v dokumentech** čte vlastní parser Splatu. Skripty, styly, rámce a formuláře se nikdy nespustí.
@@ -516,13 +516,14 @@ Soubor Markdown může pocházet od kohokoli, proto Splat považuje každý doku
 Splat zůstává svižný i u dokumentů o velikosti několika megabajtů:
 
 - Zdrojový text používá TextKit 2, který rozvrhuje jen viditelnou část.
-- Při psaní v náhledu a ve zdrojovém textu dokumentů do 2 MB se znovu parsují, barví a rozvrhují jen dotčené odstavce. V dokumentu o velikosti 10 MB trvá parsování a barvení asi 20 ms, vykreslení asi 25 ms a celý stisk klávesy v jeho náhledu asi 60 ms včetně vlastní práce zobrazení.
+- Při psaní v náhledu a ve zdrojovém textu dokumentů do 2 MB se znovu parsují, barví a rozvrhují jen dotčené odstavce. V dokumentu o velikosti 10 MB trvá parsování a barvení asi 3 ms, vykreslení asi 10 ms a celý stisk klávesy v jeho náhledu asi 30 ms včetně vlastní práce zobrazení.
 - Velké náhledy vykreslují nejdřív viditelnou část a zbytek, když aplikace nic nedělá. Bloky posunuté do zobrazení se vykreslí dřív, než se nakreslí.
 - U zdrojového textu větších dokumentů běží parsování pro náhled při psaní na pozadí.
 - Dokument zůstává čistým textem, jakmile by potřeboval asi 4 GB paměti, což je zhruba 50 až 120 MB běžného Markdownu, ale jen 10 až 20 MB samých tabulek nebo nadpisů: zdrojový text nemá barvy a náhled uvede, proč zůstává prázdný. Exporty fungují dál.
 - Od asi 200 KB se okno dokumentu otevře dřív, než se parsuje; při 5 MB následují barvy a náhled asi o čtvrt vteřiny později.
+- Všechny obrázky dohromady, včetně vzorců a diagramů, zabírají nejvýše čtvrtinu paměti Macu a polovinu toho, když je paměti málo. Nad tuto mez se další obrázky zobrazují jako zástupné symboly, dokud se znovu neuvolní místo.
 
-Některé změny se zpracovávají celé, při 10 MB zhruba 300 ms na stisk klávesy: ty v definici nebo odkazech poznámky pod čarou, vedle poznámky v textu, na samém konci dokumentu vedle poznámky pod čarou, ve front matter nebo blízko definic referenčních odkazů, a každá změna v dokumentu s bloky komentářů `%%` nebo s dvakrát definovanou poznámkou pod čarou či poznámkou uvnitř citace nebo seznamu. Paměť roste se souborem, zhruba na 115–160 MB pro 1 MB Markdownu a 340–510 MB pro 10 MB.
+Některé změny se zpracovávají celé, při 10 MB zhruba 300 ms na stisk klávesy: ty v definici nebo odkazech poznámky pod čarou, vedle poznámky v textu, na samém konci dokumentu vedle poznámky pod čarou, ve front matter nebo v definicích referenčních odkazů, a každá změna v dokumentu s bloky komentářů `%%` nebo s dvakrát definovanou poznámkou pod čarou či poznámkou uvnitř citace nebo seznamu. Paměť roste se souborem, zhruba na 115–160 MB pro 1 MB Markdownu a 340–510 MB pro 10 MB.
 
 ## Známá omezení
 
@@ -577,6 +578,7 @@ make check                  # formátování, clippy bez varování, všechny te
 make test                   # make check, potom test bez okna
 make test-gui               # testy s oknem; zabírají Mac asi čtyři minuty
 make test-long              # delší náhodné hledání a kontrola částečné aktualizace při 10 MB
+make fuzz                   # náhodný vstup pro částečnou analýzu a všechny výstupy
 make coverage               # pokrytí řádků všemi testy, s minimem pro každý modul
 make coverage-library       # stejná minima pro moduly bez okna, jako v CI
 make bench FILE=<file.md>   # časování otevření, psaní a posouvání velkého souboru
@@ -626,19 +628,24 @@ Aplikace v něm nese jiný podpis než místní sestavení, takže macOS vede pr
 | `cargo xtask check-library` | knihovna se sestaví pro Linux, takže nic v ní nepotřebuje macOS |
 | `cargo xtask vendor check` | JavaScriptové knihovny odpovídají `vendor.lock` bajt po bajtu |
 | `cargo xtask selftest probe` | bez okna, každý se svým očekávaným výsledkem: vzorce, diagramy, webové obrázky proti serveru uvnitř procesu, blokované adresy, text, který píše každý příkaz, každý formát obrázku oběma exporty, stránka, která přestane odpovídat, a obrany webových zobrazení proti stránce, která je nemá. Trvá asi půl minuty. Co potřebuje aplikaci před sebou, se při zamčené obrazovce přeskočí |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | běžící aplikace, klik po kliku. Otevře okno a píše do něj; Mac je asi čtyři minuty zaneprázdněn. `--scenarios` spustí jen druhou část, asi za půldruhé minuty |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | běžící aplikace, klik po kliku. Otevře okno a píše do něj; Mac je asi čtyři minuty zaneprázdněn. `--scenarios` spustí jen druhou část, asi za půldruhé minuty. `--only` spustí jednu skupinu této části, v jejím vlastním dokumentu, i při zamčené obrazovce. `--in-back` vynechá to, co potřebuje aplikaci v popředí; bez něj taková kontrola selže |
 | `cargo xtask selftest resize` | rozšíří okno po posunutí rozdělovače: zdrojový text se přeláme, zatímco se mění velikost okna. Trvá asi deset sekund |
-| `cargo xtask selftest bench <file.md>` | časování otevření, psaní a posouvání velkého souboru |
+| `cargo xtask selftest typing [--by-hand]` | píše i přes ukládání, klávesami přes frontu událostí aplikace nebo s `--by-hand` ručně: napsaný text zůstává a počítá se jako neuložený. Trvá asi minutu |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | časování otevření, psaní a posouvání velkého souboru; `--keystroke-ms` selže, když nejrychlejší stisk trvá déle |
 | `cargo test --release -- --ignored partial_updates` | jeden stisk klávesy v 10 MB: částečná proti úplné aktualizaci, stejný výsledek nejvýše za čtvrtinu času |
 | `cargo test --release --test hostile` | dokumenty vytvořené tak, aby přetekly zásobník nebo trvaly kvadratický čas, každý ve dvou velikostech, jejichž časy musí růst jako text, přes parsování, rozvržení, oba exporty, stisky kláves a příkazy |
-| `make mutants` | chyby vestavěné do `src/markdown/` a `src/preview/` jedna po druhé přes [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); říká, které žádný test nezaznamená. Trvá hodiny; `FILE=src/preview/bridge.rs` to zúží |
+| `make mutants` | chyby vestavěné do `crates/splat-markdown`, `crates/splat-preview` a `crates/splat-file-state` jedna po druhé přes [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); říká, které žádný test nezaznamená. Trvá hodiny; `FILE=crates/splat-preview/src/bridge/mod.rs` to zúží |
+| `make fuzz` | náhodný vstup přes [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), který potřebuje nightly z rustupu: stisky kláves, které se musí číst jako úplná analýza, všechny výstupy, úpravy v náhledu, všechny příkazy a soubor, který se uloží tak, jak se otevřel. `SECONDS=600` hledá déle |
+| `cargo test --release --test fuzz_seeds` | seedy v `fuzz/seeds/` přes kontroly těchto cílů fuzzingu, bez fuzzeru; součást každého `cargo test` |
+| `cargo test --profile checked --workspace` | testy s tím, co navíc kontroluje ladicí sestavení: po každé částečné analýze bloky odpovídají textu a to, co nese dál, je to, co říká text. Součást `make test-long` |
+| `cargo test --release --test entry_points --test structure` | ze zdrojů: vše, co volá systém, je chráněno před panikou a moduly závisí jen směrem dolů |
 | `cargo test --release --test decoder` | proces dekodéru dekóduje obrázky a nedosáhne na soubory ani na síť |
 | `make coverage` | pokrytí řádků pomocí `cargo test` a všech self-testů přes [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); selže pod minimy. Zabírá Mac asi pět minut |
-| `make coverage-library` | `src/markdown/`, `src/preview/` a `i18n.rs` proti jejich vyšším minimům, měřeno samotným `cargo test` |
+| `make coverage-library` | crates `splat-markdown`, `splat-preview`, `splat-file-state` a `splat-i18n` proti jejich vyšším minimům, měřeno samotným `cargo test` |
 
-Jednotkové testy leží vedle kódu, který testují. `tests/` obsahuje to, co se ke knihovně dostává zvenčí: náhodné testy v `robustness.rs`, které sdílejí generátor v `src/fuzz.rs` s testy v `sync.rs`, dokumenty vytvořené k poškození v `hostile.rs` a test dekodéru, který spouští sestavený program. Rozhodnutí v `src/editor/`, která nepotřebují okno, žijí ve volných funkcích s vlastními testy: vše, co ovladač ví, a jak se to mění, v `state.rs`, pravidla vykreslování v `render_queue.rs`, kopie textu v `sync.rs`, styly odstavců, písma a barvy jako hodnoty v `render.rs`, co znamenají identifikátory panelu nástrojů v `toolbar.rs`, co znamená kliknutí na odkaz v `navigation.rs`.
+Jednotkové testy leží vedle kódu, který testují. `crates/splat-testkit/tests/` obsahuje to, co se k modelu a náhledu dostává zvenčí: náhodné testy v `robustness.rs`, které sdílejí generátor z `splat-testkit` s testy v `sync.rs`, dokumenty vytvořené k poškození v `hostile.rs` a seedy cílů fuzzingu v `fuzz_seeds.rs`. `tests/` obsahuje to, co se dívá na celý program: jeho zdroje, jeho překlady a test dekodéru, který spouští sestavený program. Rozhodnutí v `src/editor/`, která nepotřebují okno, žijí ve volných funkcích s vlastními testy: vše, co ovladač ví, a jak se to mění, v `state.rs`, pravidla vykreslování v `render_queue.rs`, kopie textu v `sync.rs`, styly odstavců, písma a barvy jako hodnoty v `render.rs`, co znamenají identifikátory panelu nástrojů v `toolbar.rs`, co znamená kliknutí na odkaz v `navigation.rs`.
 
-Krok self-testu okna čeká na pojmenovanou podmínku, ne na čas; pauzu s udaným důvodem si ponechá jen to, co žádný signál nedává, například nepřítomnost něčeho. Marné čekání je selhaná kontrola, která říká, co nikdy nepřišlo, krok, který zpanikaří, je také selhaná kontrola a běh pokračuje v obou případech. Kontrola, která v tomto běhu nemůže nic říct, hlásí `SELFTEST SKIP`: xtask ji vypíše a ona neprojde ani neselže. xtask vyžaduje od každého režimu, a od `--scenarios` zvlášť, asi devět desetin jeho kontrol. Self-test okna spouští po hlavním proklikání druhou část, v `src/editor/selftest/scenarios.rs`: každý příkaz formátování a tabulek, dialogy, kliknutí na odkazy, vkládání, přetahování, exporty, velkou změnu, obrázky měnící se na disku, nedostatek paměti, obrovský dokument a obnovu po pádu.
+Krok self-testu okna čeká na pojmenovanou podmínku, ne na čas; pauzu s udaným důvodem si ponechá jen to, co žádný signál nedává, například nepřítomnost něčeho. Marné čekání je selhaná kontrola, která říká, co nikdy nepřišlo, krok, který zpanikaří, je také selhaná kontrola a běh pokračuje v obou případech. Kontrola, která v tomto běhu nemůže nic říct, hlásí `SELFTEST SKIP`: xtask ji vypíše a ona neprojde ani neselže. xtask vyžaduje od každého režimu, a od `--scenarios` zvlášť, asi devět desetin jeho kontrol. Self-test okna spouští po hlavním proklikání druhou část, v `src/editor/selftest/scenarios.rs`: každý příkaz formátování a tabulek, dialogy, kliknutí na odkazy, vkládání, přetahování, exporty, soubor, který změnil jiný program, velkou změnu, obrázky měnící se na disku, nedostatek paměti, obrovský dokument a obnovu po pádu. Každá její skupina otevírá vlastní dokument, takže selhání v jedné se nedostane do další, a každá může běžet samostatně s `--only`. Test bez okna také záměrně rozbíjí ukládání: složka, která nic nepřijme, soubor jen pro čtení, složka, která zmizela, plný disk a panika v každém callbacku uložení, a nic z toho nesmí stát text.
 
 Pokrytí má dvě minima: každý modul alespoň 84 % řádků, všechny moduly dohromady alespoň 96 %. `make coverage` měří `cargo test` spolu se self-testy a selže pod kterýmkoli z nich; `make coverage-library` drží to, co okno nepotřebuje, na 90 % a 97 %. Minima a pár výjimek, například panic hook v `main.rs`, který běží jen při pádu, jsou v [xtask](../../../xtask/src/coverage.rs) vedle svých důvodů. Měřená sestavení jdou do `target/coverage/`, takže měřicí kód se nikdy nedostane do `target/release/` ani do obrazu disku. Pomocný proces dekodéru otevírá svůj soubor s měřením dřív, než se uzamkne, takže se měří také.
 
@@ -648,16 +655,20 @@ Výstup self-testů jde do `target/selftest/`. Self-test sestaví samostatnou ap
 
 ### Struktura projektu
 
-`src/lib.rs` dělá z toho, co nepotřebuje okno, samostatnou knihovnu `splat`: `markdown/`, `preview/`, `i18n.rs` a generátor testů `fuzz.rs`. Sestaví se bez macOS. Aplikace v `src/main.rs` na ní staví.
+Vše, co nepotřebuje okno, je samostatný crate v `crates/`, který se sestaví bez macOS, takže kompilátor hlídá, jak na sobě závisejí. Aplikace v `src/` (balíček `splat-app`, program `splat`) na nich staví.
 
-- `src/markdown/`: strom, který čtou všichni spotřebitelé, `Doc` v `doc/`, který vlastní svůj text, a jediná vazba na parser v `reader/`: comrak se nejmenuje nikde jinde a `reader/assumptions.rs` drží, co kód o něm předpokládá. Barvy syntaxe a všechny příkazy jako čisté textové úpravy (`Edit`) v `commands/`. Také opětovné parsování po úpravě (`incremental.rs`), čtečka vloženého HTML (`markup.rs`), typografie, štítky, odkazy a citace v běžném textu (`typography.rs`), jak text vypadá a jaký Markdown a HTML to způsobí (`style.rs`), co smí být adresa (`url.rs`) a export do HTML a Wordu (`html.rs`, `docx.rs` s `docx/html.rs` a `docx/xml.rs`). Pozice má svůj typ: `Byte` ve zdrojovém textu, `U16` ve zdrojovém zobrazení, `Shown` v zobrazení náhledu (`text.rs`). Bez AppKit.
-- `src/preview/`: rozvržení náhledu v `layout/` s vloženým HTML v `layout/html.rs` a přiřazení mezi náhledem a zdrojem (`Bridge`, `Index`). `Bridge` odmítne rozvržení jiné verze `Doc`. Bez AppKit.
+- `crates/splat-markdown/`: strom, který čtou všichni spotřebitelé, `Doc` v `doc/`, který vlastní svůj text, a jediná vazba na parser v `reader/`: comrak se nejmenuje nikde jinde a `reader/assumptions.rs` drží, co kód o něm předpokládá. Barvy syntaxe a všechny příkazy jako čisté textové úpravy (`Edit`) v `commands/`. Také opětovné parsování po úpravě (`incremental.rs`), čtečka vloženého HTML (`markup.rs`), typografie, štítky, odkazy a citace v běžném textu (`typography.rs`), jak text vypadá a jaký Markdown a HTML to způsobí (`style.rs`), co smí být adresa (`url.rs`) a export do HTML a Wordu (`html.rs`, `docx.rs` s `docx/html.rs` a `docx/xml.rs`). Pozice má svůj typ: `Byte` ve zdrojovém textu, `U16` ve zdrojovém zobrazení, `Shown` v zobrazení náhledu (`text.rs`).
+- `crates/splat-preview/`: rozvržení náhledu v `layout/` s vloženým HTML v `layout/html.rs` a přiřazení mezi náhledem a zdrojem (`Bridge`, `Index`). `Bridge` odmítne rozvržení jiné verze `Doc`.
+- `crates/splat-file-state/`: jaký text soubor obsahuje, v jakém formátu a co znamená pohled na něj.
+- `crates/splat-i18n/` s `resources/*.lproj`: 35 jazyků; klíče jsou německé texty a aplikace při startu nainstaluje tabulku jazyka rozhraní.
+- `crates/splat-testkit/`: generátor náhodných testů a kontroly cílů fuzzingu.
 - `src/editor/`: okno. Jeden objekt `EditorController` slouží AppKit jako delegát obou zobrazení a předává práci komponentám, malým strukturám nad ovladačem a stavem, který vlastní, jejichž pole ostatní moduly nedosáhnou:
 
 | Modul | Odpovědnost |
 |---|---|
-| `mod.rs` | třída, metody delegáta, které předávají, `invalidate` |
+| `controller.rs` | třída, metody delegáta, které předávají, `invalidate` a to, co zbytek programu říká editoru; jen on se dostane ke komponentám |
 | `panes.rs` | `Panes`: textová zobrazení, osnova, zobrazení a skrytí panelů a to, co dává přístup k zobrazením |
+| `controller/layers.rs` | kdo smí kam: komponenta dostane přístup ke kontroléru, který nabízí to, co leží pod ní, a kompilátor to hlídá |
 | `state.rs` | co ovladač ví o dokumentu a každý způsob, jak se to mění; jeho pole jsou soukromá a nedotýká se žádného zobrazení |
 | `model.rs` | půjčuje stav a kopii textu closures, které na žádné zobrazení nedosáhnou |
 | `actions.rs` | registr příkazů: selektor, název, zkratka, symbol, kdy se příkaz uplatní |
@@ -669,17 +680,16 @@ Výstup self-testů jde do `target/selftest/`. Self-test sestaví samostatnou ap
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: editor vzorců a diagramů |
 | `navigation.rs`, `links.rs` | `Links`: odkazy, wikiodkazy, štítky, zaškrtávací políčka úkolů, sbalování, poznámky pod čarou |
 | `env.rs` | co náhled čte zvenčí textu: typografická interpunkce, repozitář pro `@name` a `#12`, soubor BibTeX, vložené poznámky |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | text náhledu, místní a vzdálené obrázky; `Pictures` v `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | text náhledu, místní a vzdálené obrázky; `Pictures` v `images.rs` |
 | `attributes.rs` | atributy textu; každý klíč dostane jen hodnotu typu, který očekává |
 | `shadow.rs` | kopie neuloženého textu pro obnovu po pádu |
 | `decoder.rs` | pomocné procesy v sandboxu, které dekódují obrázky a grafiku |
 | `export.rs`, `outline.rs` | `Sharing`: export do HTML a Wordu, soubor ke sdílení, tisk; postranní panel s osnovou |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit pro MathJax, Mermaid, Graphviz, PlantUML a vizuální editor vzorců; pravidla, co se kdy vykresluje, stranou od WebKitu |
 | `webkit.rs` | volání do WebKitu; u `js.rs` a `mathfield.rs` zůstává jen životnost navigačního delegáta |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | stavba okna, panel nástrojů, textová zobrazení, dialogy, barvy |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | stavba okna, panel nástrojů, textová zobrazení, dialogy, barvy |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: řádek nabídek, delegát aplikace, dokument (`MDDocument`, podtřída `NSDocument`).
-- `src/i18n.rs` s `resources/*.lproj`: 35 jazyků; klíče jsou německé texty a aplikace při startu nainstaluje tabulku jazyka rozhraní.
 - `src/util/`: pracovní vlákna (`lanes.rs`), svazky, které mohou přestat odpovídat (`volumes.rs`), pomocné funkce AppKit, soubory a procesy. `src/diag.rs`: co se pokazí mimo dohled uživatele, jde do systémového logu, bez jakéhokoli textu dokumentu.
 - `src/large_alloc.rs`: velké alokace jdou přímo z jádra a po uvolnění se do něj vracejí, takže se paměť po velkých úpravách vrací.
 - `resources/js/`: webové stránky a knihovny; verze a kontrolní součty ve [vendor.lock](../../../vendor.lock).
@@ -691,11 +701,11 @@ Zdrojový text v levém textovém zobrazení je jediný zdroj pravdy.
 
 1. Každá změna znaku tam aktualizuje kopii textu (`Snapshot`) na místě, bez nového čtení textu.
 2. Aktualizace zparsuje kopii, přebarví zdrojový text jen tam, kde se barvy změnily, rozvrhne náhled a nahradí jen bloky, jejichž obsah se změnil.
-3. Po úpravě se znovu parsují, barví a rozvrhují jen dotčené odstavce, pokud jejich sousedé zůstávají stejní; kdy tomu tak není, říká `reparse_part_and_color`. Dokumenty s bloky komentářů `%%`, změny front matter a v dokumentu s definicemi referenčních odkazů změny části s hranatou závorkou se zpracovávají celé. comrak rozpozná odkaz na poznámku pod čarou jen s její definicí ve stejném parsování a definice přesouvá za text, proto se část parsuje se zástupnou definicí pro každý štítek a čísla bere ze starého stromu; změna odkazů nebo definic v této části, nebo vedle poznámky v textu, se zpracuje celá.
+3. Po úpravě se znovu parsují, barví a rozvrhují jen dotčené odstavce, pokud jejich sousedé zůstávají stejní; proč to dává totéž co úplná analýza a na co se dívat, když se comrak změní, říká [docs/partial-parse.md](../../../docs/partial-parse.md). Dokumenty s bloky komentářů `%%`, změny front matter a v dokumentu s definicemi referenčních odkazů změny části s hranatou závorkou se zpracovávají celé. comrak rozpozná odkaz na poznámku pod čarou jen s její definicí ve stejném parsování a definice přesouvá za text, proto se část parsuje se zástupnou definicí pro každý štítek a čísla bere ze starého stromu; změna odkazů nebo definic v této části, nebo vedle poznámky v textu, se zpracuje celá.
 4. Bloky HTML, které otevírají `<details>` nebo `<div align>` a zavírají je později, ovlivňují bloky Markdownu mezi nimi; znovu použitý blok musí mít stejné okolí.
 5. Při psaní ve zdrojovém textu dokumentu do 2 MB běží částečná aktualizace okamžitě; pokud se neuplatní, nebo ve větším dokumentu, běží parsování a rozvržení na pozadí. Při psaní v náhledu běží okamžitě, protože kurzor náhledu závisí na výsledku.
 6. Vstup v náhledu převádí `Bridge` na úpravu zdrojového textu a odtud jde stejnou cestou. Markdown má příliš mnoho způsobů, jak z textu udělat syntaxi, než aby stačila pravidla, proto `preview/verify.rs` změněnou část parsuje znovu a porovná, co ukazuje, s tím, co bylo napsáno; úprava, která neobstojí, se escapuje dál nebo odmítne.
-7. Pozice v textu podle comraku jsou na několika místech chybné, například za definicí referenčního odkazu. `markdown/reader/positions.rs` je při čtení bloku kontroluje podle zdrojového textu a tam, kde nesedí, je načte ze zdrojového textu znovu.
+7. Pozice v textu podle comraku jsou na několika místech chybné, například za definicí referenčního odkazu. `reader/positions.rs` je při čtení bloku kontroluje podle zdrojového textu a tam, kde nesedí, je načte ze zdrojového textu znovu.
 
 ### Pravidla v ovladači
 
@@ -704,16 +714,18 @@ Zdrojový text v levém textovém zobrazení je jediný zdroj pravdy.
 3. Zprávy zvenčí (načtený obrázek, vykreslený vzorec) přicházejí se zpožděním přes `renders_arrived` a `image_arrived`, nikdy uprostřed aktualizace.
 4. Překreslení bez změny textu jde jen přes `invalidate(reason)`.
 5. Kopie textu se nedrží přes změnu zdrojového textu, jinak ta změna zkopíruje celý text: `with_text` ji půjčuje jen na dobu trvání closure typu `Send`.
-6. Nový příkaz potřebuje záznam v `actions.rs`, metodu v `mod.rs` a větev v `Editing::perform`.
+6. Nový příkaz potřebuje záznam v `actions.rs`, metodu v `controller.rs` a větev v `Editing::perform`.
 7. Každý blok `unsafe` nese své zdůvodnění jako komentář `// SAFETY:`. Bajty se k systémovým dekodérům obrazu dostanou jen v pomocném procesu, přes `decoder::decode_native`; test prohledá zdrojové kódy kvůli jiným voláním.
 8. Nic na hlavním vlákně nečeká na složky uživatele, protože síťový svazek může přestat odpovídat: soubory se zjišťují ve vlákně `DISK` a náhled čte odpovědi přes `Env::known`. Přímo na disk smí sáhnout jen akce, na kterou uživatel čeká, jako export nebo ukládání.
+9. Co musí skončit, skončí i po panice, protože hlavní vlákno ji přežije: nastavený příznak jde přes `with_raised`, úprava úložiště textu přes `editing` a to, o čem nemá vědět funkce Zpět, přes `without_undo`. Test najde, co je z toho napsané ručně.
+10. Adresa v dokumentu má jediné čtení, v `splat_markdown::url`; test najde schémata porovnávaná ručně.
 
 ### Přidání příkazu
 
 Řádek nabídek, panel nástrojů i kontextová nabídka vytvářejí své položky z registru v [src/editor/actions.rs](../../../src/editor/actions.rs) a validace nabídek z něj čte, kdy se příkaz uplatní a zda má zaškrtnutí. Nový příkaz potřebuje:
 
 1. variantu `Action` s jeho `Spec`: selektor, název, popisek na panelu nástrojů, nápovědu (začínající slovesem, nejvýše 75 znaků), zkratku, symbol SF a kdy se uplatní
-2. metodu v `src/editor/mod.rs`
+2. metodu v `src/editor/controller.rs`
 3. větev v `Editing::perform`
 4. jeho texty v každém souboru `Localizable.strings`
 
@@ -735,7 +747,7 @@ Kód používá německý text jako klíč: `t("Fett")` ho vyhledá za běhu, `n
 
 | Komponenta | Verze | Použití | Licence |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | parser Markdownu | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 s [jedním změněným řádkem](../../../vendor/comrak/PATCH.md) | parser Markdownu | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | běhové prostředí Objective-C, Foundation, bloky | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | vazby na AppKit, WebKit a Grand Central Dispatch | Zlib, Apache-2.0 nebo MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | vzorce a obrázky SVG jako vektorové PDF | MIT nebo Apache-2.0 |

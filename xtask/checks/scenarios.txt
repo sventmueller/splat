@@ -1,0 +1,182 @@
+HTML export proposes the document's name
+Word export proposes the document's name
+a Gantt chart is undone in one step
+a Gantt chart writes exactly its text
+a bulleted list is undone in one step
+a bulleted list writes exactly its text
+a cancelled image dialog leaves the text
+a click on a footnote reference shows the footnote
+a click on the Dock icon opens a document
+a code block is undone in one step
+a code block writes exactly its text
+a crash leaves a copy of every document with unsaved text
+a drop is undone in one step
+a failed export says so
+a file in UTF-16 opens with its umlauts
+a flowchart is undone in one step
+a flowchart writes exactly its text
+a footnote is undone in one step
+a footnote writes exactly its text
+a heading is undone in one step
+a heading writes exactly its text
+a huge document says why it has no preview
+a key right after a save marks the document as edited
+a large change renders the part around the view first
+a link to another app asks first
+a missing image counts as failed
+a numbered list is undone in one step
+a numbered list writes exactly its text
+a pasted TIFF picture is stored as PNG
+a pasted TIFF picture is taken without waiting for it
+a pasted picture becomes a file beside the document and an image link
+a pasted picture is taken without waiting for it
+a picture pasted into an unsaved document is taken
+a plain click on a web link only places the caret
+a quote is undone in one step
+a quote writes exactly its text
+a reload closes the formula's editor
+a rule is undone in one step
+a rule writes exactly its text
+a running app keeps its own copies
+a save over the file of another program asks first and leaves file and text alone
+a saved document needs no copy
+a saved file holds exactly the text of the source
+a sequence diagram is undone in one step
+a sequence diagram writes exactly its text
+a table of contents is undone in one step
+a table of contents writes exactly its text
+a task list is undone in one step
+a task list writes exactly its text
+a toolbar command is undone in one step
+a toolbar group runs the command of its segment
+aligning the table is undone in one step
+aligning the table writes exactly its text
+an alert box is undone in one step
+an alert box writes exactly its text
+an export to a place without write access fails
+an image replaced on disk shows without reopening
+an image that appears later shows
+an unsaved document asks to be saved before a picture is pasted
+backtab in a table moves between its cells
+blocks scrolled into view are rendered
+bold is undone in one step
+bold writes exactly its text
+centred alignment is undone in one step
+centred alignment writes exactly its text
+column left is undone in one step
+column left writes exactly its text
+column right is undone in one step
+column right writes exactly its text
+content stays below toolbar and tab bar
+deleting a column is undone in one step
+deleting a column writes exactly its text
+deleting a row is undone in one step
+deleting a row writes exactly its text
+document loaded
+dropped files and addresses become images and links
+every item the toolbar offers can be made
+highlight is undone in one step
+highlight writes exactly its text
+inline code is undone in one step
+inline code writes exactly its text
+inserting a link is undone in one step
+inserting a table is undone in one step
+italic is undone in one step
+italic writes exactly its text
+keys right after a save are either marked or written
+keys right after a save can be undone
+keys right after a save outlive the look at the file
+left alignment is undone in one step
+left alignment writes exactly its text
+links to other apps are links
+links to other documents are links
+nothing of a closed editor reaches the reloaded text
+once memory is back, images decode at full size again
+pasting a TIFF picture is undone in one step
+pasting a picture is undone in one step
+preview rendered
+printing does not leave out an image that is still loading
+removing formatting is undone in one step
+removing formatting writes exactly its text
+right alignment is undone in one step
+right alignment writes exactly its text
+row above is undone in one step
+row above writes exactly its text
+row below is undone in one step
+row below writes exactly its text
+saving anyway keeps no copy of the text
+saving anyway writes the text over the other version
+strikethrough is undone in one step
+strikethrough writes exactly its text
+subscript is undone in one step
+subscript writes exactly its text
+superscript is undone in one step
+superscript writes exactly its text
+tab bar shows no plus button of its own
+tab in a table moves between its cells
+tags are links
+taking the last version keeps no copy of the text
+taking the last version shows what the other program wrote
+text on the pasteboard wins over its picture
+the HTML export embeds the jpg image as image/jpeg
+the HTML export embeds the pdf image as image/png
+the HTML export embeds the png image as image/png
+the HTML export embeds the svg image as image/svg+xml
+the HTML export embeds the tif image as image/png
+the HTML export is written
+the Word export carries the jpg image as jpeg
+the Word export carries the pdf image as png
+the Word export carries the png image as png
+the Word export carries the svg image as png
+the Word export carries the tif image as png
+the Word export has a file for each image
+the Word export is written
+the actual size comes back
+the bold button sits in a toolbar group
+the footnote reference is a link
+the formula's editor opens for the reload check
+the helpers start again after they were ended for memory
+the huge text is undone in one step
+the image dialog opens
+the image line is undone in one step
+the large change is undone in one step
+the link dialog asks for address and text
+the link dialog links the selection
+the menu checks bold where the caret is in bold text
+the menu offers to hide the shown preview
+the next start says once where the copies are
+the next start takes over the copies of a crashed run
+the outline check leaves the text
+the outline closes
+the outline follows the text while the preview is hidden
+the outline opens
+the patched text copy matches the source view
+the preview can be captured
+the preview can be captured
+the preview comes back with the smaller text
+the preview of a huge document takes no input
+the preview takes input again with the smaller text
+the question offers to save anyway, to take the last version or to save elsewhere
+the quick reference is in the interface language
+the quick reference opens as a document
+the shown image survives
+the table dialog inserts a table of three by three
+the table dialog opens
+the text typed for the crash goes again
+the typing is undone
+the unsaved text can be taken back
+typing in the preview while the source is parsed shows the source again
+typographic punctuation switches
+underline is undone in one step
+underline writes exactly its text
+undoing leaves the text of before
+undoing reaches back across the save
+unsaved text has a copy that outlives a crash
+unsaved text outlives a change of its file by another program
+what is selected in the source gets marked on screen in the preview
+while memory is short, images decode smaller
+zooming in enlarges
+zooming out shrinks
+⌘-click on a link to a Markdown file opens it in Splat
+⌘-click on a missing file opens nothing
+⌘-click on a tag searches for it in the source

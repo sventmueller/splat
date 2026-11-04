@@ -14,7 +14,7 @@ use objc2_foundation::{NSNotification, NSNumber, NSObjectProtocol, NSPoint, NSRe
 
 use super::EditorController;
 use crate::markdown::text::Byte;
-use crate::util::ns;
+use crate::util::{guarded, ns};
 
 /// One heading of the tree.
 #[derive(Debug, PartialEq)]
@@ -72,22 +72,23 @@ define_class!(
     unsafe impl NSOutlineViewDataSource for OutlineSource {
         #[unsafe(method(outlineView:numberOfChildrenOfItem:))]
         fn children_count(&self, _view: &NSOutlineView, item: Option<&AnyObject>) -> isize {
-            crate::util::to_isize(self.children_of(item).len())
+            guarded(0, || crate::util::to_isize(self.children_of(item).len()))
         }
 
         #[unsafe(method_id(outlineView:child:ofItem:))]
         fn child(&self, _view: &NSOutlineView, index: isize, item: Option<&AnyObject>) -> Retained<AnyObject> {
-            let i = self
-                .children_of(item)
-                .get(crate::util::to_usize(index))
-                .copied()
-                .unwrap_or(0);
+            let i = guarded(0, || {
+                self.children_of(item)
+                    .get(crate::util::to_usize(index))
+                    .copied()
+                    .unwrap_or(0)
+            });
             crate::util::obj(NSNumber::new_usize(i))
         }
 
         #[unsafe(method(outlineView:isItemExpandable:))]
         fn expandable(&self, _view: &NSOutlineView, item: &AnyObject) -> bool {
-            !self.children_of(Some(item)).is_empty()
+            guarded(false, || !self.children_of(Some(item)).is_empty())
         }
     }
 
@@ -101,31 +102,35 @@ define_class!(
             _column: Option<&NSTableColumn>,
             item: &AnyObject,
         ) -> Option<Retained<NSView>> {
-            let title = index_of(item).and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.title.clone()));
-            title.map(|title| {
-                let label = NSTextField::labelWithString(&ns(&title), self.mtm());
-                label.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
-                label.setToolTip(Some(&ns(&title)));
-                Retained::into_super(Retained::into_super(label))
+            guarded(None, || {
+                let title = index_of(item).and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.title.clone()));
+                title.map(|title| {
+                    let label = NSTextField::labelWithString(&ns(&title), self.mtm());
+                    label.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
+                    label.setToolTip(Some(&ns(&title)));
+                    Retained::into_super(Retained::into_super(label))
+                })
             })
         }
 
         #[unsafe(method(outlineViewSelectionDidChange:))]
         fn selection_changed(&self, notification: &NSNotification) {
-            if self.ivars().reloading.get() {
-                return;
-            }
-            let Some(view) = notification.object().and_then(|o| o.downcast::<NSOutlineView>().ok()) else {
-                return;
-            };
-            let start = view
-                .itemAtRow(view.selectedRow())
-                .and_then(|item| index_of(&item))
-                .and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.start));
-            let controller = self.ivars().controller.borrow().as_ref().and_then(Weak::load);
-            if let (Some(start), Some(c)) = (start, controller) {
-                c.links().reveal_source(start);
-            }
+            guarded((), || {
+                if self.ivars().reloading.get() {
+                    return;
+                }
+                let Some(view) = notification.object().and_then(|o| o.downcast::<NSOutlineView>().ok()) else {
+                    return;
+                };
+                let start = view
+                    .itemAtRow(view.selectedRow())
+                    .and_then(|item| index_of(&item))
+                    .and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.start));
+                let controller = self.ivars().controller.borrow().as_ref().and_then(Weak::load);
+                if let (Some(start), Some(c)) = (start, controller) {
+                    c.reveal_source(start);
+                }
+            });
         }
     }
 );
@@ -204,11 +209,11 @@ impl Outline {
         *ivars.roots.borrow_mut() = roots;
         if changed {
             *ivars.shown.borrow_mut() = shape;
-            ivars.reloading.set(true);
-            self.view.reloadData();
-            // SAFETY: a missing item means every top-level item, which the method accepts.
-            unsafe { self.view.expandItem_expandChildren(None, true) };
-            ivars.reloading.set(false);
+            crate::util::with_raised(&ivars.reloading, || {
+                self.view.reloadData();
+                // SAFETY: a missing item means every top-level item, which the method accepts.
+                unsafe { self.view.expandItem_expandChildren(None, true) };
+            });
         }
     }
 }

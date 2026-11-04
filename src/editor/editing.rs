@@ -5,28 +5,27 @@ use std::cell::RefCell;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use objc2::rc::Retained;
+use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, Sel};
-use objc2::{DefinedClass, MainThreadOnly, Message, sel};
+use objc2::{Message, sel};
 use objc2_app_kit::{NSBeep, NSMenu, NSMenuItem, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeTIFF, NSTextView};
 use objc2_foundation::{NSArray, NSString, NSValue};
 
 use super::actions::{self, Action, Applies, code_language, diagram_template};
 use super::atom::atom_at_preview;
+use super::layers::ForEditing;
 use super::state::PreviewMode;
 use super::sync::utf16_diff;
 use super::views::{offers_text, pasteboard_urls};
-use super::{EditorController, Invalidate, State, tag_of};
+use super::{Invalidate, State, tag_of};
 use crate::i18n::{t, tf};
 use crate::markdown::commands::{self, Active, Edit, InlineStyle, ListStyle, Pending, Toggle};
 use crate::markdown::doc::{AlertKind, Align, Doc};
 use crate::markdown::table::{self, TableOp};
-use crate::markdown::text::{Byte, Shown, TextAt, U16, units, utf16_len};
+use crate::markdown::text::{Byte, Direction, Shown, TextAt, U16, units, utf16_len};
 use crate::preview::bridge::Bridge;
 use crate::preview::layout::Layout;
-use crate::util::{
-    answer_from, constant, contained, insert_text, ns, perform_later, shown_from_ns, storage, to_nsrange,
-};
+use crate::util::{answer_from, constant, contained, ns, perform_later, shown_from_ns, to_nsrange};
 
 /// How long a paste waits for the picture to reach the document's folder, which may lie on a volume that hangs.
 const PASTE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -57,6 +56,11 @@ pub(super) struct EditState {
 }
 
 impl EditState {
+    /// The preview text view is applying a user edit; its storage is ahead of the layout until textDidChange.
+    pub(super) fn preview_editing(&self) -> bool {
+        self.preview_edit.borrow().is_some()
+    }
+
     /// A second announcement before the first is done means several changes, which no single range describes.
     fn announce(&self, announced: Announced) {
         let mut slot = self.preview_edit.borrow_mut();
@@ -76,16 +80,13 @@ impl EditState {
 }
 
 pub(super) struct Editing<'a> {
-    host: &'a EditorController,
+    host: ForEditing<'a>,
     state: &'a EditState,
 }
 
-impl EditorController {
-    pub(super) fn editing(&self) -> Editing<'_> {
-        Editing {
-            host: self,
-            state: &self.ivars().edits,
-        }
+impl<'a> Editing<'a> {
+    pub(super) fn new(host: ForEditing<'a>, state: &'a EditState) -> Self {
+        Editing { host, state }
     }
 }
 
@@ -143,8 +144,15 @@ impl Editing<'_> {
         }
     }
 
-    #[expect(clippy::too_many_lines, reason = "one case per command")]
+    /// A command that runs into a bug beeps and leaves the text as it is.
     pub(super) fn perform(&self, action: Action, sender: Option<&AnyObject>) {
+        if contained(|| self.perform_it(action, sender)).is_none() {
+            NSBeep();
+        }
+    }
+
+    #[expect(clippy::too_many_lines, reason = "one case per command")]
+    fn perform_it(&self, action: Action, sender: Option<&AnyObject>) {
         use Action::*;
         let tag = tag_of(sender);
         match action {
@@ -163,7 +171,7 @@ impl Editing<'_> {
                 } else {
                     tf("Überschrift {}", &[&level.to_string()])
                 };
-                self.command(&name, |d, sel| Some(commands::set_heading(d.text(), sel, level)));
+                self.command(&name, |d, sel| Some(commands::set_heading(d, sel, level)));
             }
             BulletList => self.command(t("Aufzählung"), |d, sel| {
                 Some(commands::toggle_list(d.text(), sel, ListStyle::Bullet))
@@ -218,7 +226,7 @@ impl Editing<'_> {
                 self.table_op(TableOp::Align(align), t("Ausrichtung"));
             }
             TableFormat => self.table_op(TableOp::Format, t("Tabelle ausrichten")),
-            TogglePreview => self.host.panes().toggle_preview(),
+            TogglePreview => self.host.toggle_preview(),
             ToggleOutline => self.host.panes().toggle_outline(),
             Typography => {
                 super::env::set_typography(!super::env::typography_on());
@@ -233,7 +241,7 @@ impl Editing<'_> {
                 self.host.updater().set_zoom((z / 1.1).max(0.5));
             }
             ZoomReset => self.host.updater().set_zoom(1.0),
-            NewTab => super::window::new_tab(self.host),
+            NewTab => super::window::new_tab(self.host.object()),
             LoadRemoteImages => self.host.pictures().allow_remote_images(),
             ExportHtml => self.host.sharing().export(super::export::ExportKind::Html),
             ExportWord => self.host.sharing().export(super::export::ExportKind::Word),
@@ -253,51 +261,15 @@ impl Editing<'_> {
                     .map_or(0, |c| c.selectedSegment());
                 self.host.atom_editor().mode_changed(segment);
             }
-            ToolbarSegment => super::toolbar::segment_clicked(self.host, sender),
+            ToolbarSegment => super::toolbar::segment_clicked(self.host.object(), sender),
         }
     }
 
-    /// Applies a source edit as one undo step. Typing edits coalesce like keystrokes in the source view.
+    /// Applies a source edit as one undo step. An open editor's text stands in the source without an undo step; committed,
+    /// the offsets of `edit` stay right.
     pub(super) fn apply_edit(&self, edit: Edit, undo_name: Option<&str>, typing: bool) {
-        // An open editor's text stands in the source without an undo step; committed, the offsets of `edit` stay right.
         self.host.atom_editor().finish();
-        self.host.model().change(|st| st.clear_pending());
-        let range = self.host.with_text(|snap, _| {
-            let text = &snap.text;
-            (edit.range.end <= text.end() && text.boundary(edit.range.start) && text.boundary(edit.range.end))
-                .then(|| to_nsrange(snap.u16_range(&edit.range)))
-        });
-        let Some(range) = range else {
-            self.host.updater().update_now();
-            return;
-        };
-        let replacement = ns(&edit.replacement);
-        let selection = self.host.panes().silently(|views| {
-            let source = views.source;
-            if typing {
-                insert_text(source, &replacement, range);
-            } else {
-                // Without this, NSTextView merges the command into the preceding typing undo step.
-                source.breakUndoCoalescing();
-                if source.shouldChangeTextInRange_replacementString(range, Some(&replacement)) {
-                    storage(source).replaceCharactersInRange_withString(range, &replacement);
-                    source.didChangeText();
-                    if let (Some(name), Some(undo)) = (undo_name, self.host.undo_manager()) {
-                        undo.setActionName(&ns(name));
-                    }
-                }
-                source.breakUndoCoalescing();
-            }
-            let selection = self
-                .host
-                .with_text(|snap, _| to_nsrange(snap.u16_range(&edit.selection)));
-            self.host.selection().set_source_selection(selection);
-            selection
-        });
-        self.host.updater().update_now();
-        if !self.host.panes().preview_focused() {
-            self.host.panes().for_appkit().source.scrollRangeToVisible(selection);
-        }
+        self.host.updater().apply_edit(edit, undo_name, typing);
     }
 
     /// Runs a command on the source selection (mapped from the preview if it has focus). It goes unanswered while the
@@ -375,8 +347,16 @@ impl Editing<'_> {
             return false;
         }
         self.host.model().change(|st| st.clear_pending());
-        let typed = self.host.with_text(|snap, _| {
-            let (edit, keep_pending) = commands::typed_at_pending(&base, &snap.text, &pending)?;
+        let typed = self.host.with_text(|snap, st| {
+            // The update for what was just typed is still to come, so the tree at hand is that of the text before it.
+            let parsed;
+            let doc = if st.doc().text() == base {
+                st.doc()
+            } else {
+                parsed = crate::markdown::reader::parse(&base);
+                &parsed
+            };
+            let (edit, keep_pending) = contained(|| commands::typed_at_pending(doc, &snap.text, &pending)).flatten()?;
             let unchanged = snap.text.at(edit.range.clone()) == edit.replacement;
             Some((edit, unchanged, keep_pending))
         });
@@ -424,7 +404,7 @@ impl Editing<'_> {
                 return Active::default();
             }
             let sel = selection.in_source(snap, st);
-            let active = commands::active_at(st.doc(), sel.start);
+            let active = contained(|| commands::active_at(st.doc(), sel.start)).unwrap_or_default();
             match st.pending() {
                 Some((p, base)) if *base == snap.text && sel.is_empty() && sel.start == p.at => active.with_pending(p),
                 _ => active,
@@ -510,7 +490,7 @@ impl Editing<'_> {
         };
         self.state.announce(announced);
         // A composition that is cancelled announces a change and never makes it.
-        perform_later(self.host, sel!(previewEditSettled), 0.0, true);
+        perform_later(self.host.object(), sel!(previewEditSettled), 0.0, true);
     }
 
     /// The turn of the run loop that announced an edit is over, and with it the edit, unless a composition goes on.
@@ -619,11 +599,11 @@ impl Editing<'_> {
                 {
                     edit(contained(|| bridge.line_break(p)), t("Zeilenumbruch"))
                 }
-                c if c == sel!(insertTab:) => match contained(|| bridge.tab(p, false)).flatten() {
+                c if c == sel!(insertTab:) => match contained(|| bridge.tab(p, Direction::Forward)).flatten() {
                     Some(e) => PreviewCommand::Edit(e, t("Einrücken")),
                     None => PreviewCommand::Handled(!preview_in_code(st, p)),
                 },
-                c if c == sel!(insertBacktab:) => match contained(|| bridge.tab(p, true)).flatten() {
+                c if c == sel!(insertBacktab:) => match contained(|| bridge.tab(p, Direction::Backward)).flatten() {
                     Some(e) => PreviewCommand::Edit(e, t("Ausrücken")),
                     None => PreviewCommand::Handled(true),
                 },
@@ -661,7 +641,18 @@ impl Editing<'_> {
                 return None;
             }
             let at = snap.byte_range(&selection).start;
-            contained(|| table::navigate(st.doc(), at, command == sel!(insertBacktab:))).flatten()
+            contained(|| {
+                table::navigate(
+                    st.doc(),
+                    at,
+                    if command == sel!(insertBacktab:) {
+                        Direction::Backward
+                    } else {
+                        Direction::Forward
+                    },
+                )
+            })
+            .flatten()
         });
         match edit {
             Some(edit) => {
@@ -747,47 +738,58 @@ impl Editing<'_> {
     fn insert_link(&self) {
         let Some(window) = self.host.window() else { return };
         let (_, selected) = self.selected_source();
-        let this = self.host.retain();
+        let this = self.host.object().retain();
         // The selection is read again when the sheet closes: a reload from disk can change the text meanwhile.
-        super::dialogs::link(&window, &selected, move |url, label| {
-            this.updater().update_now();
-            let (sel, _) = this.editing().selected_source();
-            let edit = commands::insert_link(sel, &url, &label);
-            this.editing().apply_edit(edit, Some(t("Link einfügen")), false);
-        });
+        super::dialogs::link(&window, &selected, move |url, label| this.link_chosen(&url, &label));
+    }
+
+    pub(super) fn link_chosen(&self, url: &str, label: &str) {
+        self.host.updater().update_now();
+        let (sel, _) = self.selected_source();
+        let edit = commands::insert_link(sel, url, label);
+        self.apply_edit(edit, Some(t("Link einfügen")), false);
     }
 
     fn insert_table(&self) {
         let Some(window) = self.host.window() else { return };
-        let this = self.host.retain();
-        super::dialogs::table(&window, move |rows, cols| {
-            this.updater().update_now();
-            let (sel, _) = this.editing().selected_source();
-            let edit = this.on_source_text(move |text| commands::insert_table(text, sel, rows, cols));
-            this.editing().apply_edit(edit, Some(t("Tabelle einfügen")), false);
-        });
+        let this = self.host.object().retain();
+        super::dialogs::table(&window, move |rows, cols| this.table_chosen(rows, cols));
+    }
+
+    pub(super) fn table_chosen(&self, rows: usize, cols: usize) {
+        self.host.updater().update_now();
+        let (sel, _) = self.selected_source();
+        let edit = self
+            .host
+            .on_source_text(move |text| commands::insert_table(text, sel, rows, cols));
+        self.apply_edit(edit, Some(t("Tabelle einfügen")), false);
     }
 
     fn insert_image(&self) {
         let Some(window) = self.host.window() else { return };
-        let this = self.host.retain();
+        let this = self.host.object().retain();
         super::dialogs::image(&window, move |url| {
-            let Some(path) = url.path() else { return };
-            this.updater().update_now();
-            let (sel, _) = this.editing().selected_source();
-            let path = PathBuf::from(path.to_string());
-            let alt = path
-                .file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let rel = relative_path(this.doc_dir().as_deref(), &path);
-            let edit = commands::insert_image(sel, &alt, &rel);
-            this.editing().apply_edit(edit, Some(t("Bild einfügen")), false);
+            if let Some(path) = url.path() {
+                this.image_chosen(Path::new(&path.to_string()));
+            }
         });
     }
 
-    /// A picture on the pasteboard becomes a PNG file next to the document and an image link at the selection.
-    /// Returns whether the paste was handled here.
+    pub(super) fn image_chosen(&self, path: &Path) {
+        self.host.updater().update_now();
+        let (sel, _) = self.selected_source();
+        let alt = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let rel = super::links::relative_path(self.host.doc_dir().as_deref(), path);
+        let edit = commands::insert_image(sel, &alt, &rel);
+        self.apply_edit(edit, Some(t("Bild einfügen")), false);
+    }
+
+    /// A picture on the pasteboard becomes a PNG file next to the document and an image link at the selection once that is
+    /// done: a large TIFF takes its helper up to ten seconds, and the folder may lie on a volume that hangs. Returns whether
+    /// the paste was handled here.
     pub(super) fn paste_image(&self, pasteboard: &NSPasteboard) -> bool {
         // Text wins: spreadsheets and web pages put a picture of the copied text on the pasteboard as well.
         if offers_text(pasteboard) {
@@ -795,42 +797,66 @@ impl Editing<'_> {
         }
         let png = pasteboard
             .dataForType(constant!(NSPasteboardTypePNG))
-            .map(|d| d.to_vec())
-            .or_else(|| {
-                let tiff = pasteboard.dataForType(constant!(NSPasteboardTypeTIFF))?;
-                super::decoder::png_of_pasted_tiff(&tiff.to_vec())
-            });
-        let Some(png) = png else {
-            return false;
+            .map(|d| d.to_vec());
+        let tiff = || {
+            pasteboard
+                .dataForType(constant!(NSPasteboardTypeTIFF))
+                .map(|d| d.to_vec())
+        };
+        let (png, tiff) = match png {
+            Some(png) => (Some(png), None),
+            None => match tiff() {
+                Some(tiff) => (None, Some(tiff)),
+                None => return false,
+            },
         };
         let Some(dir) = self.host.doc_dir() else {
             self.ask_to_save_before_pasting();
             return true;
         };
         let stem = format!("{} {}", t("Bild"), crate::util::now("yyyy-MM-dd HH.mm.ss"));
-        let folder = dir.clone();
-        let written = answer_from(&dir, PASTE_WAIT, move || {
-            let mut path = folder.join(format!("{stem}.png"));
-            for n in 2.. {
-                if !path.exists() {
-                    break;
+        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
+        crate::util::BACKGROUND.run(move || {
+            let png = png.or_else(|| super::decoder::png_of_pasted_tiff(&tiff?));
+            let folder = dir.clone();
+            let written = png.and_then(|png| {
+                answer_from(&dir, PASTE_WAIT, move || {
+                    let mut path = folder.join(format!("{stem}.png"));
+                    for n in 2.. {
+                        if !path.exists() {
+                            break;
+                        }
+                        path = folder.join(format!("{stem} {n}.png"));
+                    }
+                    std::fs::write(&path, &png).ok().map(|()| path)
+                })
+                .flatten()
+            });
+            crate::util::main_soon(move || {
+                let Some(mtm) = objc2::MainThreadMarker::new() else {
+                    return;
+                };
+                if let Some(c) = me.get(mtm).load() {
+                    c.picture_pasted(written, &dir);
                 }
-                path = folder.join(format!("{stem} {n}.png"));
-            }
-            std::fs::write(&path, &png).ok().map(|()| path)
+            });
         });
-        let Some(path) = written.flatten() else {
+        true
+    }
+
+    pub(super) fn picture_pasted(&self, written: Option<PathBuf>, dir: &Path) {
+        let Some(path) = written else {
             NSBeep();
-            return true;
+            return;
         };
+        self.host.updater().update_now();
         let (sel, _) = self.selected_source();
         let alt = path
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let edit = commands::insert_image(sel, &alt, &relative_path(Some(&dir), &path));
+        let edit = commands::insert_image(sel, &alt, &super::links::relative_path(Some(dir), &path));
         self.apply_edit(edit, Some(t("Bild einfügen")), false);
-        true
     }
 
     fn ask_to_save_before_pasting(&self) {
@@ -842,14 +868,16 @@ impl Editing<'_> {
         )));
         alert.addButtonWithTitle(&ns(t("Sichern …")));
         alert.addButtonWithTitle(&ns(t("Abbrechen")));
-        let document = self.host.ivars().document.clone();
+        let document = self.host.weak_document();
         let handler = block2::RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
-            if response == objc2_app_kit::NSAlertFirstButtonReturn
-                && let Some(doc) = document.load()
-            {
-                // SAFETY: Save accepts a missing sender.
-                unsafe { doc.saveDocument(None) };
-            }
+            crate::util::guarded((), || {
+                if response == objc2_app_kit::NSAlertFirstButtonReturn
+                    && let Some(doc) = document.load()
+                {
+                    // SAFETY: Save accepts a missing sender.
+                    unsafe { doc.saveDocument(None) };
+                }
+            });
         });
         alert.beginSheetModalForWindow_completionHandler(&window, Some(&handler));
     }
@@ -891,9 +919,8 @@ impl Editing<'_> {
         true
     }
 
-    /// The preview text view is applying a user edit; its storage is ahead of the layout until textDidChange.
     pub(super) fn preview_editing(&self) -> bool {
-        self.state.preview_edit.borrow().is_some()
+        self.state.preview_editing()
     }
 }
 
@@ -967,7 +994,7 @@ fn dropped_markdown(dropped: &[Dropped], dir: Option<&Path>) -> String {
                     .file_stem()
                     .map(|s| s.to_string_lossy().into_owned())
                     .unwrap_or_default();
-                let dest = commands::link_destination(&relative_path(dir, path));
+                let dest = commands::link_destination(&super::links::relative_path(dir, path));
                 let ext = path
                     .extension()
                     .map(|e| e.to_string_lossy().to_lowercase())
@@ -996,59 +1023,11 @@ fn preview_string(layout: &Layout) -> String {
     s
 }
 
-/// Relative path from `dir` to `target`, falling back to the absolute path.
-pub(super) fn relative_path(dir: Option<&Path>, target: &Path) -> String {
-    let Some(dir) = dir else {
-        return target.to_string_lossy().into_owned();
-    };
-    let from: Vec<_> = dir.components().collect();
-    let to: Vec<_> = target.components().collect();
-    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
-    if common <= 1 {
-        return target.to_string_lossy().into_owned();
-    }
-    let mut out = PathBuf::new();
-    for _ in common..from.len() {
-        out.push("..");
-    }
-    for c in &to[common..] {
-        out.push(c);
-    }
-    out.to_string_lossy().into_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn paths_with_only_the_root_in_common_stay_absolute() {
-        assert_eq!(
-            relative_path(Some(Path::new("/a/b")), Path::new("/c/d.png")),
-            "/c/d.png"
-        );
-        assert_eq!(
-            relative_path(Some(Path::new("/a/b")), Path::new("/a/d.png")),
-            "../d.png"
-        );
-        assert_eq!(relative_path(Some(Path::new("/a")), Path::new("/a/b/d.png")), "b/d.png");
-        assert_eq!(relative_path(None, Path::new("/a/d.png")), "/a/d.png");
-    }
     use crate::markdown::reader::parse;
     use crate::preview::layout::{NoImages, layout};
-
-    #[test]
-    fn relative_paths() {
-        assert_eq!(
-            relative_path(Some(Path::new("/a/b")), Path::new("/a/b/img/x.png")),
-            "img/x.png"
-        );
-        assert_eq!(
-            relative_path(Some(Path::new("/a/b")), Path::new("/a/c/x.png")),
-            "../c/x.png"
-        );
-        assert_eq!(relative_path(None, Path::new("/a/x.png")), "/a/x.png");
-    }
 
     #[test]
     fn an_announced_preview_change_counts_only_when_it_fits_the_lengths() {

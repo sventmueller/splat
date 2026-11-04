@@ -17,7 +17,10 @@ pub(crate) use coverage::*;
 pub(crate) use release::*;
 pub(crate) use selftest::*;
 
-pub(crate) const PACKAGE: &str = "splat";
+pub(crate) const PACKAGE: &str = "splat-app";
+
+/// The program the package builds.
+pub(crate) const PROGRAM: &str = "splat";
 
 pub(crate) const APP: &str = "Splat";
 
@@ -61,11 +64,22 @@ fn main() -> ExitCode {
     }
 }
 
-const FLAGS: [&str; 5] = ["--release", "--selftest", "--stop-after", "--scenarios", "--library"];
+const FLAGS: [&str; 10] = [
+    "--only",
+    "--release",
+    "--selftest",
+    "--stop-after",
+    "--scenarios",
+    "--library",
+    "--record",
+    "--in-back",
+    "--by-hand",
+    "--keystroke-ms",
+];
 
 pub(crate) const USAGE: &str =
     "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | check-library | icon | vendor [check|fetch]
-       cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] | resize | bench <file.md>
+       cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] [--only <group>] [--in-back] | resize | typing [--by-hand] | bench <file.md> [--keystroke-ms <n>], with --record to write what a run made into xtask/checks
        cargo xtask coverage [--library]";
 
 pub(crate) fn root() -> PathBuf {

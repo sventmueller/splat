@@ -1,21 +1,22 @@
 use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use block2::RcBlock;
 use dispatch2::{DispatchObject, DispatchRetained, DispatchSource};
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::Bool;
-use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, Message, sel};
+use objc2::{MainThreadMarker, MainThreadOnly, Message, sel};
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSCompositingOperation, NSImage, NSView};
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSUserDefaults};
 
+use super::layers::ForPictures;
+use super::picture::{LOADERS, Rendered, Sizing, allowed_side, count_decoded, room_for_more, set_low_memory};
 use super::safe_image::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
 use super::{EditorController, OPEN_EDITORS};
 use crate::i18n::t;
-use crate::util::{BusyVolumes, Lane, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
+use crate::markdown::url;
+use crate::util::{BusyVolumes, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
 
 /// Height of the bar above the preview that offers to load images from the web.
 const BANNER_HEIGHT: f64 = 48.0;
@@ -43,21 +44,7 @@ fn is_allowed(paths: &[String], path: Option<&str>) -> bool {
     path.is_some_and(|path| paths.iter().any(|p| p == path))
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Sizing {
-    /// Fixed size in points; `descent` is how far the image reaches below the baseline.
-    Points { size: NSSize, descent: f64 },
-    /// MathJax metrics in ex of the surrounding font, so formulas scale with the text.
-    Ex { width: f64, height: f64, valign: f64 },
-}
-
-#[derive(Clone)]
-pub struct Rendered {
-    pub image: Retained<NSImage>,
-    pub sizing: Sizing,
-}
-
-enum Slot {
+enum ImageLoad {
     Loading,
     Done(Done),
 }
@@ -74,7 +61,7 @@ struct Done {
 
 #[derive(Default)]
 pub struct ImageStore {
-    files: HashMap<PathBuf, Slot>,
+    files: HashMap<PathBuf, ImageLoad>,
     dimmed: HashMap<String, Rendered>,
     /// Which failed image gets the next try.
     next_try: usize,
@@ -83,7 +70,7 @@ pub struct ImageStore {
 impl Drop for ImageStore {
     fn drop(&mut self) {
         for slot in self.files.values() {
-            if let Slot::Done(done) = slot {
+            if let ImageLoad::Done(done) = slot {
                 count_decoded(-crate::util::to_isize(done.bytes));
             }
         }
@@ -110,40 +97,6 @@ impl ImageFile {
     }
 }
 
-/// Decoded pixels held by all open documents; attachments in the previews keep them alive as well.
-static DECODED: AtomicUsize = AtomicUsize::new(0);
-static LOW_MEMORY: AtomicBool = AtomicBool::new(false);
-
-pub(super) fn count_decoded(bytes: isize) {
-    if bytes >= 0 {
-        DECODED.fetch_add(crate::util::to_usize(bytes), Ordering::Relaxed);
-    } else {
-        DECODED.fetch_sub(bytes.unsigned_abs(), Ordering::Relaxed);
-    }
-}
-
-/// The longest side an image decodes to: smaller as pixels pile up, so a document with hundreds of photos stays
-/// usable instead of driving the Mac into swapping.
-fn side_for(decoded: usize, budget: usize, low_memory: bool) -> u32 {
-    if low_memory || decoded >= budget {
-        640
-    } else if decoded >= budget / 2 {
-        1280
-    } else {
-        SHOWN_SIDE
-    }
-}
-
-pub(super) fn allowed_side() -> u32 {
-    static BUDGET: OnceLock<usize> = OnceLock::new();
-    let budget = *BUDGET.get_or_init(|| (objc2_foundation::NSProcessInfo::processInfo().physicalMemory() / 8) as usize);
-    side_for(
-        DECODED.load(Ordering::Relaxed),
-        budget,
-        LOW_MEMORY.load(Ordering::Relaxed),
-    )
-}
-
 thread_local! {
     static MEMORY_WATCH: Cell<Option<DispatchRetained<DispatchSource>>> = const { Cell::new(None) };
 }
@@ -154,11 +107,13 @@ pub fn watch_memory(_mtm: MainThreadMarker) {
     const WARN: usize = 2;
     const CRITICAL: usize = 4;
     extern "C" fn changed(_: *mut std::ffi::c_void) {
-        MEMORY_WATCH.with(|watch| {
-            if let Some(source) = watch.take() {
-                memory_pressure_changed(source.data() & NORMAL == 0);
-                watch.set(Some(source));
-            }
+        crate::util::guarded((), || {
+            MEMORY_WATCH.with(|watch| {
+                if let Some(source) = watch.take() {
+                    memory_pressure_changed(source.data() & NORMAL == 0);
+                    watch.set(Some(source));
+                }
+            });
         });
     }
     // SAFETY: The type is the system's constant, which takes no handle and these mask bits.
@@ -177,7 +132,7 @@ pub fn watch_memory(_mtm: MainThreadMarker) {
 
 /// New images decode smaller while memory is short; caches and helpers that are not needed right now go.
 pub fn memory_pressure_changed(low: bool) {
-    LOW_MEMORY.store(low, Ordering::Relaxed);
+    set_low_memory(low);
     if low {
         super::decoder::release_idle();
         super::js::trim();
@@ -196,20 +151,34 @@ fn dimmed(image: &NSImage) -> Retained<NSImage> {
 }
 
 pub fn resolve_path(url: &str, doc_dir: Option<&Path>) -> Option<PathBuf> {
-    if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("data:") {
+    if url::is_web_or_data(url) {
         return None;
     }
-    let raw = url
-        .strip_prefix("file://")
-        .map_or(url, |r| r.strip_prefix("localhost").unwrap_or(r));
+    let raw = url::behind_file_scheme(url).map_or(url, |r| r.strip_prefix("localhost").unwrap_or(r));
     let without_suffix = super::links::strip_suffixes(raw);
-    let found = local_path(raw, doc_dir);
+    let found = local_path(raw, doc_dir).map(|path| without_detours(&path));
     // The main thread asks this during layout, and only the start-up disk is sure to answer.
     if without_suffix.len() == raw.len() || found.as_ref().is_some_and(|p| volume_of(p) == "/" && p.exists()) {
         return found;
     }
     // `![](a.png?raw=true)` as GitHub reads it, unless a file is really called that.
-    local_path(without_suffix, doc_dir)
+    local_path(without_suffix, doc_dir).map(|path| without_detours(&path))
+}
+
+/// The path without what leads back into itself, so that each way of writing it does not decode a picture of its own.
+fn without_detours(path: &Path) -> PathBuf {
+    let mut clean = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::ParentDir if clean.file_name().is_some() => {
+                clean.pop();
+            }
+            Component::ParentDir if clean.has_root() => {}
+            Component::CurDir => {}
+            part => clean.push(part),
+        }
+    }
+    clean
 }
 
 fn local_path(raw: &str, doc_dir: Option<&Path>) -> Option<PathBuf> {
@@ -264,9 +233,9 @@ impl ImageStore {
         let path = resolve_path(url, doc_dir)?;
         match self.files.get(&path) {
             // Paper gets the full size, also of an image the preview shows smaller.
-            Some(Slot::Done(done)) if requester.is_some() || !done.reduced => return done.found.clone(),
+            Some(ImageLoad::Done(done)) if requester.is_some() || !done.reduced => return done.found.clone(),
             // Paper does not wait for a load under way: it prints once.
-            Some(Slot::Loading) if requester.is_some() => return None,
+            Some(ImageLoad::Loading) if requester.is_some() => return None,
             _ => {}
         }
         let Some(requester) = requester else {
@@ -274,13 +243,29 @@ impl ImageStore {
             let file = answer_from(&path, PAPER_WAIT, move || load(&file, dir.as_deref(), SHOWN_SIDE))?;
             self.finish(path.clone(), file);
             return match self.files.get(&path) {
-                Some(Slot::Done(done)) => done.found.clone(),
+                Some(ImageLoad::Done(done)) => done.found.clone(),
                 _ => None,
             };
         };
-        self.files.insert(path.clone(), Slot::Loading);
+        self.files.insert(path.clone(), ImageLoad::Loading);
         read_again(path, doc_dir, requester);
         None
+    }
+
+    /// Lets go of what a document stopped showing, as an image taken out of the text: its pixels would stay for as long as
+    /// the window is open. One still loading stays, as it reports to this store.
+    fn keep_only(&mut self, shown: &std::collections::HashSet<PathBuf>) {
+        self.files.retain(|path, slot| match slot {
+            ImageLoad::Loading => true,
+            ImageLoad::Done(done) => {
+                let keep = shown.contains(path);
+                if !keep {
+                    count_decoded(-crate::util::to_isize(done.bytes));
+                }
+                keep
+            }
+        });
+        self.dimmed.retain(|path, _| shown.contains(Path::new(path)));
     }
 
     /// The finished images that `look_at_images` compares with their files.
@@ -288,8 +273,8 @@ impl ImageStore {
         self.files
             .iter()
             .filter_map(|(path, slot)| match slot {
-                Slot::Done(done) => Some((path.clone(), done.file.clone(), done.seen)),
-                Slot::Loading => None,
+                ImageLoad::Done(done) => Some((path.clone(), done.file.clone(), done.seen)),
+                ImageLoad::Loading => None,
             })
             .collect()
     }
@@ -300,7 +285,7 @@ impl ImageStore {
         let mut failed: Vec<&PathBuf> = self
             .files
             .iter()
-            .filter(|(_, slot)| matches!(slot, Slot::Done(done) if done.seen.is_none()))
+            .filter(|(_, slot)| matches!(slot, ImageLoad::Done(done) if done.seen.is_none()))
             .map(|(path, _)| path)
             .collect();
         failed.sort();
@@ -311,7 +296,7 @@ impl ImageStore {
 
     /// Remembers how the file looks now, so one change starts one reading however long that takes.
     fn note_seen(&mut self, path: &Path, seen: Stamp) {
-        if let Some(Slot::Done(done)) = self.files.get_mut(path) {
+        if let Some(ImageLoad::Done(done)) = self.files.get_mut(path) {
             done.seen = seen;
         }
     }
@@ -320,8 +305,8 @@ impl ImageStore {
     #[cfg(feature = "selftest")]
     pub fn shown(&self, path: &Path) -> Option<bool> {
         match self.files.get(path)? {
-            Slot::Done(done) => Some(done.found.is_some()),
-            Slot::Loading => None,
+            ImageLoad::Done(done) => Some(done.found.is_some()),
+            ImageLoad::Loading => None,
         }
     }
 
@@ -329,8 +314,8 @@ impl ImageStore {
     #[cfg(feature = "selftest")]
     pub fn shown_size(&self, path: &Path) -> Option<NSSize> {
         match self.files.get(path)? {
-            Slot::Done(done) => done.found.as_ref().map(|r| r.image.size()),
-            Slot::Loading => None,
+            ImageLoad::Done(done) => done.found.as_ref().map(|r| r.image.size()),
+            ImageLoad::Loading => None,
         }
     }
 
@@ -348,7 +333,7 @@ impl ImageStore {
             bytes,
         };
         self.dimmed.remove(path.to_string_lossy().as_ref());
-        if let Some(Slot::Done(old)) = self.files.insert(path, Slot::Done(done)) {
+        if let Some(ImageLoad::Done(old)) = self.files.insert(path, ImageLoad::Done(done)) {
             count_decoded(-crate::util::to_isize(old.bytes));
         }
     }
@@ -367,15 +352,21 @@ fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorControlle
     };
     let asked = path.clone();
     lane.ask(
-        move || load(&asked, doc_dir.as_deref(), allowed_side()),
+        move || {
+            if room_for_more() {
+                load(&asked, doc_dir.as_deref(), allowed_side())
+            } else {
+                ImageFile::failed(asked)
+            }
+        },
         move |file| {
             let file = file.unwrap_or_else(|| ImageFile::failed(path.clone()));
-            dispatch2::DispatchQueue::main().exec_async(move || {
+            crate::util::main_soon(move || {
                 let Some(mtm) = MainThreadMarker::new() else {
                     return;
                 };
                 if let Some(c) = me.get(mtm).load() {
-                    c.pictures().image_loaded(path, file);
+                    c.image_loaded(path, file);
                 }
             });
         },
@@ -398,8 +389,8 @@ pub fn look_at_images(mtm: MainThreadMarker) {
     let editors: Vec<Retained<EditorController>> =
         OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
     let mut by_volume: BTreeMap<String, Vec<LookAtEditor>> = BTreeMap::new();
-    for e in editors.iter().filter(|e| e.panes().preview_visible()) {
-        let mut store = e.pictures().store().borrow_mut();
+    for (e, store) in editors.iter().filter_map(|e| Some((e, e.images_shown()?))) {
+        let mut store = store.borrow_mut();
         let retry = if look % LOOKS_PER_TRY == LOOKS_PER_TRY - 1 {
             store.missing_in_turn()
         } else {
@@ -436,14 +427,14 @@ pub fn look_at_images(mtm: MainThreadMarker) {
                     (request.editor, changed)
                 })
                 .collect();
-            dispatch2::DispatchQueue::main().exec_async(move || {
+            crate::util::main_soon(move || {
                 drop(on_volume);
                 let Some(mtm) = MainThreadMarker::new() else {
                     return;
                 };
                 for (editor, changed) in changed {
                     if let Some(editor) = editor.get(mtm).load() {
-                        editor.pictures().read_images_again(changed);
+                        editor.read_images_again(changed);
                     }
                 }
             });
@@ -467,16 +458,13 @@ pub(super) struct PictureState {
 }
 
 pub(super) struct Pictures<'a> {
-    host: &'a EditorController,
+    host: ForPictures<'a>,
     state: &'a PictureState,
 }
 
-impl EditorController {
-    pub(super) fn pictures(&self) -> Pictures<'_> {
-        Pictures {
-            host: self,
-            state: &self.ivars().pictures,
-        }
+impl<'a> Pictures<'a> {
+    pub(super) fn new(host: ForPictures<'a>, state: &'a PictureState) -> Self {
+        Pictures { host, state }
     }
 }
 
@@ -488,6 +476,22 @@ impl Pictures<'_> {
 }
 
 impl<'a> Pictures<'a> {
+    pub(super) fn forget_images_no_longer_shown(&self) {
+        if self.state.images.borrow().files.is_empty() {
+            return;
+        }
+        let doc_dir = self.host.doc_dir();
+        let shown: std::collections::HashSet<PathBuf> = self.host.model().read(move |st| {
+            st.layout()
+                .blocks
+                .iter()
+                .flat_map(|block| super::state::images_of(block))
+                .filter_map(|url| resolve_path(url, doc_dir.as_deref()))
+                .collect()
+        });
+        self.state.images.borrow_mut().keep_only(&shown);
+    }
+
     pub(super) fn store(&self) -> &'a RefCell<ImageStore> {
         &self.state.images
     }
@@ -503,18 +507,18 @@ impl<'a> Pictures<'a> {
         self.state.remote_allowed.set(allowed);
     }
 
-    fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
+    pub(super) fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
         let doc_dir = self.host.doc_dir();
         for (path, now) in changed {
             self.state.images.borrow_mut().note_seen(&path, now);
-            read_again(path, doc_dir.as_deref(), self.host);
+            read_again(path, doc_dir.as_deref(), self.host.object());
         }
     }
 
     pub(super) fn image_loaded(&self, path: PathBuf, file: ImageFile) {
         let key = path.to_string_lossy().into_owned();
         self.state.images.borrow_mut().finish(path, file);
-        self.host.updater().image_arrived(key);
+        self.host.image_arrived(key);
     }
 
     pub(super) fn build_banner(&self, size: NSSize) -> Retained<NSView> {
@@ -538,7 +542,7 @@ impl<'a> Pictures<'a> {
         let button = unsafe {
             objc2_app_kit::NSButton::buttonWithTitle_target_action(
                 &ns(t("Bilder laden")),
-                Some(self.host),
+                Some(self.host.object()),
                 Some(sel!(mdLoadRemoteImages:)),
                 mtm,
             )
@@ -622,14 +626,6 @@ impl<'a> Pictures<'a> {
     }
 }
 
-/// Image files and downloads are decoded by as many threads as there are decoder helpers, so a document with hundreds
-/// of pictures holds only a few of the files in memory at a time.
-static LOADERS: Lane = Lane::new("splat-image").with_workers(super::decoder::HELPER_COUNT);
-
-pub(super) fn load_in_background(job: impl FnOnce() + Send + 'static) {
-    LOADERS.run(job);
-}
-
 fn rendered(loaded: Decoded) -> Option<Rendered> {
     let image = super::decoder::image(loaded)?;
     let size = image.size();
@@ -655,6 +651,27 @@ pub fn locate(path: &Path, doc_dir: Option<&Path>) -> PathBuf {
         .zip(path.file_name().and_then(|n| n.to_str()))
         .and_then(|(dir, name)| super::links::find_note(dir, name))
         .unwrap_or_else(|| path.to_path_buf())
+}
+
+/// Whether what leaves the Mac as a file may take this one along: a document from someone else must not pull what it names
+/// from the user's folders into a file that gets sent on. Its own folder and its repository are what a document brings along.
+pub(super) fn may_carry_along(path: &Path, doc_dir: Option<&Path>) -> bool {
+    let Some(doc_dir) = doc_dir else {
+        return false;
+    };
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let root = what_a_document_brings_along(doc_dir, home.as_deref());
+    match (path.canonicalize(), root.canonicalize()) {
+        (Ok(file), Ok(root)) => file.starts_with(root),
+        _ => false,
+    }
+}
+
+/// A repository that holds the home folder, as one for dotfiles does, says nothing about what belongs to the document.
+fn what_a_document_brings_along<'a>(doc_dir: &'a Path, home: Option<&Path>) -> &'a Path {
+    super::env::repository_root(doc_dir)
+        .filter(|root| !home.is_some_and(|home| home.starts_with(root)))
+        .unwrap_or(doc_dir)
 }
 
 /// Reads and decodes an image file in a decoder helper; only formats Rust cannot decode go to the system.
@@ -702,6 +719,69 @@ mod tests {
     use super::*;
 
     #[test]
+    fn each_way_of_writing_a_path_is_the_same_picture() {
+        let dir = Some(Path::new("/docs/text"));
+        let plain = resolve_path("../d/a.png", dir);
+        assert_eq!(plain, Some(PathBuf::from("/docs/d/a.png")));
+        assert_eq!(resolve_path("../d/../d/./a.png", dir), plain);
+        assert_eq!(resolve_path("/docs/text/../d/a.png", None), plain);
+        assert_eq!(resolve_path("../../../../a.png", dir), Some(PathBuf::from("/a.png")));
+        assert_eq!(resolve_path("../a.png", None), None);
+    }
+
+    #[test]
+    fn a_file_leaves_with_a_document_only_from_where_the_document_lies() {
+        let root = std::env::temp_dir().join(format!("splat-carry-{}", std::process::id()));
+        let repo = root.join("repo");
+        let docs = repo.join("docs");
+        let plain = root.join("plain");
+        for dir in [&repo.join(".git"), &docs, &plain] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        let file = |at: &Path| {
+            std::fs::write(at, b"x").unwrap();
+            at.to_path_buf()
+        };
+        let (beside, in_repo, elsewhere) = (
+            file(&docs.join("a.png")),
+            file(&repo.join("b.png")),
+            file(&root.join("c.png")),
+        );
+        let in_plain = file(&plain.join("d.png"));
+        let through = plain.join("durch.png");
+        std::os::unix::fs::symlink(&elsewhere, &through).unwrap();
+        assert!(may_carry_along(&beside, Some(&docs)));
+        assert!(
+            may_carry_along(&in_repo, Some(&docs)),
+            "a repository keeps its pictures anywhere inside"
+        );
+        assert!(!may_carry_along(&elsewhere, Some(&docs)));
+        assert!(may_carry_along(&in_plain, Some(&plain)));
+        assert!(!may_carry_along(&elsewhere, Some(&plain)));
+        assert!(!may_carry_along(&plain.join("../c.png"), Some(&plain)), "up and out");
+        assert!(!may_carry_along(&through, Some(&plain)), "a link that points out");
+        assert!(!may_carry_along(&beside, None), "a document without a place");
+        assert!(!may_carry_along(&docs.join("missing.png"), Some(&docs)));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_repository_around_the_home_folder_opens_nothing() {
+        let root = std::env::temp_dir().join(format!("splat-carry-home-{}", std::process::id()));
+        let (home, docs) = (root.join("home"), root.join("home/docs"));
+        std::fs::create_dir_all(home.join(".git")).unwrap();
+        std::fs::create_dir_all(&docs).unwrap();
+        assert_eq!(
+            what_a_document_brings_along(&docs, Some(&home)),
+            docs,
+            "a repository of dotfiles"
+        );
+        assert_eq!(what_a_document_brings_along(&docs, Some(&root.join("other"))), home);
+        assert_eq!(what_a_document_brings_along(&docs, None), home);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn web_images_load_only_for_a_document_that_was_allowed() {
         let allowed = vec!["/a.md".to_string()];
         assert!(is_allowed(&allowed, Some("/a.md")));
@@ -739,7 +819,7 @@ mod tests {
             Some(PathBuf::from("/docs/a.png"))
         );
         assert_eq!(
-            resolve_path("file:///docs/a.png", None),
+            resolve_path("FILE:///docs/a.png", None),
             Some(PathBuf::from("/docs/a.png"))
         );
     }
@@ -751,15 +831,6 @@ mod tests {
         std::fs::write(dir.join("was?.png"), "").unwrap();
         assert_eq!(resolve_path("was?.png", Some(&dir)), Some(dir.join("was?.png")));
         std::fs::remove_dir_all(&dir).unwrap();
-    }
-
-    #[test]
-    fn images_decode_smaller_as_pixels_pile_up() {
-        let budget = 1 << 30;
-        assert_eq!(side_for(0, budget, false), SHOWN_SIDE);
-        assert_eq!(side_for(budget / 2, budget, false), 1280);
-        assert_eq!(side_for(budget, budget, false), 640);
-        assert_eq!(side_for(0, budget, true), 640);
     }
 
     #[test]

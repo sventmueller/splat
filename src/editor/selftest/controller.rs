@@ -6,16 +6,16 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use objc2::AnyThread;
+use objc2::MainThreadMarker;
 use objc2::rc::Retained;
-use objc2::{MainThreadMarker, MainThreadOnly, msg_send};
 use objc2_app_kit::{
-    NSBezierPath, NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSDocumentController, NSGraphicsContext,
-    NSTextInputClient, NSTextView,
+    NSBezierPath, NSBitmapImageRep, NSColor, NSDeviceRGBColorSpace, NSGraphicsContext, NSTextInputClient, NSTextView,
 };
 use objc2_foundation::{NSDate, NSNotFound, NSPoint, NSRange, NSRect, NSRunLoop, NSSize, NSURL};
 
 use super::scenarios::{self, COMMANDS, SECTION, TABLE_COMMANDS};
-use super::{after, check, check_in_front, compose, guarded, type_in_preview, type_in_source};
+use super::source;
+use super::{after, check, compose, guarded, type_in_preview, type_in_source};
 use crate::document::MdDocument;
 use crate::editor::actions::Action;
 use crate::editor::{EditorController, Invalidate, js};
@@ -32,20 +32,11 @@ pub(in crate::editor) fn keeps_unshown_editor() -> bool {
 }
 
 fn open(mtm: MainThreadMarker, text: &str) -> (Retained<MdDocument>, Retained<EditorController>) {
-    // SAFETY: NSDocument's initializer, called once on the newly allocated object.
-    let document: Retained<MdDocument> = unsafe { msg_send![MdDocument::alloc(mtm), init] };
-    document.set_initial_text(text);
-    document.makeWindowControllers();
-    let editor = document.editor().expect("an editor");
+    let (document, editor) = super::documents::untitled(mtm, text);
     if let Some(undo) = editor.undo_manager() {
         undo.setGroupsByEvent(false);
     }
-    editor.updater().update_now();
     (document, editor)
-}
-
-fn source(e: &EditorController) -> String {
-    e.source().string().to_string()
 }
 
 /// One step of the undo history.
@@ -58,7 +49,7 @@ fn step(e: &EditorController, f: impl FnOnce()) {
 
 /// Lets what waits for the next turn of the run loop happen; a turn that lays out a new window outlasts any fixed time,
 /// so this waits for a timer that fires behind whatever is due already.
-fn next_turn() {
+pub(super) fn next_turn() {
     let turned = Rc::new(Cell::new(false));
     let seen = turned.clone();
     after(0.0, move || seen.set(true));
@@ -85,7 +76,10 @@ fn a_formula_arriving_during_a_composition_leaves_the_text_alone(mtm: MainThread
     let behind = preview_offset_behind(&e, "Absatz");
     e.preview().setSelectedRange(NSRange::new(behind, 0));
     compose(e.preview(), "にほ");
-    js::set_ready(&js::Key::math("x", false, e.is_dark()), true);
+    js::set_ready(
+        &js::Key::math("x", false, e.is_dark(), &e.model().read(|st| st.macros())),
+        true,
+    );
     e.invalidate(Invalidate::Arrivals);
     check(
         "a formula arriving during a composition leaves the composition alone",
@@ -102,7 +96,7 @@ fn a_formula_arriving_during_a_composition_leaves_the_text_alone(mtm: MainThread
     document.close();
 }
 
-fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
+pub(super) fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
     let (document, e) = open(mtm, "Erster Absatz\n\nZweiter Absatz\n");
     caret_in_preview(&e, 5);
     compose(e.preview(), "に");
@@ -116,15 +110,13 @@ fn a_cancelled_composition_ends_the_edit_it_announced(mtm: MainThreadMarker) {
     }
     e.preview().unmarkText();
     next_turn();
-    check_in_front(
-        mtm,
+    check(
         "a cancelled composition does not leave the preview waiting for its edit",
         !e.editing().preview_editing(),
         "",
     );
     e.preview().setSelectedRange(NSRange::new(20, 0));
-    check_in_front(
-        mtm,
+    check(
         "the caret mirrors to the source after a cancelled composition",
         e.source().selectedRange().location > 14,
         &format!("{:?}", e.source().selectedRange()),
@@ -266,7 +258,7 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
 
     let (document, e) = editor_with_edit(mtm);
     type_in_editor(&e);
-    step(&e, || e.editing().perform(Action::BulletList, None));
+    step(&e, || e.perform(Action::BulletList));
     check(
         "a command with the editor open commits the formula first",
         !is_open(&e) && source(&e) == "- abc Formel $y$ und Rest des Absatzes\n",
@@ -400,9 +392,9 @@ fn a_panic_saves_what_is_unsaved_and_only_that(mtm: MainThreadMarker) {
 }
 
 /// Waits until `condition` holds, for what comes back from another thread.
-fn until(condition: impl Fn() -> bool) -> bool {
+pub(super) fn until(condition: impl Fn() -> bool) -> bool {
     let started = std::time::Instant::now();
-    while started.elapsed().as_secs_f64() < 5.0 {
+    while started.elapsed().as_secs_f64() < super::UNTIL_TIMEOUT {
         if condition() {
             return true;
         }
@@ -415,17 +407,7 @@ fn until(condition: impl Fn() -> bool) -> bool {
 fn the_file_under_a_document_may_do_anything(mtm: MainThreadMarker) {
     let path = std::env::temp_dir().join(format!("splat-probe-file-{}.md", std::process::id()));
     std::fs::write(&path, "Text\n").expect("a test file");
-    let url = NSURL::fileURLWithPath(&ns(path.to_str().unwrap_or_default()));
-    let controller = NSDocumentController::sharedDocumentController(mtm);
-    let kind = controller.typeForContentsOfURL_error(&url).expect("a document type");
-    // SAFETY: NSDocument's initializer, called once on the newly allocated object.
-    let document: Retained<MdDocument> = unsafe {
-        msg_send![MdDocument::alloc(mtm), initWithContentsOfURL: &*url, ofType: &*kind, error: std::ptr::null_mut::<*mut objc2_foundation::NSError>()]
-    };
-    document.makeWindowControllers();
-    controller.addDocument(&document);
-    let e = document.editor().expect("an editor");
-    e.updater().update_now();
+    let (document, e) = super::documents::opened(mtm, &path);
 
     let look = || crate::document::reload_changed_documents(mtm);
     let shows = |text: &str| {
@@ -439,13 +421,9 @@ fn the_file_under_a_document_may_do_anything(mtm: MainThreadMarker) {
     std::fs::write(&path, "Neu\n").expect("a test file");
     check("a changed file reloads", until(shows("Neu\n")), &source(&e));
     std::fs::write(&path, b"\xFF\xFE\0\0nicht lesbar").expect("a test file");
-    let unreadable = !until(|| {
-        look();
-        source(&e) != "Neu\n"
-    });
     check(
         "a file that cannot be read keeps the text it replaced",
-        unreadable,
+        super::saving::looked_at_files(mtm) && source(&e) == "Neu\n",
         &source(&e),
     );
     std::fs::write(&path, "Wieder da\n").expect("a test file");
@@ -455,12 +433,9 @@ fn the_file_under_a_document_may_do_anything(mtm: MainThreadMarker) {
         &source(&e),
     );
     let _ = std::fs::remove_file(&path);
-    next_turn();
-    look();
-    next_turn();
     check(
         "a deleted file leaves its text open",
-        source(&e) == "Wieder da\n",
+        super::saving::looked_at_files(mtm) && source(&e) == "Wieder da\n",
         &source(&e),
     );
     document.close();
@@ -513,14 +488,11 @@ pub(super) fn checks(mtm: MainThreadMarker) {
     let parts: [Part; 12] = [
         ("the panic check", a_panic_saves_what_is_unsaved_and_only_that),
         ("the file checks", the_file_under_a_document_may_do_anything),
+        ("the saving checks", super::saving::checks),
         ("the transparency check", |_| a_translucent_pixel_stays_translucent()),
         (
             "the composition check",
             a_formula_arriving_during_a_composition_leaves_the_text_alone,
-        ),
-        (
-            "the cancelled composition check",
-            a_cancelled_composition_ends_the_edit_it_announced,
         ),
         ("the huge document check", the_notice_of_a_huge_document_takes_no_input),
         ("the many tables check", a_preview_of_many_tables_answers_at_once),

@@ -120,7 +120,7 @@ O Splat mostra à esquerda o seu código-fonte Markdown com cores de sintaxe e, 
 - **Um botão para tudo.** Cada elemento de Markdown tem um botão na barra de ferramentas e um item de menu, e os mais comuns também um atalho de teclado. As tabelas têm um menu próprio para linhas, colunas e alinhamento.
 - **Exportação sem perdas.** PDF, um único ficheiro HTML autónomo ou um documento Word com títulos, listas, tabelas, notas de rodapé e imagens verdadeiros.
 - **Nativo até ao último pormenor.** Janelas, separadores, menus, popovers, Versões, Guardar automaticamente, o menu de partilha, modo escuro, verificação ortográfica, ditado e VoiceOver autênticos do AppKit. Sem Electron, sem vista web para o próprio texto.
-- **Rápido com ficheiros grandes.** Renderizar uma tecla num documento de 10 MB demora cerca de 25 ms, antes do trabalho da própria vista.
+- **Rápido com ficheiros grandes.** Renderizar uma tecla num documento de 10 MB demora cerca de 10 ms, antes do trabalho da própria vista.
 - **Privado e cuidadoso.** As imagens da web só são carregadas depois de as permitir, as hiperligações para outras aplicações pedem confirmação, e tudo o que descodifica dados de imagem não fiáveis corre em processos auxiliares isolados numa sandbox.
 - **No seu idioma.** A interface e a referência rápida de Markdown integrada existem em 35 idiomas: alemão, árabe, catalão, checo, chinês (simplificado), chinês (tradicional), coreano, croata, dinamarquês, eslovaco, esloveno, espanhol, finlandês, francês, grego, hebraico, hindi, húngaro, indonésio, inglês, italiano, japonês, malaio, neerlandês, norueguês, polaco, português (Brasil), português (Portugal), romeno, russo, sueco, tailandês, turco, ucraniano e vietnamita.
 
@@ -504,7 +504,7 @@ Um ficheiro Markdown pode vir de qualquer pessoa, por isso o Splat trata cada do
 - **Sem rede por predefinição.** O Splat não tem telemetria. Só procura atualizações depois de o autorizar ou de escolher **Procurar atualizações…**: nesse caso, carrega um pequeno ficheiro de feed do GitHub, e o pedido indica apenas a aplicação e a sua versão. As fórmulas e os diagramas são apresentados localmente; as vistas web que o fazem não conseguem aceder à rede.
 - **As imagens da web** só são carregadas com a sua autorização, apenas por `https`, nunca de anfitriões na sua rede local, com no máximo 10 MB cada e numa sessão privada sem cookies.
 - **Descodificação isolada.** As imagens e os gráficos de fórmulas e diagramas são descodificados em processos auxiliares que fecham todos os ficheiros herdados e se fecham numa sandbox antes de lerem o primeiro byte: sem acesso a ficheiros nem à rede. Devolvem apenas píxeis, cujo tamanho é verificado, e são parados ao fim de 10 segundos. Os descodificadores de imagem da própria Apple só veem HEIC, TIFF, AVIF e PDF, e só quando os dados são mesmo desse formato; correm num auxiliar próprio, que pode ainda ler as pastas de tipos de letra do sistema e usar o descodificador de vídeo do sistema. Os SVG, as fórmulas e os diagramas também passam por esse auxiliar, pelo que no Splat são imagens com resolução fixa: quatro píxeis por ponto, até 2560 no lado mais comprido.
-- **Os ficheiros locais** só chegam a um documento pelo caminho que ele indica. As incorporações mostram notas Markdown da pasta do documento e abaixo, e uma imagem em falta só é procurada aí. Um caminho de imagem noutro local, absoluto ou a começar por `~`, continua a ser carregado, e as exportações HTML e Word incorporam-no: olhe para a exportação de um documento que não escreveu antes de a passar a outros.
+- **Os ficheiros locais** só chegam a um documento pelo caminho que ele indica. As incorporações mostram notas Markdown da pasta do documento e abaixo, e uma imagem em falta só é procurada aí. Um caminho de imagem noutro local, absoluto ou a começar por `~`, continua a ser carregado na pré-visualização; as exportações HTML e Word, a impressão e os PDF só levam o que está na pasta do documento ou no seu repositório Git, a menos que esse repositório também contenha a sua pasta pessoal, para que um documento de outra pessoa não arraste os seus ficheiros para uma exportação que reencaminhe.
 - **As cópias de texto por guardar** ficam neste Mac, na sua pasta Biblioteca, para a recuperação após uma falha. Desaparecem quando guarda ou o Splat termina normalmente; as cópias que uma falha deixou ficam na pasta de recuperação até as apagar.
 - **As hiperligações** nunca iniciam um programa com um clique. As hiperligações web e de correio abrem como de costume; as que levam a outras aplicações pedem confirmação.
 - **O HTML nos documentos** é lido pelo analisador próprio do Splat. Scripts, estilos, frames e formulários nunca são executados.
@@ -516,13 +516,14 @@ Um ficheiro Markdown pode vir de qualquer pessoa, por isso o Splat trata cada do
 O Splat continua a responder bem com documentos de vários megabytes:
 
 - O código-fonte usa o TextKit 2, que só dispõe a parte visível.
-- Enquanto escreve na pré-visualização, e no código-fonte de documentos até 2 MB, só os parágrafos afetados são analisados, coloridos e dispostos de novo. Num documento de 10 MB, analisar e colorir demora cerca de 20 ms, renderizar cerca de 25 ms, e uma tecla completa na sua pré-visualização cerca de 60 ms, incluindo o trabalho da própria vista.
+- Enquanto escreve na pré-visualização, e no código-fonte de documentos até 2 MB, só os parágrafos afetados são analisados, coloridos e dispostos de novo. Num documento de 10 MB, analisar e colorir demora cerca de 3 ms, renderizar cerca de 10 ms, e uma tecla completa na sua pré-visualização cerca de 30 ms, incluindo o trabalho da própria vista.
 - As pré-visualizações grandes apresentam primeiro a parte visível e o resto enquanto a aplicação está inativa. Os blocos que entram na área visível são apresentados antes de serem desenhados.
 - No código-fonte de documentos maiores, a análise para a pré-visualização corre em segundo plano enquanto escreve.
 - Um documento fica em texto simples quando precisaria de cerca de 4 GB de memória, ou seja, cerca de 50 a 120 MB de Markdown comum, mas apenas de 10 a 20 MB se tiver só tabelas ou títulos: o código-fonte não tem cores e a pré-visualização explica porque fica vazia. As exportações continuam a funcionar.
 - A partir de cerca de 200 KB, um documento abre a janela antes de ser analisado; aos 5 MB, as cores e a pré-visualização seguem-se cerca de um quarto de segundo depois.
+- Todas as imagens juntas, incluindo fórmulas e diagramas, ocupam no máximo um quarto da memória do Mac, e metade disso enquanto a memória escasseia. Para além disso, as restantes imagens aparecem como marcadores de posição até voltar a haver espaço.
 
-Algumas alterações são processadas por inteiro, a cerca de 300 ms por tecla a 10 MB: as que afetam a definição ou as referências de uma nota de rodapé, junto de uma nota de rodapé em linha, no fim do documento junto de uma nota de rodapé, no front matter ou perto de definições de referências de hiperligações, e todas as alterações num documento com blocos de comentários `%%` ou com uma nota de rodapé definida duas vezes ou dentro de uma citação ou lista. A memória cresce com o ficheiro, para cerca de 115–160 MB por 1 MB de Markdown e 340–510 MB para 10 MB.
+Algumas alterações são processadas por inteiro, a cerca de 300 ms por tecla a 10 MB: as que afetam a definição ou as referências de uma nota de rodapé, junto de uma nota de rodapé em linha, no fim do documento junto de uma nota de rodapé, no front matter ou em definições de referências de hiperligações, e todas as alterações num documento com blocos de comentários `%%` ou com uma nota de rodapé definida duas vezes ou dentro de uma citação ou lista. A memória cresce com o ficheiro, para cerca de 115–160 MB por 1 MB de Markdown e 340–510 MB para 10 MB.
 
 ## Limitações conhecidas
 
@@ -577,6 +578,7 @@ make check                  # formatação, clippy sem avisos, todos os testes, 
 make test                   # make check e depois o autoteste sem janela
 make test-gui               # autotestes com janela; ocupam o Mac durante cerca de quatro minutos
 make test-long              # pesquisa aleatória mais longa e a verificação da atualização parcial a 10 MB
+make fuzz                   # entrada aleatória para a análise parcial e todas as saídas
 make coverage               # cobertura de linhas de todos os testes e autotestes, com um mínimo por módulo
 make coverage-library       # os mesmos mínimos para os módulos sem janela, como no CI
 make bench FILE=<file.md>   # tempos de abertura, escrita e deslocamento num ficheiro grande
@@ -624,19 +626,24 @@ A imagem de disco é um binário universal para Apple Silicon e Intel; as outras
 | `cargo xtask check-library` | a biblioteca compila para Linux, pelo que nada nela precisa do macOS |
 | `cargo xtask vendor check` | as bibliotecas JavaScript coincidem com `vendor.lock` byte a byte |
 | `cargo xtask selftest probe` | sem janela, cada um com o seu resultado esperado: fórmulas, diagramas, imagens da web contra um servidor dentro do processo, endereços bloqueados, o texto que cada comando escreve, cada formato de imagem através das duas exportações, uma página que deixa de responder e as defesas das vistas web contra uma página sem elas. Demora cerca de meio minuto. O que precisa da aplicação à frente do ecrã é ignorado com o ecrã bloqueado |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | a aplicação em execução, clique a clique. Abre uma janela e escreve nela; o Mac fica ocupado durante cerca de quatro minutos. `--scenarios` executa só a segunda parte, em cerca de um minuto e meio |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | a aplicação em execução, clique a clique. Abre uma janela e escreve nela; o Mac fica ocupado durante cerca de quatro minutos. `--scenarios` executa só a segunda parte, em cerca de um minuto e meio. `--only` executa um grupo dessa parte, no seu próprio documento, também com o ecrã bloqueado. `--in-back` deixa de fora o que precisa da app em primeiro plano; sem isso, essa verificação falha |
 | `cargo xtask selftest resize` | alarga a janela depois de mover o divisor: o código-fonte volta a quebrar as linhas enquanto a janela é redimensionada. Demora cerca de dez segundos |
-| `cargo xtask selftest bench <file.md>` | tempos de abertura, escrita e deslocamento num ficheiro grande |
+| `cargo xtask selftest typing [--by-hand]` | escreve durante os guardados, com teclas pela fila de eventos da app ou, com `--by-hand`, à mão: o que é escrito mantém-se e consta como não guardado. Demora cerca de um minuto |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | tempos de abertura, escrita e deslocamento num ficheiro grande; `--keystroke-ms` falha quando a tecla mais rápida demora mais |
 | `cargo test --release -- --ignored partial_updates` | uma tecla em 10 MB: atualização parcial contra completa, o mesmo resultado em, no máximo, um quarto do tempo |
 | `cargo test --release --test hostile` | documentos construídos para rebentar a pilha ou levar tempo quadrático, cada um em dois tamanhos cujos tempos têm de crescer como o texto, através da análise, da disposição, das duas exportações, das teclas e dos comandos |
-| `make mutants` | falhas introduzidas uma a uma em `src/markdown/` e `src/preview/`, através do [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diz quais nenhum teste nota. Demora horas; `FILE=src/preview/bridge.rs` restringe |
+| `make mutants` | falhas introduzidas uma a uma em `crates/splat-markdown`, `crates/splat-preview` e `crates/splat-file-state`, através do [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diz quais nenhum teste nota. Demora horas; `FILE=crates/splat-preview/src/bridge/mod.rs` restringe |
+| `make fuzz` | entrada aleatória com o [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), que precisa do nightly do rustup: teclas que têm de se ler como uma análise completa, todas as saídas, edições na pré-visualização, todos os comandos e um ficheiro que é guardado tal como foi aberto. `SECONDS=600` procura durante mais tempo |
+| `cargo test --release --test fuzz_seeds` | as sementes em `fuzz/seeds/` através das verificações desses alvos de fuzzing, sem fuzzer; parte de cada `cargo test` |
+| `cargo test --profile checked --workspace` | os testes com o que uma compilação de depuração verifica a mais: depois de cada análise parcial os blocos cabem no texto, e o que ela leva adiante é o que o texto diz. Parte de `make test-long` |
+| `cargo test --release --test entry_points --test structure` | a partir das fontes: tudo o que o sistema chama está protegido contra panics, e os módulos só dependem para baixo |
 | `cargo test --release --test decoder` | o processo descodificador descodifica imagens e não chega a ficheiros nem à rede |
 | `make coverage` | cobertura de linhas de `cargo test` e de todos os autotestes, através do [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); falha abaixo dos mínimos. Ocupa o Mac durante cerca de cinco minutos |
-| `make coverage-library` | `src/markdown/`, `src/preview/` e `i18n.rs` contra os seus mínimos mais altos, medidos apenas por `cargo test` |
+| `make coverage-library` | os crates `splat-markdown`, `splat-preview`, `splat-file-state` e `splat-i18n` contra os seus mínimos mais altos, medidos apenas por `cargo test` |
 
-Os testes unitários ficam junto do código que testam. `tests/` contém o que chega à biblioteca a partir do exterior: os testes aleatórios em `robustness.rs`, que partilham o gerador em `src/fuzz.rs` com os de `sync.rs`, os documentos construídos para magoar em `hostile.rs` e o teste do descodificador, que inicia o programa compilado. As decisões em `src/editor/` que não precisam de janela vivem em funções livres com testes próprios: tudo o que o controlador sabe e como isso muda em `state.rs`, as regras de apresentação em `render_queue.rs`, a cópia de texto em `sync.rs`, os estilos de parágrafo, os tipos de letra e as cores como valores em `render.rs`, o que os identificadores da barra de ferramentas significam em `toolbar.rs`, o que um clique numa hiperligação significa em `navigation.rs`.
+Os testes unitários ficam junto do código que testam. `crates/splat-testkit/tests/` contém o que chega ao modelo e à pré-visualização a partir do exterior: os testes aleatórios em `robustness.rs`, que partilham o gerador de `splat-testkit` com os de `sync.rs`, os documentos construídos para magoar em `hostile.rs` e as sementes dos alvos de fuzzing em `fuzz_seeds.rs`. `tests/` contém o que examina o programa inteiro: as suas fontes, as suas traduções e o teste do descodificador, que inicia o programa compilado. As decisões em `src/editor/` que não precisam de janela vivem em funções livres com testes próprios: tudo o que o controlador sabe e como isso muda em `state.rs`, as regras de apresentação em `render_queue.rs`, a cópia de texto em `sync.rs`, os estilos de parágrafo, os tipos de letra e as cores como valores em `render.rs`, o que os identificadores da barra de ferramentas significam em `toolbar.rs`, o que um clique numa hiperligação significa em `navigation.rs`.
 
-Um passo do autoteste de janela espera por uma condição com nome, não por um tempo; só o que não dá sinal, como a ausência de algo, mantém uma pausa com o seu motivo. Esperar em vão é uma verificação falhada que nomeia o que nunca chegou, um passo que entra em pânico também é uma verificação falhada, e a execução continua nos dois casos. Uma verificação que nada pode dizer nesta execução comunica `SELFTEST SKIP`: o xtask lista-a, e ela nem passa nem falha. O xtask prende cada modo, e `--scenarios` por si, a cerca de nove décimos das suas verificações. O autoteste de janela executa uma segunda parte depois do seu percurso principal de cliques, em `src/editor/selftest/scenarios.rs`: todos os comandos de formatação e de tabelas, as caixas de diálogo, cliques em hiperligações, colar, largar, exportações, uma alteração grande, imagens a mudar no disco, pressão de memória, um documento enorme e a recuperação após uma falha.
+Um passo do autoteste de janela espera por uma condição com nome, não por um tempo; só o que não dá sinal, como a ausência de algo, mantém uma pausa com o seu motivo. Esperar em vão é uma verificação falhada que nomeia o que nunca chegou, um passo que entra em pânico também é uma verificação falhada, e a execução continua nos dois casos. Uma verificação que nada pode dizer nesta execução comunica `SELFTEST SKIP`: o xtask lista-a, e ela nem passa nem falha. O xtask prende cada modo, e `--scenarios` por si, a cerca de nove décimos das suas verificações. O autoteste de janela executa uma segunda parte depois do seu percurso principal de cliques, em `src/editor/selftest/scenarios.rs`: todos os comandos de formatação e de tabelas, as caixas de diálogo, cliques em hiperligações, colar, largar, exportações, um ficheiro que outro programa alterou, uma alteração grande, imagens a mudar no disco, pressão de memória, um documento enorme e a recuperação após uma falha. Cada grupo abre um documento próprio, para que uma falha num não chegue ao seguinte, e cada um pode ser executado sozinho com `--only`. O autoteste sem janela também estraga de propósito a gravação: uma pasta que não aceita nada, um ficheiro só de leitura, uma pasta que desapareceu, um disco cheio e um panic em cada callback de uma gravação, e nada disso pode custar texto.
 
 A cobertura tem dois mínimos: cada módulo com pelo menos 84 % das suas linhas e todos os módulos em conjunto com pelo menos 96 %. `make coverage` mede `cargo test` em conjunto com os autotestes e falha abaixo de qualquer um deles; `make coverage-library` mantém o que não precisa de janela em 90 % e 97 %. Os mínimos e as poucas exceções, como o panic hook em `main.rs` que só corre numa falha, estão em [xtask](../../../xtask/src/coverage.rs) ao lado das suas razões. As compilações medidas vão para `target/coverage/`, por isso medir o código nunca chega a `target/release/` nem a uma imagem de disco. O auxiliar descodificador abre o seu ficheiro de medição antes de se fechar numa sandbox, pelo que também é medido.
 
@@ -646,16 +653,20 @@ A saída dos autotestes vai para `target/selftest/`. O autoteste compila uma apl
 
 ### Estrutura do projeto
 
-`src/lib.rs` faz de tudo o que não precisa de janela uma biblioteca própria, `splat`: `markdown/`, `preview/`, `i18n.rs` e o gerador de testes `fuzz.rs`. Compila sem o macOS. A aplicação em `src/main.rs` assenta nela.
+Tudo o que não precisa de janela é um crate próprio em `crates/`, que compila sem o macOS, pelo que o compilador garante a forma como dependem uns dos outros. A aplicação em `src/` (pacote `splat-app`, programa `splat`) assenta neles.
 
-- `src/markdown/`: a árvore que todos os consumidores leem, `Doc` em `doc/`, que é dona do seu texto, e a única ligação ao analisador em `reader/`: o comrak não é nomeado em mais lado nenhum, e `reader/assumptions.rs` reúne o que o código pressupõe sobre ele. As cores de sintaxe e todos os comandos como edições de texto puras (`Edit`) em `commands/`. Também a nova análise após uma edição (`incremental.rs`), o leitor do HTML incorporado (`markup.rs`), a tipografia, as etiquetas, as referências e as citações no texto corrido (`typography.rs`), o aspeto do texto e que Markdown e HTML o produzem (`style.rs`), o que um endereço pode ser (`url.rs`) e a exportação para HTML e Word (`html.rs`, `docx.rs` com `docx/html.rs` e `docx/xml.rs`). Uma posição tem o seu tipo: `Byte` no texto-fonte, `U16` na vista do código-fonte, `Shown` na vista da pré-visualização (`text.rs`). Sem AppKit.
-- `src/preview/`: a disposição da pré-visualização em `layout/`, com o HTML incorporado em `layout/html.rs`, e a correspondência entre a pré-visualização e o código-fonte (`Bridge`, `Index`). Um `Bridge` recusa a disposição de outra versão do `Doc`. Sem AppKit.
+- `crates/splat-markdown/`: a árvore que todos os consumidores leem, `Doc` em `doc/`, que é dona do seu texto, e a única ligação ao analisador em `reader/`: o comrak não é nomeado em mais lado nenhum, e `reader/assumptions.rs` reúne o que o código pressupõe sobre ele. As cores de sintaxe e todos os comandos como edições de texto puras (`Edit`) em `commands/`. Também a nova análise após uma edição (`incremental.rs`), o leitor do HTML incorporado (`markup.rs`), a tipografia, as etiquetas, as referências e as citações no texto corrido (`typography.rs`), o aspeto do texto e que Markdown e HTML o produzem (`style.rs`), o que um endereço pode ser (`url.rs`) e a exportação para HTML e Word (`html.rs`, `docx.rs` com `docx/html.rs` e `docx/xml.rs`). Uma posição tem o seu tipo: `Byte` no texto-fonte, `U16` na vista do código-fonte, `Shown` na vista da pré-visualização (`text.rs`).
+- `crates/splat-preview/`: a disposição da pré-visualização em `layout/`, com o HTML incorporado em `layout/html.rs`, e a correspondência entre a pré-visualização e o código-fonte (`Bridge`, `Index`). Um `Bridge` recusa a disposição de outra versão do `Doc`.
+- `crates/splat-file-state/`: que texto contém um ficheiro, em que formato e o que significa dar-lhe uma vista de olhos.
+- `crates/splat-i18n/` com `resources/*.lproj`: 35 idiomas; as chaves são os textos alemães, e a aplicação instala a tabela do idioma da interface no arranque.
+- `crates/splat-testkit/`: o gerador dos testes aleatórios e as verificações dos alvos de fuzzing.
 - `src/editor/`: a janela. Um único objeto `EditorController` serve o AppKit como delegado das duas vistas e reencaminha para componentes, pequenas structs sobre o controlador e o estado que possuem, cujos campos os outros módulos não alcançam:
 
 | Módulo | Responsabilidade |
 |---|---|
-| `mod.rs` | classe, métodos de delegado que reencaminham, `invalidate` |
+| `controller.rs` | classe, métodos de delegado que reencaminham, `invalidate` e o que o resto do programa diz a um editor; só ele chega aos componentes |
 | `panes.rs` | `Panes`: as vistas de texto, a estrutura, mostrar e ocultar os painéis, e o que dá acesso às vistas |
+| `controller/layers.rs` | quem pode chegar a quem: um componente recebe um acesso ao controlador que oferece o que está abaixo dele, e o compilador garante isso |
 | `state.rs` | o que o controlador sabe sobre o documento e todas as formas de isso mudar; os seus campos são privados e não toca em nenhuma vista |
 | `model.rs` | empresta o estado e a cópia de texto a closures que não alcançam uma vista |
 | `actions.rs` | registo de comandos: seletor, título, atalho, símbolo, quando o comando se aplica |
@@ -667,17 +678,16 @@ A saída dos autotestes vai para `target/selftest/`. O autoteste compila uma apl
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: o editor de fórmulas e diagramas |
 | `navigation.rs`, `links.rs` | `Links`: hiperligações, hiperligações wiki, etiquetas, caixas de tarefas, dobragem, notas de rodapé |
 | `env.rs` | o que a pré-visualização lê de fora do texto: pontuação tipográfica, o repositório para `@name` e `#12`, o ficheiro BibTeX, notas incorporadas |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | texto da pré-visualização, imagens locais e remotas; `Pictures` em `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | texto da pré-visualização, imagens locais e remotas; `Pictures` em `images.rs` |
 | `attributes.rs` | atributos de texto; cada chave só recebe um valor do tipo que espera |
 | `shadow.rs` | cópias de texto por guardar para a recuperação após uma falha |
 | `decoder.rs` | processos auxiliares isolados numa sandbox que descodificam imagens e gráficos |
 | `export.rs`, `outline.rs` | `Sharing`: exportação para HTML e Word, o ficheiro de partilha, a impressão; a barra lateral de estrutura |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit para MathJax, Mermaid, Graphviz, PlantUML e o editor visual de fórmulas; as regras sobre o que é apresentado quando, à parte do WebKit |
 | `webkit.rs` | chamadas ao WebKit; só o tempo de vida do delegado de navegação fica com `js.rs` e `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construção da janela, barra de ferramentas, vistas de texto, caixas de diálogo, cores |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construção da janela, barra de ferramentas, vistas de texto, caixas de diálogo, cores |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: barra de menus, delegado da aplicação, documento (`MDDocument`, uma subclasse de `NSDocument`).
-- `src/i18n.rs` com `resources/*.lproj`: 35 idiomas; as chaves são os textos alemães, e a aplicação instala a tabela do idioma da interface no arranque.
 - `src/util/`: threads de trabalho (`lanes.rs`), volumes que podem deixar de responder (`volumes.rs`), auxiliares do AppKit, ficheiros e processos. `src/diag.rs`: o que corre mal fora da vista do utilizador vai para o registo do sistema, sem qualquer texto de um documento.
 - `src/large_alloc.rs`: as alocações grandes vêm diretamente do kernel e voltam a ele quando libertadas, para que a memória seja devolvida após grandes edições.
 - `resources/js/`: páginas web e bibliotecas; versões e somas de verificação em [vendor.lock](../../../vendor.lock).
@@ -689,11 +699,11 @@ O texto-fonte na vista de texto da esquerda é a única fonte de verdade.
 
 1. Cada alteração de um carácter ali atualiza no próprio local a cópia do texto (`Snapshot`), sem voltar a ler o texto.
 2. Uma atualização analisa a cópia, volta a colorir o código-fonte apenas onde as cores mudaram, dispõe a pré-visualização e substitui só os blocos cujo conteúdo mudou.
-3. Após uma edição, só os parágrafos afetados são analisados, coloridos e dispostos de novo, desde que os vizinhos se mantenham iguais; `reparse_part_and_color` indica quando não se mantêm. Os documentos com blocos de comentários `%%`, as alterações ao front matter e, num documento com definições de referências de hiperligações, as alterações a uma parte que contém um parêntese reto são processados por inteiro. O comrak só reconhece uma referência de nota de rodapé com a sua definição na mesma análise e move as definições para trás do texto, por isso a parte é analisada com uma definição provisória por etiqueta e retira os seus números da árvore antiga; uma alteração às referências ou às definições na parte, ou junto de uma nota de rodapé em linha, é processada por inteiro.
+3. Após uma edição, só os parágrafos afetados são analisados, coloridos e dispostos de novo, desde que os vizinhos se mantenham iguais; [docs/partial-parse.md](../../../docs/partial-parse.md) indica porque é que isso dá o mesmo que uma análise completa e o que ver quando o comrak muda. Os documentos com blocos de comentários `%%`, as alterações ao front matter e, num documento com definições de referências de hiperligações, as alterações a uma parte que contém um parêntese reto são processados por inteiro. O comrak só reconhece uma referência de nota de rodapé com a sua definição na mesma análise e move as definições para trás do texto, por isso a parte é analisada com uma definição provisória por etiqueta e retira os seus números da árvore antiga; uma alteração às referências ou às definições na parte, ou junto de uma nota de rodapé em linha, é processada por inteiro.
 4. Os blocos HTML que abrem `<details>` ou `<div align>` e o fecham mais tarde afetam os blocos Markdown entre os dois; um bloco reutilizado tem de ter a mesma envolvente.
 5. Enquanto escreve no código-fonte de um documento até 2 MB, a atualização parcial corre de imediato; quando não se aplica, ou num documento maior, a análise e a disposição correm em segundo plano. Enquanto escreve na pré-visualização, correm de imediato, porque o cursor da pré-visualização depende do resultado.
 6. A entrada na pré-visualização é traduzida pelo `Bridge` numa edição do código-fonte e segue daí o mesmo caminho. O Markdown tem demasiadas formas de transformar texto em sintaxe para bastarem regras, por isso `preview/verify.rs` volta a analisar a parte alterada e compara o que ela mostra com o que foi escrito; uma edição que não se sustenta recebe mais escapes ou é recusada.
-7. As posições em linha do comrak falham em alguns casos, por exemplo atrás de uma definição de referência de hiperligação. `markdown/reader/positions.rs` verifica-as no código-fonte ao ler um bloco e volta a lê-las do código-fonte onde não coincidem.
+7. As posições em linha do comrak falham em alguns casos, por exemplo atrás de uma definição de referência de hiperligação. `reader/positions.rs` verifica-as no código-fonte ao ler um bloco e volta a lê-las do código-fonte onde não coincidem.
 
 ### Regras no controlador
 
@@ -702,16 +712,18 @@ O texto-fonte na vista de texto da esquerda é a única fonte de verdade.
 3. As mensagens do exterior (uma imagem carregada, uma fórmula apresentada) chegam com atraso através de `renders_arrived` e `image_arrived`, nunca a meio de uma atualização.
 4. Voltar a desenhar sem alteração de texto passa apenas por `invalidate(reason)`.
 5. A cópia de texto não é mantida durante uma alteração do código-fonte, ou essa alteração copia o texto inteiro: `with_text` empresta-a apenas durante uma closure `Send`.
-6. Um novo comando precisa de uma entrada em `actions.rs`, de um método em `mod.rs` e de um ramo em `Editing::perform`.
+6. Um novo comando precisa de uma entrada em `actions.rs`, de um método em `controller.rs` e de um ramo em `Editing::perform`.
 7. Cada bloco `unsafe` leva a sua justificação num comentário `// SAFETY:`. Os bytes chegam aos descodificadores de imagem do sistema apenas no processo auxiliar, através de `decoder::decode_native`; um teste procura nas fontes outras chamadas.
 8. Nada na thread principal espera pelas pastas do utilizador, já que um volume de rede pode deixar de responder: os ficheiros são consultados na thread `DISK`, e a pré-visualização lê as respostas através de `Env::known`. Só uma ação por que o utilizador espera, como uma exportação ou guardar, pode tocar diretamente no disco.
+9. O que tem de terminar também termina depois de um panic, já que a thread principal sobrevive a um: uma flag levantada passa por `with_raised`, uma edição do armazenamento de texto por `editing` e o que o anular não deve saber por `without_undo`. Um teste encontra os que foram escritos à mão.
+10. Um endereço num documento tem uma só leitura, em `splat_markdown::url`; um teste encontra esquemas comparados à mão.
 
 ### Acrescentar um comando
 
 A barra de menus, a barra de ferramentas e o menu de contexto constroem os seus itens a partir do registo em [src/editor/actions.rs](../../../src/editor/actions.rs), e a validação de menus lê ali quando um comando se aplica e se mostra uma marca de seleção. Um novo comando precisa de:
 
 1. uma variante de `Action` com o seu `Spec`: seletor, título, etiqueta da barra de ferramentas, dica (começa com um verbo, no máximo 75 carateres), atalho, símbolo SF e quando se aplica
-2. o método em `src/editor/mod.rs`
+2. o método em `src/editor/controller.rs`
 3. um ramo em `Editing::perform`
 4. os seus textos em cada `Localizable.strings`
 
@@ -733,7 +745,7 @@ O código usa o texto alemão como chave: `t("Fett")` procura-o em tempo de exec
 
 | Componente | Versão | Utilização | Licença |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | analisador de Markdown | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 com [uma linha alterada](../../../vendor/comrak/PATCH.md) | analisador de Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime de Objective-C, Foundation, blocos | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | ligações ao AppKit, ao WebKit e ao Grand Central Dispatch | Zlib, Apache-2.0 ou MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | fórmulas e imagens SVG como PDF vetorial | MIT ou Apache-2.0 |

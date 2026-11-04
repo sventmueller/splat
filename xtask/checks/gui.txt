@@ -1,0 +1,85 @@
+a click into the source keeps the new formula and the focus
+a click on ▸ unfolds the callout
+a click opens the HTML details
+a closed editor does not reopen while the caret stays
+a discarded formula edit leaves the document unedited
+a pane toggled twice during its animation ends as it was
+a preview selection shows in the source in the selection colour
+a preview shown again has the text typed while it was hidden
+a preview the divider brings back has the text typed while it was hidden
+a source selection shows in the preview
+a space typed at a paragraph end stays before the next letter (preview)
+alert box renders its German title
+alert box wraps the paragraph
+an empty formula block is inserted
+an input method commits its word once (preview)
+an input method commits its word once (source)
+an input method composes in the preview
+an input method composes in the source
+an open formula edit counts as unsaved
+an unedited document reloads when another program changes its file
+anchor link jumps to its heading
+backspace removes one empty line, typing fills the other
+bold again at the end of bold text stops it (preview)
+bold at a word end formats the next word (preview)
+bold at a word end formats the next word (source)
+bold at a word end waits for typing (preview)
+bold from toolbar action in preview
+caret on a formula opens its editor
+checkbox click toggles task
+closing the popover commits
+code block with a language
+connection button continues from the last node
+context menu offers Markdown commands
+context menu on a formula offers to edit it
+dark mode keeps rendered formulas
+diagram popover shows the Mermaid error
+edit command is available right behind a formula
+empty last table row keeps all cells
+escape discards the popover edit
+escape removes a new empty formula again
+escape restores the formula
+extended syntax renders
+formula edit is one undo step
+formula popover shows TeX
+formulas and diagram rendered as images
+fraction button inserts a template with the selection
+highlight wraps the selection in <mark>
+images from the web wait for permission
+inserting a formula opens its editor
+link dialog fields are full width
+link dialog fields span the sheet
+making the app the default for a type it opens needs no confirmation and shows no error
+opened details show their Markdown
+panes toggled twice in a moment end as they were
+pdf export
+plus opens a new document as a tab
+popover edits apply live
+reloading keeps the caret
+reloading leaves no undo steps into the old text
+remote image loads
+return creates a paragraph
+return twice in the preview leaves two empty lines
+scroll positions follow the text typed while the preview was hidden
+scrolling the source scrolls the preview
+share hands over the current text as a .md file
+source view stays on TextKit 2
+tab moves to next table cell
+tab selects the next placeholder
+table of contents links the headings
+the app menu checks for updates through Sparkle
+the app menu offers to open Markdown files in Splat, ticked once it does
+the new formula is kept when its editor closes
+the preview shows the source selection on screen
+the share file holds no text before sharing
+the source shows the preview selection on screen
+the unfolded callout shows its content
+the update settings in the app menu switch Sparkle's options, installing only with automatic checks
+toolbar offers new tab, share and more formats
+typed markdown characters are escaped
+typing in preview edits heading
+undo removes bold only
+undo takes back typed text together with its markers
+visual edits reach the document
+visual formula editor loads
+⌘-click on a link to a heading jumps there

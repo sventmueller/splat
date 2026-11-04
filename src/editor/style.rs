@@ -131,23 +131,23 @@ pub fn apply_highlight_changes(
         (r.start, r.end)
     };
     let (region, styled) = styled_ranges(text, spans, start..end);
-    storage.beginEditing();
-    let base = base_source_attributes(fonts);
-    set_attributes(storage, &base, region);
-    let strike = Attribute::strikethrough();
-    for (r, style) in styled {
-        if style.bold || style.italic {
-            add_attribute(storage, &Attribute::font(fonts.pick(style.bold, style.italic)), r);
+    crate::util::editing(storage, || {
+        let base = base_source_attributes(fonts);
+        set_attributes(storage, &base, region);
+        let strike = Attribute::strikethrough();
+        for (r, style) in styled {
+            if style.bold || style.italic {
+                add_attribute(storage, &Attribute::font(fonts.pick(style.bold, style.italic)), r);
+            }
+            if let Some(token) = style.token {
+                add_attribute(storage, &Attribute::foreground(&token_color(token)), r);
+            }
+            if style.strike {
+                add_attribute(storage, &strike, r);
+            }
         }
-        if let Some(token) = style.token {
-            add_attribute(storage, &Attribute::foreground(&token_color(token)), r);
-        }
-        if style.strike {
-            add_attribute(storage, &strike, r);
-        }
-    }
-    set_line_directions(storage, text, start..end.max(start));
-    storage.endEditing();
+        set_line_directions(storage, text, start..end.max(start));
+    });
 }
 
 /// What is restyled in UTF-16 units: all of `region`, and the part of each span within it.

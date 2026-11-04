@@ -36,15 +36,24 @@ function ignoreLineBreaks({ data }) {
   });
 }
 
+const packagesOfInput = () => MathJax.startup.input[0].parseOptions.packageData.get("require").required.length;
+
+let packagesAtStart;
+function freshInput() {
+  MathJax.startup.getComponents();
+  const { postFilters } = MathJax.startup.input[0];
+  postFilters.add(keepShapedTextWhole);
+  postFilters.add(ignoreLineBreaks);
+  packagesAtStart = packagesOfInput();
+}
+
 let mathLoaded;
 let mathStyle;
 function loadMath() {
   mathLoaded ??= load("js/mathjax/tex-mml-svg-mathjax-tex.js")
     .then(() => MathJax.startup.promise)
     .then(() => {
-      const { postFilters } = MathJax.startup.input[0];
-      postFilters.add(keepShapedTextWhole);
-      postFilters.add(ignoreLineBreaks);
+      freshInput();
       // MathJax's stylesheet draws tables and errors; a formula leaves it behind with this page, and the SVG library would
       // then fill their shapes black.
       mathStyle = MathJax.svgStylesheet().textContent.match(/g\[data-mml-node="(?:merror|mtable)"\][^{]*\{[^}]*\}/g).join("");
@@ -52,13 +61,27 @@ function loadMath() {
   return mathLoaded;
 }
 
-async function renderMath(tex, display, color) {
+// Each formula is one picture that any document may show again, so none may depend on what rendered before it: MathJax
+// keeps labels, numbers, definitions and what `\\require` loaded for the life of the page, and only a new input forgets the
+// last of them. `macros` are the definitions of the formula's document; one that fails must not take the formula along.
+async function startFormula(macros) {
+  if (packagesOfInput() !== packagesAtStart) freshInput();
+  MathJax.tex2mml("\\begingroupSandbox");
+  if (macros) await MathJax.tex2mmlPromise(macros).catch(() => {});
+  // `MathJax.texReset` keeps resetting the input it was made with.
+  MathJax.startup.input[0].reset();
+}
+
+async function renderMath(tex, display, color, macros) {
   await loadMath();
+  await startFormula(macros);
   const node = await MathJax.tex2svgPromise(tex, { display });
   const svg = node.querySelector("svg");
-  const w = parseFloat(svg.getAttribute("width"));
-  const h = parseFloat(svg.getAttribute("height"));
   const style = svg.getAttribute("style") || "";
+  // A formula with a \\tag stretches across a container this page does not have; its least width is what it takes.
+  const width = svg.getAttribute("width");
+  const w = parseFloat(width.endsWith("%") ? style.match(/min-width:\s*([\d.]+)ex/)?.[1] : width);
+  const h = parseFloat(svg.getAttribute("height"));
   const match = style.match(/vertical-align:\s*(-?[\d.]+)ex/);
   const va = match ? parseFloat(match[1]) : 0;
   const error = node.querySelector("[data-mjx-error]");

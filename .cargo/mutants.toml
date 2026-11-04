@@ -1,5 +1,5 @@
 # `make mutants`: the tests of the model and the preview need no window.
-test_workspace = false
+test_package = ["splat-markdown", "splat-preview", "splat-file-state", "splat-testkit"]
 additional_cargo_test_args = ["--lib", "--test", "robustness"]
 timeout_multiplier = 3.0
 # A run of hours slows down from 5 to 20 s per test run, and the default floor of 20 s then reports every mutant as a hang.

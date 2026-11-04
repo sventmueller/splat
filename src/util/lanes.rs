@@ -85,6 +85,41 @@ pub fn contained<T>(f: impl FnOnce() -> T) -> Option<T> {
     result
 }
 
+/// Raises `flag` for the length of `f` and puts back what it was, also when `f` panics, as the main thread survives that.
+pub fn with_raised<R>(flag: &std::cell::Cell<bool>, f: impl FnOnce() -> R) -> R {
+    struct Restore<'a>(&'a std::cell::Cell<bool>, bool);
+    impl Drop for Restore<'_> {
+        fn drop(&mut self) {
+            self.0.set(self.1);
+        }
+    }
+    let _restore = Restore(flag, flag.replace(true));
+    f()
+}
+
+/// What a callback from the system does, with `fallback` if a bug in it panics. A panic would otherwise unwind through the
+/// system's frames; the text stays safe in its view, and the next update starts from there.
+pub fn guarded<R>(fallback: R, f: impl FnOnce() -> R) -> R {
+    contained(f).unwrap_or(fallback)
+}
+
+/// Runs `f` on the main thread when its turn comes. dispatch2 calls it through `extern "C"`, so a panic that left it would
+/// end the app.
+pub fn main_soon(f: impl FnOnce() + Send + 'static) {
+    dispatch2::DispatchQueue::main().exec_async(move || {
+        contained(f);
+    });
+}
+
+/// `main_soon` after `delay`.
+pub fn main_after(delay: std::time::Duration, f: impl FnOnce() + Send + 'static) {
+    if let Ok(when) = dispatch2::DispatchTime::try_from(delay) {
+        let _ = dispatch2::DispatchQueue::main().after(when, move || {
+            contained(f);
+        });
+    }
+}
+
 /// Runs `f` as if no `contained` were around it, for a check of what a panic outside of one does.
 #[cfg(feature = "selftest")]
 pub fn uncontained<T>(f: impl FnOnce() -> T) -> T {
@@ -94,12 +129,17 @@ pub fn uncontained<T>(f: impl FnOnce() -> T) -> T {
     result
 }
 
-/// CPU work off the main thread.
-pub static BACKGROUND: Lane = Lane::new("splat-render");
+/// CPU work off the main thread, about as much at a time as the decoder has helpers: a picture that takes long leaves the
+/// others free to go on.
+pub static BACKGROUND: Lane = Lane::new("splat-render").with_workers(3);
+
+/// Lets a value go; on a lane of its own, since a large tree that waits here must not delay a formula, nor a formula that
+/// takes long hold up memory that could be free.
+static FREEING: Lane = Lane::new("splat-free");
 
 /// Frees a large value elsewhere: a whole document tree takes long enough to be felt while typing.
 pub fn free_in_background<T: Send + 'static>(value: T) {
-    BACKGROUND.run(move || drop(value));
+    FREEING.run(move || drop(value));
 }
 
 /// Everything that touches the user's folders: a network volume that stopped answering may hold this thread for

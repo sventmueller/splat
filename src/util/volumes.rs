@@ -98,8 +98,8 @@ pub fn lane_of(path: &Path) -> &'static Lane {
     lane_of_volume(&volume_of(path))
 }
 
-/// What `f` finds at `path`, for a thread that cannot wait for a volume that stopped answering: `None` after `wait`, and
-/// at once while the last question to that volume is still open. The start-up disk is simply asked.
+/// What `f` finds at `path`, for a thread that cannot wait for a volume that stopped answering, or for a helper that does:
+/// `None` after `wait`, and at once while the last question to that volume is still open.
 pub fn answer_from<T: Send + 'static>(
     path: &Path,
     wait: std::time::Duration,
@@ -107,9 +107,6 @@ pub fn answer_from<T: Send + 'static>(
 ) -> Option<T> {
     static ASKED: BusyVolumes = BusyVolumes::new();
     let volume = volume_of(path);
-    if volume == "/" {
-        return Some(f());
-    }
     let on_volume = ASKED.enter(&volume)?;
     let (answered, answer) = std::sync::mpsc::sync_channel(1);
     lane_of_volume(&volume).run(move || {
@@ -221,7 +218,11 @@ mod tests {
                 })
             });
         assert_eq!(again, Some(2), "it answers again");
-        assert_eq!(answer_from(Path::new("/tmp/a.png"), Duration::ZERO, || 3), Some(3));
+        assert_eq!(
+            answer_from(Path::new("/tmp/a.png"), Duration::from_secs(5), || 3),
+            Some(3),
+            "the start-up disk goes the same way"
+        );
     }
 
     #[test]

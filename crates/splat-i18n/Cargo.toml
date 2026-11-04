@@ -1,0 +1,10 @@
+[package]
+name = "splat-i18n"
+version = "0.0.0"
+description = "The interface texts of Splat"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

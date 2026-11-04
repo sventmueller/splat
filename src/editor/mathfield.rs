@@ -14,7 +14,7 @@ use objc2_web_kit::{
 
 use super::EditorController;
 use super::webkit::{self, ScriptValue};
-use crate::util::{contained, ns};
+use crate::util::{contained, guarded, ns};
 
 define_class!(
     #[unsafe(super(NSObject))]
@@ -28,37 +28,41 @@ define_class!(
     unsafe impl WKScriptMessageHandler for Bridge {
         #[unsafe(method(userContentController:didReceiveScriptMessage:))]
         fn received(&self, _content: &WKUserContentController, message: &WKScriptMessage) {
-            let body = webkit::message_body(message);
-            let Some(dict) = body.downcast_ref::<NSDictionary>() else {
-                return;
-            };
-            let Some(editor) = self.ivars().borrow().as_ref().and_then(Weak::load) else {
-                return;
-            };
-            let latex = ns("latex");
-            if let Some(value) = dict.objectForKey(&latex)
-                && let Some(s) = value.downcast_ref::<NSString>()
-            {
-                let latex = s.to_string();
-                if let Some(field) = FIELD.with(|f| f.get().cloned()) {
-                    field.shown.replace(latex.clone());
+            guarded((), || {
+                let body = webkit::message_body(message);
+                let Some(dict) = body.downcast_ref::<NSDictionary>() else {
+                    return;
+                };
+                let Some(editor) = self.ivars().borrow().as_ref().and_then(Weak::load) else {
+                    return;
+                };
+                let latex = ns("latex");
+                if let Some(value) = dict.objectForKey(&latex)
+                    && let Some(s) = value.downcast_ref::<NSString>()
+                {
+                    let latex = s.to_string();
+                    if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+                        field.shown.replace(latex.clone());
+                    }
+                    editor.visual_formula_changed(&latex);
+                } else if dict.objectForKey(&ns("cancel")).is_some() {
+                    editor.cancel_formula();
                 }
-                editor.atom_editor().visual_formula_changed(&latex);
-            } else if dict.objectForKey(&ns("cancel")).is_some() {
-                editor.atom_editor().cancel();
-            }
+            });
         }
     }
 
     unsafe impl WKNavigationDelegate for Bridge {
         #[unsafe(method(webView:didFinishNavigation:))]
         fn finished(&self, _web: &WKWebView, _navigation: Option<&WKNavigation>) {
-            if let Some(field) = FIELD.with(|f| f.get().cloned()) {
-                field.loaded.set(true);
-                if let Some(latex) = field.pending.borrow_mut().take() {
-                    field.run("setLatex(latex)", &latex);
+            guarded((), || {
+                if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+                    field.loaded.set(true);
+                    if let Some(latex) = field.pending.borrow_mut().take() {
+                        field.run("setLatex(latex)", &latex);
+                    }
                 }
-            }
+            });
         }
 
         #[unsafe(method(webView:decidePolicyForNavigationAction:decisionHandler:))]
@@ -68,18 +72,18 @@ define_class!(
             action: &WKNavigationAction,
             handler: &block2::DynBlock<dyn Fn(WKNavigationActionPolicy)>,
         ) {
-            handler.call((webkit::navigation_policy(action, PAGE),));
+            handler.call((guarded(WKNavigationActionPolicy::Cancel, || webkit::navigation_policy(action, PAGE)),));
         }
 
         #[unsafe(method(webViewWebContentProcessDidTerminate:))]
         fn terminated(&self, web: &WKWebView) {
-            if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+            guarded((), || if let Some(field) = FIELD.with(|f| f.get().cloned()) {
                 field.loaded.set(false);
                 // The new page starts empty, and the next input would replace the formula with what it then holds.
                 let shown = field.shown.borrow().clone();
                 *field.pending.borrow_mut() = field.has_owner().then_some(shown);
                 webkit::load_bundled_page(web, PAGE);
-            }
+            });
         }
     }
 );

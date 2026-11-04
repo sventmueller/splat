@@ -40,8 +40,6 @@ pub(crate) const SELFTEST_ENTITLEMENTS: &str = r#"<?xml version="1.0" encoding="
 </plist>
 "#;
 
-/// Selftest and debug builds are separate apps: they leave the user's settings, recent documents and Markdown file
-/// association alone, and macOS cannot mistake an outdated debug build for Splat when it opens a document.
 /// Whether a build carries Sparkle, and which feed it reads.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Updates {
@@ -55,6 +53,8 @@ pub(crate) enum Updates {
     Selftest,
 }
 
+/// Selftest and debug builds are separate apps: they leave the user's settings, recent documents and Markdown file
+/// association alone, and macOS cannot mistake an outdated debug build for Splat when it opens a document.
 #[expect(clippy::too_many_lines, reason = "the property list, as it reads in the file")]
 pub(crate) fn info_plist(version: &str, languages: &[String], variant: Option<&str>, updates: Updates) -> String {
     let (bundle_id, rank) = match variant {
@@ -232,7 +232,7 @@ pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distributio
             build.args(["--features", "selftest"]);
         }
         run(&mut build)?;
-        target.join(PACKAGE)
+        target.join(PROGRAM)
     };
     let variant = if selftest {
         Some("Selftest")
@@ -296,10 +296,10 @@ pub(crate) fn universal_program() -> Result<PathBuf, String> {
     join.arg("-create");
     for (target, _) in UNIVERSAL {
         build.args(["--target", target]);
-        join.arg(target_dir().join(target).join("release").join(PACKAGE));
+        join.arg(target_dir().join(target).join("release").join(PROGRAM));
     }
     run(&mut build)?;
-    let program = target_dir().join(format!("{PACKAGE}-universal"));
+    let program = target_dir().join(format!("{PROGRAM}-universal"));
     run(join.arg("-output").arg(&program))?;
     Ok(program)
 }
@@ -309,8 +309,13 @@ pub(crate) fn check_library() -> Result<(), String> {
     run(rustup_cargo()?.args([
         "check",
         "--package",
-        PACKAGE,
-        "--lib",
+        "splat-i18n",
+        "--package",
+        "splat-file-state",
+        "--package",
+        "splat-markdown",
+        "--package",
+        "splat-preview",
         "--target",
         "x86_64-unknown-linux-gnu",
     ]))
@@ -440,7 +445,7 @@ pub(crate) fn signing_identity() -> Result<&'static str, String> {
     if String::from_utf8_lossy(&listed.stdout).contains(&format!("\"{SIGNING_IDENTITY}\"")) {
         return Ok(SIGNING_IDENTITY);
     }
-    let dir = std::env::temp_dir().join(format!("{PACKAGE}-signing-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("{PROGRAM}-signing-{}", std::process::id()));
     std::os::unix::fs::DirBuilderExt::mode(&mut fs::DirBuilder::new(), 0o700)
         .create(&dir)
         .map_err(|e| format!("{}: {e}", dir.display()))?;

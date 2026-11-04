@@ -120,7 +120,7 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 - **Gumb za vse.** Vsak element Markdown ima gumb v orodni vrstici in ukaz v meniju, pogosti tudi bližnjico na tipkovnici. Tabele imajo svoj meni za vrstice, stolpce in poravnavo.
 - **Izvoz brez izgub.** PDF, ena sama samostojna datoteka HTML ali dokument Word s pravimi naslovi, seznami, tabelami, sprotnimi opombami in slikami.
 - **Domač na Macu skozi in skozi.** Prava okna AppKit, zavihki, meniji, pojavna okna, različice, samodejno shranjevanje, meni za deljenje, temni način, preverjanje črkovanja, narekovanje in VoiceOver. Brez Electrona, brez spletnega pogleda za samo besedilo.
-- **Hiter z velikimi datotekami.** Izris pritiska tipke v dokumentu velikosti 10 MB traja okoli 25 ms, pred lastnim delom pogleda.
+- **Hiter z velikimi datotekami.** Izris pritiska tipke v dokumentu velikosti 10 MB traja okoli 10 ms, pred lastnim delom pogleda.
 - **Zasebnost in previdnost.** Slike iz spleta se naložijo šele, ko jih dovolite, povezave do drugih aplikacij vprašajo za dovoljenje, vse, kar dekodira nezaupane slikovne podatke, pa teče v pomožnih procesih v peskovniku.
 - **V vašem jeziku.** Vmesnik in vgrajeni hitri priročnik za Markdown sta na voljo v 35 jezikih: arabščini, katalonščini, kitajščini (poenostavljeni), kitajščini (tradicionalni), hrvaščini, češčini, danščini, nizozemščini, angleščini, finščini, francoščini, nemščini, grščini, hebrejščini, hindijščini, madžarščini, indonezijščini, italijanščini, japonščini, korejščini, malajščini, norveščini, poljščini, portugalščini (Brazilija), portugalščini (Portugalska), romunščini, ruščini, slovaščini, slovenščini, španščini, švedščini, tajščini, turščini, ukrajinščini in vietnamščini.
 
@@ -504,7 +504,7 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 - **Privzeto brez omrežja.** Splat nima telemetrije. Posodobitve išče šele, ko se strinjate ali izberete **Preveri, ali so na voljo posodobitve …**: nato z GitHuba naloži majhno datoteko vira, zahteva pa ne navaja ničesar razen aplikacije in njene različice. Formule in diagrami se upodobijo lokalno; spletni pogledi, ki to počnejo, ne dosežejo omrežja.
 - **Slike iz spleta** se naložijo šele z vašim dovoljenjem, samo prek `https`, nikoli z gostiteljev v vašem lokalnem omrežju, največ 10 MB vsaka in v zasebni seji brez piškotkov.
 - **Izolirano dekodiranje.** Slike ter grafike formul in diagramov se dekodirajo v pomožnih procesih, ki zaprejo vsako datoteko, ki so jo podedovali, in se pred branjem prvega bajta zaklenejo v peskovnik: brez dostopa do datotek, brez omrežja. Vrnejo samo piksle, katerih velikost se preveri, in se po 10 sekundah ustavijo. Applovi lastni dekodirniki slik vidijo samo HEIC, TIFF, AVIF in PDF, in to le, kadar so podatki res v tej obliki; tečejo v svojem pomožnem procesu, ki sme poleg tega brati sistemske mape s pisavami in uporabljati sistemski video dekodirnik. Tudi SVG-ji, formule in diagrami gredo skozenj, zato so v Splatu slike s fiksno ločljivostjo: štiri slikovne pike na točko, do 2560 na daljši strani.
-- **Lokalne datoteke** dosežejo dokument samo po poti, ki jo ta navaja. Vdelave prikažejo zapiske Markdown iz mape dokumenta in niže, manjkajoča slika pa se išče samo tam. Pot do slike drugje, absolutna ali z začetkom `~`, se še vedno naloži, izvoza v HTML in Word pa jo vdelata: oglejte si izvoz dokumenta, ki ga niste napisali vi, preden ga posredujete naprej.
+- **Lokalne datoteke** dosežejo dokument samo po poti, ki jo ta navaja. Vdelave prikažejo zapiske Markdown iz mape dokumenta in niže, manjkajoča slika pa se išče samo tam. Pot do slike drugje, absolutna ali z začetkom `~`, se v predogledu še vedno naloži; izvoza v HTML in Word, tiskanje in PDF-ji vzamejo le tisto, kar je v mapi dokumenta ali v njegovem repozitoriju Git, razen če ta repozitorij vsebuje tudi vašo domačo mapo, zato tuj dokument ne more povleči vaših datotek v izvoz, ki ga posredujete naprej.
 - **Kopije neshranjenega besedila** ostanejo na tem Macu, v vaši mapi Knjižnica, za obnovitev po zrušitvi. Odidejo s shranjevanjem ali običajnim koncem Splata; kopije, ki jih je pustila zrušitev, ostanejo v mapi za obnovitev, dokler jih ne izbrišete.
 - **Povezave** nikoli ne zaženejo programa s klikom. Spletne in poštne povezave se odprejo kot običajno; povezave do drugih aplikacij najprej vprašajo.
 - **HTML v dokumentih** bere Splatov lastni razčlenjevalnik. Skripte, slogi, okvirji in obrazci se nikoli ne izvedejo.
@@ -516,13 +516,14 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 Splat ostaja odziven tudi pri dokumentih z več megabajti:
 
 - Izvorno besedilo uporablja TextKit 2, ki razporedi samo vidni del.
-- Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki. V dokumentu velikosti 10 MB razčlenjevanje in barvanje trajata okoli 20 ms, izris okoli 25 ms, celoten pritisk tipke v njegovem predogledu pa okoli 60 ms z lastnim delom pogleda.
+- Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki. V dokumentu velikosti 10 MB razčlenjevanje in barvanje trajata okoli 3 ms, izris okoli 10 ms, celoten pritisk tipke v njegovem predogledu pa okoli 30 ms z lastnim delom pogleda.
 - Veliki predogledi najprej upodobijo vidni del, preostalo pa, ko je aplikacija nedejavna. Bloki, ki jih pomaknete v vidno polje, se upodobijo, preden se narišejo.
 - V izvornem besedilu večjih dokumentov razčlenjevanje za predogled med tipkanjem teče v ozadju.
 - Dokument ostane navadno besedilo, ko bi potreboval približno 4 GB pomnilnika, kar je približno 50 do 120 MB običajnega Markdowna, a le 10 do 20 MB, če vsebuje samo tabele ali naslove: izvorno besedilo nima barv, predogled pa pove, zakaj ostaja prazen. Izvozi še vedno delujejo.
 - Od približno 200 KB naprej dokument odpre okno, preden je razčlenjen; pri 5 MB barve in predogled sledijo približno četrt sekunde pozneje.
+- Vse slike skupaj, vključno s formulami in diagrami, zasedejo največ četrtino pomnilnika Maca in polovico tega, dokler je pomnilnika malo. Nad tem se nadaljnje slike prikažejo kot nadomestni znaki, dokler spet ni prostora.
 
-Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 10 MB: spremembe definicije ali sklicev sprotne opombe, ob opombi v vrstici, čisto na koncu dokumenta ob sprotni opombi, spremembe front matterja ali blizu definicij sklicev na povezave ter vsaka sprememba v dokumentu z bloki komentarjev `%%` ali s sprotno opombo, definirano dvakrat ali znotraj citata ali seznama. Pomnilnik raste z datoteko, na približno 115–160 MB za 1 MB Markdowna in 340–510 MB za 10 MB.
+Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 10 MB: spremembe definicije ali sklicev sprotne opombe, ob opombi v vrstici, čisto na koncu dokumenta ob sprotni opombi, spremembe front matterja ali definicij sklicev na povezave ter vsaka sprememba v dokumentu z bloki komentarjev `%%` ali s sprotno opombo, definirano dvakrat ali znotraj citata ali seznama. Pomnilnik raste z datoteko, na približno 115–160 MB za 1 MB Markdowna in 340–510 MB za 10 MB.
 
 ## Znane omejitve
 
@@ -577,6 +578,7 @@ make check                  # oblikovanje, clippy brez opozoril, vsi testi, vend
 make test                   # make check, nato samotest brez okna
 make test-gui               # samotesti z oknom; Mac zasedejo za okoli štiri minute
 make test-long              # daljše naključno iskanje in preverjanje delnih posodobitev pri 10 MB
+make fuzz                   # naključni vnos za delno razčlenjevanje in vse izhode
 make coverage               # pokritost vrstic vseh testov in samotestov, z mejo za vsak modul
 make coverage-library       # enake meje za module brez okna, kot v CI
 make bench FILE=<file.md>   # časi odpiranja, tipkanja in pomikanja po veliki datoteki
@@ -626,19 +628,24 @@ Aplikacija v njej nosi drugačen podpis kot lokalna zgradba, zato macOS za obe v
 | `cargo xtask check-library` | knjižnica se zgradi za Linux, torej nič v njej ne potrebuje macOS |
 | `cargo xtask vendor check` | knjižnice JavaScript se bajt za bajtom ujemajo z `vendor.lock` |
 | `cargo xtask selftest probe` | brez okna, vsak z pričakovanim rezultatom: formule, diagrami, spletne slike proti strežniku znotraj procesa, blokirani naslovi, besedilo, ki ga zapiše vsak ukaz, vsak zapis slike prek obeh izvozov, stran, ki preneha odgovarjati, in obrambe spletnih pogledov proti strani brez njih. Traja približno pol minute. Kar potrebuje aplikacijo v ospredju, se na zaklenjenem zaslonu preskoči |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios]` | delujoča aplikacija, klik za klikom. Odpre okno in tipka vanj; Mac je zaseden okoli štiri minute. `--scenarios` požene samo drugi del, v okoli minuti in pol |
+| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | delujoča aplikacija, klik za klikom. Odpre okno in tipka vanj; Mac je zaseden okoli štiri minute. `--scenarios` požene samo drugi del, v okoli minuti in pol. `--only` požene eno skupino tega dela, v lastnem dokumentu, tudi na zaklenjenem zaslonu. `--in-back` izpusti to, kar potrebuje aplikacijo v ospredju; brez tega taka preverba ne uspe |
 | `cargo xtask selftest resize` | razširi okno po premiku razdelilnika: izvorno besedilo se ponovno prelomi, medtem ko se velikost okna spreminja. Traja okoli deset sekund |
-| `cargo xtask selftest bench <file.md>` | časi odpiranja, tipkanja in pomikanja po veliki datoteki |
+| `cargo xtask selftest typing [--by-hand]` | tipka skozi shranjevanja, s tipkami prek čakalne vrste dogodkov aplikacije ali, z `--by-hand`, ročno: natipkano ostane in šteje kot neshranjeno. Traja približno minuto |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | časi odpiranja, tipkanja in pomikanja po veliki datoteki; `--keystroke-ms` ne uspe, ko najhitrejši pritisk traja dlje |
 | `cargo test --release -- --ignored partial_updates` | pritisk tipke pri 10 MB: delna proti polni posodobitvi, enak rezultat v največ četrtini časa |
 | `cargo test --release --test hostile` | dokumenti, zgrajeni tako, da prelijejo sklad ali zahtevajo kvadratni čas, vsak v dveh velikostih, katerih časi morajo rasti skupaj z besedilom, prek razčlenjevanja, razporeditve, obeh izvozov, pritiskov tipk in ukazov |
-| `make mutants` | napake, vgrajene v `src/markdown/` in `src/preview/` ena za drugo, prek [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); pove, katerih ne opazi noben test. Traja ure; `FILE=src/preview/bridge.rs` zoži izbor |
+| `make mutants` | napake, vgrajene v `crates/splat-markdown`, `crates/splat-preview` in `crates/splat-file-state` ena za drugo, prek [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); pove, katerih ne opazi noben test. Traja ure; `FILE=crates/splat-preview/src/bridge/mod.rs` zoži izbor |
+| `make fuzz` | naključni vnos prek [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), ki potrebuje nightly iz rustupa: pritiski tipk, ki se morajo brati kot polno razčlenjevanje, vsi izhodi, urejanja v predogledu, vsi ukazi in datoteka, ki se shrani tako, kot se je odprla. `SECONDS=600` išče dlje |
+| `cargo test --release --test fuzz_seeds` | semena v `fuzz/seeds/` skozi preverbe teh ciljev fuzzinga, brez fuzzerja; del vsakega `cargo test` |
+| `cargo test --profile checked --workspace` | preizkusi s tem, kar dodatno preverja razhroščevalna gradnja: po vsakem delnem razčlenjevanju se bloki ujemajo z besedilom, in to, kar nosi naprej, je to, kar pove besedilo. Del `make test-long` |
+| `cargo test --release --test entry_points --test structure` | iz virov: vse, kar kliče sistem, je zaščiteno pred panikami, moduli pa so odvisni le navzdol |
 | `cargo test --release --test decoder` | proces dekodirnika dekodira slike in ne doseže ne datotek ne omrežja |
 | `make coverage` | pokritost vrstic za `cargo test` in vseh samotestov, prek [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); ne uspe pod mejami. Mac zasede za okoli pet minut |
-| `make coverage-library` | `src/markdown/`, `src/preview/` in `i18n.rs` proti njihovim višjim mejam, izmerjene samo s `cargo test` |
+| `make coverage-library` | crate `splat-markdown`, `splat-preview`, `splat-file-state` in `splat-i18n` proti njihovim višjim mejam, izmerjene samo s `cargo test` |
 
-Enotni testi stojijo ob kodi, ki jo testirajo. `tests/` vsebuje tisto, kar knjižnico doseže od zunaj: naključnostne teste v `robustness.rs`, ki z `sync.rs` delijo generator v `src/fuzz.rs`, dokumente, zgrajene za škodovanje, v `hostile.rs`, in test dekodirnika, ki zažene zgrajeni program. Odločitve v `src/editor/`, ki ne potrebujejo okna, živijo v prostih funkcijah z lastnimi testi: vse, kar krmilnik ve, in kako se to spreminja, v `state.rs`, pravila upodabljanja v `render_queue.rs`, kopija besedila v `sync.rs`, slogi odstavkov, pisave in barve kot vrednosti v `render.rs`, kaj pomenijo identifikatorji orodne vrstice, v `toolbar.rs`, kaj pomeni klik na povezavo, v `navigation.rs`.
+Enotni testi stojijo ob kodi, ki jo testirajo. `crates/splat-testkit/tests/` vsebuje tisto, kar model in predogled doseže od zunaj: naključnostne teste v `robustness.rs`, ki z `sync.rs` delijo generator iz `splat-testkit`, dokumente, zgrajene za škodovanje, v `hostile.rs`, in semena ciljev fuzzinga v `fuzz_seeds.rs`. `tests/` vsebuje tisto, kar gleda celoten program: njegove vire, njegove prevode in test dekodirnika, ki zažene zgrajeni program. Odločitve v `src/editor/`, ki ne potrebujejo okna, živijo v prostih funkcijah z lastnimi testi: vse, kar krmilnik ve, in kako se to spreminja, v `state.rs`, pravila upodabljanja v `render_queue.rs`, kopija besedila v `sync.rs`, slogi odstavkov, pisave in barve kot vrednosti v `render.rs`, kaj pomenijo identifikatorji orodne vrstice, v `toolbar.rs`, kaj pomeni klik na povezavo, v `navigation.rs`.
 
-Korak samotesta okna čaka na imenovan pogoj, ne na čas; premor z razlogom obdrži samo to, kar ne da signala, na primer odsotnost nečesa. Zaman čakanje je neuspešen preizkus, ki pove, kaj ni nikoli prišlo, korak, ki se sesuje, je prav tako neuspešen preizkus, zagon pa se v obeh primerih nadaljuje. Preizkus, ki v tem zagonu ne more povedati ničesar, sporoči `SELFTEST SKIP`: xtask ga navede, ne opravi ga in ne pade. xtask drži vsak način, in `--scenarios` posebej, pri približno devetih desetinah njegovih preizkusov. Samotest okna po svojem glavnem prehodu s kliki požene drugi del, v `src/editor/selftest/scenarios.rs`: vsak ukaz za oblikovanje in tabele, pogovorna okna, klike na povezave, lepljenje, spuščanje, izvoze, veliko spremembo, slike, ki se spreminjajo na disku, pomanjkanje pomnilnika, ogromen dokument in obnovitev po zrušitvi.
+Korak samotesta okna čaka na imenovan pogoj, ne na čas; premor z razlogom obdrži samo to, kar ne da signala, na primer odsotnost nečesa. Zaman čakanje je neuspešen preizkus, ki pove, kaj ni nikoli prišlo, korak, ki se sesuje, je prav tako neuspešen preizkus, zagon pa se v obeh primerih nadaljuje. Preizkus, ki v tem zagonu ne more povedati ničesar, sporoči `SELFTEST SKIP`: xtask ga navede, ne opravi ga in ne pade. xtask drži vsak način, in `--scenarios` posebej, pri približno devetih desetinah njegovih preizkusov. Samotest okna po svojem glavnem prehodu s kliki požene drugi del, v `src/editor/selftest/scenarios.rs`: vsak ukaz za oblikovanje in tabele, pogovorna okna, klike na povezave, lepljenje, spuščanje, izvoze, datoteko, ki jo je spremenil drug program, veliko spremembo, slike, ki se spreminjajo na disku, pomanjkanje pomnilnika, ogromen dokument in obnovitev po zrušitvi. Vsaka njegova skupina odpre lasten dokument, tako da napaka v eni ne seže do naslednje, in vsako je mogoče pognati samo z `--only`. Samotest brez okna tudi namerno pokvari shranjevanje: mapa, ki ničesar ne sprejme, datoteka samo za branje, mapa, ki je izginila, poln disk in panika v vsakem povratnem klicu shranjevanja, in nič od tega ne sme stati besedila.
 
 Pokritost ima dve meji: vsak modul vsaj 84 % vrstic, vsi moduli skupaj vsaj 96 %. `make coverage` meri `cargo test` skupaj s samotesti in ne uspe pod katero koli; `make coverage-library` drži, kar ne potrebuje okna, pri 90 % in 97 %. Meje in redke izjeme, kot je panic hook v `main.rs`, ki teče samo ob zrušitvi, so v [xtask](../../../xtask/src/coverage.rs) ob svojih razlogih. Izmerjene zgradbe gredo v `target/coverage/`, zato merilna koda nikoli ne doseže `target/release/` ali diskovne slike. Pomožni dekodirnik odpre svojo merilno datoteko, preden se zaklene, zato je izmerjen tudi on.
 
@@ -648,16 +655,20 @@ Izhod samotestov gre v `target/selftest/`. Samotest zgradi ločeno aplikacijo (`
 
 ### Zgradba projekta
 
-`src/lib.rs` vse, kar ne potrebuje okna, spremeni v knjižnico zase, `splat`: `markdown/`, `preview/`, `i18n.rs` in testni generator `fuzz.rs`. Zgradi se brez macOS. Aplikacija v `src/main.rs` gradi na njej.
+Vse, kar ne potrebuje okna, je crate zase v `crates/`, ki se zgradi brez macOS, zato prevajalnik uveljavlja, kako so odvisni drug od drugega. Aplikacija v `src/` (paket `splat-app`, program `splat`) gradi na njih.
 
-- `src/markdown/`: drevo, ki ga berejo vsi uporabniki, `Doc` v `doc/`, ki ima v lasti svoje besedilo, in edina vezava na razčlenjevalnik v `reader/`: comrak ni omenjen nikjer drugje, `reader/assumptions.rs` pa vsebuje, kaj koda o njem predpostavlja. Barve sintakse in vsi ukazi kot čiste spremembe besedila (`Edit`) v `commands/`. Tudi ponovno razčlenjevanje po urejanju (`incremental.rs`), bralnik vdelanega HTML (`markup.rs`), tipografija, oznake, sklici in citati v tekočem besedilu (`typography.rs`), kako besedilo izgleda in kateri Markdown in HTML ga tako naredita (`style.rs`), kaj je lahko naslov (`url.rs`) ter izvoz v HTML in Word (`html.rs`, `docx.rs` z `docx/html.rs` in `docx/xml.rs`). Položaj ima svoj tip: `Byte` v izvornem besedilu, `U16` v pogledu izvora, `Shown` v pogledu predogleda (`text.rs`). Brez AppKit.
-- `src/preview/`: razporeditev predogleda v `layout/`, z vdelanim HTML v `layout/html.rs`, in preslikava med predogledom in izvorom (`Bridge`, `Index`). `Bridge` zavrne razporeditev druge različice `Doc`. Brez AppKit.
+- `crates/splat-markdown/`: drevo, ki ga berejo vsi uporabniki, `Doc` v `doc/`, ki ima v lasti svoje besedilo, in edina vezava na razčlenjevalnik v `reader/`: comrak ni omenjen nikjer drugje, `reader/assumptions.rs` pa vsebuje, kaj koda o njem predpostavlja. Barve sintakse in vsi ukazi kot čiste spremembe besedila (`Edit`) v `commands/`. Tudi ponovno razčlenjevanje po urejanju (`incremental.rs`), bralnik vdelanega HTML (`markup.rs`), tipografija, oznake, sklici in citati v tekočem besedilu (`typography.rs`), kako besedilo izgleda in kateri Markdown in HTML ga tako naredita (`style.rs`), kaj je lahko naslov (`url.rs`) ter izvoz v HTML in Word (`html.rs`, `docx.rs` z `docx/html.rs` in `docx/xml.rs`). Položaj ima svoj tip: `Byte` v izvornem besedilu, `U16` v pogledu izvora, `Shown` v pogledu predogleda (`text.rs`).
+- `crates/splat-preview/`: razporeditev predogleda v `layout/`, z vdelanim HTML v `layout/html.rs`, in preslikava med predogledom in izvorom (`Bridge`, `Index`). `Bridge` zavrne razporeditev druge različice `Doc`.
+- `crates/splat-file-state/`: katero besedilo vsebuje datoteka, v kateri obliki in kaj pomeni pogled nanjo.
+- `crates/splat-i18n/` z `resources/*.lproj`: 35 jezikov; ključi so nemška besedila, aplikacija pa ob zagonu namesti tabelo jezika vmesnika.
+- `crates/splat-testkit/`: generator naključnostnih testov in preverbe ciljev fuzzinga.
 - `src/editor/`: okno. En sam objekt `EditorController` streže AppKit kot delegat obeh pogledov in dela posreduje komponentam, majhnim strukturam nad krmilnikom in stanjem, ki ga imajo v lasti; njihovih polj drugi moduli ne dosežejo:
 
 | Modul | Odgovornost |
 |---|---|
-| `mod.rs` | razred, metode delegata, ki posredujejo naprej, `invalidate` |
+| `controller.rs` | razred, metode delegata, ki posredujejo naprej, `invalidate` ter to, kar preostanek programa pove urejevalniku; samo on doseže komponente |
 | `panes.rs` | `Panes`: besedilni pogledi, oris, prikaz in skrivanje podoken ter to, kar daje dostop do pogledov |
+| `controller/layers.rs` | kdo sme do koga: komponenta dobi ročaj krmilnika, ki ponuja to, kar leži pod njo, in prevajalnik to uveljavlja |
 | `state.rs` | kar krmilnik ve o dokumentu in vsi načini, kako se to spreminja; njegova polja so zasebna in se ne dotika nobenega pogleda |
 | `model.rs` | posodi stanje in kopijo besedila zaprtjem, ki ne dosežejo pogleda |
 | `actions.rs` | register ukazov: selektor, naslov, bližnjica, simbol, kdaj ukaz velja |
@@ -669,17 +680,16 @@ Izhod samotestov gre v `target/selftest/`. Samotest zgradi ločeno aplikacijo (`
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: urejevalnik formul in diagramov |
 | `navigation.rs`, `links.rs` | `Links`: povezave, wiki povezave, oznake, potrditvena polja opravil, zlaganje, sprotne opombe |
 | `env.rs` | kar predogled bere od zunaj besedila: tipografska ločila, repozitorij za `@name` in `#12`, datoteka BibTeX, vdelani zapiski |
-| `render.rs`, `images.rs`, `remote.rs`, `safe_image.rs` | besedilo predogleda, lokalne in oddaljene slike; `Pictures` v `images.rs` |
+| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | besedilo predogleda, lokalne in oddaljene slike; `Pictures` v `images.rs` |
 | `attributes.rs` | atributi besedila; vsak ključ dobi samo vrednost tipa, ki ga pričakuje |
 | `shadow.rs` | kopije neshranjenega besedila za obnovitev po zrušitvi |
 | `decoder.rs` | pomožni procesi v peskovniku, ki dekodirajo slike in grafike |
 | `export.rs`, `outline.rs` | `Sharing`: izvoz v HTML in Word; stranska vrstica z orisom |
 | `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit za MathJax, Mermaid, Graphviz, PlantUML in vizualni urejevalnik formul; pravila, kaj se kdaj upodobi, ločeno od WebKita |
 | `webkit.rs` | klici v WebKit; samo življenjska doba navigacijskega delegata ostane pri `js.rs` in `mathfield.rs` |
-| `window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | gradnja okna, orodna vrstica, besedilni pogledi, pogovorna okna, barve |
+| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | gradnja okna, orodna vrstica, besedilni pogledi, pogovorna okna, barve |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menijska vrstica, delegat aplikacije, dokument (`MDDocument`, podrazred `NSDocument`).
-- `src/i18n.rs` z `resources/*.lproj`: 35 jezikov; ključi so nemška besedila, aplikacija pa ob zagonu namesti tabelo jezika vmesnika.
 - `src/util/`: delovne niti (`lanes.rs`), nosilci, ki lahko prenehajo odgovarjati (`volumes.rs`), pomočniki za AppKit, datoteke in procesi. `src/diag.rs`: kar gre narobe zunaj uporabnikovega pogleda, gre v sistemski dnevnik, brez kakršnega koli besedila dokumenta.
 - `src/large_alloc.rs`: velike dodelitve pridejo naravnost iz jedra in se ob sprostitvi vrnejo vanj, zato se pomnilnik po velikih urejanjih vrne.
 - `resources/js/`: spletne strani in knjižnice; različice in kontrolne vsote v [vendor.lock](../../../vendor.lock).
@@ -691,11 +701,11 @@ Izvorno besedilo v levem besedilnem pogledu je edini vir resnice.
 
 1. Vsaka sprememba znaka tam sproti posodobi kopijo besedila (`Snapshot`), ne da bi besedilo ponovno prebral.
 2. Posodobitev razčleni kopijo, ponovno obarva izvorno besedilo samo tam, kjer so se barve spremenile, razporedi predogled in zamenja samo bloke, katerih vsebina se je spremenila.
-3. Po urejanju se ponovno razčlenijo, obarvajo in razporedijo samo prizadeti odstavki, dokler njihovi sosedje ostanejo enaki; `reparse_part_and_color` pove, kdaj ne ostanejo. Dokumenti z bloki komentarjev `%%`, spremembe front matterja in v dokumentu z definicijami sklicev na povezave spremembe dela z oglatim oklepajem se obdelajo v celoti. comrak prepozna sklic na sprotno opombo samo z definicijo v istem razčlenjevanju in definicije premakne za besedilo, zato se del razčleni z nadomestno definicijo za vsako oznako in številke vzame iz starega drevesa; sprememba sklicev ali definicij v delu ali ob opombi v vrstici se obdela v celoti.
+3. Po urejanju se ponovno razčlenijo, obarvajo in razporedijo samo prizadeti odstavki, dokler njihovi sosedje ostanejo enaki; [docs/partial-parse.md](../../../docs/partial-parse.md) pove, zakaj to da enako kot polno razčlenjevanje in kaj pogledati, ko se comrak spremeni. Dokumenti z bloki komentarjev `%%`, spremembe front matterja in v dokumentu z definicijami sklicev na povezave spremembe dela z oglatim oklepajem se obdelajo v celoti. comrak prepozna sklic na sprotno opombo samo z definicijo v istem razčlenjevanju in definicije premakne za besedilo, zato se del razčleni z nadomestno definicijo za vsako oznako in številke vzame iz starega drevesa; sprememba sklicev ali definicij v delu ali ob opombi v vrstici se obdela v celoti.
 4. Bloki HTML, ki odprejo `<details>` ali `<div align>` in ga zaprejo pozneje, vplivajo na bloke Markdown vmes; ponovno uporabljen blok mora imeti enako okolico.
 5. Medtem ko tipkate v izvornem besedilu dokumenta do 2 MB, delna posodobitev teče takoj; kadar ne velja ali pri večjem dokumentu, razčlenjevanje in postavitev tečeta v ozadju. Medtem ko tipkate v predogledu, tečeta takoj, ker je kazalka predogleda odvisna od rezultata.
 6. Vnos v predogledu `Bridge` prevede v urejanje izvornega besedila in od tam naprej gre po isti poti. Markdown ima preveč načinov, kako besedilo spremeniti v skladnjo, da bi zadoščala samo pravila, zato `preview/verify.rs` ponovno razčleni spremenjeni del in primerja, kaj prikazuje, s tistim, kar je bilo natipkano; urejanje, ki ne zdrži, se dodatno označi z vzvratno poševnico ali zavrne.
-7. Položaji comrakovih vrstičnih elementov so na nekaj mestih napačni, na primer za definicijo sklica na povezavo. `markdown/reader/positions.rs` jih ob branju bloka preveri glede na izvorno besedilo in jih tam, kjer se ne ujemajo, ponovno prebere iz izvornega besedila.
+7. Položaji comrakovih vrstičnih elementov so na nekaj mestih napačni, na primer za definicijo sklica na povezavo. `reader/positions.rs` jih ob branju bloka preveri glede na izvorno besedilo in jih tam, kjer se ne ujemajo, ponovno prebere iz izvornega besedila.
 
 ### Pravila v krmilniku
 
@@ -704,16 +714,18 @@ Izvorno besedilo v levem besedilnem pogledu je edini vir resnice.
 3. Sporočila od zunaj (naložena slika, upodobljena formula) prispejo z zamikom prek `renders_arrived` in `image_arrived`, nikoli sredi posodobitve.
 4. Ponovno risanje brez spremembe besedila poteka samo prek `invalidate(reason)`.
 5. Kopija besedila se ne drži čez spremembo izvora, sicer ta sprememba skopira vse besedilo: `with_text` jo posodi samo za dolžino zaprtja `Send`.
-6. Nov ukaz potrebuje vnos v `actions.rs`, metodo v `mod.rs` in vejo v `Editing::perform`.
+6. Nov ukaz potrebuje vnos v `actions.rs`, metodo v `controller.rs` in vejo v `Editing::perform`.
 7. Vsak blok `unsafe` nosi svojo utemeljitev kot komentar `// SAFETY:`. Bajti do sistemskih dekodirnikov slik pridejo samo v pomožnem procesu, prek `decoder::decode_native`; test pregleda izvorne datoteke za druge klice.
 8. Nič na glavni niti ne čaka na uporabnikove mape, ker lahko omrežni nosilec preneha odgovarjati: datoteke se pregledujejo na niti `DISK`, predogled pa odgovore bere prek `Env::known`. Samo dejanje, na katero uporabnik čaka, kot sta izvoz ali shranjevanje, se sme dotakniti diska neposredno.
+9. Kar se mora končati, se konča tudi po paniki, saj glavna nit preživi eno: dvignjena zastavica gre skozi `with_raised`, urejanje shrambe besedila skozi `editing`, tisto, o čemer razveljavitev ne sme vedeti, pa skozi `without_undo`. Test najde tisto, kar je napisano ročno.
+10. Naslov v dokumentu ima eno samo branje, v `splat_markdown::url`; test najde sheme, primerjane ročno.
 
 ### Dodajanje ukaza
 
 Menijska vrstica, orodna vrstica in kontekstni meni gradijo svoje elemente iz registra v [src/editor/actions.rs](../../../src/editor/actions.rs), preverjanje menijev pa tam bere, kdaj ukaz velja in ali kaže kljukico. Nov ukaz potrebuje:
 
 1. različico `Action` z njegovim `Spec`: selektor, naslov, oznaka v orodni vrstici, namig (ki se začne z glagolom, največ 75 znakov), bližnjica, simbol SF Symbol in kdaj velja
-2. metodo v `src/editor/mod.rs`
+2. metodo v `src/editor/controller.rs`
 3. vejo v `Editing::perform`
 4. njegova besedila v vsaki datoteki `Localizable.strings`
 
@@ -735,7 +747,7 @@ Koda uporablja nemško besedilo kot ključ: `t("Fett")` ga poišče med izvajanj
 
 | Komponenta | Različica | Za kaj se uporablja | Licenca |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59 | razčlenjevalnik Markdown | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 0.59 z [eno spremenjeno vrstico](../../../vendor/comrak/PATCH.md) | razčlenjevalnik Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | izvajalno okolje Objective-C, Foundation, bloki | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | povezave za AppKit, WebKit in Grand Central Dispatch | Zlib, Apache-2.0 ali MIT |
 | [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formule in slike SVG kot vektorski PDF | MIT ali Apache-2.0 |

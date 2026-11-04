@@ -10,7 +10,9 @@ mod util;
 use objc2::runtime::ProtocolObject;
 use objc2::{ClassType, MainThreadMarker};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
-use splat::{i18n, markdown, preview};
+use splat_i18n as i18n;
+use splat_markdown as markdown;
+use splat_preview as preview;
 
 #[global_allocator]
 static ALLOC: large_alloc::LargeAlloc = large_alloc::LargeAlloc;

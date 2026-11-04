@@ -6,16 +6,17 @@ use std::cell::{Cell, OnceCell};
 
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
-use objc2::{DefinedClass, sel};
+use objc2::sel;
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSScrollView, NSSplitViewItem, NSTextInputClient, NSTextView, NSWindow,
     NSWindowStyleMask,
 };
 use objc2_foundation::{NSCoder, NSRange, NSRect, NSString, NSUserDefaults};
 
+use super::layers::ForPanes;
 use super::outline::Outline;
 use super::views::{PreviewTextView, SourceTextView};
-use super::{EditorController, scroll, string_of};
+use super::{scroll, string_of};
 use crate::util::{ns, perform_later, storage};
 
 /// User defaults key of the frame the last moved or resized document window had.
@@ -23,18 +24,6 @@ pub(super) const FRAME_KEY: &str = "DocumentWindowFrame";
 
 /// A little longer than AppKit takes to collapse a pane.
 const PANE_ANIMATION_SECONDS: f64 = 0.6;
-
-/// Raises `flag` for the length of `f` and puts back what it was, also when `f` panics, as the main thread survives that.
-pub(super) fn with_raised<R>(flag: &Cell<bool>, f: impl FnOnce() -> R) -> R {
-    struct Restore<'a>(&'a Cell<bool>, bool);
-    impl Drop for Restore<'_> {
-        fn drop(&mut self) {
-            self.0.set(self.1);
-        }
-    }
-    let _restore = Restore(flag, flag.replace(true));
-    f()
-}
 
 /// Whether a pane was last asked to show, for as long as its animation runs.
 #[derive(Default)]
@@ -157,16 +146,13 @@ impl<'a> ViewReader<'a> {
 }
 
 pub(super) struct Panes<'a> {
-    host: &'a EditorController,
+    host: ForPanes<'a>,
     state: &'a PaneState,
 }
 
-impl EditorController {
-    pub(super) fn panes(&self) -> Panes<'_> {
-        Panes {
-            host: self,
-            state: &self.ivars().panes,
-        }
+impl<'a> Panes<'a> {
+    pub(super) fn new(host: ForPanes<'a>, state: &'a PaneState) -> Self {
+        Panes { host, state }
     }
 }
 
@@ -219,7 +205,12 @@ impl<'a> Panes<'a> {
     /// The controller's own changes to its views go here: for the length of `f`, the delegate callbacks ignore them.
     pub(super) fn silently<R>(&self, f: impl for<'v> FnOnce(Views<'v>) -> R) -> R {
         let views = self.views();
-        with_raised(&self.state.busy, || f(views))
+        crate::util::with_raised(&self.state.busy, || f(views))
+    }
+
+    /// The widest an image shows in the preview.
+    pub(super) fn preview_image_width(&self) -> f64 {
+        (self.preview().bounds().size.width - 60.0).max(200.0)
     }
 
     pub(super) fn is_silent(&self) -> bool {
@@ -279,35 +270,37 @@ impl<'a> Panes<'a> {
         if self.toggle_pane(item, &self.state.outline_asked) {
             self.show_headings();
         }
-        self.host.invalidateRestorableState();
+        self.host.object().invalidateRestorableState();
     }
 
-    pub(super) fn toggle_preview(&self) {
+    /// Whether the preview came back and has to catch up.
+    pub(super) fn toggle_preview(&self) -> bool {
         let Some(item) = self.state.preview_item.get() else {
-            return;
+            return false;
         };
-        if self.toggle_pane(item, &self.state.preview_asked) {
-            self.host.updater().update_now();
-        } else if self.preview_focused() {
+        let shown = self.toggle_pane(item, &self.state.preview_asked);
+        if !shown && self.preview_focused() {
             self.host
                 .window()
                 .map(|w| w.makeFirstResponder(Some(self.views().source)));
         }
-        self.host.invalidateRestorableState();
+        self.host.object().invalidateRestorableState();
+        shown
     }
 
-    /// Asks a pane to go the other way than it was last asked, with its animation, and says whether it will show.
-    /// Two requests in one turn of the run loop, or any on a locked screen, end up as the animation of the first one
-    /// wants, so `settle` looks when it should be over.
+    /// Asks a pane to go the other way than it was last asked, with its animation, and says whether it will show. Two
+    /// requests in one turn of the run loop, or any on a locked screen, end up as the animation of the first one wants, so
+    /// `settle` looks when it should be over.
     fn toggle_pane(&self, item: &NSSplitViewItem, asked: &Asked) -> bool {
         let shows = asked.toggle(item.isCollapsed());
         objc2_app_kit::NSAnimatablePropertyContainer::animator(item).setCollapsed(!shows);
-        perform_later(self.host, sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
+        perform_later(self.host.object(), sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
         shows
     }
 
-    /// The animations of the panes are over: each pane is what was asked for last.
-    pub(super) fn settle(&self) {
+    /// The animations of the panes are over: each pane is what was asked for last. Whether the preview came back and has
+    /// to catch up.
+    pub(super) fn settle(&self) -> bool {
         let corrected = |item: &OnceCell<Retained<NSSplitViewItem>>, asked: &Asked| {
             let item = item.get()?;
             let shows = asked.settle(item.isCollapsed())?;
@@ -317,9 +310,7 @@ impl<'a> Panes<'a> {
         if corrected(&self.state.outline_item, &self.state.outline_asked) == Some(true) {
             self.show_headings();
         }
-        if corrected(&self.state.preview_item, &self.state.preview_asked) == Some(true) {
-            self.host.updater().update_now();
-        }
+        corrected(&self.state.preview_item, &self.state.preview_asked) == Some(true)
     }
 
     /// Shows the current headings in the outline, if it is open; a closed one catches up when it opens.
@@ -334,7 +325,8 @@ impl<'a> Panes<'a> {
             return;
         };
         let headings: Vec<_> = self.host.model().read(|st| {
-            crate::markdown::commands::heading_anchors(st.doc())
+            crate::util::contained(|| crate::markdown::commands::heading_anchors(st.doc()))
+                .unwrap_or_default()
                 .into_iter()
                 .map(|h| (h.level, h.title, h.range))
                 .collect()
@@ -366,7 +358,8 @@ impl<'a> Panes<'a> {
         }
     }
 
-    pub(super) fn restore_state(&self, coder: &NSCoder) {
+    /// The zoom the window had, if any.
+    pub(super) fn restore_state(&self, coder: &NSCoder) -> Option<f64> {
         if let Some(item) = self.state.preview_item.get() {
             // SAFETY: Window restoration always passes a keyed coder.
             item.setCollapsed(unsafe { coder.decodeBoolForKey(&ns("previewCollapsed")) });
@@ -377,9 +370,7 @@ impl<'a> Panes<'a> {
         if unsafe { coder.decodeBoolForKey(&ns("outlineShown")) } && !self.outline_visible() {
             self.toggle_outline();
         }
-        if zoom > 0.3 {
-            self.host.updater().set_zoom(zoom);
-        }
+        (zoom > 0.3).then_some(zoom)
     }
 }
 
@@ -414,9 +405,9 @@ mod tests {
     #[test]
     fn a_raised_flag_goes_back_to_what_it_was() {
         let flag = Cell::new(false);
-        with_raised(&flag, || {
+        crate::util::with_raised(&flag, || {
             assert!(flag.get());
-            with_raised(&flag, || assert!(flag.get()));
+            crate::util::with_raised(&flag, || assert!(flag.get()));
             assert!(flag.get(), "the inner one must not lower it for the outer one");
         });
         assert!(!flag.get());
@@ -426,7 +417,7 @@ mod tests {
     fn a_raised_flag_comes_down_after_a_panic() {
         let flag = Cell::new(false);
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            with_raised(&flag, || panic!("contained"));
+            crate::util::with_raised(&flag, || panic!("contained"));
         }));
         assert!(outcome.is_err());
         assert!(!flag.get(), "the callbacks would ignore the user from then on");

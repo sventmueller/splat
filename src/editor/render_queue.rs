@@ -9,6 +9,9 @@ const MAX_LOADS: u32 = 3;
 /// A key counts as in use for this many requests after the last that named it.
 const IN_USE_FOR: u64 = 8;
 
+/// Who asks for renders: one document, by a number of its own.
+pub(super) type Owner = usize;
+
 pub(super) struct RenderQueue<K, V> {
     ready: bool,
     /// Attempts to load the page since it last finished loading.
@@ -17,7 +20,12 @@ pub(super) struct RenderQueue<K, V> {
     current: Option<K>,
     /// A number identifying the current attempt, for its time limit and for answers that come too late.
     job: u64,
-    queue: VecDeque<K>,
+    /// What waits, by the owner that asked first.
+    waiting: HashMap<Owner, VecDeque<K>>,
+    /// Whose key comes next, one of each in turn: a document full of slow diagrams must not hold up the formulas of others.
+    turns: VecDeque<Owner>,
+    /// What each owner last asked for.
+    wanted: HashMap<Owner, HashSet<K>>,
     pending: HashSet<K>,
     failed: HashSet<K>,
     /// Keys that already got their second chance after WebKit went away while rendering them.
@@ -29,6 +37,9 @@ pub(super) struct RenderQueue<K, V> {
     tick: u64,
     /// Keys whose result is being converted on another thread.
     converting: usize,
+    /// How many bytes of memory each result holds.
+    sizes: HashMap<K, usize>,
+    bytes: usize,
 }
 
 impl<K: Clone + Eq + Hash, V: Clone> Default for RenderQueue<K, V> {
@@ -38,7 +49,9 @@ impl<K: Clone + Eq + Hash, V: Clone> Default for RenderQueue<K, V> {
             loads: 0,
             current: None,
             job: 0,
-            queue: VecDeque::new(),
+            waiting: HashMap::new(),
+            turns: VecDeque::new(),
+            wanted: HashMap::new(),
             pending: HashSet::new(),
             failed: HashSet::new(),
             retried: HashSet::new(),
@@ -47,6 +60,8 @@ impl<K: Clone + Eq + Hash, V: Clone> Default for RenderQueue<K, V> {
             used: HashMap::new(),
             tick: 0,
             converting: 0,
+            sizes: HashMap::new(),
+            bytes: 0,
         }
     }
 }
@@ -69,15 +84,65 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         job == self.job && !self.ready && self.loads < MAX_LOADS
     }
 
-    /// Queues keys that are neither rendered, failed nor already queued.
-    pub(super) fn request(&mut self, keys: Vec<K>) {
+    /// All that `owner` needs now: what is neither rendered, failed nor queued gets queued, and what nobody needs any longer
+    /// leaves the queue.
+    pub(super) fn request(&mut self, owner: Owner, keys: Vec<K>) {
         self.tick += 1;
+        let mut wanted = HashSet::with_capacity(keys.len());
         for key in keys {
             self.used.insert(key.clone(), self.tick);
             if !self.done.contains_key(&key) && !self.failed.contains(&key) && self.pending.insert(key.clone()) {
-                self.queue.push_back(key);
+                self.enqueue(owner, key.clone());
+            }
+            wanted.insert(key);
+        }
+        self.wanted.insert(owner, wanted);
+        self.drop_what_nobody_wants();
+    }
+
+    fn enqueue(&mut self, owner: Owner, key: K) {
+        if !self.turns.contains(&owner) {
+            self.turns.push_back(owner);
+        }
+        self.waiting.entry(owner).or_default().push_back(key);
+    }
+
+    fn drop_what_nobody_wants(&mut self) {
+        let Self {
+            waiting,
+            wanted,
+            pending,
+            ..
+        } = self;
+        for queue in waiting.values_mut() {
+            queue.retain(|key| {
+                let keep = wanted.values().any(|keys| keys.contains(key));
+                if !keep {
+                    pending.remove(key);
+                }
+                keep
+            });
+        }
+    }
+
+    /// `owner` is gone: what only it asked for leaves the queue, what another asked for too goes to that one, and all it
+    /// holds counts as no longer in use.
+    pub(super) fn forget(&mut self, owner: Owner) {
+        self.wanted.remove(&owner);
+        self.turns.retain(|o| *o != owner);
+        for key in self.waiting.remove(&owner).unwrap_or_default() {
+            match self.owner_of(&key) {
+                Some(other) => self.enqueue(other, key),
+                None => {
+                    self.pending.remove(&key);
+                }
             }
         }
+        self.tick += IN_USE_FOR + 1;
+    }
+
+    fn owner_of(&self, key: &K) -> Option<Owner> {
+        self.wanted.iter().find(|(_, keys)| keys.contains(key)).map(|(o, _)| *o)
     }
 
     /// The next key to render and the number of its attempt, if the page is free.
@@ -85,10 +150,21 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         if !self.ready || self.current.is_some() {
             return None;
         }
-        let key = self.queue.pop_front()?;
+        let key = self.next_in_turn()?;
         self.job += 1;
         self.current = Some(key.clone());
         Some((key, self.job))
+    }
+
+    fn next_in_turn(&mut self) -> Option<K> {
+        for _ in 0..self.turns.len() {
+            let owner = self.turns.pop_front()?;
+            self.turns.push_back(owner);
+            if let Some(key) = self.waiting.get_mut(&owner).and_then(VecDeque::pop_front) {
+                return Some(key);
+            }
+        }
+        None
     }
 
     /// Whether an answer of attempt `job` still counts. One from a page that was given up on or lost may come long after
@@ -130,6 +206,19 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         }
     }
 
+    /// How much memory the result for `key` holds; a picture of a large diagram can take as much as a thousand formulas.
+    pub(super) fn note_size(&mut self, key: K, bytes: usize) {
+        self.bytes += bytes;
+        if let Some(before) = self.sizes.insert(key, bytes) {
+            self.bytes -= before;
+        }
+    }
+
+    /// The memory all results hold.
+    pub(super) fn bytes(&self) -> usize {
+        self.bytes
+    }
+
     pub(super) fn note_error(&mut self, key: K, message: String) {
         self.errors.insert(key, message);
     }
@@ -140,13 +229,18 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// WebKit went away or stopped answering: the page has to load again. The running key gets a second chance, since
-    /// WebKit can go away for reasons of its own; only a second failure counts.
+    /// WebKit can go away for reasons of its own, if anybody still wants it; only a second failure counts.
     pub(super) fn lost_page(&mut self) {
         if let Some(key) = self.current.take() {
-            if self.retried.insert(key.clone()) {
-                self.queue.push_back(key);
-            } else {
-                self.store(key, None);
+            match self.owner_of(&key) {
+                Some(owner) if self.retried.insert(key.clone()) => self.enqueue(owner, key),
+                Some(_) => {
+                    self.store(key, None);
+                }
+                None => {
+                    self.pending.remove(&key);
+                    self.retried.remove(&key);
+                }
             }
         }
         self.job += 1;
@@ -155,7 +249,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
 
     /// Nothing is queued, rendering or converting.
     pub(super) fn idle(&self) -> bool {
-        self.queue.is_empty() && self.current.is_none() && self.converting == 0
+        self.waiting.values().all(VecDeque::is_empty) && self.current.is_none() && self.converting == 0
     }
 
     pub(super) fn rendered(&self, key: &K) -> Option<&V> {
@@ -174,10 +268,11 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         self.failed.contains(key).then_some(Err(None))
     }
 
-    /// Above `limit`, drops what no open document asked for in its last few requests, and returns it. Formulas still in
-    /// use stay, however many there are: dropping them would only make the documents request them again.
-    pub(super) fn evict(&mut self, limit: usize) -> Vec<K> {
-        if self.done.len() + self.failed.len() <= limit {
+    /// Above `limit` results or `budget` bytes, drops what no open document needs or asked for in its last few requests, and
+    /// returns it. Results still in use stay, however many there are: dropping them would only make the documents request
+    /// them again.
+    pub(super) fn evict(&mut self, limit: usize, budget: usize) -> Vec<K> {
+        if self.done.len() + self.failed.len() <= limit && self.bytes <= budget {
             return Vec::new();
         }
         let recent = self.tick.saturating_sub(IN_USE_FOR);
@@ -185,7 +280,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
             .done
             .keys()
             .chain(self.failed.iter())
-            .filter(|k| self.used.get(*k).copied().unwrap_or(0) < recent)
+            .filter(|k| self.used.get(*k).copied().unwrap_or(0) < recent && self.owner_of(k).is_none())
             .cloned()
             .collect();
         for key in &stale {
@@ -193,6 +288,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
             self.failed.remove(key);
             self.errors.remove(key);
             self.used.remove(key);
+            self.bytes -= self.sizes.remove(key).unwrap_or(0);
         }
         stale
     }
@@ -201,6 +297,9 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ONE: Owner = 1;
+    const OTHER: Owner = 2;
 
     fn ready() -> RenderQueue<&'static str, u32> {
         let mut q = RenderQueue::default();
@@ -211,14 +310,14 @@ mod tests {
     #[test]
     fn keys_render_one_at_a_time_in_order_and_once() {
         let mut q = ready();
-        q.request(vec!["a", "b", "a"]);
+        q.request(ONE, vec!["a", "b", "a"]);
         let (key, _) = q.next().unwrap();
         assert_eq!(key, "a");
         assert!(q.next().is_none(), "the page renders one at a time");
         assert!(q.release(&"a"));
         q.store("a", Some(1));
         assert_eq!(q.next().unwrap().0, "b");
-        q.request(vec!["a", "b"]);
+        q.request(ONE, vec!["a", "b"]);
         assert!(q.release(&"b"));
         q.store("b", Some(2));
         assert!(
@@ -232,7 +331,7 @@ mod tests {
     #[test]
     fn nothing_renders_before_the_page_is_ready() {
         let mut q: RenderQueue<&str, u32> = RenderQueue::default();
-        q.request(vec!["a"]);
+        q.request(ONE, vec!["a"]);
         assert!(q.next().is_none());
         assert!(!q.idle());
         q.page_ready();
@@ -242,7 +341,7 @@ mod tests {
     #[test]
     fn a_lost_page_gives_the_running_key_one_more_chance() {
         let mut q = ready();
-        q.request(vec!["a"]);
+        q.request(ONE, vec!["a"]);
         let (_, first) = q.next().unwrap();
         assert!(q.timed_out(first));
         q.lost_page();
@@ -262,7 +361,7 @@ mod tests {
     #[test]
     fn an_answer_from_a_lost_page_does_not_count() {
         let mut q = ready();
-        q.request(vec!["a"]);
+        q.request(ONE, vec!["a"]);
         let (_, job) = q.next().unwrap();
         q.lost_page();
         assert!(!q.answer_counts(job));
@@ -275,7 +374,7 @@ mod tests {
     #[test]
     fn a_time_limit_only_ends_its_own_attempt() {
         let mut q = ready();
-        q.request(vec!["a", "b"]);
+        q.request(ONE, vec!["a", "b"]);
         let (_, first) = q.next().unwrap();
         q.release(&"a");
         q.store("a", Some(1));
@@ -299,7 +398,7 @@ mod tests {
     #[test]
     fn a_conversion_keeps_the_queue_busy_but_frees_the_page() {
         let mut q = ready();
-        q.request(vec!["a", "b"]);
+        q.request(ONE, vec!["a", "b"]);
         q.next().unwrap();
         q.conversion_started();
         q.release(&"a");
@@ -315,13 +414,13 @@ mod tests {
     #[test]
     fn errors_are_reported_and_failures_not_asked_for_again() {
         let mut q = ready();
-        q.request(vec!["a"]);
+        q.request(ONE, vec!["a"]);
         q.next().unwrap();
         q.note_error("a", "Syntaxfehler".into());
         q.release(&"a");
         q.store("a", None);
         assert_eq!(q.outcome(&"a"), Some(Err(Some("Syntaxfehler".into()))));
-        q.request(vec!["a"]);
+        q.request(ONE, vec!["a"]);
         assert!(q.next().is_none());
         assert_eq!(q.outcome(&"b"), None);
     }
@@ -329,19 +428,135 @@ mod tests {
     #[test]
     fn only_what_nobody_asked_for_lately_is_dropped() {
         let mut q = ready();
-        q.request(vec!["alt"]);
+        q.request(ONE, vec!["alt"]);
         q.next().unwrap();
         q.release(&"alt");
         q.store("alt", Some(1));
         for _ in 0..=IN_USE_FOR {
-            q.request(vec!["neu"]);
+            q.request(ONE, vec!["neu"]);
         }
         q.next().unwrap();
         q.release(&"neu");
         q.store("neu", Some(2));
-        assert!(q.evict(10).is_empty(), "below the limit nothing goes");
-        assert_eq!(q.evict(1), ["alt"]);
+        assert!(q.evict(10, 100).is_empty(), "below the limit nothing goes");
+        assert_eq!(q.evict(1, 100), ["alt"]);
         assert_eq!(q.rendered(&"neu"), Some(&2));
         assert_eq!(q.outcome(&"alt"), None);
+    }
+
+    #[test]
+    fn few_large_results_are_dropped_like_many_small_ones() {
+        let mut q = ready();
+        q.request(ONE, vec!["alt"]);
+        q.next().unwrap();
+        q.release(&"alt");
+        q.store("alt", Some(1));
+        q.note_size("alt", 90);
+        for _ in 0..=IN_USE_FOR {
+            q.request(ONE, vec!["neu"]);
+        }
+        q.next().unwrap();
+        q.release(&"neu");
+        q.store("neu", Some(2));
+        q.note_size("neu", 20);
+        q.note_size("neu", 30);
+        assert!(q.evict(10, 120).is_empty(), "within the budget");
+        assert_eq!(q.evict(10, 100), ["alt"]);
+        assert!(
+            q.evict(10, 100).is_empty(),
+            "what is in use stays, and the bytes went with the other"
+        );
+        assert_eq!(q.rendered(&"neu"), Some(&2));
+    }
+
+    #[test]
+    fn owners_take_turns() {
+        let mut q = ready();
+        q.request(ONE, vec!["a", "b", "c"]);
+        q.request(OTHER, vec!["x", "y"]);
+        let mut order = Vec::new();
+        while let Some((key, _)) = q.next() {
+            q.release(&key);
+            q.store(key, Some(0));
+            order.push(key);
+        }
+        assert_eq!(order, ["a", "x", "b", "y", "c"]);
+        assert!(q.idle());
+    }
+
+    #[test]
+    fn what_nobody_needs_any_longer_leaves_the_queue() {
+        let mut q = ready();
+        q.request(ONE, vec!["a", "b", "c"]);
+        q.request(ONE, vec!["c", "d"]);
+        let (first, _) = q.next().unwrap();
+        assert_eq!(first, "c");
+        q.release(&first);
+        q.store(first, Some(0));
+        assert_eq!(q.next().unwrap().0, "d");
+        q.request(ONE, vec!["a"]);
+        assert!(q.pending.contains("a"), "asked for again, it queues again");
+    }
+
+    #[test]
+    fn a_key_two_owners_want_stays_until_both_are_gone() {
+        let mut q = ready();
+        q.request(ONE, vec!["a", "b"]);
+        q.request(OTHER, vec!["b"]);
+        q.forget(ONE);
+        assert_eq!(q.next().unwrap().0, "b", "the other still wants it");
+        q.release(&"b");
+        q.store("b", Some(0));
+        assert!(q.idle(), "and what only the one wanted has gone");
+        assert!(q.next().is_none());
+    }
+
+    #[test]
+    fn an_owner_that_is_gone_leaves_nothing_waiting() {
+        let mut q = ready();
+        q.request(ONE, vec!["a", "b", "c"]);
+        let (running, _) = q.next().unwrap();
+        q.forget(ONE);
+        assert!(!q.idle(), "what runs cannot be taken back");
+        q.release(&running);
+        q.store(running, Some(0));
+        assert!(q.idle());
+        assert!(q.next().is_none());
+        assert!(q.pending.is_empty());
+    }
+
+    #[test]
+    fn a_lost_page_does_not_try_again_for_nobody() {
+        let mut q = ready();
+        q.request(ONE, vec!["a"]);
+        q.next().unwrap();
+        q.forget(ONE);
+        q.lost_page();
+        q.page_ready();
+        assert!(q.next().is_none());
+        assert!(q.pending.is_empty() && q.outcome(&"a").is_none());
+    }
+
+    #[test]
+    fn what_a_gone_owner_held_goes_at_the_next_eviction_and_what_others_need_stays() {
+        let mut q = ready();
+        for (owner, key) in [(ONE, "a"), (OTHER, "b")] {
+            q.request(owner, vec![key]);
+            let (key, _) = q.next().unwrap();
+            q.release(&key);
+            q.store(key, Some(0));
+        }
+        q.forget(ONE);
+        assert_eq!(q.evict(0, 0), ["a"]);
+        assert_eq!(q.rendered(&"b"), Some(&0));
+    }
+
+    #[test]
+    fn the_bytes_of_the_results_are_known() {
+        let mut q = ready();
+        q.note_size("a", 10);
+        q.note_size("b", 5);
+        q.note_size("a", 7);
+        assert_eq!(q.bytes(), 12);
     }
 }

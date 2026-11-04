@@ -34,6 +34,15 @@ pub enum Decoded {
     },
 }
 
+impl Decoded {
+    /// How much memory it holds.
+    pub fn bytes(&self) -> usize {
+        match self {
+            Decoded::Pdf(bytes) | Decoded::Png(bytes) | Decoded::Rgba { pixels: bytes, .. } => bytes.len(),
+        }
+    }
+}
+
 /// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`; anything else is
 /// refused.
 pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Option<Decoded> {

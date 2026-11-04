@@ -113,8 +113,6 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 [[package]]
 name = "comrak"
 version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3adf553d37681e21753316065ad5a763d9513f81c910e250576c572114a8eb06"
 dependencies = [
  "caseless",
  "emojis",
@@ -988,13 +986,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8"
 
 [[package]]
-name = "splat"
+name = "splat-app"
 version = "0.0.0"
 dependencies = [
  "block2",
- "comrak",
  "dispatch2",
- "entities",
  "image",
  "libc",
  "objc2",
@@ -1002,9 +998,51 @@ dependencies = [
  "objc2-foundation",
  "objc2-uniform-type-identifiers",
  "objc2-web-kit",
- "roxmltree 0.21.2",
+ "splat-file-state",
+ "splat-i18n",
+ "splat-markdown",
+ "splat-preview",
+ "splat-testkit",
  "svg2pdf",
+]
+
+[[package]]
+name = "splat-file-state"
+version = "0.0.0"
+
+[[package]]
+name = "splat-i18n"
+version = "0.0.0"
+
+[[package]]
+name = "splat-markdown"
+version = "0.0.0"
+dependencies = [
+ "caseless",
+ "comrak",
+ "entities",
+ "roxmltree 0.21.2",
+ "splat-i18n",
  "unicode-width",
+]
+
+[[package]]
+name = "splat-preview"
+version = "0.0.0"
+dependencies = [
+ "splat-i18n",
+ "splat-markdown",
+]
+
+[[package]]
+name = "splat-testkit"
+version = "0.0.0"
+dependencies = [
+ "roxmltree 0.21.2",
+ "splat-file-state",
+ "splat-i18n",
+ "splat-markdown",
+ "splat-preview",
 ]
 
 [[package]]
