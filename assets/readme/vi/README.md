@@ -8,9 +8,9 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
  
 
 
-[![Tải Splat cho macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)
+[![Tải Splat cho macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
 
-**[Tải về Splat-1.0.6.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg)**: được Apple ký và công chứng, dành cho macOS 14 trở lên, trên Apple Silicon và Intel.
+**[Tải về Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: được Apple ký và công chứng, dành cho macOS 14 trở lên, trên Apple Silicon và Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 
 ## Cài đặt
 
-**Từ ảnh đĩa.** Tải về [`dist/Splat-1.0.6.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.6.dmg), mở ra rồi kéo Splat vào thư mục Applications. Ảnh đĩa được ký bằng Developer ID và được Apple công chứng, nên mở ra mà không có cảnh báo nào.
+**Từ ảnh đĩa.** Tải về [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), mở ra rồi kéo Splat vào thư mục Applications. Ảnh đĩa được ký bằng Developer ID và được Apple công chứng, nên mở ra mà không có cảnh báo nào.
 
 **Với Homebrew.** Cask nằm trong một tap riêng:
 
