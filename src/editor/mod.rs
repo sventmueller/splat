@@ -167,10 +167,6 @@ pub fn offer_recovered(mtm: MainThreadMarker) {
     }
 }
 
-pub fn warm_renderer(mtm: MainThreadMarker) {
-    js::renderer(mtm);
-}
-
 fn tag_of(sender: Option<&AnyObject>) -> isize {
     let Some(s) = sender else { return 0 };
     if let Some(item) = s.downcast_ref::<NSMenuItem>() {

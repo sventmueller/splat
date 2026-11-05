@@ -121,9 +121,20 @@ fn switch_off(object: &NSObject, key: &str) -> bool {
     .is_some()
 }
 
-/// The shared visual editor; its page loads once, the first time a formula popover opens.
+/// The shared visual editor; its page loads once, the first time a formula popover shows it.
 pub fn field(mtm: MainThreadMarker) -> Rc<MathField> {
     FIELD.with(|f| f.get_or_init(|| Rc::new(MathField::new(mtm))).clone())
+}
+
+pub fn detach_if_started(editor: &EditorController) {
+    if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+        field.detach(editor);
+    }
+}
+
+#[cfg(feature = "selftest")]
+pub(super) fn started() -> bool {
+    FIELD.with(|f| f.get().is_some())
 }
 
 impl MathField {

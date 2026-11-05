@@ -300,6 +300,21 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
         }),
         applied(|c| {
             let e = &c.e;
+            let defaults = objc2_foundation::NSUserDefaults::standardUserDefaults();
+            defaults.setBool_forKey(true, &ns(super::super::atom::VISUAL_DEFAULT));
+            let opened = open_formula_editor(e).is_some();
+            e.atom_editor().set_visual(false);
+            check(
+                "LaTeX code in a formula popover starts no visual editor",
+                opened && !super::super::mathfield::started(),
+                &format!("opened={opened}"),
+            );
+            defaults.setBool_forKey(false, &ns(super::super::atom::VISUAL_DEFAULT));
+            close_popover(e);
+        }),
+        closed(|_| {}),
+        applied(|c| {
+            let e = &c.e;
             let Some(view) = open_formula_editor(e) else {
                 check("formula popover opens", false, "no popover");
                 return;

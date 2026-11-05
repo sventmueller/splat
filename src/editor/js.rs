@@ -97,7 +97,7 @@ define_class!(
 
 const PAGE: &str = "render.html";
 
-/// The view that renders, filling the renderer's window, with the bundled page loading.
+/// The view that renders, sized for the renderer's window, still without its page.
 fn web_view(window: &NSPanel, delegate: &NavDelegate) -> Retained<WKWebView> {
     let mtm = window.mtm();
     let web = webkit::new_view(
@@ -107,10 +107,17 @@ fn web_view(window: &NSPanel, delegate: &NavDelegate) -> Retained<WKWebView> {
     );
     // SAFETY: WebKit holds the delegate weakly; the renderer keeps it alive next to the web view.
     unsafe { web.setNavigationDelegate(Some(objc2::runtime::ProtocolObject::from_ref(delegate))) };
-    window.setContentView(Some(&web));
-    webkit::load_bundled_page(&web, PAGE);
     web
 }
+
+fn load_page(window: &NSPanel, web: &WKWebView) {
+    window.setContentView(Some(web));
+    webkit::load_bundled_page(web, PAGE);
+}
+
+/// Between creating the first web view and loading its page, so that a key pressed meanwhile gets through; a block
+/// dispatched without a delay would run ahead of it.
+const TURN_FOR_KEYS: std::time::Duration = std::time::Duration::from_millis(16);
 
 /// A render that has not answered by then counts as failed, and a new web view takes over.
 pub(super) const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -124,11 +131,38 @@ pub fn renderer(mtm: MainThreadMarker) -> Rc<Renderer> {
     RENDERER.with(|cell| {
         cell.get_or_init(|| {
             let renderer = Rc::new(Renderer::new(mtm));
+            #[cfg(feature = "selftest")]
+            HAD_ITS_PAGE_AT_ONCE.set(renderer.web.borrow().window().is_some());
             renderer.watch_load();
+            main_after(TURN_FOR_KEYS, || {
+                if let Some(r) = renderer_if_started() {
+                    load_page(&r.window, &r.web.borrow());
+                }
+            });
             renderer
         })
         .clone()
     })
+}
+
+#[cfg(feature = "selftest")]
+thread_local! {
+    static HAD_ITS_PAGE_AT_ONCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(feature = "selftest")]
+pub(super) fn had_its_page_at_once() -> bool {
+    HAD_ITS_PAGE_AT_ONCE.get()
+}
+
+#[cfg(feature = "selftest")]
+pub(super) fn started() -> bool {
+    renderer_if_started().is_some()
+}
+
+#[cfg(feature = "selftest")]
+pub(super) fn idle() -> bool {
+    renderer_if_started().is_none_or(|r| r.idle())
 }
 
 #[cfg(feature = "selftest")]
@@ -326,7 +360,9 @@ impl Renderer {
             let pid: i32 = unsafe { msg_send![&*stuck, _webProcessIdentifier] };
             crate::util::end_process(pid);
         }
-        *self.web.borrow_mut() = web_view(&self.window, &self._delegate);
+        let web = web_view(&self.window, &self._delegate);
+        load_page(&self.window, &web);
+        *self.web.borrow_mut() = web;
     }
 
     /// WebKit reports a page that never finishes loading to nobody, and queued formulas would wait forever.

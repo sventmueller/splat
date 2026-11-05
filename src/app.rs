@@ -48,8 +48,6 @@ define_class!(
         #[unsafe(method(applicationDidFinishLaunching:))]
         fn did_finish_launching(&self, _notification: &NSNotification) {
             guarded((), || {
-                // WebKit needs about a second to start; doing it now keeps the first formula from waiting on it.
-                crate::util::perform_later(self, objc2::sel!(warmRenderer), 1.0, false);
                 crate::document::watch_files(self.mtm());
                 crate::editor::watch_memory(self.mtm());
                 crate::editor::keep_copies(self.mtm());
@@ -87,11 +85,6 @@ define_class!(
     }
 
     impl AppDelegate {
-        #[unsafe(method(warmRenderer))]
-        fn warm_renderer(&self) {
-            guarded((), || crate::editor::warm_renderer(self.mtm()));
-        }
-
         #[unsafe(method(mdOpenMarkdownHere:))]
         fn open_markdown_here(&self, _sender: Option<&AnyObject>) {
             guarded((), || make_default(MARKDOWN));

@@ -1,3 +1,4 @@
+LaTeX code in a formula popover starts no visual editor
 a click into the source keeps the new formula and the focus
 a click on ▸ unfolds the callout
 a click opens the HTML details

@@ -61,7 +61,7 @@ const DIAGRAM_ACTIONS: [DiagramAction; 21] = [
     DiagramAction::Milestone,
 ];
 
-const VISUAL_DEFAULT: &str = "FormulaEditorCode";
+pub(super) const VISUAL_DEFAULT: &str = "FormulaEditorCode";
 
 pub(super) fn diagram_tag(action: DiagramAction) -> isize {
     DIAGRAM_TAG + crate::util::to_isize(DIAGRAM_ACTIONS.iter().position(|a| *a == action).unwrap_or(0))
@@ -540,9 +540,9 @@ impl AtomEditor<'_> {
                 e.view.clone(),
             )
         };
-        let field = mathfield::field(self.host.mtm());
         scroll.setHidden(visual);
         if visual {
+            let field = mathfield::field(self.host.mtm());
             if let Some(root) = root {
                 field.web.setFrame(frame);
                 field.web.setAutoresizingMask(
@@ -556,7 +556,7 @@ impl AtomEditor<'_> {
                 w.makeFirstResponder(Some(&field.web));
             }
         } else {
-            field.detach(self.host.object());
+            mathfield::detach_if_started(self.host.object());
             if let Some(w) = view.window() {
                 w.makeFirstResponder(Some(&view));
             }

@@ -623,7 +623,7 @@ fn settled(e: &EditorController) -> bool {
     }
     let dark = e.is_dark();
     let macros = e.model().read(|st| st.macros());
-    super::js::renderer(e.mtm()).idle()
+    super::js::idle()
         && super::remote::idle()
         && e.model().read(move |st| {
             crate::markdown::doc::figures(st.doc())

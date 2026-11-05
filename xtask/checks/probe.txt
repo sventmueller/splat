@@ -20,6 +20,7 @@ a copy elsewhere leaves the document marked and its file alone
 a deleted file leaves its text open
 a discarded formula leaves text and document as they were
 a document whose editor is gone cannot empty its file
+a document without formulas or diagrams starts no web view
 a draft can be saved
 a failed save keeps no copy of the text
 a failed save leaves the file as it was
@@ -197,7 +198,9 @@ the Word export is written
 the decoder helper reads no files and reaches no network
 the defaults of a graph go behind its brace, not into a comment or name
 the draft of a named document stays marked until it is saved
+the first formula starts the web view and shows
 the first save of a new document writes its text and clears the mark
+the first web view loads its page in a later turn of the main loop
 the formula editor has an undo history of its own
 the formula editor shows its formula again after its web process ended
 the formula editor's page loads

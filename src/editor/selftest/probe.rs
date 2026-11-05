@@ -62,6 +62,54 @@ struct Probe {
 }
 
 pub(super) fn run(mtm: MainThreadMarker) {
+    let name = "a document without formulas or diagrams starts no web view";
+    // SAFETY: NSDocument's initializer, called once on the newly allocated object.
+    let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
+    document.set_initial_text("Nur Text\n");
+    document.makeWindowControllers();
+    let Some(editor) = document.editor() else {
+        check(name, false, "no editor");
+        with_web_views_started(mtm);
+        return;
+    };
+    let shown = editor.clone();
+    once(
+        2.0,
+        "the document without formulas to show",
+        move || super::quiet(&shown),
+        move || {
+            check(name, !js::started() && !mathfield::started(), "");
+            super::type_in_source(&editor, "$x^2$\n\n");
+            let rendered = editor.clone();
+            let (editor, document) = (editor.clone(), document.clone());
+            once(
+                0.0,
+                "the first formula of the document to render",
+                move || js::started() && super::settled(&rendered),
+                move || {
+                    check(
+                        "the first web view loads its page in a later turn of the main loop",
+                        !js::had_its_page_at_once(),
+                        "",
+                    );
+                    check(
+                        "the first formula starts the web view and shows",
+                        crate::util::storage(editor.preview())
+                            .string()
+                            .to_string()
+                            .contains('\u{FFFC}'),
+                        "no picture in the preview",
+                    );
+                    document.updateChangeCount(NSDocumentChangeType::ChangeCleared);
+                    document.close();
+                    with_web_views_started(mtm);
+                },
+            );
+        },
+    );
+}
+
+fn with_web_views_started(mtm: MainThreadMarker) {
     let keys = render_keys();
     js::renderer(mtm).request(0, keys.iter().map(|(_, k)| k.clone()).collect());
     let field = mathfield::field(mtm);
