@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "数式をビジュアルに、またはLaTeXコードで編集します";
 "Formel oder Diagramm bearbeiten …" = "数式または図を編集…";
 "Formel: {}" = "数式：{}";
+"Funktion vorschlagen …" = "機能を提案…";
 "Fußnote" = "脚注";
 "Fußnote einfügen" = "脚注を挿入します";
 "Gantt-Diagramm" = "ガントチャート";
@@ -172,6 +173,7 @@
 "Papierformat …" = "ページ設定…";
 "Person" = "人物";
 "Phase {}" = "フェーズ{}";
+"Problem melden …" = "問題を報告…";
 "Projektplan" = "プロジェクト計画";
 "Raute (Entscheidung)" = "ひし形（判断）";
 "Rechteck" = "長方形";
@@ -197,6 +199,7 @@
 "Spalte {}" = "列{}";
 "Spalten" = "列";
 "Spalten:" = "列：";
+"Splat auf GitHub" = "GitHubのSplat";
 "Splat ausblenden" = "Splatを非表示";
 "Splat beenden" = "Splatを終了";
 "Sprachausgabe" = "スピーチ";

@@ -100,6 +100,21 @@ define_class!(
             guarded((), || crate::updates::set_installs_automatically(!crate::updates::installs_automatically()));
         }
 
+        #[unsafe(method(mdReportProblem:))]
+        fn report_problem(&self, _sender: Option<&AnyObject>) {
+            guarded((), crate::feedback::report_problem);
+        }
+
+        #[unsafe(method(mdSuggestFeature:))]
+        fn suggest_feature(&self, _sender: Option<&AnyObject>) {
+            guarded((), crate::feedback::suggest_feature);
+        }
+
+        #[unsafe(method(mdOpenRepository:))]
+        fn open_repository(&self, _sender: Option<&AnyObject>) {
+            guarded((), crate::feedback::show_repository);
+        }
+
         #[unsafe(method(mdQuickReference:))]
         fn quick_reference(&self, _sender: Option<&AnyObject>) {
             guarded((), || {

@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "עריכת הנוסחה באופן חזותי או כקוד LaTeX";
 "Formel oder Diagramm bearbeiten …" = "עריכת נוסחה או תרשים…";
 "Formel: {}" = "נוסחה: {}";
+"Funktion vorschlagen …" = "הצעת מאפיין…";
 "Fußnote" = "הערת שוליים";
 "Fußnote einfügen" = "הוספת הערת שוליים";
 "Gantt-Diagramm" = "תרשים גאנט";
@@ -172,6 +173,7 @@
 "Papierformat …" = "הגדרת עמוד…";
 "Person" = "אדם";
 "Phase {}" = "שלב {}";
+"Problem melden …" = "דיווח על בעיה…";
 "Projektplan" = "תוכנית פרויקט";
 "Raute (Entscheidung)" = "מעוין (החלטה)";
 "Rechteck" = "מלבן";
@@ -197,6 +199,7 @@
 "Spalte {}" = "עמודה {}";
 "Spalten" = "עמודות";
 "Spalten:" = "עמודות:";
+"Splat auf GitHub" = "Splat ב-GitHub";
 "Splat ausblenden" = "הסתרת Splat";
 "Splat beenden" = "סיום Splat";
 "Sprachausgabe" = "הקראה";

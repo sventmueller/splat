@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Sửa công thức trực quan hoặc dưới dạng mã LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Sửa công thức hoặc sơ đồ…";
 "Formel: {}" = "Công thức: {}";
+"Funktion vorschlagen …" = "Đề xuất tính năng…";
 "Fußnote" = "Chú thích cuối trang";
 "Fußnote einfügen" = "Chèn chú thích cuối trang";
 "Gantt-Diagramm" = "Biểu đồ Gantt";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Thiết lập trang…";
 "Person" = "Người";
 "Phase {}" = "Giai đoạn {}";
+"Problem melden …" = "Báo cáo sự cố…";
 "Projektplan" = "Kế hoạch dự án";
 "Raute (Entscheidung)" = "Hình thoi (quyết định)";
 "Rechteck" = "Hình chữ nhật";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Cột {}";
 "Spalten" = "Cột";
 "Spalten:" = "Cột:";
+"Splat auf GitHub" = "Splat trên GitHub";
 "Splat ausblenden" = "Ẩn Splat";
 "Splat beenden" = "Thoát Splat";
 "Sprachausgabe" = "Đọc văn bản";

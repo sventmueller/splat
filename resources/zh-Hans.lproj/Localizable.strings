@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "以可视化方式或 LaTeX 代码编辑公式";
 "Formel oder Diagramm bearbeiten …" = "编辑公式或图表…";
 "Formel: {}" = "公式：{}";
+"Funktion vorschlagen …" = "建议新功能…";
 "Fußnote" = "脚注";
 "Fußnote einfügen" = "插入脚注";
 "Gantt-Diagramm" = "甘特图";
@@ -172,6 +173,7 @@
 "Papierformat …" = "页面设置…";
 "Person" = "人员";
 "Phase {}" = "阶段 {}";
+"Problem melden …" = "报告问题…";
 "Projektplan" = "项目计划";
 "Raute (Entscheidung)" = "菱形（判断）";
 "Rechteck" = "矩形";
@@ -197,6 +199,7 @@
 "Spalte {}" = "列 {}";
 "Spalten" = "列数";
 "Spalten:" = "列数：";
+"Splat auf GitHub" = "GitHub 上的 Splat";
 "Splat ausblenden" = "隐藏 Splat";
 "Splat beenden" = "退出 Splat";
 "Sprachausgabe" = "语音";

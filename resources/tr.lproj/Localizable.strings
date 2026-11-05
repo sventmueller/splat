@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Formülü görsel olarak veya LaTeX kodu olarak düzenle";
 "Formel oder Diagramm bearbeiten …" = "Formülü veya Diyagramı Düzenle…";
 "Formel: {}" = "Formül: {}";
+"Funktion vorschlagen …" = "Özellik Öner…";
 "Fußnote" = "Dipnot";
 "Fußnote einfügen" = "Dipnot ekle";
 "Gantt-Diagramm" = "Gantt Şeması";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Sayfa Düzeni…";
 "Person" = "Kişi";
 "Phase {}" = "Aşama {}";
+"Problem melden …" = "Sorun Bildir…";
 "Projektplan" = "Proje planı";
 "Raute (Entscheidung)" = "Eşkenar dörtgen (karar)";
 "Rechteck" = "Dikdörtgen";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Sütun {}";
 "Spalten" = "Sütunlar";
 "Spalten:" = "Sütunlar:";
+"Splat auf GitHub" = "GitHub’da Splat";
 "Splat ausblenden" = "Splat’ı Gizle";
 "Splat beenden" = "Splat’tan Çık";
 "Sprachausgabe" = "Konuşma";

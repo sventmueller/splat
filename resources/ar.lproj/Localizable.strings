@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "تعديل الصيغة مرئيًا أو كرمز LaTeX";
 "Formel oder Diagramm bearbeiten …" = "تعديل الصيغة أو المخطط…";
 "Formel: {}" = "صيغة: {}";
+"Funktion vorschlagen …" = "اقتراح ميزة…";
 "Fußnote" = "حاشية سفلية";
 "Fußnote einfügen" = "إدراج حاشية سفلية";
 "Gantt-Diagramm" = "مخطط جانت";
@@ -172,6 +173,7 @@
 "Papierformat …" = "إعداد الصفحة…";
 "Person" = "شخص";
 "Phase {}" = "المرحلة {}";
+"Problem melden …" = "الإبلاغ عن مشكلة…";
 "Projektplan" = "خطة المشروع";
 "Raute (Entscheidung)" = "معين (قرار)";
 "Rechteck" = "مستطيل";
@@ -197,6 +199,7 @@
 "Spalte {}" = "العمود {}";
 "Spalten" = "أعمدة";
 "Spalten:" = "الأعمدة:";
+"Splat auf GitHub" = "Splat على GitHub";
 "Splat ausblenden" = "إخفاء Splat";
 "Splat beenden" = "إنهاء Splat";
 "Sprachausgabe" = "التكلم";

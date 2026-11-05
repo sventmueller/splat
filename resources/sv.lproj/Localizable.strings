@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Redigera formeln visuellt eller som LaTeX-kod";
 "Formel oder Diagramm bearbeiten …" = "Redigera formel eller diagram…";
 "Formel: {}" = "Formel: {}";
+"Funktion vorschlagen …" = "Föreslå en funktion…";
 "Fußnote" = "Fotnot";
 "Fußnote einfügen" = "Infoga en fotnot";
 "Gantt-Diagramm" = "Gantt-schema";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Utskriftsformat…";
 "Person" = "Person";
 "Phase {}" = "Fas {}";
+"Problem melden …" = "Rapportera ett problem…";
 "Projektplan" = "Projektplan";
 "Raute (Entscheidung)" = "Romb (beslut)";
 "Rechteck" = "Rektangel";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Kolumn {}";
 "Spalten" = "Kolumner";
 "Spalten:" = "Kolumner:";
+"Splat auf GitHub" = "Splat på GitHub";
 "Splat ausblenden" = "Göm Splat";
 "Splat beenden" = "Avsluta Splat";
 "Sprachausgabe" = "Tal";

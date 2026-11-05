@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Editați formula vizual sau ca cod LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Editați formula sau diagrama…";
 "Formel: {}" = "Formulă: {}";
+"Funktion vorschlagen …" = "Sugerați o funcție…";
 "Fußnote" = "Notă de subsol";
 "Fußnote einfügen" = "Inserați o notă de subsol";
 "Gantt-Diagramm" = "Diagramă Gantt";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Configurare pagină…";
 "Person" = "Persoană";
 "Phase {}" = "Faza {}";
+"Problem melden …" = "Raportați o problemă…";
 "Projektplan" = "Plan de proiect";
 "Raute (Entscheidung)" = "Romb (decizie)";
 "Rechteck" = "Dreptunghi";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Coloana {}";
 "Spalten" = "Coloane";
 "Spalten:" = "Coloane:";
+"Splat auf GitHub" = "Splat pe GitHub";
 "Splat ausblenden" = "Ascundeți Splat";
 "Splat beenden" = "Închideți aplicația Splat";
 "Sprachausgabe" = "Enunțare";

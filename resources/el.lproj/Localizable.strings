@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Επεξεργασία του τύπου οπτικά ή ως κώδικα LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Επεξεργασία τύπου ή διαγράμματος…";
 "Formel: {}" = "Τύπος: {}";
+"Funktion vorschlagen …" = "Πρόταση λειτουργίας…";
 "Fußnote" = "Υποσημείωση";
 "Fußnote einfügen" = "Εισαγωγή υποσημείωσης";
 "Gantt-Diagramm" = "Διάγραμμα Gantt";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Διαμόρφωση σελίδας…";
 "Person" = "Πρόσωπο";
 "Phase {}" = "Φάση {}";
+"Problem melden …" = "Αναφορά προβλήματος…";
 "Projektplan" = "Σχέδιο έργου";
 "Raute (Entscheidung)" = "Ρόμβος (απόφαση)";
 "Rechteck" = "Ορθογώνιο";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Στήλη {}";
 "Spalten" = "Στήλες";
 "Spalten:" = "Στήλες:";
+"Splat auf GitHub" = "Το Splat στο GitHub";
 "Splat ausblenden" = "Απόκρυψη Splat";
 "Splat beenden" = "Τερματισμός Splat";
 "Sprachausgabe" = "Εκφώνηση";

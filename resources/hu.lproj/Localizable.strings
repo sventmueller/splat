@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "A képlet szerkesztése vizuálisan vagy LaTeX-kódként";
 "Formel oder Diagramm bearbeiten …" = "Képlet vagy diagram szerkesztése…";
 "Formel: {}" = "Képlet: {}";
+"Funktion vorschlagen …" = "Funkció javaslása…";
 "Fußnote" = "Lábjegyzet";
 "Fußnote einfügen" = "Lábjegyzet beszúrása";
 "Gantt-Diagramm" = "Gantt-diagram";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Oldalbeállítás…";
 "Person" = "Személy";
 "Phase {}" = "{}. fázis";
+"Problem melden …" = "Probléma jelentése…";
 "Projektplan" = "Projektterv";
 "Raute (Entscheidung)" = "Rombusz (döntés)";
 "Rechteck" = "Téglalap";
@@ -197,6 +199,7 @@
 "Spalte {}" = "{}. oszlop";
 "Spalten" = "Oszlopok";
 "Spalten:" = "Oszlopok:";
+"Splat auf GitHub" = "A Splat a GitHubon";
 "Splat ausblenden" = "A Splat elrejtése";
 "Splat beenden" = "Kilépés a Splatból";
 "Sprachausgabe" = "Beszéd";

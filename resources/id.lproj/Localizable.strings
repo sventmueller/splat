@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Edit rumus secara visual atau sebagai kode LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Edit Rumus atau Diagram…";
 "Formel: {}" = "Rumus: {}";
+"Funktion vorschlagen …" = "Sarankan Fitur…";
 "Fußnote" = "Catatan Kaki";
 "Fußnote einfügen" = "Sisipkan catatan kaki";
 "Gantt-Diagramm" = "Diagram Gantt";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Pengaturan Halaman…";
 "Person" = "Orang";
 "Phase {}" = "Fase {}";
+"Problem melden …" = "Laporkan Masalah…";
 "Projektplan" = "Rencana proyek";
 "Raute (Entscheidung)" = "Belah Ketupat (keputusan)";
 "Rechteck" = "Persegi Panjang";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Kolom {}";
 "Spalten" = "Kolom";
 "Spalten:" = "Kolom:";
+"Splat auf GitHub" = "Splat di GitHub";
 "Splat ausblenden" = "Sembunyikan Splat";
 "Splat beenden" = "Tutup Splat";
 "Sprachausgabe" = "Ucapan";

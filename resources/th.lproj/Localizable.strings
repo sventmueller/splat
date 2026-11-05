@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "แก้ไขสูตรแบบภาพหรือเป็นโค้ด LaTeX";
 "Formel oder Diagramm bearbeiten …" = "แก้ไขสูตรหรือแผนภาพ…";
 "Formel: {}" = "สูตร: {}";
+"Funktion vorschlagen …" = "เสนอแนะคุณสมบัติ…";
 "Fußnote" = "เชิงอรรถ";
 "Fußnote einfügen" = "แทรกเชิงอรรถ";
 "Gantt-Diagramm" = "แผนภูมิแกนต์";
@@ -172,6 +173,7 @@
 "Papierformat …" = "ตั้งค่าหน้ากระดาษ…";
 "Person" = "บุคคล";
 "Phase {}" = "ระยะที่ {}";
+"Problem melden …" = "รายงานปัญหา…";
 "Projektplan" = "แผนโครงการ";
 "Raute (Entscheidung)" = "ข้าวหลามตัด (การตัดสินใจ)";
 "Rechteck" = "สี่เหลี่ยมผืนผ้า";
@@ -197,6 +199,7 @@
 "Spalte {}" = "คอลัมน์ {}";
 "Spalten" = "คอลัมน์";
 "Spalten:" = "คอลัมน์:";
+"Splat auf GitHub" = "Splat บน GitHub";
 "Splat ausblenden" = "ซ่อน Splat";
 "Splat beenden" = "ออกจาก Splat";
 "Sprachausgabe" = "เสียงพูด";

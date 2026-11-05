@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Muokkaa kaavaa visuaalisesti tai LaTeX-koodina";
 "Formel oder Diagramm bearbeiten …" = "Muokkaa kaavaa tai kaaviota…";
 "Formel: {}" = "Kaava: {}";
+"Funktion vorschlagen …" = "Ehdota ominaisuutta…";
 "Fußnote" = "Alaviite";
 "Fußnote einfügen" = "Lisää alaviite";
 "Gantt-Diagramm" = "Gantt-kaavio";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Arkin määritys…";
 "Person" = "Henkilö";
 "Phase {}" = "Vaihe {}";
+"Problem melden …" = "Ilmoita ongelmasta…";
 "Projektplan" = "Projektisuunnitelma";
 "Raute (Entscheidung)" = "Vinoneliö (päätös)";
 "Rechteck" = "Suorakaide";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Sarake {}";
 "Spalten" = "Sarakkeet";
 "Spalten:" = "Sarakkeet:";
+"Splat auf GitHub" = "Splat GitHubissa";
 "Splat ausblenden" = "Kätke Splat";
 "Splat beenden" = "Lopeta Splat";
 "Sprachausgabe" = "Puhe";

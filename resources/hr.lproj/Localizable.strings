@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Uredi formulu vizualno ili kao LaTeX kod";
 "Formel oder Diagramm bearbeiten …" = "Uredi formulu ili dijagram…";
 "Formel: {}" = "Formula: {}";
+"Funktion vorschlagen …" = "Predloži značajku…";
 "Fußnote" = "Fusnota";
 "Fußnote einfügen" = "Umetni fusnotu";
 "Gantt-Diagramm" = "Ganttov dijagram";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Podešavanje stranice…";
 "Person" = "Osoba";
 "Phase {}" = "Faza {}";
+"Problem melden …" = "Prijavi problem…";
 "Projektplan" = "Plan projekta";
 "Raute (Entscheidung)" = "Romb (odluka)";
 "Rechteck" = "Pravokutnik";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Stupac {}";
 "Spalten" = "Stupci";
 "Spalten:" = "Stupci:";
+"Splat auf GitHub" = "Splat na GitHubu";
 "Splat ausblenden" = "Sakrij Splat";
 "Splat beenden" = "Zatvori Splat";
 "Sprachausgabe" = "Čitanje";

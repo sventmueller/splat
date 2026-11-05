@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "सूत्र को विज़ुअल रूप से या LaTeX कोड के रूप में संपादित करें";
 "Formel oder Diagramm bearbeiten …" = "सूत्र या डायग्राम संपादित करें…";
 "Formel: {}" = "सूत्र : {}";
+"Funktion vorschlagen …" = "सुविधा का सुझाव दें…";
 "Fußnote" = "फ़ुटनोट";
 "Fußnote einfügen" = "फ़ुटनोट डालें";
 "Gantt-Diagramm" = "गैंट चार्ट";
@@ -172,6 +173,7 @@
 "Papierformat …" = "पृष्ठ सेटअप…";
 "Person" = "व्यक्ति";
 "Phase {}" = "चरण {}";
+"Problem melden …" = "समस्या की रिपोर्ट करें…";
 "Projektplan" = "प्रोजेक्ट योजना";
 "Raute (Entscheidung)" = "समचतुर्भुज (निर्णय)";
 "Rechteck" = "आयत";
@@ -197,6 +199,7 @@
 "Spalte {}" = "कॉलम {}";
 "Spalten" = "कॉलम";
 "Spalten:" = "कॉलम :";
+"Splat auf GitHub" = "GitHub पर Splat";
 "Splat ausblenden" = "Splat छिपाएँ";
 "Splat beenden" = "Splat बंद करें";
 "Sprachausgabe" = "बोली";

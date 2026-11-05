@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Редагувати формулу візуально або як код LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Редагувати формулу або діаграму…";
 "Formel: {}" = "Формула: {}";
+"Funktion vorschlagen …" = "Запропонувати функцію…";
 "Fußnote" = "Виноска";
 "Fußnote einfügen" = "Вставити виноску";
 "Gantt-Diagramm" = "Діаграма Ганта";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Параметри сторінки…";
 "Person" = "Особа";
 "Phase {}" = "Етап {}";
+"Problem melden …" = "Повідомити про проблему…";
 "Projektplan" = "План проєкту";
 "Raute (Entscheidung)" = "Ромб (рішення)";
 "Rechteck" = "Прямокутник";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Стовпець {}";
 "Spalten" = "Стовпці";
 "Spalten:" = "Стовпці:";
+"Splat auf GitHub" = "Splat на GitHub";
 "Splat ausblenden" = "Сховати Splat";
 "Splat beenden" = "Завершити Splat";
 "Sprachausgabe" = "Читання вголос";

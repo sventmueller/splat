@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Editar a fórmula visualmente ou como código LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Editar Fórmula ou Diagrama…";
 "Formel: {}" = "Fórmula: {}";
+"Funktion vorschlagen …" = "Sugerir um Recurso…";
 "Fußnote" = "Nota de Rodapé";
 "Fußnote einfügen" = "Inserir uma nota de rodapé";
 "Gantt-Diagramm" = "Gráfico de Gantt";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Configurar Página…";
 "Person" = "Pessoa";
 "Phase {}" = "Fase {}";
+"Problem melden …" = "Relatar um Problema…";
 "Projektplan" = "Plano do projeto";
 "Raute (Entscheidung)" = "Losango (decisão)";
 "Rechteck" = "Retângulo";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Coluna {}";
 "Spalten" = "Colunas";
 "Spalten:" = "Colunas:";
+"Splat auf GitHub" = "Splat no GitHub";
 "Splat ausblenden" = "Ocultar Splat";
 "Splat beenden" = "Encerrar Splat";
 "Sprachausgabe" = "Fala";

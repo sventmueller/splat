@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "以視覺化方式或 LaTeX 程式碼編輯公式";
 "Formel oder Diagramm bearbeiten …" = "編輯公式或圖表⋯";
 "Formel: {}" = "公式：{}";
+"Funktion vorschlagen …" = "建議功能⋯";
 "Fußnote" = "註腳";
 "Fußnote einfügen" = "插入註腳";
 "Gantt-Diagramm" = "甘特圖";
@@ -172,6 +173,7 @@
 "Papierformat …" = "設定頁面⋯";
 "Person" = "人員";
 "Phase {}" = "階段 {}";
+"Problem melden …" = "回報問題⋯";
 "Projektplan" = "專案計畫";
 "Raute (Entscheidung)" = "菱形（判斷）";
 "Rechteck" = "矩形";
@@ -197,6 +199,7 @@
 "Spalte {}" = "欄 {}";
 "Spalten" = "欄";
 "Spalten:" = "欄數：";
+"Splat auf GitHub" = "GitHub 上的 Splat";
 "Splat ausblenden" = "隱藏 Splat";
 "Splat beenden" = "結束 Splat";
 "Sprachausgabe" = "語音";

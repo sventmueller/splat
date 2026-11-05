@@ -362,7 +362,13 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
     let (help_item, help_menu) = submenu(
         mtm,
         t("Hilfe"),
-        vec![item(mtm, t("Markdown-Kurzreferenz"), Some(sel!(mdQuickReference:)), "")],
+        vec![
+            item(mtm, t("Markdown-Kurzreferenz"), Some(sel!(mdQuickReference:)), ""),
+            separator(mtm),
+            item(mtm, t("Problem melden …"), Some(sel!(mdReportProblem:)), ""),
+            item(mtm, t("Funktion vorschlagen …"), Some(sel!(mdSuggestFeature:)), ""),
+            item(mtm, t("Splat auf GitHub"), Some(sel!(mdOpenRepository:)), ""),
+        ],
     );
 
     for i in [

@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Wijzig de formule visueel of als LaTeX-code";
 "Formel oder Diagramm bearbeiten …" = "Wijzig formule of diagram…";
 "Formel: {}" = "Formule: {}";
+"Funktion vorschlagen …" = "Stel een functie voor…";
 "Fußnote" = "Voetnoot";
 "Fußnote einfügen" = "Voeg een voetnoot in";
 "Gantt-Diagramm" = "Gantt-diagram";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Pagina-instelling…";
 "Person" = "Persoon";
 "Phase {}" = "Fase {}";
+"Problem melden …" = "Meld een probleem…";
 "Projektplan" = "Projectplan";
 "Raute (Entscheidung)" = "Ruit (beslissing)";
 "Rechteck" = "Rechthoek";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Kolom {}";
 "Spalten" = "Kolommen";
 "Spalten:" = "Kolommen:";
+"Splat auf GitHub" = "Splat op GitHub";
 "Splat ausblenden" = "Verberg Splat";
 "Splat beenden" = "Stop Splat";
 "Sprachausgabe" = "Spraak";

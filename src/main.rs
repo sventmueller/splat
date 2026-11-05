@@ -2,6 +2,7 @@ mod app;
 mod diag;
 mod document;
 mod editor;
+mod feedback;
 mod large_alloc;
 mod menu;
 mod updates;

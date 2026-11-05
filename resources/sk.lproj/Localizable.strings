@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Upraví vzorec vizuálne alebo ako kód LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Upraviť vzorec alebo diagram…";
 "Formel: {}" = "Vzorec: {}";
+"Funktion vorschlagen …" = "Navrhnúť funkciu…";
 "Fußnote" = "Poznámka pod čiarou";
 "Fußnote einfügen" = "Vloží poznámku pod čiarou";
 "Gantt-Diagramm" = "Ganttov diagram";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Nastavenie strany…";
 "Person" = "Osoba";
 "Phase {}" = "Fáza {}";
+"Problem melden …" = "Nahlásiť problém…";
 "Projektplan" = "Plán projektu";
 "Raute (Entscheidung)" = "Kosoštvorec (rozhodnutie)";
 "Rechteck" = "Obdĺžnik";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Stĺpec {}";
 "Spalten" = "Stĺpce";
 "Spalten:" = "Stĺpce:";
+"Splat auf GitHub" = "Splat na GitHube";
 "Splat ausblenden" = "Skryť Splat";
 "Splat beenden" = "Ukončiť Splat";
 "Sprachausgabe" = "Reč";

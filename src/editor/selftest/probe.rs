@@ -570,6 +570,30 @@ fn sharing(e: &EditorController, mtm: MainThreadMarker) {
                 .any(|w| w[0] == "Teilen" && w[1] == "Als PDF exportieren …"),
         &format!("{file_menu:?}"),
     );
+    let help_menu = NSApplication::sharedApplication(mtm).helpMenu();
+    if let Some(menu) = &help_menu {
+        menu.update();
+    }
+    let enabled = |action: objc2::runtime::Sel| {
+        help_menu.as_ref().is_some_and(|menu| {
+            menu.itemArray()
+                .iter()
+                .any(|i| i.action() == Some(action) && i.isEnabled())
+        })
+    };
+    check(
+        "the help menu leads to the problem form, the feature form and the repository",
+        enabled(objc2::sel!(mdReportProblem:))
+            && enabled(objc2::sel!(mdSuggestFeature:))
+            && enabled(objc2::sel!(mdOpenRepository:)),
+        "",
+    );
+    let form = crate::feedback::problem_form();
+    check(
+        "the problem form names the version of Splat and of macOS",
+        !form.contains("version=&") && !form.contains("macos=0."),
+        &form,
+    );
 }
 
 fn outline_and_web_permission(e: &EditorController) {

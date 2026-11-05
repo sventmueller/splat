@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Edit the formula visually or as LaTeX code";
 "Formel oder Diagramm bearbeiten …" = "Edit Formula or Diagram…";
 "Formel: {}" = "Formula: {}";
+"Funktion vorschlagen …" = "Suggest a Feature…";
 "Fußnote" = "Footnote";
 "Fußnote einfügen" = "Insert a footnote";
 "Gantt-Diagramm" = "Gantt Chart";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Page Setup…";
 "Person" = "Person";
 "Phase {}" = "Phase {}";
+"Problem melden …" = "Report a Problem…";
 "Projektplan" = "Project plan";
 "Raute (Entscheidung)" = "Diamond (decision)";
 "Rechteck" = "Rectangle";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Column {}";
 "Spalten" = "Columns";
 "Spalten:" = "Columns:";
+"Splat auf GitHub" = "Splat on GitHub";
 "Splat ausblenden" = "Hide Splat";
 "Splat beenden" = "Quit Splat";
 "Sprachausgabe" = "Speech";

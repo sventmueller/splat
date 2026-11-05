@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "수식을 시각적으로 또는 LaTeX 코드로 편집";
 "Formel oder Diagramm bearbeiten …" = "수식 또는 다이어그램 편집…";
 "Formel: {}" = "수식: {}";
+"Funktion vorschlagen …" = "기능 제안…";
 "Fußnote" = "각주";
 "Fußnote einfügen" = "각주 삽입";
 "Gantt-Diagramm" = "간트 차트";
@@ -172,6 +173,7 @@
 "Papierformat …" = "페이지 설정…";
 "Person" = "사람";
 "Phase {}" = "단계 {}";
+"Problem melden …" = "문제 신고…";
 "Projektplan" = "프로젝트 계획";
 "Raute (Entscheidung)" = "마름모(결정)";
 "Rechteck" = "사각형";
@@ -197,6 +199,7 @@
 "Spalte {}" = "열 {}";
 "Spalten" = "열";
 "Spalten:" = "열:";
+"Splat auf GitHub" = "GitHub의 Splat";
 "Splat ausblenden" = "Splat 가리기";
 "Splat beenden" = "Splat 종료";
 "Sprachausgabe" = "말하기";

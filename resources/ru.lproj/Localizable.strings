@@ -91,6 +91,7 @@
 "Formel grafisch oder als LaTeX-Code bearbeiten" = "Изменить формулу визуально или как код LaTeX";
 "Formel oder Diagramm bearbeiten …" = "Изменить формулу или диаграмму…";
 "Formel: {}" = "Формула: {}";
+"Funktion vorschlagen …" = "Предложить функцию…";
 "Fußnote" = "Сноска";
 "Fußnote einfügen" = "Вставить сноску";
 "Gantt-Diagramm" = "Диаграмма Ганта";
@@ -172,6 +173,7 @@
 "Papierformat …" = "Параметры страницы…";
 "Person" = "Участник";
 "Phase {}" = "Этап {}";
+"Problem melden …" = "Сообщить о проблеме…";
 "Projektplan" = "План проекта";
 "Raute (Entscheidung)" = "Ромб (решение)";
 "Rechteck" = "Прямоугольник";
@@ -197,6 +199,7 @@
 "Spalte {}" = "Столбец {}";
 "Spalten" = "Столбцы";
 "Spalten:" = "Столбцы:";
+"Splat auf GitHub" = "Splat на GitHub";
 "Splat ausblenden" = "Скрыть Splat";
 "Splat beenden" = "Завершить Splat";
 "Sprachausgabe" = "Проговаривание текста";
