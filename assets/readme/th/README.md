@@ -992,7 +992,7 @@ bundle ID `local.splat.selftest`) และไม่แตะต้องกา�
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 [แก้ไขหนึ่งบรรทัด](../../../vendor/comrak/PATCH.md) | ตัวแยกวิเคราะห์ Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | รันไทม์ Objective-C, Foundation, บล็อก | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | การผูกกับ AppKit, WebKit และ Grand Central Dispatch | Zlib, Apache-2.0 หรือ MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | สูตรและภาพ SVG เป็น PDF แบบเวกเตอร์ | MIT หรือ Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | สูตรและภาพ SVG เป็น PDF แบบเวกเตอร์ | MIT หรือ Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | ถอดรหัส PNG, JPEG, GIF, WebP และ BMP | MIT หรือ Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | จัดแนวคอลัมน์ตาราง | MIT หรือ Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | ชื่อของการอ้างอิงอักขระ HTML | MIT |

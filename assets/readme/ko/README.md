@@ -753,7 +753,7 @@ CI([.github/workflows/ci.yml](../../../.github/workflows/ci.yml))는 `main`에 �
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 ([한 줄 변경](../../../vendor/comrak/PATCH.md)) | Markdown 파서 | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C 런타임, Foundation, 블록 | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit, WebKit, Grand Central Dispatch 바인딩 | Zlib, Apache-2.0 or MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | 수식과 SVG 이미지를 벡터 PDF로 | MIT or Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | 수식과 SVG 이미지를 벡터 PDF로 | MIT or Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP, BMP 디코딩 | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 표 열 정렬 | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 문자 참조의 이름 | MIT |

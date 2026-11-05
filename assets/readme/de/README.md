@@ -752,7 +752,7 @@ Der Code nutzt den deutschen Text als Schlüssel: `t("Fett")` schlägt ihn zur L
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 mit [einer geänderten Zeile](../../../vendor/comrak/PATCH.md) | Markdown-Parser | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C-Laufzeit, Foundation, Blöcke | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | Anbindungen für AppKit, WebKit und Grand Central Dispatch | Zlib, Apache-2.0 oder MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | Formeln und SVG-Bilder als Vektor-PDF | MIT oder Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | Formeln und SVG-Bilder als Vektor-PDF | MIT oder Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | Dekodieren von PNG, JPEG, GIF, WebP und BMP | MIT oder Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | Tabellenspalten ausrichten | MIT oder Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | die Namen der HTML-Zeichenverweise | MIT |

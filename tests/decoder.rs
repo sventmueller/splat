@@ -123,6 +123,26 @@ fn text_in_a_formula_reaches_the_pdf_as_outlines_in_every_script() {
     );
 }
 
+#[test]
+fn an_svg_image_keeps_its_text_and_its_colored_emoji() {
+    let _limit = limited();
+    let mut child = helper();
+    let mut pdf = |text: &str| {
+        let svg = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="240" height="40"><text x="2" y="30" font-size="24">{text}</text></svg>"#
+        );
+        send(&mut child, 1, &image(2560, svg.as_bytes()));
+        assert_eq!(read(&mut child, 1), [1], "{text}");
+        let len = usize::try_from(u64::from_le_bytes(read(&mut child, 8).try_into().unwrap())).unwrap();
+        read(&mut child, len)
+    };
+    assert!(pdf("Splat").windows(5).any(|w| w == b"/Font"), "text stays text");
+    assert!(
+        pdf("😀").len() > 10_000,
+        "a colored emoji is an image, unlike a placeholder"
+    );
+}
+
 unsafe extern "C" {
     fn fcntl(fd: i32, command: i32, ...) -> i32;
 }

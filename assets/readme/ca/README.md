@@ -750,7 +750,7 @@ El codi fa servir el text en alemany com a clau: `t("Fett")` el cerca en temps d
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 amb [una línia canviada](../../../vendor/comrak/PATCH.md) | analitzador de Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | entorn d’execució d’Objective-C, Foundation, blocs | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | enllaços amb AppKit, WebKit i Grand Central Dispatch | Zlib, Apache-2.0 o MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | fórmules i imatges SVG com a PDF vectorial | MIT o Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | fórmules i imatges SVG com a PDF vectorial | MIT o Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | descodificació de PNG, JPEG, GIF, WebP i BMP | MIT o Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alineació de les columnes de les taules | MIT o Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | els noms de les referències de caràcters HTML | MIT |

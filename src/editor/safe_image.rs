@@ -5,7 +5,10 @@
 
 use std::sync::Arc;
 
-use svg2pdf::usvg;
+use krilla::geom::Size;
+use krilla::page::PageSettings;
+use krilla::{Document, SerializeSettings};
+use krilla_svg::{SurfaceExt, SvgSettings};
 
 /// Larger downloads and SVG sources are not shown.
 pub const MAX_BYTES: usize = 10 << 20;
@@ -13,6 +16,8 @@ pub const MAX_BYTES: usize = 10 << 20;
 pub const MAX_FILE_BYTES: usize = 64 << 20;
 /// Pixels an SVG filter may be rasterised to.
 const MAX_PIXELS: f64 = 16_000_000.0;
+/// Memory an image may decode to.
+const MAX_DECODED_BYTES: u64 = 512 << 20;
 /// Larger images are not decoded at all.
 pub const MAX_SIDE: u32 = 16_384;
 /// Longest side of a decoded image in the preview and on paper, where 2480 pixels fill an A4 page at 300 dpi; larger
@@ -58,7 +63,7 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(MAX_SIDE);
     limits.max_image_height = Some(MAX_SIDE);
-    limits.max_alloc = Some(512 << 20);
+    limits.max_alloc = Some(MAX_DECODED_BYTES);
     reader.limits(limits);
     let mut decoder = reader.into_decoder().ok()?;
     // Cameras store photos unrotated and note the orientation in the EXIF data.
@@ -96,13 +101,21 @@ fn convert(svg: &str, fonts: Arc<usvg::fontdb::Database>, embed_text: bool) -> O
         return None;
     }
     let tree = usvg::Tree::from_str(svg, &options(fonts)).ok()?;
-    let raster_scale = raster_scale(&tree)?;
-    let conversion = svg2pdf::ConversionOptions {
-        raster_scale,
+    let settings = SvgSettings {
         embed_text,
-        ..Default::default()
+        filter_scale: filter_scale(&tree)?,
     };
-    svg2pdf::to_pdf(&tree, conversion, svg2pdf::PageOptions::default()).ok()
+    let size = Size::from_wh(tree.size().width(), tree.size().height())?;
+    let mut document = Document::new_with(SerializeSettings {
+        render_svg_glyph_fn: krilla_svg::render_svg_glyph,
+        ..SerializeSettings::default()
+    });
+    let mut page = document.start_page_with(PageSettings::new(size));
+    let mut surface = page.surface();
+    surface.draw_svg(&tree, size, settings)?;
+    surface.finish();
+    page.finish();
+    document.finish().ok()
 }
 
 fn options(fonts: Arc<usvg::fontdb::Database>) -> usvg::Options<'static> {
@@ -110,7 +123,7 @@ fn options(fonts: Arc<usvg::fontdb::Database>) -> usvg::Options<'static> {
         fontdb: fonts,
         image_href_resolver: usvg::ImageHrefResolver {
             resolve_data: Box::new(|mime, data, options| match mime {
-                "image/png" => Some(usvg::ImageKind::PNG(data)),
+                "image/png" => png_fits_in_memory(&data).then_some(usvg::ImageKind::PNG(data)),
                 "image/svg+xml" => (usvg::ImageHrefResolver::default_data_resolver())(mime, data, options),
                 _ => None,
             }),
@@ -120,9 +133,16 @@ fn options(fonts: Arc<usvg::fontdb::Database>) -> usvg::Options<'static> {
     }
 }
 
-/// svg2pdf rasterises filters over their whole region; a tiny SVG can declare a region of gigapixels. The scale is
+/// krilla decodes an embedded PNG without a limit, and a few megabytes can unpack to many gigabytes.
+fn png_fits_in_memory(png: &[u8]) -> bool {
+    image::ImageReader::with_format(std::io::Cursor::new(png), image::ImageFormat::Png)
+        .into_decoder()
+        .is_ok_and(|decoder| image::ImageDecoder::total_bytes(&decoder) <= MAX_DECODED_BYTES)
+}
+
+/// krilla-svg rasterises filters over their whole region; a tiny SVG can declare a region of gigapixels. The scale is
 /// lowered until the largest region fits, and an SVG that would need less than a twentieth is refused.
-fn raster_scale(tree: &usvg::Tree) -> Option<f32> {
+fn filter_scale(tree: &usvg::Tree) -> Option<f32> {
     fn largest(group: &usvg::Group, max: &mut f64) {
         let t = group.abs_transform();
         let area_scale = f64::from((t.sx * t.sy - t.kx * t.ky).abs()).max(1.0);
@@ -191,6 +211,80 @@ mod tests {
         );
         let huge = bomb.replace("4000", "4000000");
         assert!(svg_to_pdf(&huge, fonts()).is_none());
+    }
+
+    /// A PNG that names its size and holds no pixels: what a decoder plans its memory from.
+    fn png_claiming(side: u32) -> Vec<u8> {
+        fn chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
+            let mut crc = !0u32;
+            for byte in kind.iter().chain(data) {
+                crc ^= u32::from(*byte);
+                for _ in 0..8 {
+                    crc = if crc & 1 == 1 {
+                        (crc >> 1) ^ 0xEDB8_8320
+                    } else {
+                        crc >> 1
+                    };
+                }
+            }
+            let length = u32::try_from(data.len()).unwrap().to_be_bytes();
+            [&length[..], kind, data, &(!crc).to_be_bytes()].concat()
+        }
+        const RGBA: [u8; 5] = [8, 6, 0, 0, 0];
+        let header = [&side.to_be_bytes()[..], &side.to_be_bytes(), &RGBA].concat();
+        [
+            b"\x89PNG\r\n\x1a\n".to_vec(),
+            chunk(b"IHDR", &header),
+            chunk(b"IDAT", &[]),
+            chunk(b"IEND", &[]),
+        ]
+        .concat()
+    }
+
+    fn holds_a_png(group: &usvg::Group) -> bool {
+        group.children().iter().any(|node| match node {
+            usvg::Node::Group(group) => holds_a_png(group),
+            usvg::Node::Image(image) => match image.kind() {
+                usvg::ImageKind::PNG(_) => true,
+                usvg::ImageKind::SVG(tree) => holds_a_png(tree.root()),
+                _ => false,
+            },
+            _ => false,
+        })
+    }
+
+    fn data_url(mime: &str, bytes: &[u8]) -> String {
+        let escaped: String = bytes.iter().map(|byte| format!("%{byte:02X}")).collect();
+        format!("data:{mime},{escaped}")
+    }
+
+    #[test]
+    fn an_embedded_png_too_large_to_decode_is_left_out() {
+        let svg_with = |content: &str| {
+            format!(r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">{content}</svg>"#)
+        };
+        let image = |url: String| format!(r#"<image width="10" height="10" href="{url}"/>"#);
+        let directly = |side| image(data_url("image/png", &png_claiming(side)));
+        let nested = |side| image(data_url("image/svg+xml", svg_with(&directly(side)).as_bytes()));
+        let drawn = |content: String| {
+            let tree = usvg::Tree::from_str(&svg_with(&content), &options(fonts())).unwrap();
+            holds_a_png(tree.root())
+        };
+        assert!(drawn(directly(2)), "a small image stays");
+        assert!(!drawn(directly(16_384)), "a gigabyte of pixels");
+        assert!(drawn(nested(2)), "a small image inside an embedded SVG stays");
+        assert!(!drawn(nested(16_384)), "an embedded SVG is no way around the limit");
+    }
+
+    /// Recursing through this many levels would run out of stack and end the helper.
+    #[test]
+    fn extreme_nesting_is_refused() {
+        let deep = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">{}<rect width="1" height="1"/>{}</svg>"#,
+            "<g>".repeat(100_000),
+            "</g>".repeat(100_000)
+        );
+        assert!(svg_to_pdf(&deep, fonts()).is_none());
     }
 
     #[test]

@@ -14,7 +14,7 @@ use objc2_app_kit::{
     NSBitmapFormat, NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpace, NSGraphicsContext, NSImage,
 };
 use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSSize};
-use svg2pdf::usvg::fontdb;
+use usvg::fontdb;
 
 use super::safe_image::{self, Decoded, EXPORT_SIDE, MAX_FILE_BYTES, MAX_SIDE};
 
