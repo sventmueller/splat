@@ -8,9 +8,9 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
  
 
 
-[![Lataa Splat macOS:lle](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Lataa Splat macOS:lle](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Lataa Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: Applen allekirjoittama ja notarisoima, macOS 14:lle tai uudemmalle, Apple Silicon- ja Intel-Maceille.
+**[Lataa Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: Applen allekirjoittama ja notarisoima, macOS 14:lle tai uudemmalle, Apple Silicon- ja Intel-Maceille.
  
  
 
@@ -132,7 +132,7 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 
 ## Asennus
 
-**Levykuvasta.** Lataa [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), avaa se ja vedä Splat Ohjelmat-kansioon. Kuva on allekirjoitettu Developer ID:llä ja Apple on notarisoinut sen, joten se aukeaa ilman varoituksia.
+**Levykuvasta.** Lataa [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), avaa se ja vedä Splat Ohjelmat-kansioon. Kuva on allekirjoitettu Developer ID:llä ja Apple on notarisoinut sen, joten se aukeaa ilman varoituksia.
 
 **Homebrew'lla.** Cask sijaitsee omassa tapissaan:
 

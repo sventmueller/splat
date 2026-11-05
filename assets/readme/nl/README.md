@@ -14,9 +14,9 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
  
 
 
-[![Download Splat voor macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Download Splat voor macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Download Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: ondertekend en door Apple genotariseerd, voor macOS 14 of nieuwer op Apple Silicon en Intel.
+**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: ondertekend en door Apple genotariseerd, voor macOS 14 of nieuwer op Apple Silicon en Intel.
  
  
 
@@ -152,7 +152,7 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 
 ## Installatie
 
-**Vanaf de schijfkopie.** Download [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), open haar en sleep Splat naar de map Programma's. De schijfkopie is
+**Vanaf de schijfkopie.** Download [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), open haar en sleep Splat naar de map Programma's. De schijfkopie is
 ondertekend met een Developer ID en door Apple genotariseerd, dus ze opent zonder waarschuwingen.
 
 **Met Homebrew.** De cask staat in een eigen tap:

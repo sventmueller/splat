@@ -8,9 +8,9 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
  
 
 
-[![Splat letöltése macOSre](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Splat letöltése macOSre](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Download Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: az Apple aláírta és hitelesítette, macOS 14 vagy újabb rendszerhez, Apple Silicon és Intel gépekre.
+**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: az Apple aláírta és hitelesítette, macOS 14 vagy újabb rendszerhez, Apple Silicon és Intel gépekre.
  
  
 
@@ -132,7 +132,7 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 
 ## Telepítés
 
-**Lemezképből.** Töltse le a [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg) fájlt, nyissa meg, és húzza a Splatot az Alkalmazások mappára. A lemezképet Developer ID-val írták alá, és az Apple hitelesítette, így figyelmeztetés nélkül megnyílik.
+**Lemezképből.** Töltse le a [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg) fájlt, nyissa meg, és húzza a Splatot az Alkalmazások mappára. A lemezképet Developer ID-val írták alá, és az Apple hitelesítette, így figyelmeztetés nélkül megnyílik.
 
 **Homebrew-val.** A cask saját tapben található:
 

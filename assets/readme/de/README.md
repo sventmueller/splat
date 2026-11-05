@@ -8,9 +8,9 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
  
 
 
-[![Splat für macOS laden](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Splat für macOS laden](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Splat-1.0.7.dmg laden](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: von Apple signiert und notarisiert, für macOS 14 oder neuer auf Apple Silicon und Intel.
+**[Splat-1.0.8.dmg laden](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: von Apple signiert und notarisiert, für macOS 14 oder neuer auf Apple Silicon und Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
 
 ## Installation
 
-**Vom Disk-Image.** Lade [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), öffne es und ziehe Splat auf den Ordner „Programme“. Das Image ist mit einer Developer ID signiert und von Apple notarisiert, sodass es ohne Warnungen öffnet.
+**Vom Disk-Image.** Lade [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), öffne es und ziehe Splat auf den Ordner „Programme“. Das Image ist mit einer Developer ID signiert und von Apple notarisiert, sodass es ohne Warnungen öffnet.
 
 **Mit Homebrew.** Das Cask liegt in einem eigenen Tap:
 

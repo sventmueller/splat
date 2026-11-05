@@ -8,9 +8,9 @@
  
 
 
-[![تنزيل Splat لنظام macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![تنزيل Splat لنظام macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[تنزيل Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: موقّع ومعتمد من Apple، لنظام macOS 14 أو أحدث على Apple Silicon وIntel.
+**[تنزيل Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: موقّع ومعتمد من Apple، لنظام macOS 14 أو أحدث على Apple Silicon وIntel.
  
  
 
@@ -132,7 +132,7 @@
 
 ## التثبيت
 
-**من صورة القرص.** نزّل [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)، وافتحه واسحب Splat إلى مجلد التطبيقات. الصورة موقّعة بشهادة Developer ID ومعتمدة من Apple، لذا تُفتح دون تحذيرات.
+**من صورة القرص.** نزّل [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)، وافتحه واسحب Splat إلى مجلد التطبيقات. الصورة موقّعة بشهادة Developer ID ومعتمدة من Apple، لذا تُفتح دون تحذيرات.
 
 **عبر Homebrew.** توجد الحزمة cask في tap خاص بها:
 

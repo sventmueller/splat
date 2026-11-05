@@ -8,9 +8,9 @@ Splatは、左にシンタックスカラー付きのMarkdownソース、右に�
  
 
 
-[![macOS用のSplatをダウンロード](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![macOS用のSplatをダウンロード](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Download Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**：Appleによる署名と公証済み。Apple SiliconとIntelのmacOS 14以降に対応しています。
+**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**：Appleによる署名と公証済み。Apple SiliconとIntelのmacOS 14以降に対応しています。
  
  
 
@@ -132,7 +132,7 @@ Splatは、左にシンタックスカラー付きのMarkdownソース、右に�
 
 ## インストール
 
-**ディスクイメージから。** [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)をダウンロードして開き、Splatをアプリケーションフォルダにドラッグしてください。イメージはDeveloper IDで署名され、Appleによって公証されているため、警告なしで開きます。
+**ディスクイメージから。** [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)をダウンロードして開き、Splatをアプリケーションフォルダにドラッグしてください。イメージはDeveloper IDで署名され、Appleによって公証されているため、警告なしで開きます。
 
 **Homebrewで。** Caskは専用のtapにあります。
 

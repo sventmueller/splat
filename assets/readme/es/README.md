@@ -8,9 +8,9 @@ Splat muestra a la izquierda tu código fuente Markdown con colores de sintaxis 
  
 
 
-[![Descargar Splat para macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Descargar Splat para macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Descargar Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: firmado y notarizado por Apple, para macOS 14 o posterior en Apple Silicon e Intel.
+**[Descargar Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: firmado y notarizado por Apple, para macOS 14 o posterior en Apple Silicon e Intel.
  
  
 
@@ -132,7 +132,7 @@ Splat muestra a la izquierda tu código fuente Markdown con colores de sintaxis 
 
 ## Instalación
 
-**Desde la imagen de disco.** Descarga [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), ábrela y arrastra Splat a la carpeta Aplicaciones. La imagen está firmada con un Developer ID y notarizada por Apple, así que se abre sin avisos.
+**Desde la imagen de disco.** Descarga [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), ábrela y arrastra Splat a la carpeta Aplicaciones. La imagen está firmada con un Developer ID y notarizada por Apple, así que se abre sin avisos.
 
 **Con Homebrew.** El cask está en un tap propio:
 

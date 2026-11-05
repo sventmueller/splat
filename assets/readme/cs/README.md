@@ -8,9 +8,9 @@ Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntax
  
 
 
-[![Stáhnout Splat pro macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)
+[![Stáhnout Splat pro macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
 
-**[Download Splat-1.0.7.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg)**: podepsáno a notarizováno Applem, pro macOS 14 nebo novější na Apple Silicon i Intelu.
+**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: podepsáno a notarizováno Applem, pro macOS 14 nebo novější na Apple Silicon i Intelu.
  
  
 
@@ -132,7 +132,7 @@ Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntax
 
 ## Instalace
 
-**Z obrazu disku.** Stáhněte si [`dist/Splat-1.0.7.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg), otevřete ho a přetáhněte Splat do složky Aplikace. Obraz je podepsaný certifikátem Developer ID a notarizovaný Applem, takže se otevře bez varování.
+**Z obrazu disku.** Stáhněte si [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), otevřete ho a přetáhněte Splat do složky Aplikace. Obraz je podepsaný certifikátem Developer ID a notarizovaný Applem, takže se otevře bez varování.
 
 **Přes Homebrew.** Cask má vlastní tap:
 

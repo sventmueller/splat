@@ -3,12 +3,12 @@
   <channel>
     <title>Splat</title>
     <item>
-      <title>Splat 1.0.7</title>
-      <pubDate>Wed, 04 Nov 2026 22:34:48 +0000</pubDate>
-      <sparkle:version>1.0.7</sparkle:version>
-      <sparkle:shortVersionString>1.0.7</sparkle:shortVersionString>
+      <title>Splat 1.0.8</title>
+      <pubDate>Thu, 05 Nov 2026 11:16:41 +0000</pubDate>
+      <sparkle:version>1.0.8</sparkle:version>
+      <sparkle:shortVersionString>1.0.8</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.7.dmg" sparkle:edSignature="zSwlFrgkM0B9Arb2h6LVdnVs/Wwje+a8qUhe0XAUVModmpq7aJE9759zHQlIHpNVo/1xBXgKkof2umq9UTAYAQ==" length="15398219" type="application/octet-stream"/>
+      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg" sparkle:edSignature="d5lpWsOBiZvIabcv+fArwsvV1puCe3MS8K6uWD4l0Ld9CZczIWhevcnGusSp+wna7OPaodUQueeOAPxBtpaUBg==" length="15399552" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>
