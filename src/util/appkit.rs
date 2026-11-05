@@ -94,23 +94,26 @@ pub fn byte_range_to_ns(map: &Utf16Map, r: &Range<Byte>) -> NSRange {
     to_nsrange(map.to_u16(r.start)..map.to_u16(r.end))
 }
 
+/// The modifiers and the key of a key equivalent; the key can be `+` itself, the separator.
+pub fn split_shortcut(key: &str) -> (&str, &str) {
+    match key.strip_suffix('+') {
+        Some(modifiers) => (modifiers.trim_end_matches('+'), "+"),
+        None => key.rsplit_once('+').unwrap_or(("", key)),
+    }
+}
+
 /// Key equivalent with modifiers: "cmd", "shift", "alt", "ctrl" joined by '+', e.g. "alt+cmd+p".
 pub fn item(mtm: MainThreadMarker, title: &str, action: Option<Sel>, key: &str) -> Retained<NSMenuItem> {
+    let (mods, equivalent) = split_shortcut(key);
     let mut modifiers = NSEventModifierFlags::empty();
-    let mut equivalent = "";
-    if !key.is_empty() {
-        let parts: Vec<&str> = key.split('+').collect();
-        let (last, mods) = parts.split_last().unwrap();
-        equivalent = last;
-        for m in mods {
-            modifiers |= match *m {
-                "cmd" => NSEventModifierFlags::Command,
-                "shift" => NSEventModifierFlags::Shift,
-                "alt" => NSEventModifierFlags::Option,
-                "ctrl" => NSEventModifierFlags::Control,
-                _ => NSEventModifierFlags::empty(),
-            };
-        }
+    for m in mods.split('+') {
+        modifiers |= match m {
+            "cmd" => NSEventModifierFlags::Command,
+            "shift" => NSEventModifierFlags::Shift,
+            "alt" => NSEventModifierFlags::Option,
+            "ctrl" => NSEventModifierFlags::Control,
+            _ => NSEventModifierFlags::empty(),
+        };
     }
     assert!(
         action.is_none_or(|action| arguments_of(action) <= 1),
@@ -220,6 +223,14 @@ mod exception_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_shortcut_splits_into_modifiers_and_key() {
+        assert_eq!(split_shortcut(""), ("", ""));
+        assert_eq!(split_shortcut("cmd+b"), ("cmd", "b"));
+        assert_eq!(split_shortcut("alt+cmd+1"), ("alt+cmd", "1"));
+        assert_eq!(split_shortcut("cmd++"), ("cmd", "+"));
+    }
 
     #[test]
     fn a_storage_ends_its_editing_when_what_edits_it_panics() {

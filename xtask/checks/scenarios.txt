@@ -144,6 +144,7 @@ the link dialog asks for address and text
 the link dialog links the selection
 the menu checks bold where the caret is in bold text
 the menu offers to hide the shown preview
+the menu zooms in with command plus
 the next start says once where the copies are
 the next start takes over the copies of a crashed run
 the outline check leaves the text

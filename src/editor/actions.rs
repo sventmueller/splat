@@ -419,6 +419,18 @@ mod tests {
     }
 
     #[test]
+    fn every_shortcut_names_a_key() {
+        for action in Action::ALL {
+            let key = action.spec().key;
+            assert_eq!(
+                crate::util::split_shortcut(key).1.is_empty(),
+                key.is_empty(),
+                "{action:?}"
+            );
+        }
+    }
+
+    #[test]
     fn menu_commands_have_titles() {
         for action in Action::ALL {
             let spec = action.spec();

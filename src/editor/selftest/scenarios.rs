@@ -1152,6 +1152,13 @@ fn view_steps() -> Vec<Step> {
                     (zoom - 1.0).abs() < 1e-9,
                     &format!("{zoom}"),
                 );
+                check(
+                    "the menu zooms in with command plus",
+                    menu_items(c.e.mtm(), Action::ZoomIn.spec().selector)
+                        .iter()
+                        .any(|item| item.keyEquivalent().to_string() == "+"),
+                    "",
+                );
             },
         ),
         settle(|c| {
