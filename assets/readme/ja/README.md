@@ -8,9 +8,11 @@ Splatは、左にシンタックスカラー付きのMarkdownソース、右に�
  
 
 
-[![macOS用のSplatをダウンロード](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![macOS用のSplatをダウンロード](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**：Appleによる署名と公証済み。Apple SiliconとIntelのmacOS 14以降に対応しています。
+**[Download Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**：Appleによる署名と公証済み。Apple SiliconとIntelのmacOS 14以降に対応しています。
+
+**バグを見つけましたか？** Splatは、触れていない行を1バイトも変えません。それでも行が変わった場合や、ファイルが正しく表示されない場合は、[Issueを作成](https://github.com/sventmueller/splat/issues/new/choose)してファイルを添付してください。Splatがお役に立ったら、[GitHubのスター](https://github.com/sventmueller/splat)が、ほかの人がSplatを見つける助けになります。
  
  
 
@@ -132,7 +134,7 @@ Splatは、左にシンタックスカラー付きのMarkdownソース、右に�
 
 ## インストール
 
-**ディスクイメージから。** [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)をダウンロードして開き、Splatをアプリケーションフォルダにドラッグしてください。イメージはDeveloper IDで署名され、Appleによって公証されているため、警告なしで開きます。
+**ディスクイメージから。** [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)をダウンロードして開き、Splatをアプリケーションフォルダにドラッグしてください。イメージはDeveloper IDで署名され、Appleによって公証されているため、警告なしで開きます。
 
 **Homebrewで。** Caskは専用のtapにあります。
 
@@ -501,7 +503,7 @@ Splatは、Appleの標準のショートカットをそのままにしていま�
 
 Markdownファイルは誰からでも届き得るため、Splatはすべての書類を信頼できないものとして扱います。
 
-- **デフォルトではネットワークを使いません。** Splatにテレメトリはありません。アップデートの確認は、ユーザが同意するか**アップデートを確認…**を選んだときだけ行われ、そのときGitHubから小さなフィードファイルを読み込みます。リクエストにはアプリ名とそのバージョンしか含まれません。数式と図はローカルでレンダリングされ、それを行うWebビューはネットワークに接続できません。
+- **デフォルトではネットワークを使いません。** Splatにテレメトリはありません。アップデートの確認は、ユーザが同意するか**アップデートを確認…**を選んだときだけ行われ、そのときGitHubから小さなフィードファイルを読み込みます。リクエストにはアプリ名とそのバージョンしか含まれません。数式と図はローカルでレンダリングされ、それを行うWebビューはネットワークに接続できません。**ヘルプ › 問題を報告…**を選ぶと、ブラウザでGitHubのフォームが開きます。そのアドレスに含まれるのはSplatのバージョン、macOSのバージョン、Macの種類だけで、書類の内容は含まれません。
 - **Webの画像**は、許可を得てからでなければ読み込まれず、読み込むのは`https`だけで、ローカルネットワーク内のホストからは読み込まず、1枚につき最大10 MBで、Cookieのないプライベートセッションで行われます。
 - **隔離されたデコード。** 画像、および数式と図のグラフィックは、ヘルパープロセスでデコードされます。ヘルパーは、継承したファイルをすべて閉じ、最初の1バイトを読む前に自らをサンドボックスに閉じ込めます。ファイルへのアクセスもネットワークもありません。返すのはピクセルだけで、そのサイズは検査され、10秒後に停止されます。Appleのシステム標準の画像デコーダが見るのは、HEIC、TIFF、AVIF、PDFだけで、しかもデータが本当にその形式であるときだけです。このデコーダは専用のヘルパーで動作し、そのヘルパーには追加でシステムのフォントフォルダを読むことと、システムのビデオデコーダを使うことが許されています。SVG、数式、図もこのヘルパーを通るため、Splatの中では解像度が固定された画像になります。1ポイントあたり4ピクセルで、長辺は最大2560ピクセルです。
 - **ローカルのファイル**が書類に届くのは、書類が指定したパスによってだけです。埋め込みでは、書類のフォルダとその下にあるMarkdownのノートが表示され、見つからない画像もそこでだけ探されます。ほかの場所にある画像のパス（絶対パスや`~`で始まるもの）は、プレビューではそれでも読み込まれます。HTMLとWordの書き出し、印刷、PDFに含まれるのは、書類のフォルダまたはそのGitリポジトリにあるものだけです（そのリポジトリにホームフォルダも含まれている場合を除きます）。そのため、他人の書類があなたのファイルを、人に渡す書き出しに取り込むことはできません。
@@ -602,17 +604,18 @@ cargo xtask vendor fetch       # vendor.lockのバージョンを変えた後に
 
 ### 配布
 
-`cargo xtask dmg`（または、先に`make test`を実行する`make release`）は、リリースをビルドし、Developer IDで署名し、Appleによるアプリの公証を受けてチケットをステープルし、圧縮された読み取り専用のディスクイメージにアプリケーションへのリンクとともにまとめ、イメージも同様に公証してステープルし、結果をGatekeeperで確認します。アプリ自体がチケットを持つので、Homebrewのように、Finderを使わずにインストールされたコピーも、初回起動時にオフラインで開きます。公証サービスとのやり取りは2回あり、それぞれ数分かかります。すべての手順を通ったイメージだけが`dist/Splat-<version>.dmg`になり、それがコミットされるコピーです。このREADMEとその翻訳のダウンロードリンクはそれに従い、ビルド番号が上がります。直前のイメージはもう1リリース分残されます。GitHubのrawサーバが、プッシュの後も数分間は古いアップデートフィードを返すことがあるからです。それより古いものはゴミ箱に移されます。実行に失敗した場合、`dist/`、README、VERSIONは元のままです。
+`cargo xtask dmg`（または、先に`make test`を実行する`make release`）は、リリースをビルドし、Developer IDで署名し、Appleによるアプリの公証を受けてチケットをステープルし、圧縮された読み取り専用のディスクイメージにアプリケーションへのリンクとともにまとめ、イメージも同様に公証してステープルし、結果をGatekeeperで確認します。アプリ自体がチケットを持つので、Homebrewのように、Finderを使わずにインストールされたコピーも、初回起動時にオフラインで開きます。公証サービスとのやり取りは2回あり、それぞれ数分かかります。すべての手順を通ったイメージだけが`dist/Splat-<version>.dmg`になり、それがコミットされるコピーです。ビルド番号も上がります。直前のイメージはもう1リリース分残されます。GitHubのrawサーバが、プッシュの後も数分間は古いアップデートフィードを返すことがあるからです。それより古いものはゴミ箱に移されます。実行に失敗した場合、`dist/`とVERSIONは元のままです。
 リリースのたびに、約16 MBの完全なイメージがリポジトリの履歴に加わります。呼び出されたときにだけ実行され、通常のビルドの一部として実行されることはなく、次のものが必要です。
 
 - キーチェーンにある「Developer ID Application」証明書
 - アプリ用パスワードで保存した、Appleの公証サービスへのログイン。`xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`で一度だけ作成します
 - アップデートに署名する秘密鍵。ログインキーチェーンにあります。Sparkleの`generate_keys`が作成したもので、その公開鍵が[xtask/src/main.rs](../../../xtask/src/main.rs)の`UPDATE_KEY`であり、インストールされたすべてのコピーの中にもあります。コピーは、この鍵で署名されたアップデートだけを受け入れます。パスワードマネージャにバックアップを保管してください。`target/sparkle-2.10.1/bin/generate_keys -x <file>`でエクスポートでき、`-f <file>`で別のMacにインポートできます。これがないと、インストール済みのコピーは二度とアップデートできなくなります。
 - rustup（`brew install rustup`。HomebrewのRustはそのまま残ります）
+- `RELEASE_NOTES.md`（このリリースの内容を記載）。アップデートのダイアログは、問題の報告方法を示す行の上にこれを表示します。ファイルが空の場合や前回のリリースの内容のままの場合、`dmg`は停止します
 
 どれか1つでも欠けていると、`dmg`はビルドの前に停止します。初回の実行では、ターミナルがFinderを制御してよいかをmacOSがたずねます。許可しないと、ディスクイメージに背景もアイコンの配置も表示されません。
 
-アップデータ[Sparkle](https://sparkle-project.org)を搭載するのはディスクイメージだけです。ビルドはSparkleをGitHubのリリースから一度`target/`にダウンロードし、xtask内のチェックサムと照合します。Hardened Runtimeがフレームワークを読み込むのは、それがアプリのTeam IDを持つときだけです。Developer ID署名にはそれがあり、ローカルの証明書にはありません。また、アップデートで自分でビルドしたものを置き換えてはなりません。セルフテスト用のビルドにもSparkleが入っていて、アップデートメニューを確認します。存在しないフィードを使い、2回目の起動時のSparkleの質問は出さず、ローカルで署名したアプリがフレームワークを読み込めるようにするentitlementを付けています。`dmg`は新しいイメージにアップデート用の鍵で署名し、`dist/appcast.xml`を書き出します。これは、インストール済みのコピーがGitHubから読むフィードです。イメージ、フィード、READMEをまとめてコミットしてプッシュしてください。それ以降、インストール済みのコピーにアップデートが提示されます。
+アップデータ[Sparkle](https://sparkle-project.org)を搭載するのはディスクイメージだけです。ビルドはSparkleをGitHubのリリースから一度`target/`にダウンロードし、xtask内のチェックサムと照合します。Hardened Runtimeがフレームワークを読み込むのは、それがアプリのTeam IDを持つときだけです。Developer ID署名にはそれがあり、ローカルの証明書にはありません。また、アップデートで自分でビルドしたものを置き換えてはなりません。セルフテスト用のビルドにもSparkleが入っていて、アップデートメニューを確認します。存在しないフィードを使い、2回目の起動時のSparkleの質問は出さず、ローカルで署名したアプリがフレームワークを読み込めるようにするentitlementを付けています。`dmg`は新しいイメージにアップデート用の鍵で署名し、`dist/appcast.xml`を書き出します。これは、インストール済みのコピーがGitHubから読むフィードです。イメージとフィードをまとめてコミットしてプッシュしてください。それ以降、インストール済みのコピーにアップデートが提示されます。このREADMEとその翻訳のダウンロードリンクは最新のGitHubリリースの`Splat.dmg`を指しているので、各リリースにはこの名前のコピーを含めます。`cp dist/Splat-<version>.dmg target/Splat.dmg`のあと、`gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`を実行します。
 
 ディスクイメージはApple SiliconとIntel用のユニバーサルバイナリで、それ以外のビルドはホストのプロセッサ専用です。HomebrewのRustが同梱する標準ライブラリはホストのプロセッサ向けだけなので、`dmg`はrustup経由でビルドします。rustupは初回の使用時に[rust-toolchain.toml](../../../rust-toolchain.toml)のツールチェーンとターゲットをインストールし、プログラムまたはSparkleにどちらかのプロセッサ向けのコードがなければ停止します。`make universal`がビルドするのはプログラムだけです。
 その中のアプリはローカルのビルドとは署名が異なるため、macOSは2つに別々の最近使った書類とフォルダへのアクセス許可を保持します。

@@ -8,9 +8,11 @@ Splat מציג את קוד המקור של ה-Markdown עם צבעי תחביר 
  
 
 
-[![הורדת Splat ל-macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![הורדת Splat ל-macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[הורדת Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: חתום ומאושר (notarized) על ידי Apple, ל-macOS 14 ואילך, ב-Apple Silicon וב-Intel.
+**[הורדת Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: חתום ומאושר (notarized) על ידי Apple, ל-macOS 14 ואילך, ב-Apple Silicon וב-Intel.
+
+**מצאתם באג?** Splat שומר על שורות שלא נגעתם בהן זהות בייט אחר בייט. אם בכל זאת אחת מהן משתנה, או שקובץ מוצג באופן שגוי, אפשר [לפתוח issue](https://github.com/sventmueller/splat/issues/new/choose) ולצרף את הקובץ. אם Splat מועיל לכם, [כוכב ב-GitHub](https://github.com/sventmueller/splat) עוזר לאחרים למצוא אותו.
  
  
 
@@ -132,7 +134,7 @@ Splat מציג את קוד המקור של ה-Markdown עם צבעי תחביר 
 
 ## התקנה
 
-**מתוך קובץ ה-disk image.** יש להוריד את [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), לפתוח אותו ולגרור את Splat אל תיקיית היישומים (Applications). הקובץ חתום עם Developer ID ומאושר (notarized) על ידי Apple, ולכן נפתח בלי אזהרות.
+**מתוך קובץ ה-disk image.** יש להוריד את [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), לפתוח אותו ולגרור את Splat אל תיקיית היישומים (Applications). הקובץ חתום עם Developer ID ומאושר (notarized) על ידי Apple, ולכן נפתח בלי אזהרות.
 
 **עם Homebrew.** ה-cask נמצא ב-tap נפרד:
 
@@ -502,7 +504,7 @@ Splat משאיר את הקיצורים הרגילים של Apple במקומם.
 
 קובץ Markdown יכול להגיע מכל אחד, ולכן Splat מתייחס לכל מסמך כאל לא מהימן.
 
-- **ללא רשת כברירת מחדל.** ל-Splat אין טלמטריה. הוא מחפש עדכונים רק אחרי שהסכמתם או בחרתם **חיפוש עדכונים…**: אז הוא טוען מ-GitHub קובץ הזנה קטן, והבקשה מציינת רק את היישום ואת גירסתו. נוסחאות ותרשימים מעובדים מקומית; תצוגות האינטרנט שעושות זאת אינן יכולות להגיע לרשת.
+- **ללא רשת כברירת מחדל.** ל-Splat אין טלמטריה. הוא מחפש עדכונים רק אחרי שהסכמתם או בחרתם **חיפוש עדכונים…**: אז הוא טוען מ-GitHub קובץ הזנה קטן, והבקשה מציינת רק את היישום ואת גירסתו. נוסחאות ותרשימים מעובדים מקומית; תצוגות האינטרנט שעושות זאת אינן יכולות להגיע לרשת. **עזרה › דיווח על בעיה…** פותח טופס ב-GitHub בדפדפן; הכתובת שלו כוללת את גירסת Splat, את גירסת macOS ואת סוג ה-Mac, ושום דבר מהמסמכים שלכם.
 - **תמונות מהאינטרנט** נטענות רק באישורכם, רק דרך `https`, אף פעם לא משרתים ברשת המקומית שלכם, עד 10 MB לכל אחת, ובסשן פרטי בלי עוגיות.
 - **פענוח מבודד.** תמונות והגרפיקה של נוסחאות ותרשימים מפוענחות בתהליכי עזר שסוגרים כל קובץ שירשו ונועלים את עצמם ב-sandbox לפני שהם קוראים את הבייט הראשון: בלי גישה לקבצים ובלי רשת. הם מחזירים רק פיקסלים, שגודלם נבדק, ונעצרים אחרי 10 שניות. מפענחי התמונות של Apple עצמה רואים רק HEIC, TIFF, AVIF ו-PDF, ורק כשהנתונים באמת בפורמט הזה; הם רצים בתהליך עזר משלהם, שרשאי בנוסף לקרוא את תיקיות הגופנים של המערכת ולהשתמש במפענח הווידאו של המערכת. גם SVG, נוסחאות ותרשימים עוברים דרך תהליך העזר הזה, ולכן הם תמונות ברזולוציה קבועה ב-Splat: ארבעה פיקסלים לנקודה, עד 2560 בצד הארוך.
 - **קבצים מקומיים** מגיעים למסמך רק דרך הנתיב שהוא מציין. הטמעות מציגות פתקי Markdown מתיקיית המסמך ומתחתיה, ותמונה חסרה מחופשת רק שם. נתיב תמונה במקום אחר, מוחלט או כזה שמתחיל ב-`~`, עדיין נטען בתצוגה המקדימה; ייצואי HTML ו-Word, הדפסה וקובצי PDF לוקחים איתם רק מה שנמצא בתיקיית המסמך או במאגר ה-Git שלו, אלא אם המאגר הזה מכיל גם את תיקיית הבית שלכם, כך שמסמך ממישהו אחר לא יכול למשוך את הקבצים שלכם לייצוא שאתם מעבירים הלאה.
@@ -603,17 +605,18 @@ cargo xtask vendor fetch       # הורדה מחדש אחרי שינוי גיר�
 
 ### הפצה
 
-`cargo xtask dmg` (או `make release`, שמריץ קודם `make test`) בונה release, חותם אותו עם ה-Developer ID שלכם, שולח את היישום לאישור (notarization) של Apple ומצרף את האישור (staple), אורז אותו בקובץ disk image דחוס לקריאה בלבד עם קישור ל-Applications, מאשר ומצרף אישור גם לקובץ ה-image ובודק את התוצאה עם Gatekeeper. היישום נושא אישור משלו כדי שעותק שהותקן בלי Finder, כמו ש-Homebrew עושה, ייפתח גם ללא רשת בהפעלה הראשונה; שני הסבבים מול שירות ה-notary לוקחים כמה דקות כל אחד. רק image שעבר כל שלב הופך ל-`dist/Splat-<version>.dmg`, העותק שנכנס ל-commit: קישורי ההורדה ב-README הזה ובתרגומיו עוקבים אחריו, ומספר ה-build עולה. ה-image הקודם נשאר עוד גירסה אחת, כי השרת הגולמי של GitHub עשוי להגיש את הזנת העדכונים הישנה כמה דקות אחרי push; ישנים יותר מועברים לאשפה. ריצה שנכשלה משאירה את `dist/`, את קובצי ה-README ואת VERSION כפי שהיו.
+`cargo xtask dmg` (או `make release`, שמריץ קודם `make test`) בונה release, חותם אותו עם ה-Developer ID שלכם, שולח את היישום לאישור (notarization) של Apple ומצרף את האישור (staple), אורז אותו בקובץ disk image דחוס לקריאה בלבד עם קישור ל-Applications, מאשר ומצרף אישור גם לקובץ ה-image ובודק את התוצאה עם Gatekeeper. היישום נושא אישור משלו כדי שעותק שהותקן בלי Finder, כמו ש-Homebrew עושה, ייפתח גם ללא רשת בהפעלה הראשונה; שני הסבבים מול שירות ה-notary לוקחים כמה דקות כל אחד. רק image שעבר כל שלב הופך ל-`dist/Splat-<version>.dmg`, העותק שנכנס ל-commit, ומספר ה-build עולה. ה-image הקודם נשאר עוד גירסה אחת, כי השרת הגולמי של GitHub עשוי להגיש את הזנת העדכונים הישנה כמה דקות אחרי push; ישנים יותר מועברים לאשפה. ריצה שנכשלה משאירה את `dist/` ואת VERSION כפי שהיו.
 כל גירסה מוסיפה להיסטוריית המאגר את ה-image המלא, כ-16 MB. הפקודה רצה רק כשקוראים לה, אף פעם לא כחלק מבנייה רגילה, והיא דורשת:
 
 - תעודת "Developer ID Application" בצרור המפתחות
 - התחברות שמורה לשירות ה-notary של Apple עם סיסמה ייעודית ליישום, שנוצרה פעם אחת עם `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
 - המפתח הפרטי שחותם עדכונים, בצרור המפתחות של ההתחברות. `generate_keys` של Sparkle יצר אותו; החצי הציבורי שלו הוא `UPDATE_KEY` ב-[xtask/src/main.rs](../../../xtask/src/main.rs) ובתוך כל עותק מותקן, שמקבל רק עדכונים חתומים בו. יש לשמור גיבוי במנהל סיסמאות: `target/sparkle-2.10.1/bin/generate_keys -x <file>` מייצא אותו, `-f <file>` מייבא אותו ב-Mac אחר. בלעדיו אי אפשר יהיה לעדכן עותקים מותקנים לעולם.
 - rustup (`brew install rustup`, שמשאיר את ה-Rust של Homebrew במקומו)
+- `RELEASE_NOTES.md`, עם מה שהגירסה הזו מביאה. חלון העדכון מציג אותו מעל שורה שמסבירה איך לדווח על בעיה, ולכן `dmg` עוצר אם הקובץ ריק או עדיין מכיל את ההערות של הגירסה הקודמת
 
 אם אחד מהם חסר, `dmg` נעצר לפני הבנייה. בהרצה הראשונה macOS שואל אם ל-Terminal מותר לשלוט ב-Finder; בלי ההרשאה הזו, ה-disk image לא מציג לא את הרקע שלו ולא את סידור האייקונים.
 
-רק ה-disk image נושא את מנגנון העדכון, [Sparkle](https://sparkle-project.org), שהבנייה מורידה פעם אחת אל `target/` מה-release שלו ב-GitHub ובודקת מול סכום הביקורת ב-xtask. ה-hardened runtime טוען את ה-framework רק כשהוא נושא את ה-Team ID של היישום, שיש בחתימת Developer ID ואין בתעודה המקומית; ועדכון אינו רשאי להחליף בנייה שלכם. גם בניית הבדיקה העצמית נושאת את Sparkle, כדי לבדוק מולו את תפריט העדכון: עם הזנה שאינה קיימת, בלי השאלה של Sparkle בהפעלה השנייה, ועם entitlement שמאפשר ליישום החתום מקומית לטעון את ה-framework. `dmg` חותם את ה-image החדש במפתח העדכון וכותב את `dist/appcast.xml`, הזנת העדכונים שעותקים מותקנים קוראים מ-GitHub. יש לעשות commit ו-push ל-image, להזנה ולקובצי ה-README יחד: מאותו רגע עותקים מותקנים מציעים את העדכון.
+רק ה-disk image נושא את מנגנון העדכון, [Sparkle](https://sparkle-project.org), שהבנייה מורידה פעם אחת אל `target/` מה-release שלו ב-GitHub ובודקת מול סכום הביקורת ב-xtask. ה-hardened runtime טוען את ה-framework רק כשהוא נושא את ה-Team ID של היישום, שיש בחתימת Developer ID ואין בתעודה המקומית; ועדכון אינו רשאי להחליף בנייה שלכם. גם בניית הבדיקה העצמית נושאת את Sparkle, כדי לבדוק מולו את תפריט העדכון: עם הזנה שאינה קיימת, בלי השאלה של Sparkle בהפעלה השנייה, ועם entitlement שמאפשר ליישום החתום מקומית לטעון את ה-framework. `dmg` חותם את ה-image החדש במפתח העדכון וכותב את `dist/appcast.xml`, הזנת העדכונים שעותקים מותקנים קוראים מ-GitHub. יש לעשות commit ו-push ל-image ולהזנה יחד: מאותו רגע עותקים מותקנים מציעים את העדכון. קישורי ההורדה ב-README הזה ובתרגומיו מפנים אל `Splat.dmg` בגירסה האחרונה ב-GitHub, ולכן כל גירסה כוללת עותק בשם הזה: `cp dist/Splat-<version>.dmg target/Splat.dmg`, ואז `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 ה-disk image הוא קובץ בינארי אוניברסלי ל-Apple Silicon ול-Intel; בניות אחרות הן למעבד המארח בלבד. ה-Rust של Homebrew מגיע עם הספרייה הסטנדרטית למעבד המארח בלבד, ולכן `dmg` בונה דרך rustup, שמתקין בשימוש הראשון את ה-toolchain ואת היעדים של [rust-toolchain.toml](../../../rust-toolchain.toml), ונעצר אם בתוכנית או ב-Sparkle חסר קוד לאחד המעבדים. `make universal` בונה את התוכנית בלבד.
 היישום שבו נושא חתימה שונה מזו של בנייה מקומית, ולכן macOS מנהל מסמכים אחרונים והרשאות לתיקיות בנפרד לכל אחד מהם.

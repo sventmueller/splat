@@ -8,9 +8,11 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
  
 
 
-[![Last ned Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Last ned Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Last ned Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: signert og notarisert av Apple, for macOS 14 eller nyere på Apple Silicon og Intel.
+**[Last ned Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: signert og notarisert av Apple, for macOS 14 eller nyere på Apple Silicon og Intel.
+
+**Fant du en feil?** Splat holder linjene du ikke har rørt, byte for byte like. Hvis en likevel endrer seg, eller en fil vises feil, kan du [opprette et issue](https://github.com/sventmueller/splat/issues/new/choose) og legge ved filen. Hvis du har nytte av Splat, hjelper en [stjerne på GitHub](https://github.com/sventmueller/splat) andre med å finne det.
  
  
 
@@ -132,7 +134,7 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 
 ## Installasjon
 
-**Fra diskbildet.** Last ned [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), åpne det og dra Splat til Apper-mappen. Bildet er signert med en Developer ID og notarisert av Apple, så det åpnes uten advarsler.
+**Fra diskbildet.** Last ned [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), åpne det og dra Splat til Apper-mappen. Bildet er signert med en Developer ID og notarisert av Apple, så det åpnes uten advarsler.
 
 **Med Homebrew.** Cask-pakken ligger i en egen tap:
 
@@ -501,7 +503,7 @@ Splat lar Apples standard hurtigtaster stå i fred.
 
 En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument som upålitelig.
 
-- **Ingen nettverksbruk som standard.** Splat har ingen telemetri. Appen søker etter oppdateringer først når du har samtykket eller velger **Søk etter oppdateringer…**: da laster den en liten feedfil fra GitHub, og forespørselen nevner ikke annet enn appen og versjonen. Formler og diagrammer gjengis lokalt; nettvisningene som gjør det, kan ikke nå nettverket.
+- **Ingen nettverksbruk som standard.** Splat har ingen telemetri. Appen søker etter oppdateringer først når du har samtykket eller velger **Søk etter oppdateringer…**: da laster den en liten feedfil fra GitHub, og forespørselen nevner ikke annet enn appen og versjonen. Formler og diagrammer gjengis lokalt; nettvisningene som gjør det, kan ikke nå nettverket. **Hjelp › Rapporter et problem…** åpner et skjema på GitHub i nettleseren; adressen inneholder versjonen av Splat og macOS og typen Mac, ingenting fra dokumentene dine.
 - **Bilder fra nettet** lastes først etter at du har gitt tillatelse, bare over `https`, aldri fra verter i det lokale nettverket ditt, på maksimalt 10 MB hver og i en privat økt uten informasjonskapsler.
 - **Isolert dekoding.** Bilder og grafikken til formler og diagrammer dekodes i helperprosesser som lukker alle filer de har arvet og låser seg inn i en sandkasse før de leser den første byten: ingen filtilgang, ingen nettverk. De leverer bare tilbake piksler, hvis størrelse kontrolleres, og stoppes etter 10 sekunder. Apples egne bildedekodere ser bare HEIC, TIFF, AVIF og PDF, og bare når dataene faktisk har det formatet; de kjører i en helper for seg, som i tillegg kan lese systemets fontmapper og bruke systemets videodekoder. SVG-er, formler og diagrammer går også gjennom denne helperen, så de er bilder med fast oppløsning i Splat: fire piksler per punkt, opptil 2560 på den lengste siden.
 - **Lokale filer** når et dokument bare via stien det navngir. Innbygginger viser Markdown-notater fra dokumentets mappe og nedover, og et manglende bilde letes det bare etter der. En bildesti andre steder, absolutt eller som begynner med `~`, lastes fortsatt i forhåndsvisningen; HTML- og Word-eksporter, utskrift og PDF-er tar bare med det som ligger i dokumentets mappe eller Git-repositoriet, med mindre det repositoriet også inneholder Hjem-mappen din, så et dokument fra noen andre ikke kan dra filene dine inn i en eksport du gir videre.
@@ -602,17 +604,18 @@ Versjonen ligger i [VERSION](../../../VERSION) som `major.minor.build` og er den
 
 ### Distribusjon
 
-`cargo xtask dmg` (eller `make release`, som kjører `make test` først) bygger en release, signerer den med Developer ID-en din, notariserer appen hos Apple og hefter på billetten, pakker den i et komprimert, skrivebeskyttet diskbilde med en lenke til Apper, notariserer og hefter også på diskbildet og kontrollerer resultatet med Gatekeeper. Appen bærer sin egen billett, slik at en kopi som er installert uten Finder, slik Homebrew gjør det, også åpnes uten nett ved første oppstart; de to rundene med notartjenesten tar noen minutter hver. Bare et bilde som har bestått alle trinn, blir til `dist/Splat-<version>.dmg`, kopien som sjekkes inn: nedlastingslenkene i denne README-filen og oversettelsene av den følger den, og build-nummeret går opp. Det forrige bildet blir liggende én utgivelse til, siden GitHubs raw-server kan levere den gamle oppdateringsfeeden i noen minutter etter en push; eldre bilder flyttes til papirkurven. En mislykket kjøring lar `dist/`, README-filene og VERSION stå som de var.
+`cargo xtask dmg` (eller `make release`, som kjører `make test` først) bygger en release, signerer den med Developer ID-en din, notariserer appen hos Apple og hefter på billetten, pakker den i et komprimert, skrivebeskyttet diskbilde med en lenke til Apper, notariserer og hefter også på diskbildet og kontrollerer resultatet med Gatekeeper. Appen bærer sin egen billett, slik at en kopi som er installert uten Finder, slik Homebrew gjør det, også åpnes uten nett ved første oppstart; de to rundene med notartjenesten tar noen minutter hver. Bare et bilde som har bestått alle trinn, blir til `dist/Splat-<version>.dmg`, kopien som sjekkes inn, og build-nummeret går opp. Det forrige bildet blir liggende én utgivelse til, siden GitHubs raw-server kan levere den gamle oppdateringsfeeden i noen minutter etter en push; eldre bilder flyttes til papirkurven. En mislykket kjøring lar `dist/` og VERSION stå som de var.
 Hver utgivelse legger til hele bildet, rundt 16 MB, i historikken til repositoriet. Det kjører bare når det kalles, aldri som del av et vanlig bygg, og krever:
 
 - et «Developer ID Application»-sertifikat i nøkkelringen
 - en lagret pålogging til Apples notartjeneste med et appspesifikt passord, opprettet én gang med `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
 - den private nøkkelen som signerer oppdateringer, i påloggingsnøkkelringen. Sparkles `generate_keys` opprettet den; den offentlige halvdelen er `UPDATE_KEY` i [xtask/src/main.rs](../../../xtask/src/main.rs) og inne i hver installert kopi, som bare godtar oppdateringer signert med den. Ta en sikkerhetskopi i en passordbehandler: `target/sparkle-2.10.1/bin/generate_keys -x <file>` eksporterer den, `-f <file>` importerer den på en annen Mac. Uten den kan installerte kopier aldri oppdateres igjen.
 - rustup (`brew install rustup`, som lar Homebrews Rust stå)
+- `RELEASE_NOTES.md` med det denne utgivelsen bringer. Oppdateringsdialogen viser den over en linje om hvordan man rapporterer et problem, så `dmg` stopper hvis filen er tom eller fortsatt inneholder notatene fra forrige utgivelse
 
 Mangler noe av dette, stopper `dmg` før bygging. Ved første kjøring spør macOS om Terminal får styre Finder; uten den tillatelsen viser diskbildet verken bakgrunnen eller ikonplasseringen sin.
 
-Bare diskbildet har oppdatereren, [Sparkle](https://sparkle-project.org), som bygget laster ned én gang til `target/` fra GitHub-utgivelsen og kontrollerer mot sjekksummen i xtask. Hardened runtime laster rammeverket bare når det bærer appens Team ID, som Developer ID-signaturen har og det lokale sertifikatet mangler; og en oppdatering må ikke erstatte et bygg du har laget selv. Selvtestbygget har også Sparkle, for å kontrollere oppdateringsmenyen mot det: med en feed som ikke finnes, uten Sparkles spørsmål ved andre oppstart og med en entitlement som lar den lokalt signerte appen laste rammeverket. `dmg` signerer det nye bildet med oppdateringsnøkkelen og skriver `dist/appcast.xml`, feeden installerte kopier leser fra GitHub. Sjekk inn og push bildet, feeden og README-filene sammen: fra da av tilbyr installerte kopier oppdateringen.
+Bare diskbildet har oppdatereren, [Sparkle](https://sparkle-project.org), som bygget laster ned én gang til `target/` fra GitHub-utgivelsen og kontrollerer mot sjekksummen i xtask. Hardened runtime laster rammeverket bare når det bærer appens Team ID, som Developer ID-signaturen har og det lokale sertifikatet mangler; og en oppdatering må ikke erstatte et bygg du har laget selv. Selvtestbygget har også Sparkle, for å kontrollere oppdateringsmenyen mot det: med en feed som ikke finnes, uten Sparkles spørsmål ved andre oppstart og med en entitlement som lar den lokalt signerte appen laste rammeverket. `dmg` signerer det nye bildet med oppdateringsnøkkelen og skriver `dist/appcast.xml`, feeden installerte kopier leser fra GitHub. Sjekk inn og push bildet og feeden sammen: fra da av tilbyr installerte kopier oppdateringen. Nedlastingslenkene i denne README-filen og oversettelsene av den peker til `Splat.dmg` i den nyeste GitHub-utgivelsen, så hver utgivelse har en kopi med det navnet: `cp dist/Splat-<version>.dmg target/Splat.dmg`, deretter `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 Diskbildet er en universell binærfil for Apple Silicon og Intel; andre bygg er bare for vertsprosessoren. Homebrews Rust leveres med standardbiblioteket bare for vertsprosessoren, så `dmg` bygger gjennom rustup, som ved første bruk installerer verktøykjeden og målene fra [rust-toolchain.toml](../../../rust-toolchain.toml), og stopper hvis programmet eller Sparkle mangler koden for en av prosessorene. `make universal` bygger bare programmet.
 Appen i det har en annen signatur enn et lokalt bygg, så macOS fører separate nylige dokumenter og mappetillatelser for de to.

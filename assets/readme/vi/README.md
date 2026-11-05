@@ -8,9 +8,11 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
  
 
 
-[![Tải Splat cho macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Tải Splat cho macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Tải về Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: được Apple ký và công chứng, dành cho macOS 14 trở lên, trên Apple Silicon và Intel.
+**[Tải về Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: được Apple ký và công chứng, dành cho macOS 14 trở lên, trên Apple Silicon và Intel.
+
+**Bạn phát hiện lỗi?** Splat giữ nguyên từng byte những dòng bạn không đụng tới. Nếu vẫn có dòng bị đổi, hoặc tệp hiển thị sai, hãy [mở một issue](https://github.com/sventmueller/splat/issues/new/choose) và đính kèm tệp. Nếu Splat hữu ích với bạn, một [sao trên GitHub](https://github.com/sventmueller/splat) sẽ giúp người khác tìm thấy nó.
  
  
 
@@ -132,7 +134,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 
 ## Cài đặt
 
-**Từ ảnh đĩa.** Tải về [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), mở ra rồi kéo Splat vào thư mục Applications. Ảnh đĩa được ký bằng Developer ID và được Apple công chứng, nên mở ra mà không có cảnh báo nào.
+**Từ ảnh đĩa.** Tải về [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), mở ra rồi kéo Splat vào thư mục Applications. Ảnh đĩa được ký bằng Developer ID và được Apple công chứng, nên mở ra mà không có cảnh báo nào.
 
 **Với Homebrew.** Cask nằm trong một tap riêng:
 
@@ -500,7 +502,7 @@ Splat để nguyên các phím tắt chuẩn của Apple.
 
 Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi tài liệu là không đáng tin.
 
-- **Mặc định không dùng mạng.** Splat không có telemetry. Nó chỉ tìm bản cập nhật khi bạn đồng ý hoặc chọn **Kiểm tra Bản cập nhật…**: khi đó nó tải một tệp nguồn cấp nhỏ từ GitHub, và yêu cầu chỉ nêu tên ứng dụng và phiên bản của nó. Công thức và sơ đồ được hiển thị cục bộ; các web view thực hiện việc đó không thể truy cập mạng.
+- **Mặc định không dùng mạng.** Splat không có telemetry. Nó chỉ tìm bản cập nhật khi bạn đồng ý hoặc chọn **Kiểm tra Bản cập nhật…**: khi đó nó tải một tệp nguồn cấp nhỏ từ GitHub, và yêu cầu chỉ nêu tên ứng dụng và phiên bản của nó. Công thức và sơ đồ được hiển thị cục bộ; các web view thực hiện việc đó không thể truy cập mạng. **Trợ giúp › Báo cáo sự cố…** mở một biểu mẫu trên GitHub trong trình duyệt; địa chỉ của nó chứa phiên bản Splat, phiên bản macOS và loại máy Mac, không có gì từ tài liệu của bạn.
 - **Hình ảnh từ web** chỉ được tải sau khi bạn cho phép, chỉ qua `https`, không bao giờ từ máy chủ trong mạng cục bộ của bạn, tối đa 10 MB mỗi hình, và trong một phiên riêng tư không có cookie.
 - **Giải mã cô lập.** Hình ảnh cùng đồ họa của công thức và sơ đồ được giải mã trong các tiến trình phụ trợ đóng mọi tệp mà chúng thừa hưởng và tự khóa mình vào một sandbox trước khi đọc byte đầu tiên: không truy cập tệp, không mạng. Chúng chỉ trả về điểm ảnh, có kiểm tra kích thước, và bị dừng sau 10 giây. Bộ giải mã hình ảnh của chính Apple chỉ nhìn thấy HEIC, TIFF, AVIF và PDF, và chỉ khi dữ liệu thật sự thuộc định dạng đó; chúng chạy trong một tiến trình phụ trợ riêng, có thể đọc thêm các thư mục phông của hệ thống và dùng bộ giải mã video của hệ thống. SVG, công thức và sơ đồ cũng đi qua tiến trình phụ trợ đó, nên trong Splat chúng là hình ảnh có độ phân giải cố định: bốn điểm ảnh cho mỗi point, tối đa 2560 ở cạnh dài hơn.
 - **Tệp cục bộ** chỉ đến được tài liệu qua đường dẫn mà nó nêu. Phần nhúng hiển thị các ghi chú Markdown từ thư mục của tài liệu và bên dưới, và hình ảnh bị thiếu chỉ được tìm ở đó. Đường dẫn hình ảnh ở nơi khác, tuyệt đối hoặc bắt đầu bằng `~`, vẫn được tải trong bản xem trước; các bản xuất HTML và Word, việc in và các tệp PDF chỉ mang theo những gì nằm trong thư mục của tài liệu hoặc kho Git của nó, trừ khi kho đó cũng chứa thư mục chính của bạn, nên tài liệu của người khác không thể kéo tệp của bạn vào bản xuất mà bạn chuyển đi.
@@ -601,17 +603,18 @@ Phiên bản nằm trong [VERSION](../../../VERSION) dưới dạng `major.minor
 
 ### Phân phối
 
-`cargo xtask dmg` (hoặc `make release`, chạy `make test` trước) build một bản release, ký bằng Developer ID của bạn, nhờ Apple công chứng ứng dụng và đính kèm vé, đóng gói nó vào một ảnh đĩa nén, chỉ đọc cùng liên kết tới Applications, công chứng và đính kèm vé cho cả ảnh đĩa, rồi kiểm tra kết quả bằng Gatekeeper. Ứng dụng mang vé riêng của nó để bản sao cài đặt mà không qua Finder, như Homebrew làm, cũng mở được ngoại tuyến ngay lần chạy đầu; hai lượt làm việc với dịch vụ công chứng mất vài phút mỗi lượt. Chỉ ảnh đĩa nào đã qua mọi bước mới trở thành `dist/Splat-<version>.dmg`, bản được commit: các liên kết tải về trong README này và các bản dịch của nó đi theo nó, và số build tăng lên. Ảnh đĩa trước đó được giữ thêm một bản phát hành, vì máy chủ raw của GitHub có thể trả về nguồn cấp cập nhật cũ trong vài phút sau một lần push; những ảnh cũ hơn được chuyển vào thùng rác. Một lần chạy thất bại để `dist/`, các README và VERSION như cũ.
+`cargo xtask dmg` (hoặc `make release`, chạy `make test` trước) build một bản release, ký bằng Developer ID của bạn, nhờ Apple công chứng ứng dụng và đính kèm vé, đóng gói nó vào một ảnh đĩa nén, chỉ đọc cùng liên kết tới Applications, công chứng và đính kèm vé cho cả ảnh đĩa, rồi kiểm tra kết quả bằng Gatekeeper. Ứng dụng mang vé riêng của nó để bản sao cài đặt mà không qua Finder, như Homebrew làm, cũng mở được ngoại tuyến ngay lần chạy đầu; hai lượt làm việc với dịch vụ công chứng mất vài phút mỗi lượt. Chỉ ảnh đĩa nào đã qua mọi bước mới trở thành `dist/Splat-<version>.dmg`, bản được commit, và số build tăng lên. Ảnh đĩa trước đó được giữ thêm một bản phát hành, vì máy chủ raw của GitHub có thể trả về nguồn cấp cập nhật cũ trong vài phút sau một lần push; những ảnh cũ hơn được chuyển vào thùng rác. Một lần chạy thất bại để `dist/` và VERSION như cũ.
 Mỗi bản phát hành thêm ảnh đĩa đầy đủ, khoảng 16 MB, vào lịch sử kho. Nó chỉ chạy khi được gọi, không bao giờ là một phần của build thông thường, và cần:
 
 - chứng chỉ “Developer ID Application” trong chuỗi khóa
 - thông tin đăng nhập đã lưu cho dịch vụ công chứng của Apple với mật khẩu dành riêng cho ứng dụng, tạo một lần bằng `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
 - khóa riêng dùng để ký bản cập nhật, trong chuỗi khóa đăng nhập. `generate_keys` của Sparkle đã tạo ra nó; nửa công khai của nó là `UPDATE_KEY` trong [xtask/src/main.rs](../../../xtask/src/main.rs) và bên trong mọi bản sao đã cài, vốn chỉ chấp nhận bản cập nhật được ký bằng nó. Hãy giữ một bản sao lưu trong trình quản lý mật khẩu: `target/sparkle-2.10.1/bin/generate_keys -x <file>` xuất nó, `-f <file>` nhập nó trên máy Mac khác. Nếu không có nó, các bản sao đã cài sẽ không bao giờ cập nhật được nữa.
 - rustup (`brew install rustup`, vẫn để nguyên Rust của Homebrew)
+- `RELEASE_NOTES.md`, ghi những gì bản phát hành này mang lại. Hộp thoại cập nhật hiển thị nó phía trên dòng hướng dẫn cách báo cáo sự cố, nên `dmg` sẽ dừng nếu tệp trống hoặc vẫn chứa ghi chú của bản phát hành trước
 
 Nếu thiếu bất kỳ thứ nào trong số đó, `dmg` dừng trước khi build. Ở lần chạy đầu tiên, macOS hỏi xem Terminal có được điều khiển Finder hay không; không có quyền đó, ảnh đĩa không hiện hình nền lẫn cách sắp xếp biểu tượng.
 
-Chỉ ảnh đĩa mang trình cập nhật, [Sparkle](https://sparkle-project.org), mà bản build tải về một lần vào `target/` từ bản phát hành GitHub của nó và kiểm tra theo giá trị kiểm tra trong xtask. Hardened runtime chỉ nạp framework khi nó mang Team ID của ứng dụng, thứ mà chữ ký Developer ID có còn chứng chỉ cục bộ thì không; và một bản cập nhật không được thay thế bản tự build của bạn. Bản build tự kiểm tra cũng mang Sparkle, để kiểm tra menu cập nhật với nó: với một nguồn cấp không tồn tại, không có câu hỏi của Sparkle ở lần chạy thứ hai, và với một entitlement cho phép ứng dụng ký cục bộ nạp framework. `dmg` ký ảnh đĩa mới bằng khóa cập nhật và ghi `dist/appcast.xml`, nguồn cấp mà các bản sao đã cài đọc từ GitHub. Hãy commit và push ảnh đĩa, nguồn cấp và các README cùng nhau: từ đó trở đi, các bản sao đã cài sẽ đề nghị cập nhật.
+Chỉ ảnh đĩa mang trình cập nhật, [Sparkle](https://sparkle-project.org), mà bản build tải về một lần vào `target/` từ bản phát hành GitHub của nó và kiểm tra theo giá trị kiểm tra trong xtask. Hardened runtime chỉ nạp framework khi nó mang Team ID của ứng dụng, thứ mà chữ ký Developer ID có còn chứng chỉ cục bộ thì không; và một bản cập nhật không được thay thế bản tự build của bạn. Bản build tự kiểm tra cũng mang Sparkle, để kiểm tra menu cập nhật với nó: với một nguồn cấp không tồn tại, không có câu hỏi của Sparkle ở lần chạy thứ hai, và với một entitlement cho phép ứng dụng ký cục bộ nạp framework. `dmg` ký ảnh đĩa mới bằng khóa cập nhật và ghi `dist/appcast.xml`, nguồn cấp mà các bản sao đã cài đọc từ GitHub. Hãy commit và push ảnh đĩa và nguồn cấp cùng nhau: từ đó trở đi, các bản sao đã cài sẽ đề nghị cập nhật. Các liên kết tải về trong README này và các bản dịch trỏ tới `Splat.dmg` trong bản phát hành mới nhất trên GitHub, nên mỗi bản phát hành đều có một bản sao mang tên đó: `cp dist/Splat-<version>.dmg target/Splat.dmg`, rồi `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 Ảnh đĩa là một binary universal cho Apple Silicon và Intel; các bản build khác chỉ dành cho bộ xử lý của máy chủ. Rust của Homebrew chỉ có thư viện chuẩn cho bộ xử lý của máy chủ, nên `dmg` build qua rustup, thứ cài toolchain và các target của [rust-toolchain.toml](../../../rust-toolchain.toml) ở lần dùng đầu tiên, và dừng nếu chương trình hoặc Sparkle thiếu mã cho một trong hai bộ xử lý. `make universal` chỉ build chương trình.
 Ứng dụng trong đó mang chữ ký khác với bản build cục bộ, nên macOS giữ riêng tài liệu gần đây và quyền truy cập thư mục cho hai bản.

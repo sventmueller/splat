@@ -14,9 +14,11 @@ nätverket om du inte ber om det.
  
 
 
-[![Ladda ner Splat för macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Ladda ner Splat för macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Ladda ner Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: signerad och notariserad av Apple, för macOS 14 eller senare på Apple Silicon och Intel.
+**[Ladda ner Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: signerad och notariserad av Apple, för macOS 14 eller senare på Apple Silicon och Intel.
+
+**Hittat en bugg?** Splat håller rader du inte har rört identiska byte för byte. Om en ändå ändras, eller om en fil visas fel, [öppna ett issue](https://github.com/sventmueller/splat/issues/new/choose) och bifoga filen. Om du har nytta av Splat hjälper en [stjärna på GitHub](https://github.com/sventmueller/splat) andra att hitta det.
  
  
 
@@ -149,7 +151,7 @@ nätverket om du inte ber om det.
 
 ## Installation
 
-**Från skivavbilden.** Ladda ner [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), öppna den och dra Splat till mappen Appar. Avbilden är signerad med ett
+**Från skivavbilden.** Ladda ner [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), öppna den och dra Splat till mappen Appar. Avbilden är signerad med ett
 Developer ID och notariserad av Apple, så den öppnas utan varningar.
 
 **Med Homebrew.** Cask-paketet finns i en egen tap:
@@ -610,7 +612,7 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
 
 - **Inget nätverk som standard.** Splat har ingen telemetri. Appen letar efter uppdateringar först när du går med på det eller väljer **Leta efter
   uppdateringar…**: den läser då in en liten flödesfil från GitHub, och förfrågan innehåller bara appens namn och version.
-  Formler och diagram renderas lokalt; webbvyerna som gör det kan inte nå nätverket.
+  Formler och diagram renderas lokalt; webbvyerna som gör det kan inte nå nätverket. **Hjälp › Rapportera ett problem…** öppnar ett formulär på GitHub i webbläsaren; adressen innehåller versionen av Splat och macOS och typen av Mac, inget från dina dokument.
 - **Bilder från webben** läses in först efter ditt tillstånd, bara över `https`, aldrig från värdar i ditt lokala nätverk,
   högst 10 MB vardera och i en privat session utan cookies.
 - **Isolerad avkodning.** Bilder och grafiken i formler och diagram avkodas i hjälpprocesser som stänger
@@ -768,10 +770,9 @@ notariserar appen hos Apple och fäster biljetten, packar den i en komprimerad, 
 Appar, notariserar och fäster biljetten på avbilden också och kontrollerar resultatet med Gatekeeper. Appen bär sin egen
 biljett så att en kopia som installerats utan Finder, som Homebrew gör, öppnas offline vid första starten också; de två
 omgångarna med notariseringstjänsten tar några minuter vardera. Bara en avbild som klarat varje steg blir
-`dist/Splat-<version>.dmg`, den kopia som checkas in: nedladdningslänkarna i den här README-filen och dess översättningar följer den, och buildnumret
+`dist/Splat-<version>.dmg`, den kopia som checkas in, och buildnumret
 höjs. Den föregående avbilden ligger kvar en release till, eftersom GitHubs råserver kan lämna ut det gamla uppdateringsflödet
-några minuter efter en push; äldre flyttas till papperskorgen. En misslyckad körning lämnar `dist/`, README-filerna och
-VERSION som de var.
+några minuter efter en push; äldre flyttas till papperskorgen. En misslyckad körning lämnar `dist/` och VERSION som de var.
 Varje release lägger till hela avbilden, cirka 16 MB, i arkivets historik. Den körs bara när den anropas, aldrig som del av ett vanligt bygge, och kräver:
 
 - ett certifikat av typen ”Developer ID Application” i nyckelringen
@@ -782,6 +783,7 @@ Varje release lägger till hela avbilden, cirka 16 MB, i arkivets historik. Den 
   signerade med den. Behåll en säkerhetskopia i en lösenordshanterare: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exporterar
   den, `-f <file>` importerar den på en annan Mac. Utan den kan installerade kopior aldrig uppdateras igen.
 - rustup (`brew install rustup`, som lämnar Homebrews Rust kvar)
+- `RELEASE_NOTES.md` med det den här releasen innehåller. Uppdateringsdialogen visar den ovanför en rad om hur man rapporterar ett problem, så `dmg` stannar om filen är tom eller fortfarande innehåller anteckningarna från föregående release
 
 Saknas något av dem stannar `dmg` innan bygget. Vid första körningen frågar macOS om Terminal får styra
 Finder; utan det tillståndet visar skivavbilden varken sin bakgrund eller ikonarrangemanget.
@@ -792,8 +794,7 @@ bara när det bär appens Team ID, vilket Developer ID-signaturen har och det lo
 uppdatering får inte ersätta en egen build. Självtestbygget bär också Sparkle, för att kontrollera uppdateringsmenyn
 mot det: med ett flöde som inte finns, utan Sparkles fråga vid andra starten och med en rättighet
 som låter den lokalt signerade appen läsa in ramverket. `dmg` signerar den nya avbilden med uppdateringsnyckeln och skriver
-`dist/appcast.xml`, det flöde som installerade kopior läser från GitHub. Checka in och pusha avbilden, flödet och README-filerna
-tillsammans: från och med då erbjuder installerade kopior uppdateringen.
+`dist/appcast.xml`, det flöde som installerade kopior läser från GitHub. Checka in och pusha avbilden och flödet tillsammans: från och med då erbjuder installerade kopior uppdateringen. Nedladdningslänkarna i den här README-filen och dess översättningar pekar på `Splat.dmg` i den senaste GitHub-releasen, så varje release har en kopia med det namnet: `cp dist/Splat-<version>.dmg target/Splat.dmg`, sedan `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 Skivavbilden är en universell binär för Apple Silicon och Intel; andra byggen gäller bara värdprocessorn.
 Homebrews Rust levereras med standardbiblioteket bara för värdprocessorn, så `dmg` bygger via rustup, som installerar

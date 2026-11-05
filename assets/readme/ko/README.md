@@ -8,9 +8,11 @@ Splat은 구문이 색상으로 표시된 Markdown 소스를 왼쪽에, 실시�
  
 
 
-[![macOS용 Splat 다운로드](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![macOS용 Splat 다운로드](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: Apple의 서명과 공증을 거쳤으며, Apple Silicon과 Intel을 탑재한 macOS 14 이상에서 사용할 수 있습니다.
+**[Download Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: Apple의 서명과 공증을 거쳤으며, Apple Silicon과 Intel을 탑재한 macOS 14 이상에서 사용할 수 있습니다.
+
+**버그를 발견하셨나요?** Splat은 건드리지 않은 줄을 바이트 단위로 그대로 유지합니다. 그런데도 줄이 바뀌거나 파일이 잘못 표시되면 [이슈를 열고](https://github.com/sventmueller/splat/issues/new/choose) 파일을 첨부해 주세요. Splat이 유용하다면 [GitHub 스타](https://github.com/sventmueller/splat)가 다른 사람들이 Splat을 찾는 데 도움이 됩니다.
  
  
 
@@ -132,7 +134,7 @@ Splat은 구문이 색상으로 표시된 Markdown 소스를 왼쪽에, 실시�
 
 ## 설치
 
-**디스크 이미지로 설치.** [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)를 내려받아 열고, Splat을 응용 프로그램 폴더로 드래그하십시오. 이 이미지는 Developer ID로 서명되고 Apple의 공증을 거쳤으므로 경고 없이 열립니다.
+**디스크 이미지로 설치.** [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)를 내려받아 열고, Splat을 응용 프로그램 폴더로 드래그하십시오. 이 이미지는 Developer ID로 서명되고 Apple의 공증을 거쳤으므로 경고 없이 열립니다.
 
 **Homebrew로 설치.** 이 cask는 전용 tap에 있습니다.
 
@@ -501,7 +503,7 @@ Splat은 Apple의 표준 단축키를 그대로 둡니다.
 
 Markdown 파일은 누구에게서든 올 수 있으므로 Splat은 모든 문서를 신뢰할 수 없는 것으로 취급합니다.
 
-- **기본적으로 네트워크 없음.** Splat에는 원격 측정이 없습니다. 업데이트 확인은 사용자가 동의하거나 **업데이트 확인…**을 선택한 뒤에만 하며, 이때 GitHub에서 작은 피드 파일을 불러오고 요청에는 앱 이름과 버전 외에는 아무것도 담기지 않습니다. 수식과 다이어그램은 로컬에서 렌더링되며, 이를 처리하는 웹 뷰는 네트워크에 접근할 수 없습니다.
+- **기본적으로 네트워크 없음.** Splat에는 원격 측정이 없습니다. 업데이트 확인은 사용자가 동의하거나 **업데이트 확인…**을 선택한 뒤에만 하며, 이때 GitHub에서 작은 피드 파일을 불러오고 요청에는 앱 이름과 버전 외에는 아무것도 담기지 않습니다. 수식과 다이어그램은 로컬에서 렌더링되며, 이를 처리하는 웹 뷰는 네트워크에 접근할 수 없습니다. **도움말 › 문제 신고…** 항목은 브라우저에서 GitHub 양식을 엽니다. 그 주소에는 Splat 버전, macOS 버전, Mac 종류만 담기며 문서 내용은 담기지 않습니다.
 - **웹의 이미지**는 사용자가 허용한 뒤에만, `https`로만, 로컬 네트워크의 호스트에서는 절대 가져오지 않고, 하나당 최대 10MB까지, 쿠키 없는 비공개 세션에서 로드됩니다.
 - **격리된 디코딩.** 이미지와 수식 및 다이어그램의 그래픽은 보조 프로세스에서 디코딩됩니다. 이 프로세스는 상속받은 모든 파일을 닫고 첫 바이트를 읽기 전에 스스로를 샌드박스에 가둡니다. 파일 접근도, 네트워크도 없습니다. 크기를 검사한 픽셀만 돌려보내며, 10초 뒤에는 중단됩니다. Apple 자체의 이미지 디코더는 HEIC, TIFF, AVIF, PDF만, 그리고 데이터가 실제로 그 형식일 때만 다루며, 전용 보조 프로세스에서 실행됩니다. 이 프로세스는 추가로 시스템 서체 폴더를 읽고 시스템의 비디오 디코더를 쓸 수 있습니다. SVG, 수식, 다이어그램도 이 보조 프로세스를 거치므로 Splat에서는 해상도가 고정된 그림이며, 포인트당 4픽셀로 긴 쪽은 최대 2560픽셀입니다.
 - **로컬 파일**은 문서가 이름으로 지정한 경로를 통해서만 문서에 닿습니다. 임베드는 문서의 폴더와 그 하위 폴더에 있는 Markdown 메모를 보여 주며, 없는 그림은 그곳에서만 찾습니다. 그 밖의 위치를 가리키는 이미지 경로(절대 경로이거나 `~`로 시작하는 경로)는 미리 보기에서 여전히 로드됩니다. HTML과 Word 내보내기, 인쇄, PDF에는 문서의 폴더나 그 Git 저장소에 있는 것만 포함되므로(그 저장소에 사용자의 홈 폴더도 들어 있는 경우는 제외), 다른 사람의 문서가 사용자의 파일을 전달할 내보내기로 끌어들일 수 없습니다.
@@ -602,17 +604,18 @@ cargo xtask vendor fetch       # vendor.lock의 버전을 바꾼 뒤 다시 다�
 
 ### 배포
 
-`cargo xtask dmg`(또는 먼저 `make test`를 실행하는 `make release`)는 릴리스를 빌드하고, Developer ID로 서명하고, Apple에서 앱을 공증받아 티켓을 스테이플하고, 압축된 읽기 전용 디스크 이미지에 응용 프로그램 폴더 링크와 함께 담은 다음, 이미지도 공증하고 스테이플하며 Gatekeeper로 결과를 검사합니다. 앱은 자체 티켓을 갖고 있으므로, Homebrew처럼 Finder를 거치지 않고 설치한 복사본도 처음 실행할 때 오프라인에서 열립니다. 공증 서비스와의 두 차례 작업은 각각 몇 분이 걸립니다. 모든 단계를 통과한 이미지만 `dist/Splat-<version>.dmg`가 되며 이것이 커밋되는 복사본입니다. 이 README와 번역본의 다운로드 링크가 이를 따라가고 빌드 번호가 올라갑니다. 이전 이미지는 한 릴리스 동안 더 남겨 둡니다. 푸시 후 몇 분 동안 GitHub의 raw 서버가 이전 업데이트 피드를 내줄 수 있기 때문이며, 그보다 오래된 이미지는 휴지통으로 옮깁니다. 실행이 실패하면 `dist/`, README, VERSION은 그대로 남습니다.
+`cargo xtask dmg`(또는 먼저 `make test`를 실행하는 `make release`)는 릴리스를 빌드하고, Developer ID로 서명하고, Apple에서 앱을 공증받아 티켓을 스테이플하고, 압축된 읽기 전용 디스크 이미지에 응용 프로그램 폴더 링크와 함께 담은 다음, 이미지도 공증하고 스테이플하며 Gatekeeper로 결과를 검사합니다. 앱은 자체 티켓을 갖고 있으므로, Homebrew처럼 Finder를 거치지 않고 설치한 복사본도 처음 실행할 때 오프라인에서 열립니다. 공증 서비스와의 두 차례 작업은 각각 몇 분이 걸립니다. 모든 단계를 통과한 이미지만 `dist/Splat-<version>.dmg`가 되며 이것이 커밋되는 복사본입니다. 빌드 번호도 올라갑니다. 이전 이미지는 한 릴리스 동안 더 남겨 둡니다. 푸시 후 몇 분 동안 GitHub의 raw 서버가 이전 업데이트 피드를 내줄 수 있기 때문이며, 그보다 오래된 이미지는 휴지통으로 옮깁니다. 실행이 실패하면 `dist/`와 VERSION은 그대로 남습니다.
 릴리스마다 약 16MB의 전체 이미지가 저장소 기록에 추가됩니다. 이 작업은 호출할 때만 실행되고 일반 빌드의 일부로는 실행되지 않으며, 다음이 필요합니다.
 
 - 키체인의 “Developer ID Application” 인증서
 - 앱 암호로 저장한 Apple 공증 서비스의 로그인 정보. `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`로 한 번 만듭니다
 - 업데이트에 서명하는 개인 키(로그인 키체인에 있음). Sparkle의 `generate_keys`가 만든 것이며, 그 공개 키는 [xtask/src/main.rs](../../../xtask/src/main.rs)의 `UPDATE_KEY`와 설치된 모든 복사본 안에 있고, 설치된 복사본은 이 키로 서명된 업데이트만 받아들입니다. 백업을 암호 관리자에 보관하십시오. `target/sparkle-2.10.1/bin/generate_keys -x <file>`로 내보내고 `-f <file>`로 다른 Mac에서 가져옵니다. 이 키가 없으면 설치된 복사본은 다시는 업데이트할 수 없습니다.
 - rustup(`brew install rustup`, Homebrew의 Rust는 그대로 남음)
+- `RELEASE_NOTES.md`(이번 릴리스의 내용). 업데이트 대화상자는 문제 신고 방법을 알려 주는 줄 위에 이 내용을 표시하므로, 파일이 비어 있거나 이전 릴리스의 내용이 그대로이면 `dmg`가 중단됩니다
 
 이 중 하나라도 없으면 `dmg`는 빌드하기 전에 멈춥니다. 처음 실행하면 macOS가 터미널이 Finder를 제어해도 되는지 묻습니다. 이 권한이 없으면 디스크 이미지에 배경도 아이콘 배치도 나타나지 않습니다.
 
-업데이트 기능 [Sparkle](https://sparkle-project.org)은 디스크 이미지에만 들어 있으며, 빌드가 GitHub 릴리스에서 `target/`으로 한 번 내려받아 xtask의 체크섬과 대조합니다. Hardened Runtime은 프레임워크가 앱의 Team ID를 갖고 있을 때만 로드하는데, Developer ID 서명에는 Team ID가 있고 로컬 인증서에는 없습니다. 또한 업데이트가 직접 빌드한 앱을 덮어써서는 안 됩니다. 자체 테스트 빌드에도 Sparkle이 들어 있어 업데이트 메뉴를 확인합니다. 존재하지 않는 피드를 쓰고, 두 번째 실행 때 Sparkle의 질문 없이, 로컬 서명된 앱이 프레임워크를 로드할 수 있는 entitlement와 함께 실행합니다. `dmg`는 새 이미지에 업데이트 키로 서명하고 `dist/appcast.xml`을 작성합니다. 설치된 복사본이 GitHub에서 읽는 피드입니다. 이미지, 피드, README를 함께 커밋하고 푸시하십시오. 그 순간부터 설치된 복사본이 업데이트를 제안합니다.
+업데이트 기능 [Sparkle](https://sparkle-project.org)은 디스크 이미지에만 들어 있으며, 빌드가 GitHub 릴리스에서 `target/`으로 한 번 내려받아 xtask의 체크섬과 대조합니다. Hardened Runtime은 프레임워크가 앱의 Team ID를 갖고 있을 때만 로드하는데, Developer ID 서명에는 Team ID가 있고 로컬 인증서에는 없습니다. 또한 업데이트가 직접 빌드한 앱을 덮어써서는 안 됩니다. 자체 테스트 빌드에도 Sparkle이 들어 있어 업데이트 메뉴를 확인합니다. 존재하지 않는 피드를 쓰고, 두 번째 실행 때 Sparkle의 질문 없이, 로컬 서명된 앱이 프레임워크를 로드할 수 있는 entitlement와 함께 실행합니다. `dmg`는 새 이미지에 업데이트 키로 서명하고 `dist/appcast.xml`을 작성합니다. 설치된 복사본이 GitHub에서 읽는 피드입니다. 이미지와 피드를 함께 커밋하고 푸시하십시오. 그 순간부터 설치된 복사본이 업데이트를 제안합니다. 이 README와 번역본의 다운로드 링크는 최신 GitHub 릴리스의 `Splat.dmg`를 가리키므로, 각 릴리스에 이 이름의 복사본을 포함합니다. `cp dist/Splat-<version>.dmg target/Splat.dmg`를 실행한 다음 `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`을 실행하십시오.
 
 디스크 이미지는 Apple Silicon과 Intel용 유니버설 바이너리이며, 다른 빌드는 사용 중인 프로세서용으로만 만들어집니다. Homebrew의 Rust는 사용 중인 프로세서용 표준 라이브러리만 제공하므로 `dmg`는 rustup으로 빌드합니다. rustup은 처음 사용할 때 [rust-toolchain.toml](../../../rust-toolchain.toml)의 툴체인과 타깃을 설치하며, 프로그램이나 Sparkle에 두 프로세서 중 어느 한쪽의 코드가 없으면 멈춥니다. `make universal`은 프로그램만 빌드합니다.
 이 안의 앱은 로컬 빌드와 서명이 다르므로, macOS는 두 앱에 대해 최근 사용한 문서와 폴더 접근 권한을 따로 유지합니다.

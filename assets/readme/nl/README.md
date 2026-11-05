@@ -14,9 +14,11 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
  
 
 
-[![Download Splat voor macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Download Splat voor macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: ondertekend en door Apple genotariseerd, voor macOS 14 of nieuwer op Apple Silicon en Intel.
+**[Download Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: ondertekend en door Apple genotariseerd, voor macOS 14 of nieuwer op Apple Silicon en Intel.
+
+**Een bug gevonden?** Splat houdt regels die je niet hebt aangeraakt byte voor byte identiek. Verandert er toch een, of wordt een bestand verkeerd weergegeven, [open dan een issue](https://github.com/sventmueller/splat/issues/new/choose) en voeg het bestand toe. Heb je iets aan Splat, dan helpt een [ster op GitHub](https://github.com/sventmueller/splat) anderen het te vinden.
  
  
 
@@ -152,7 +154,7 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 
 ## Installatie
 
-**Vanaf de schijfkopie.** Download [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), open haar en sleep Splat naar de map Programma's. De schijfkopie is
+**Vanaf de schijfkopie.** Download [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), open haar en sleep Splat naar de map Programma's. De schijfkopie is
 ondertekend met een Developer ID en door Apple genotariseerd, dus ze opent zonder waarschuwingen.
 
 **Met Homebrew.** De cask staat in een eigen tap:
@@ -628,7 +630,7 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
 - **Standaard geen netwerk.** Splat heeft geen telemetrie. Het zoekt alleen naar updates nadat je daarmee akkoord gaat
   of **Zoek naar updates…** kiest: dan laadt het een klein feedbestand van GitHub en noemt het verzoek niets
   anders dan de app en haar versie. Formules en diagrammen worden lokaal weergegeven; de webweergaven die dat doen,
-  hebben geen toegang tot het netwerk.
+  hebben geen toegang tot het netwerk. **Help › Meld een probleem…** opent een formulier op GitHub in je browser; het adres bevat de versie van Splat en macOS en het type Mac, niets uit je documenten.
 - **Afbeeldingen van het web** laden pas na jouw toestemming, alleen via `https`, nooit van hosts in je lokale
   netwerk, hooguit 10 MB per stuk en in een privésessie zonder cookies.
 - **Geïsoleerd decoderen.** Afbeeldingen en de afbeeldingen van formules en diagrammen worden gedecodeerd in
@@ -791,10 +793,9 @@ ID, notariseert de app bij Apple en hecht het ticket eraan vast, verpakt haar in
 Programma's, notariseert ook de schijfkopie en hecht er het ticket aan vast en controleert het resultaat met Gatekeeper. De app draagt haar eigen
 ticket, zodat een kopie die zonder de Finder is geïnstalleerd, zoals Homebrew doet, ook bij de eerste start offline opent; de twee
 rondes met de notarisdienst duren elk een paar minuten. Alleen een schijfkopie die elke stap heeft doorstaan, wordt
-`dist/Splat-<version>.dmg`, de kopie die wordt gecommit: de downloadlinks in deze README en haar vertalingen volgen die, en het buildnummer
+`dist/Splat-<version>.dmg`, de kopie die wordt gecommit, en het buildnummer
 gaat omhoog. De vorige schijfkopie blijft nog één release staan, omdat de raw-server van GitHub na een push enkele minuten de oude
-updatefeed kan blijven uitgeven; oudere gaan naar de prullenmand. Een mislukte run laat `dist/`, de README's en
-VERSION zoals ze waren.
+updatefeed kan blijven uitgeven; oudere gaan naar de prullenmand. Een mislukte run laat `dist/` en VERSION zoals ze waren.
 Elke release voegt de volledige schijfkopie, ongeveer 16 MB, toe aan de repositorygeschiedenis. Het draait alleen als je het aanroept, nooit als onderdeel van een normale build, en vraagt:
 
 - een certificaat "Developer ID Application" in de sleutelhanger
@@ -805,6 +806,7 @@ Elke release voegt de volledige schijfkopie, ongeveer 16 MB, toe aan de reposito
   accepteert die ermee zijn ondertekend. Bewaar een back-up in een wachtwoordbeheerder: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exporteert
   haar, `-f <file>` importeert haar op een andere Mac. Zonder haar kunnen geïnstalleerde kopieën nooit meer worden bijgewerkt.
 - rustup (`brew install rustup`, dat de Rust van Homebrew laat staan)
+- `RELEASE_NOTES.md`, met wat deze release brengt. Het updatevenster toont het boven een regel over hoe je een probleem meldt, dus `dmg` stopt als het bestand leeg is of nog de notities van de vorige release bevat
 
 Ontbreekt er een van, dan stopt `dmg` voordat het bouwt. Bij de eerste run vraagt macOS of Terminal de Finder mag
 bedienen; zonder die toestemming toont de schijfkopie noch haar achtergrond noch de pictogramindeling.
@@ -815,8 +817,7 @@ alleen als het de Team ID van de app draagt, wat de Developer ID-handtekening he
 update mag geen eigen build vervangen. De zelftestbuild bevat ook Sparkle, om het updatemenu ertegen te controleren:
 met een feed die niet bestaat, zonder de vraag van Sparkle bij de tweede start en met een entitlement
 waarmee de lokaal ondertekende app het framework kan laden. `dmg` ondertekent de nieuwe schijfkopie met de updatesleutel en schrijft
-`dist/appcast.xml`, de feed die geïnstalleerde kopieën van GitHub lezen. Commit en push de schijfkopie, de feed en de README's
-samen: vanaf dat moment bieden geïnstalleerde kopieën de update aan.
+`dist/appcast.xml`, de feed die geïnstalleerde kopieën van GitHub lezen. Commit en push de schijfkopie en de feed samen: vanaf dat moment bieden geïnstalleerde kopieën de update aan. De downloadlinks in deze README en haar vertalingen wijzen naar `Splat.dmg` in de nieuwste GitHub-release, dus elke release bevat een kopie onder die naam: `cp dist/Splat-<version>.dmg target/Splat.dmg`, daarna `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 De schijfkopie is een universele binary voor Apple Silicon en Intel; andere builds zijn alleen voor de hostprocessor.
 De Rust van Homebrew levert de standaardbibliotheek alleen voor de hostprocessor, dus `dmg` bouwt via rustup, dat de

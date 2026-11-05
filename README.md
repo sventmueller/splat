@@ -14,9 +14,11 @@ the network unless you ask it to.
  
 
 
-[![Download Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Download Splat for macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Download Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: signed and notarized by Apple, for macOS 14 or later on Apple Silicon and Intel.
+**[Download Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: signed and notarized by Apple, for macOS 14 or later on Apple Silicon and Intel.
+
+**Found a bug?** Splat keeps the lines you did not touch byte-for-byte identical. If one changes anyway, or a file renders wrong, [open an issue](https://github.com/sventmueller/splat/issues/new/choose) and attach the file. If Splat is useful to you, a [star on GitHub](https://github.com/sventmueller/splat) helps others find it.
  
  
 
@@ -150,7 +152,7 @@ the network unless you ask it to.
 
 ## Installation
 
-**From the disk image.** Download [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), open it and drag Splat onto the Applications folder. The image is signed with a
+**From the disk image.** Download [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), open it and drag Splat onto the Applications folder. The image is signed with a
 Developer ID and notarized by Apple, so it opens without warnings.
 
 **With Homebrew.** The cask lives in a tap of its own:
@@ -612,7 +614,9 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
 
 - **No network by default.** Splat has no telemetry. It looks for updates only once you agree or choose **Check for
   Updates…**: it then loads a small feed file from GitHub, and the request names nothing but the app and its version.
-  Formulas and diagrams render locally; the web views that do it cannot reach the network.
+  Formulas and diagrams render locally; the web views that do it cannot reach the network. **Help › Report a Problem…**
+  opens a form on GitHub in your browser; its address carries Splat's version, the macOS version and the kind of Mac,
+  nothing from your documents.
 - **Images from the web** load only after your permission, only over `https`, never from hosts in your local network,
   at most 10 MB each, and in a private session without cookies.
 - **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in helper processes that close
@@ -767,10 +771,9 @@ notarizes the app with Apple and staples the ticket, packs it into a compressed,
 Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
 rounds with the notary service take a few minutes each. Only an image that passed every step becomes
-`dist/Splat-<version>.dmg`, the copy that is committed: the download links in this README and its translations follow it, and the build
-number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
-feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/`, the READMEs and
-VERSION as they were.
+`dist/Splat-<version>.dmg`, the copy that is committed, and the build number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
+feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/` and VERSION as they
+were.
 Each release adds the full image, about 16 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
 - a "Developer ID Application" certificate in the keychain
@@ -781,6 +784,8 @@ Each release adds the full image, about 16 MB, to the repository history. It run
   signed with it. Keep a backup in a password manager: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exports
   it, `-f <file>` imports it on another Mac. Without it, installed copies can never be updated again.
 - rustup (`brew install rustup`, which leaves Homebrew's Rust in place)
+- `RELEASE_NOTES.md`, with what this release brings. The update dialog shows it above a line on how to report a problem,
+  so `dmg` stops if the file is empty or still holds the previous release's notes
 
 If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
 Finder; without that permission, the disk image shows neither its background nor the icon arrangement.
@@ -791,8 +796,11 @@ only when it carries the app's Team ID, which the Developer ID signature has and
 update must not replace a build of your own. The self-test build carries Sparkle as well, to check the update menu
 against it: with a feed that does not exist, without Sparkle's question on the second launch, and with an entitlement
 that lets the locally signed app load the framework. `dmg` signs the new image with the update key and writes
-`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image, the feed and the READMEs
-together: from then on, installed copies offer the update.
+`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image and the feed
+together: from then on, installed copies offer the update. The download links in this README and its translations point
+at `Splat.dmg` in the latest GitHub Release, so each release carries a copy under that name:
+`cp dist/Splat-<version>.dmg target/Splat.dmg`, then
+`gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 The disk image is a universal binary for Apple Silicon and Intel; other builds are for the host processor alone.
 Homebrew's Rust ships the standard library for the host processor only, so `dmg` builds through rustup, which installs

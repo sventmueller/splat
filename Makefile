@@ -53,5 +53,5 @@ bench: ## Open, type and scroll timings: make bench FILE=<file.md>
 	@test -n "$(FILE)" || { echo "usage: make bench FILE=<file.md>"; exit 2; } $(if $(KEYSTROKE_MS),--keystroke-ms $(KEYSTROKE_MS))
 	cargo xtask selftest bench "$(FILE)"
 
-release: test ## After make test: dist/Splat-<version>.dmg, notarized; replaces the old one, links the READMEs
+release: test ## After make test, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
 	cargo xtask dmg

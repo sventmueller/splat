@@ -20,3 +20,9 @@ jobs:
       - run: make test-long
         env:
           SPLAT_FUZZ_SEED: ${{ github.run_id }}
+
+  download-link:
+    runs-on: ubuntu-latest
+    steps:
+      # The READMEs link here, so a release without a copy under this name breaks every download.
+      - run: curl --fail --silent --show-error --location --head --output /dev/null https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg

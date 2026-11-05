@@ -8,9 +8,11 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
  
 
 
-[![Preuzmite Splat za macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Preuzmite Splat za macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Preuzmite Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: potpisan i ovjeren (notariziran) od Applea, za macOS 14 ili noviji na Apple Siliconu i Intelu.
+**[Preuzmite Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: potpisan i ovjeren (notariziran) od Applea, za macOS 14 ili noviji na Apple Siliconu i Intelu.
+
+**Pronašli ste grešku?** Splat retke koje niste dirali ostavlja bajt po bajt iste. Ako se neki ipak promijeni ili se datoteka prikaže pogrešno, [otvorite issue](https://github.com/sventmueller/splat/issues/new/choose) i priložite datoteku. Ako vam je Splat koristan, [zvjezdica na GitHubu](https://github.com/sventmueller/splat) pomaže drugima da ga pronađu.
  
  
 
@@ -132,7 +134,7 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
 
 ## Instalacija
 
-**Iz slike diska.** Preuzmite [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), otvorite je i povucite Splat na mapu Aplikacije. Slika je potpisana certifikatom Developer ID i ovjerena (notarizirana) od Applea, pa se otvara bez upozorenja.
+**Iz slike diska.** Preuzmite [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), otvorite je i povucite Splat na mapu Aplikacije. Slika je potpisana certifikatom Developer ID i ovjerena (notarizirana) od Applea, pa se otvara bez upozorenja.
 
 **S Homebrewom.** Cask se nalazi u vlastitom tapu:
 
@@ -501,7 +503,7 @@ Splat ne dira Appleove standardne prečace.
 
 Markdown datoteka može doći od bilo koga, pa Splat svaki dokument smatra nepouzdanim.
 
-- **Bez mreže prema zadanim postavkama.** Splat nema telemetriju. Ažuriranja traži tek kad pristanete ili odaberete **Potraži ažuriranja…**: tada s GitHuba učitava malu datoteku feeda, a zahtjev navodi samo aplikaciju i njezinu verziju. Formule i dijagrami prikazuju se lokalno; web prikazi koji to rade ne mogu doseći mrežu.
+- **Bez mreže prema zadanim postavkama.** Splat nema telemetriju. Ažuriranja traži tek kad pristanete ili odaberete **Potraži ažuriranja…**: tada s GitHuba učitava malu datoteku feeda, a zahtjev navodi samo aplikaciju i njezinu verziju. Formule i dijagrami prikazuju se lokalno; web prikazi koji to rade ne mogu doseći mrežu. **Pomoć › Prijavi problem…** otvara obrazac na GitHubu u vašem pregledniku; njegova adresa sadrži verziju Splata, verziju macOS-a i vrstu Maca, a ništa iz vaših dokumenata.
 - **Slike s weba** učitavaju se tek nakon vašeg dopuštenja, samo preko `https`, nikad s hostova u vašoj lokalnoj mreži, najviše 10 MB po slici i u privatnoj sesiji bez kolačića.
 - **Izolirano dekodiranje.** Slike te grafika formula i dijagrama dekodiraju se u pomoćnim procesima koji zatvaraju sve datoteke koje su naslijedili i zaključavaju se u sandbox prije čitanja prvog bajta: bez pristupa datotekama, bez mreže. Vraćaju samo piksele, čija se veličina provjerava, i zaustavljaju se nakon 10 sekundi. Appleovi vlastiti dekoderi slika vide samo HEIC, TIFF, AVIF i PDF, i to samo kad podaci doista jesu taj format; rade u vlastitom pomoćnom procesu, koji uz to smije čitati sistemske mape s fontovima i koristiti sistemski video dekoder. I SVG-ovi, formule i dijagrami prolaze kroz taj pomoćni proces, pa su u Splatu slike fiksne razlučivosti: četiri piksela po točki, do 2560 po duljoj stranici.
 - **Lokalne datoteke** dolaze do dokumenta samo putanjom koju on navodi. Ugradnje prikazuju Markdown bilješke iz mape dokumenta i ispod nje, a slika koje nema traži se samo ondje. Putanja slike drugdje, apsolutna ili koja počinje s `~`, i dalje se učitava u pregledu; HTML i Word izvozi, ispis i PDF-ovi uzimaju samo ono što je u mapi dokumenta ili u njegovu Git repozitoriju, osim ako taj repozitorij sadrži i vašu početnu mapu, pa tuđi dokument ne može uvući vaše datoteke u izvoz koji prosljeđujete.
@@ -602,17 +604,18 @@ Verzija živi u datoteci [VERSION](../../../VERSION) kao `major.minor.build` i t
 
 ### Distribucija
 
-`cargo xtask dmg` (ili `make release`, koji najprije pokreće `make test`) gradi izdanje, potpisuje ga vašim Developer ID-om, ovjerava (notarizira) aplikaciju kod Applea i pričvršćuje potvrdu, pakira je u komprimiranu sliku diska samo za čitanje s linkom na Aplikacije, ovjerava i pričvršćuje potvrdu i na sliku te provjerava rezultat Gatekeeperom. Aplikacija nosi vlastitu potvrdu kako bi se kopija instalirana bez Findera, kao što radi Homebrew, pri prvom pokretanju otvorila i izvan mreže; dva kruga s uslugom ovjere traju po nekoliko minuta. Samo slika koja je prošla svaki korak postaje `dist/Splat-<version>.dmg`, kopija koja se commita: linkovi za preuzimanje u ovom README-u i njegovim prijevodima prate je, a broj izgradnje raste. Prethodna slika ostaje još jedno izdanje, jer GitHubov raw poslužitelj nekoliko minuta nakon pusha može isporučivati stari feed ažuriranja; starije se premještaju u smeće. Neuspjeli pokušaj ostavlja `dist/`, README-ove i VERSION kakvi su bili.
+`cargo xtask dmg` (ili `make release`, koji najprije pokreće `make test`) gradi izdanje, potpisuje ga vašim Developer ID-om, ovjerava (notarizira) aplikaciju kod Applea i pričvršćuje potvrdu, pakira je u komprimiranu sliku diska samo za čitanje s linkom na Aplikacije, ovjerava i pričvršćuje potvrdu i na sliku te provjerava rezultat Gatekeeperom. Aplikacija nosi vlastitu potvrdu kako bi se kopija instalirana bez Findera, kao što radi Homebrew, pri prvom pokretanju otvorila i izvan mreže; dva kruga s uslugom ovjere traju po nekoliko minuta. Samo slika koja je prošla svaki korak postaje `dist/Splat-<version>.dmg`, kopija koja se commita, a broj izgradnje raste. Prethodna slika ostaje još jedno izdanje, jer GitHubov raw poslužitelj nekoliko minuta nakon pusha može isporučivati stari feed ažuriranja; starije se premještaju u smeće. Neuspjeli pokušaj ostavlja `dist/` i VERSION kakvi su bili.
 Svako izdanje u povijest repozitorija dodaje punu sliku, oko 16 MB. Pokreće se samo kad se pozove, nikad kao dio normalne izgradnje, a treba:
 
 - certifikat „Developer ID Application” u lančiću
 - spremljenu prijavu za Appleovu uslugu ovjere s lozinkom specifičnom za aplikaciju, stvorenu jednom s `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
 - privatni ključ koji potpisuje ažuriranja, u lančiću prijave. Stvorio ga je Sparkleov `generate_keys`; njegova javna polovica je `UPDATE_KEY` u [xtask/src/main.rs](../../../xtask/src/main.rs) i unutar svake instalirane kopije, koja prihvaća samo ažuriranja potpisana njime. Čuvajte sigurnosnu kopiju u upravitelju lozinki: `target/sparkle-2.10.1/bin/generate_keys -x <file>` ga izvozi, `-f <file>` uvozi na drugom Macu. Bez njega se instalirane kopije više nikad ne mogu ažurirati.
 - rustup (`brew install rustup`, koji ostavlja Homebrewov Rust na mjestu)
+- `RELEASE_NOTES.md` s onim što ovo izdanje donosi. Dijalog za ažuriranje prikazuje ga iznad retka o tome kako prijaviti problem, pa `dmg` staje ako je datoteka prazna ili još sadrži bilješke prethodnog izdanja
 
 Ako išta od toga nedostaje, `dmg` staje prije izgradnje. Pri prvom pokretanju macOS pita smije li Terminal upravljati Finderom; bez tog dopuštenja slika diska ne prikazuje ni pozadinu ni raspored ikona.
 
-Samo slika diska nosi program za ažuriranje, [Sparkle](https://sparkle-project.org), koji izgradnja jednom preuzima u `target/` iz njegova GitHub izdanja i provjerava prema kontrolnom zbroju u xtasku. Hardened runtime učitava framework samo kad nosi Team ID aplikacije, što Developer ID potpis ima, a lokalni certifikat nema; a ažuriranje ne smije zamijeniti vlastitu izgradnju. Izgradnja za samoprovjeru nosi i Sparkle, kako bi prema njemu provjerila izbornik ažuriranja: s feedom koji ne postoji, bez Sparkleova pitanja pri drugom pokretanju i s entitlementom koji lokalno potpisanoj aplikaciji dopušta učitati framework. `dmg` potpisuje novu sliku ključem za ažuriranja i zapisuje `dist/appcast.xml`, feed koji instalirane kopije čitaju s GitHuba. Commitajte i pushajte sliku, feed i README-ove zajedno: od tada instalirane kopije nude ažuriranje.
+Samo slika diska nosi program za ažuriranje, [Sparkle](https://sparkle-project.org), koji izgradnja jednom preuzima u `target/` iz njegova GitHub izdanja i provjerava prema kontrolnom zbroju u xtasku. Hardened runtime učitava framework samo kad nosi Team ID aplikacije, što Developer ID potpis ima, a lokalni certifikat nema; a ažuriranje ne smije zamijeniti vlastitu izgradnju. Izgradnja za samoprovjeru nosi i Sparkle, kako bi prema njemu provjerila izbornik ažuriranja: s feedom koji ne postoji, bez Sparkleova pitanja pri drugom pokretanju i s entitlementom koji lokalno potpisanoj aplikaciji dopušta učitati framework. `dmg` potpisuje novu sliku ključem za ažuriranja i zapisuje `dist/appcast.xml`, feed koji instalirane kopije čitaju s GitHuba. Commitajte i pushajte sliku i feed zajedno: od tada instalirane kopije nude ažuriranje. Linkovi za preuzimanje u ovom README-u i njegovim prijevodima vode na `Splat.dmg` u najnovijem izdanju na GitHubu, pa svako izdanje nosi kopiju pod tim imenom: `cp dist/Splat-<version>.dmg target/Splat.dmg`, zatim `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 Slika diska je univerzalna binarna datoteka za Apple Silicon i Intel; ostale izgradnje namijenjene su samo procesoru računala na kojem se grade. Homebrewov Rust isporučuje standardnu biblioteku samo za procesor računala, pa `dmg` gradi preko rustupa, koji pri prvoj upotrebi instalira toolchain i ciljeve iz [rust-toolchain.toml](../../../rust-toolchain.toml), i staje ako programu ili Sparkleu nedostaje kod za bilo koji od dvaju procesora. `make universal` gradi samo program.
 Aplikacija u njoj nosi drugačiji potpis od lokalne izgradnje, pa macOS za njih dvije vodi zasebne nedavne dokumente i dopuštenja za mape.

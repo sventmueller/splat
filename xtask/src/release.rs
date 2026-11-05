@@ -9,13 +9,25 @@ use crate::*;
 /// Created once with `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`.
 pub(crate) const NOTARY_PROFILE: &str = "notary";
 
+/// What the release being built brings, written by hand before `cargo xtask dmg`.
+const NOTES: &str = "RELEASE_NOTES.md";
+
+const REPORT_LINE: &str =
+    "Something wrong or missing? [Report it on GitHub](https://github.com/sventmueller/splat/issues/new/choose).";
+
 /// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
 /// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
-/// into the repository: it replaces older ones there and in the links of the READMEs, `dist/appcast.xml` offers it
-/// to installed copies, and the build number goes up.
+/// into the repository: it replaces older ones there, `dist/appcast.xml` offers it to installed copies with the
+/// notes of `RELEASE_NOTES.md`, and the build number goes up.
 pub(crate) fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
+    let dist = root().join("dist");
+    let feed_path = dist.join("appcast.xml");
+    let previous_feed = fs::read_to_string(&feed_path).ok();
+    let notes_path = root().join(NOTES);
+    let written = fs::read_to_string(&notes_path).map_err(|e| format!("{}: {e}", notes_path.display()))?;
+    let notes = release_notes(&written, previous_feed.as_deref())?;
     let (identity, name) = developer_id()?;
     // Checks the saved login before the release build, which takes minutes.
     run(Command::new("xcrun")
@@ -81,7 +93,6 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             "--verbose",
         ])
         .arg(&image))?;
-    let dist = root().join("dist");
     files::create_dir_all(&dist)?;
     let file = format!("{APP}-{version}.dmg");
     let published = dist.join(&file);
@@ -94,12 +105,9 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
     // Copied rather than renamed: target/ may be a link to another volume.
     fs::copy(&image, &published).map_err(|e| format!("{}: {e}", published.display()))?;
     files::remove_file(&image)?;
-    let feed_path = dist.join("appcast.xml");
     // GitHub's raw server caches the feed for up to five minutes, so the image the old feed offers stays one release.
-    let offered = fs::read_to_string(&feed_path)
-        .ok()
-        .and_then(|old| offered_image(&old).map(str::to_string));
-    let feed = appcast(&version, &file, signature.trim(), date.trim())?;
+    let offered = previous_feed.as_deref().and_then(offered_image).map(str::to_string);
+    let feed = appcast(&version, &file, signature.trim(), date.trim(), &notes)?;
     files::write(&feed_path, feed)?;
     for entry in files::read_dir(&dist)?.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -107,29 +115,28 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             run(Command::new("trash").arg(entry.path()))?;
         }
     }
-    for readme in readmes()? {
-        let text = fs::read_to_string(&readme).map_err(|e| format!("{}: {e}", readme.display()))?;
-        files::write(&readme, relink(&text, &file))?;
-    }
     next_build(&version)?;
     Ok(published)
 }
 
-/// README.md and its translations in `assets/readme/<language>/`.
-fn readmes() -> Result<Vec<PathBuf>, String> {
-    let mut found = vec![root().join("README.md")];
-    for entry in files::read_dir(root().join("assets/readme"))?.flatten() {
-        let readme = entry.path().join("README.md");
-        if readme.is_file() {
-            found.push(readme);
-        }
+/// What the update dialog shows: the notes written for this release and the way to report a problem.
+pub(crate) fn release_notes(written: &str, previous_feed: Option<&str>) -> Result<String, String> {
+    let written = written.trim();
+    if written.is_empty() {
+        return Err(format!("{NOTES} is empty; write what this release brings"));
     }
-    Ok(found)
+    if written.contains("]]>") {
+        return Err(format!("{NOTES} contains ]]>, which would end the feed's text early"));
+    }
+    if previous_feed.is_some_and(|feed| feed.contains(written)) {
+        return Err(format!("{NOTES} still holds the notes of the previous release"));
+    }
+    Ok(format!("{written}\n\n{REPORT_LINE}"))
 }
 
 /// The update feed Sparkle reads: the newest disk image with the EdDSA signature and length `sign_update` printed for
 /// it. Older Macs than `MINIMUM_SYSTEM` are not offered it.
-pub(crate) fn appcast(version: &str, image: &str, signature: &str, date: &str) -> Result<String, String> {
+pub(crate) fn appcast(version: &str, image: &str, signature: &str, date: &str, notes: &str) -> Result<String, String> {
     if !signature.starts_with("sparkle:edSignature=\"") || !signature.contains(" length=\"") {
         return Err(format!("sign_update printed {signature:?}"));
     }
@@ -144,6 +151,7 @@ pub(crate) fn appcast(version: &str, image: &str, signature: &str, date: &str) -
       <sparkle:version>{version}</sparkle:version>
       <sparkle:shortVersionString>{version}</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>{MINIMUM_SYSTEM}</sparkle:minimumSystemVersion>
+      <description sparkle:format="markdown"><![CDATA[{notes}]]></description>
       <enclosure url="{DOWNLOADS}/{image}" {signature} type="application/octet-stream"/>
     </item>
   </channel>
@@ -167,27 +175,6 @@ pub(crate) fn image_name_len(s: &str) -> Option<usize> {
     let rest = rest.strip_prefix('-')?;
     let end = rest.find(".dmg")?;
     is_version(&rest[..end]).then_some(APP.len() + 1 + end + 4)
-}
-
-/// `text` with every disk image name in it replaced by `image`.
-pub(crate) fn relink(text: &str, image: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(at) = rest.find(APP) {
-        out.push_str(&rest[..at]);
-        match image_name_len(&rest[at..]) {
-            Some(len) => {
-                out.push_str(image);
-                rest = &rest[at + len..];
-            }
-            None => {
-                out.push_str(APP);
-                rest = &rest[at + APP.len()..];
-            }
-        }
-    }
-    out.push_str(rest);
-    out
 }
 
 /// SHA-1 hash and name of the first valid Developer ID Application identity in the keychains.
@@ -341,26 +328,59 @@ mod tests {
     use super::*;
 
     #[test]
-    fn readme_links_follow_the_new_image_and_leave_the_rest() {
-        let text = "[dl](dist/Splat.dmg?raw=true) **[Download Splat-1.0.3.dmg](https://raw.githubusercontent.com/a/splat/main/dist/Splat-1.0.3.dmg)** \
-                    Splat.app, `dist/Splat-<version>.dmg`, Splat-1.0.dmg";
-        assert_eq!(
-            relink(text, "Splat-1.0.4.dmg"),
-            "[dl](dist/Splat-1.0.4.dmg?raw=true) **[Download Splat-1.0.4.dmg](https://raw.githubusercontent.com/a/splat/main/dist/Splat-1.0.4.dmg)** \
-             Splat.app, `dist/Splat-<version>.dmg`, Splat-1.0.dmg"
-        );
+    fn a_disk_image_is_named_with_or_without_a_version() {
         assert_eq!(image_name_len("Splat-1.0.3.dmg"), Some(15));
         assert_eq!(image_name_len("Splat.dmg"), Some(9));
         assert_eq!(image_name_len("Splat-notes.dmg"), None);
     }
 
     #[test]
-    fn the_release_relinks_a_readme_of_every_language() {
+    fn every_readme_downloads_the_fixed_name_in_the_latest_release() {
         let languages = files::read_dir(root().join("resources"))
             .unwrap()
             .flatten()
             .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "lproj"))
             .count();
-        assert_eq!(readmes().unwrap().len(), languages);
+        let mut readmes = vec![root().join("README.md")];
+        readmes.extend(
+            files::read_dir(root().join("assets/readme"))
+                .unwrap()
+                .flatten()
+                .map(|entry| entry.path().join("README.md"))
+                .filter(|readme| readme.is_file()),
+        );
+        assert_eq!(readmes.len(), languages);
+        for readme in readmes {
+            let text = fs::read_to_string(&readme).unwrap();
+            assert!(
+                text.contains("https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg"),
+                "{}",
+                readme.display()
+            );
+            assert!(
+                !text.contains("/main/dist/Splat") && !text.contains("Splat-1."),
+                "{}",
+                readme.display()
+            );
+        }
+    }
+
+    #[test]
+    fn the_feed_carries_the_notes_of_this_release_and_the_way_to_report_a_problem() {
+        let notes = release_notes("- New.\n", None).unwrap();
+        assert_eq!(notes, format!("- New.\n\n{REPORT_LINE}"));
+        let feed = appcast(
+            "1.0.4",
+            "Splat-1.0.4.dmg",
+            "sparkle:edSignature=\"c2ln\" length=\"42\"",
+            "",
+            &notes,
+        )
+        .unwrap();
+        assert!(feed.contains("<description sparkle:format=\"markdown\"><![CDATA[- New.\n\nSomething wrong"));
+        assert!(release_notes(" \n", None).is_err());
+        assert!(release_notes("a ]]> b", None).is_err());
+        assert!(release_notes("- New.\n", Some(&feed)).is_err());
+        assert!(release_notes("- Newer.\n", Some(&feed)).is_ok());
     }
 }

@@ -205,6 +205,7 @@ mod tests {
             "Splat-1.0.4.dmg",
             "sparkle:edSignature=\"c2ln\" length=\"42\"",
             "Sat, 31 Oct 2026 12:00:00 +0000",
+            "- New.",
         )
         .unwrap();
         assert!(feed.contains(&format!(
@@ -214,7 +215,7 @@ mod tests {
         assert!(feed.contains("<sparkle:version>1.0.4</sparkle:version>"));
         assert_eq!(offered_image(&feed), Some("Splat-1.0.4.dmg"));
         assert_eq!(offered_image("<rss/>"), None);
-        assert!(appcast("1.0.4", "Splat-1.0.4.dmg", "ERROR: no key", "").is_err());
+        assert!(appcast("1.0.4", "Splat-1.0.4.dmg", "ERROR: no key", "", "").is_err());
     }
 
     #[test]

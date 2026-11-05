@@ -8,9 +8,11 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
  
 
 
-[![下载适用于 macOS 的 Splat](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![下载适用于 macOS 的 Splat](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[下载 Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**：已由 Apple 签名并公证，适用于 macOS 14 或更高版本，支持 Apple 芯片和 Intel 处理器。
+**[下载 Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**：已由 Apple 签名并公证，适用于 macOS 14 或更高版本，支持 Apple 芯片和 Intel 处理器。
+
+**发现 Bug 了？** Splat 会让你没碰过的行与原来逐字节相同。如果某行还是变了，或者文件显示不正确，请[提交 Issue](https://github.com/sventmueller/splat/issues/new/choose) 并附上文件。如果 Splat 对你有用，在 [GitHub 上点个 Star](https://github.com/sventmueller/splat) 能帮助更多人找到它。
  
  
 
@@ -132,7 +134,7 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 
 ## 安装
 
-**通过磁盘映像。** 下载 [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)，打开后将 Splat 拖到“应用程序”文件夹。该映像已使用 Developer ID 签名并经 Apple 公证，因此打开时不会出现警告。
+**通过磁盘映像。** 下载 [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)，打开后将 Splat 拖到“应用程序”文件夹。该映像已使用 Developer ID 签名并经 Apple 公证，因此打开时不会出现警告。
 
 **通过 Homebrew。** Cask 位于专属的 tap 中：
 
@@ -501,7 +503,7 @@ Splat 不改动 Apple 的标准快捷键。
 
 Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不受信任。
 
-- **默认不联网。** Splat 没有遥测功能。只有在你同意或选取 **检查更新…** 之后，它才会检查更新：此时它会从 GitHub 载入一个小型订阅源文件，请求中除了 App 名称及其版本外不含任何信息。公式和图表在本地渲染；负责渲染的网页视图无法访问网络。
+- **默认不联网。** Splat 没有遥测功能。只有在你同意或选取 **检查更新…** 之后，它才会检查更新：此时它会从 GitHub 载入一个小型订阅源文件，请求中除了 App 名称及其版本外不含任何信息。公式和图表在本地渲染；负责渲染的网页视图无法访问网络。**帮助 › 报告问题…** 会在浏览器中打开 GitHub 上的表单；其地址包含 Splat 版本、macOS 版本和 Mac 类型，不含你文档中的任何内容。
 - **来自网络的图像**只有在你许可之后才会载入，只通过 `https`，从不来自本地网络中的主机，每张最大 10 MB，并且在不带 Cookie 的隐私会话中进行。
 - **隔离解码。** 图像以及公式和图表的图形，在辅助进程中解码；这些进程会关闭继承的所有文件，并在读取第一个字节之前把自己锁进沙盒：无法访问文件，也无法联网。它们只交回像素，且会检查像素的尺寸，10 秒后即被终止。Apple 自带的图像解码器只处理 HEIC、TIFF、AVIF 和 PDF，而且仅当数据确实是该格式时才处理；它们在专属的辅助进程中运行，该进程另外可以读取系统的字体文件夹，并使用系统的视频解码器。SVG、公式和图表同样要经过这个辅助进程，因此它们在 Splat 中是分辨率固定的图片：每点四个像素，长边最多 2560 像素。
 - **本地文件**只能通过文稿中写明的路径进入文稿。嵌入会显示文稿所在文件夹及其下级文件夹中的 Markdown 笔记，缺失的图片也只在那里查找。其他位置的图像路径，无论是绝对路径还是以 `~` 开头，在预览中仍然会载入；HTML 和 Word 导出、打印和 PDF 只带上文稿所在文件夹或其 Git 仓库中的内容（除非该仓库同时包含你的个人文件夹），因此别人的文稿无法把你的文件拉进你转交的导出文件。
@@ -602,16 +604,17 @@ cargo xtask vendor fetch       # 修改 vendor.lock 中的版本后重新下载
 
 ### 分发
 
-`cargo xtask dmg`（或先运行 `make test` 的 `make release`）会构建发布版本，用你的 Developer ID 签名，请 Apple 公证该 App 并装订票据，把它打包成带有指向“应用程序”链接的压缩只读磁盘映像，同样对映像进行公证和装订，并用 Gatekeeper 检查结果。App 自带票据，这样不经过访达安装的副本（如 Homebrew 所做的）首次启动时也能离线打开；与公证服务的两轮往返各需几分钟。只有通过了每一步的映像才会成为 `dist/Splat-<version>.dmg`，也就是提交的那一份：本 README 及其翻译中的下载链接随之更新，构建号也会增加。上一个映像会再保留一个版本，因为推送之后的几分钟内，GitHub 的 raw 服务器可能仍会提供旧的更新订阅源；更旧的映像会被移到废纸篓。失败的运行会让 `dist/`、各 README 和 VERSION 保持原样。每次发布都会把完整的映像（约 16 MB）加入仓库历史。它只在被调用时运行，绝不作为普通构建的一部分，并且需要：
+`cargo xtask dmg`（或先运行 `make test` 的 `make release`）会构建发布版本，用你的 Developer ID 签名，请 Apple 公证该 App 并装订票据，把它打包成带有指向“应用程序”链接的压缩只读磁盘映像，同样对映像进行公证和装订，并用 Gatekeeper 检查结果。App 自带票据，这样不经过访达安装的副本（如 Homebrew 所做的）首次启动时也能离线打开；与公证服务的两轮往返各需几分钟。只有通过了每一步的映像才会成为 `dist/Splat-<version>.dmg`，也就是提交的那一份，构建号也会增加。上一个映像会再保留一个版本，因为推送之后的几分钟内，GitHub 的 raw 服务器可能仍会提供旧的更新订阅源；更旧的映像会被移到废纸篓。失败的运行会让 `dist/` 和 VERSION 保持原样。每次发布都会把完整的映像（约 16 MB）加入仓库历史。它只在被调用时运行，绝不作为普通构建的一部分，并且需要：
 
 - 钥匙串中的“Developer ID Application”证书
 - 已保存的 Apple 公证服务登录信息，使用 App 专用密码，通过 `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>` 创建一次
 - 登录钥匙串中用于签署更新的私钥。它由 Sparkle 的 `generate_keys` 创建；其公钥是 [xtask/src/main.rs](../../../xtask/src/main.rs) 中的 `UPDATE_KEY`，也存在于每一份已安装的副本中，这些副本只接受用它签署的更新。请在密码管理器中保留一份备份：`target/sparkle-2.10.1/bin/generate_keys -x <file>` 导出它，`-f <file>` 在另一台 Mac 上导入它。没有它，已安装的副本就再也无法更新。
 - rustup（`brew install rustup`，它不会动 Homebrew 的 Rust）
+- `RELEASE_NOTES.md`，写明此次发布带来的内容。更新对话框会把它显示在一行报告问题的说明上方，因此如果文件为空或仍是上一次发布的内容，`dmg` 会停止
 
 只要缺少其中任何一项，`dmg` 就会在构建之前停止。首次运行时，macOS 会询问“终端”是否可以控制访达；没有这项权限，磁盘映像既不会显示背景，也不会显示图标排列。
 
-只有磁盘映像带有更新程序 [Sparkle](https://sparkle-project.org)，构建时会从它的 GitHub 发布页面下载一次到 `target/` 中，并对照 xtask 中的校验和进行检查。Hardened Runtime 只会在框架带有 App 的 Team ID 时才加载它，Developer ID 签名带有该 ID，而本地证书没有；而且更新不得替换你自己构建的版本。自测构建同样带有 Sparkle，以便据此检查更新菜单：使用不存在的订阅源，不出现 Sparkle 在第二次启动时的询问，并带有让本地签名的 App 能加载该框架的权限。`dmg` 会用更新密钥为新映像签名，并写出 `dist/appcast.xml`，即已安装的副本从 GitHub 读取的订阅源。请把映像、订阅源和各 README 一起提交并推送：从那时起，已安装的副本就会收到更新提示。
+只有磁盘映像带有更新程序 [Sparkle](https://sparkle-project.org)，构建时会从它的 GitHub 发布页面下载一次到 `target/` 中，并对照 xtask 中的校验和进行检查。Hardened Runtime 只会在框架带有 App 的 Team ID 时才加载它，Developer ID 签名带有该 ID，而本地证书没有；而且更新不得替换你自己构建的版本。自测构建同样带有 Sparkle，以便据此检查更新菜单：使用不存在的订阅源，不出现 Sparkle 在第二次启动时的询问，并带有让本地签名的 App 能加载该框架的权限。`dmg` 会用更新密钥为新映像签名，并写出 `dist/appcast.xml`，即已安装的副本从 GitHub 读取的订阅源。请把映像和订阅源一起提交并推送：从那时起，已安装的副本就会收到更新提示。本 README 及其翻译中的下载链接指向 GitHub 最新发布中的 `Splat.dmg`，因此每次发布都带有一份这个名字的副本：先运行 `cp dist/Splat-<version>.dmg target/Splat.dmg`，再运行 `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`。
 
 磁盘映像是同时适用于 Apple 芯片和 Intel 的通用二进制；其他构建只面向主机的处理器。Homebrew 的 Rust 只附带主机处理器的标准库，所以 `dmg` 通过 rustup 构建，它会在首次使用时安装 [rust-toolchain.toml](../../../rust-toolchain.toml) 中的工具链和目标平台，并且在程序或 Sparkle 缺少任一处理器的代码时停止。`make universal` 只构建程序本身。其中的 App 带有与本地构建不同的签名，所以 macOS 会为两者分别保存最近使用的文稿和文件夹权限。
 

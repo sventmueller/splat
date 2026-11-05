@@ -1,0 +1,2 @@
+- **Help** has new items: **Report a Problem…** opens a form on GitHub with the versions of Splat and macOS and the kind of Mac filled in, **Suggest a Feature…** opens one for ideas, and **Splat on GitHub** opens the project page.
+- The update dialog now shows what a new version brings.

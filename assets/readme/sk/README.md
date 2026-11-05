@@ -8,9 +8,11 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
  
 
 
-[![Stiahnuť Splat pre macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)
+[![Stiahnuť Splat pre macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
 
-**[Stiahnuť Splat-1.0.8.dmg](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg)**: podpísaný a overený spoločnosťou Apple (notarizovaný), pre macOS 14 alebo novší na Apple Silicon aj Intel.
+**[Stiahnuť Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: podpísaný a overený spoločnosťou Apple (notarizovaný), pre macOS 14 alebo novší na Apple Silicon aj Intel.
+
+**Našli ste chybu?** Splat zachováva riadky, ktorých ste sa nedotkli, bajt po bajte rovnaké. Ak sa niektorý predsa zmení alebo sa súbor zobrazí nesprávne, [založte issue](https://github.com/sventmueller/splat/issues/new/choose) a priložte súbor. Ak je pre vás Splat užitočný, [hviezdička na GitHube](https://github.com/sventmueller/splat) pomôže ostatným nájsť ho.
  
  
 
@@ -132,7 +134,7 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 
 ## Inštalácia
 
-**Z obrazu disku.** Stiahnite si [`dist/Splat-1.0.8.dmg`](https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.8.dmg), otvorte ho a pretiahnite Splat do priečinka Aplikácie. Obraz je podpísaný certifikátom Developer ID a overený spoločnosťou Apple (notarizovaný), takže sa otvorí bez upozornení.
+**Z obrazu disku.** Stiahnite si [`Splat.dmg`](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg), otvorte ho a pretiahnite Splat do priečinka Aplikácie. Obraz je podpísaný certifikátom Developer ID a overený spoločnosťou Apple (notarizovaný), takže sa otvorí bez upozornení.
 
 **Cez Homebrew.** Cask je vo vlastnom tape:
 
@@ -501,7 +503,7 @@ Splat necháva štandardné skratky Applu tam, kde sú.
 
 Súbor Markdown môže pochádzať od kohokoľvek, preto Splat považuje každý dokument za nedôveryhodný.
 
-- **Predvolene bez siete.** Splat nemá telemetriu. Aktualizácie vyhľadáva, až keď s tým súhlasíte alebo zvolíte **Vyhľadať aktualizácie…**: potom načíta malý súbor kanála z GitHubu a požiadavka uvádza len aplikáciu a jej verziu. Vzorce a diagramy sa vykresľujú lokálne; webové zobrazenia, ktoré to robia, nemajú prístup k sieti.
+- **Predvolene bez siete.** Splat nemá telemetriu. Aktualizácie vyhľadáva, až keď s tým súhlasíte alebo zvolíte **Vyhľadať aktualizácie…**: potom načíta malý súbor kanála z GitHubu a požiadavka uvádza len aplikáciu a jej verziu. Vzorce a diagramy sa vykresľujú lokálne; webové zobrazenia, ktoré to robia, nemajú prístup k sieti. **Pomocník › Nahlásiť problém…** otvorí v prehliadači formulár na GitHube; jeho adresa obsahuje verziu Splatu, verziu macOS a typ Macu, nič z vašich dokumentov.
 - **Obrázky z webu** sa načítajú až s vaším povolením, len cez `https`, nikdy z hostiteľov vo vašej lokálnej sieti, najviac po 10 MB a v súkromnej relácii bez cookies.
 - **Izolované dekódovanie.** Obrázky a grafiku vzorcov a diagramov dekódujú pomocné procesy, ktoré zatvoria každý zdedený súbor a pred čítaním prvého bajtu sa zamknú do sandboxu: bez prístupu k súborom, bez siete. Vracajú iba pixely, ktorých veľkosť sa kontroluje, a po 10 sekundách sa zastavia. Dekodéry obrázkov od Applu vidia iba HEIC, TIFF, AVIF a PDF, a to len vtedy, keď dáta naozaj majú tento formát; bežia vo vlastnom pomocnom procese, ktorý smie navyše čítať systémové priečinky s písmami a používať systémový dekodér videa. Týmto pomocníkom prechádzajú aj SVG, vzorce a diagramy, takže v Splate sú to obrázky s pevným rozlíšením: štyri pixely na bod, najviac 2560 na dlhšej strane.
 - **Lokálne súbory** sa do dokumentu dostanú len cez cestu, ktorú uvádza. Vloženia zobrazujú poznámky Markdown z priečinka dokumentu a pod ním a chýbajúci obrázok sa hľadá len tam. Cesta k obrázku inde, absolútna alebo začínajúca `~`, sa v náhľade stále načíta; exporty do HTML a Wordu, tlač a PDF berú len to, čo leží v priečinku dokumentu alebo v jeho repozitári Git, pokiaľ tento repozitár neobsahuje aj váš domovský priečinok, takže cudzí dokument nemôže vtiahnuť vaše súbory do exportu, ktorý odovzdáte ďalej.
@@ -602,17 +604,18 @@ Verzia je vo [VERSION](../../../VERSION) ako `major.minor.build` a je to tá, kt
 
 ### Distribúcia
 
-`cargo xtask dmg` (alebo `make release`, ktoré najprv spustí `make test`) zostaví vydanie, podpíše ho vaším Developer ID, notarizuje aplikáciu u Applu a pripojí tiket, zabalí ju do komprimovaného obrazu disku len na čítanie s odkazom na Aplikácie, notarizuje a označí tiketom aj obraz a výsledok skontroluje cez Gatekeeper. Aplikácia nesie vlastný tiket, aby sa kópia nainštalovaná bez Findera, ako to robí Homebrew, pri prvom spustení otvorila aj offline; dve kolá so službou notarizácie trvajú niekoľko minút každé. Len obraz, ktorý prešiel všetkými krokmi, sa stane `dist/Splat-<version>.dmg`, kópiou, ktorá sa commituje: odkazy na stiahnutie v tomto README a jeho prekladoch ju sledujú a číslo zostavenia sa zvýši. Predchádzajúci obraz zostane ešte jedno vydanie, pretože raw server GitHubu môže pár minút po pushi vydávať starý kanál aktualizácií; staršie sa presunú do koša. Neúspešný beh nechá `dist/`, README a VERSION tak, ako boli.
+`cargo xtask dmg` (alebo `make release`, ktoré najprv spustí `make test`) zostaví vydanie, podpíše ho vaším Developer ID, notarizuje aplikáciu u Applu a pripojí tiket, zabalí ju do komprimovaného obrazu disku len na čítanie s odkazom na Aplikácie, notarizuje a označí tiketom aj obraz a výsledok skontroluje cez Gatekeeper. Aplikácia nesie vlastný tiket, aby sa kópia nainštalovaná bez Findera, ako to robí Homebrew, pri prvom spustení otvorila aj offline; dve kolá so službou notarizácie trvajú niekoľko minút každé. Len obraz, ktorý prešiel všetkými krokmi, sa stane `dist/Splat-<version>.dmg`, kópiou, ktorá sa commituje, a číslo zostavenia sa zvýši. Predchádzajúci obraz zostane ešte jedno vydanie, pretože raw server GitHubu môže pár minút po pushi vydávať starý kanál aktualizácií; staršie sa presunú do koša. Neúspešný beh nechá `dist/` a VERSION tak, ako boli.
 Každé vydanie pridá do histórie repozitára celý obraz, asi 16 MB. Beží len na požiadanie, nikdy ako súčasť bežného zostavenia, a potrebuje:
 
 - certifikát „Developer ID Application“ v kľúčenke
 - uložené prihlásenie k notárskej službe Applu s heslom špecifickým pre aplikáciu, vytvorené raz cez `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
 - súkromný kľúč, ktorým sa podpisujú aktualizácie, v kľúčenke prihlásenia. Vytvoril ho `generate_keys` zo Sparkle; jeho verejná polovica je `UPDATE_KEY` v [xtask/src/main.rs](../../../xtask/src/main.rs) a vo vnútri každej nainštalovanej kópie, ktorá prijíma iba aktualizácie ním podpísané. Uchovávajte zálohu v správcovi hesiel: `target/sparkle-2.10.1/bin/generate_keys -x <file>` ho exportuje, `-f <file>` ho importuje na inom Macu. Bez neho sa už nainštalované kópie nikdy nedajú aktualizovať.
 - rustup (`brew install rustup`, ktorý Rust z Homebrew ponechá)
+- `RELEASE_NOTES.md` s tým, čo toto vydanie prináša. Dialóg aktualizácie ho zobrazí nad riadkom o tom, ako nahlásiť problém, preto sa `dmg` zastaví, ak je súbor prázdny alebo v ňom stále sú poznámky predchádzajúceho vydania
 
 Ak niečo z toho chýba, `dmg` sa zastaví pred zostavením. Pri prvom spustení sa macOS opýta, či smie Terminál ovládať Finder; bez tohto oprávnenia obraz disku nezobrazí ani pozadie, ani rozmiestnenie ikon.
 
-Aktualizátor, [Sparkle](https://sparkle-project.org), nesie iba obraz disku; zostavenie ho raz stiahne do `target/` z jeho vydania na GitHube a overí voči kontrolnému súčtu v xtasku. Hardened runtime načíta framework len vtedy, keď nesie Team ID aplikácie, ktoré podpis Developer ID má a lokálny certifikát nemá; a aktualizácia nesmie nahradiť vlastné zostavenie. Zostavenie pre self-test nesie Sparkle tiež, aby voči nemu overilo menu aktualizácií: s kanálom, ktorý neexistuje, bez otázky Sparkle pri druhom spustení a s oprávnením, ktoré lokálne podpísanej aplikácii dovolí framework načítať. `dmg` podpíše nový obraz kľúčom aktualizácií a zapíše `dist/appcast.xml`, kanál, ktorý nainštalované kópie čítajú z GitHubu. Obraz, kanál a README commitnite a pushnite spolu: odvtedy nainštalované kópie ponúknu aktualizáciu.
+Aktualizátor, [Sparkle](https://sparkle-project.org), nesie iba obraz disku; zostavenie ho raz stiahne do `target/` z jeho vydania na GitHube a overí voči kontrolnému súčtu v xtasku. Hardened runtime načíta framework len vtedy, keď nesie Team ID aplikácie, ktoré podpis Developer ID má a lokálny certifikát nemá; a aktualizácia nesmie nahradiť vlastné zostavenie. Zostavenie pre self-test nesie Sparkle tiež, aby voči nemu overilo menu aktualizácií: s kanálom, ktorý neexistuje, bez otázky Sparkle pri druhom spustení a s oprávnením, ktoré lokálne podpísanej aplikácii dovolí framework načítať. `dmg` podpíše nový obraz kľúčom aktualizácií a zapíše `dist/appcast.xml`, kanál, ktorý nainštalované kópie čítajú z GitHubu. Obraz a kanál commitnite a pushnite spolu: odvtedy nainštalované kópie ponúknu aktualizáciu. Odkazy na stiahnutie v tomto README a jeho prekladoch vedú na `Splat.dmg` v najnovšom vydaní na GitHube, preto každé vydanie obsahuje kópiu s týmto názvom: `cp dist/Splat-<version>.dmg target/Splat.dmg` a potom `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
 Obraz disku je univerzálny binárny súbor pre Apple Silicon aj Intel; ostatné zostavenia sú len pre procesor hostiteľa. Rust z Homebrew dodáva štandardnú knižnicu len pre procesor hostiteľa, preto `dmg` zostavuje cez rustup, ktorý pri prvom použití nainštaluje toolchain a ciele z [rust-toolchain.toml](../../../rust-toolchain.toml) a zastaví sa, ak programu alebo Sparkle chýba kód pre niektorý z procesorov. `make universal` zostaví len program.
 Aplikácia v ňom nesie iný podpis ako lokálne zostavenie, takže macOS vedie pre obe samostatné nedávne dokumenty a oprávnenia priečinkov.
