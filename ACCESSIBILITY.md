@@ -1,8 +1,10 @@
 # Accessibility
 
-Splat works with VoiceOver and Increase Contrast, scales with zoom, and every command is reachable from the keyboard.
-Details are under [Appearance and accessibility](README.md#appearance-and-accessibility).
+Both panes and all toolbar buttons are named for VoiceOver, Increase Contrast switches to high-contrast colours, zoom
+scales both panes, and every menu command is reachable from the keyboard. Details are under
+[Appearance and accessibility](README.md#appearance-and-accessibility).
 
-Known limits: VoiceOver reads a formula as its LaTeX code and a diagram as its title or alternative text.
+Known limits: in the source, VoiceOver reads a formula or diagram as its code. In the preview, formulas, diagrams and
+images may be announced only as placeholders; this has not yet been checked with VoiceOver itself.
 
 If something in Splat is a barrier for you, [report it as a problem](https://github.com/sventmueller/splat/issues/new/choose).
