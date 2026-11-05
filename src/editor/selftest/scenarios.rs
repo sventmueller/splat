@@ -13,7 +13,8 @@ use objc2_app_kit::{
     NSAlertFirstButtonReturn, NSAlertSecondButtonReturn, NSApplication, NSBitmapImageRep, NSColor,
     NSDocumentController, NSEventModifierFlags, NSMenu, NSModalResponse, NSModalResponseCancel, NSPasteboard,
     NSPasteboardTypePNG, NSPasteboardTypeString, NSPasteboardTypeTIFF, NSSavePanel, NSSegmentedControl,
-    NSTextFinderAction, NSTextFinderBarContainer, NSUserInterfaceItemIdentification, NSWindow,
+    NSTextFinderAction, NSTextFinderBarContainer, NSToolbarDisplayMode, NSUserInterfaceItemIdentification, NSView,
+    NSWindow, NSWindowButton,
 };
 use objc2_foundation::{NSArray, NSData, NSFileManager, NSRange, NSRunLoop, NSRunLoopCommonModes, NSTimer, NSURL};
 
@@ -1177,6 +1178,35 @@ fn view_steps() -> Vec<Step> {
     ]
 }
 
+/// AppKit gives no frames of toolbar items, so this looks for the private views of their capsules by class.
+fn capsule_ends(view: &NSView, out: &mut Vec<f64>) {
+    if view.class().name().to_bytes().ends_with(b"NSToolbarPlatterView") {
+        let frame = view.convertRect_toView(view.bounds(), None);
+        out.push(frame.origin.x + frame.size.width);
+    }
+    for sub in view.subviews().iter() {
+        capsule_ends(&sub, out);
+    }
+}
+
+/// How far the toolbar's last capsule stands from the window's right edge.
+fn toolbar_margin(c: &Ctx) -> Option<f64> {
+    let window = c.e.window()?;
+    let content = window.contentView()?;
+    // SAFETY: Only read here, on the main thread, while the window holds its content view.
+    let frame = unsafe { content.superview() }?;
+    let mut ends = Vec::new();
+    capsule_ends(&frame, &mut ends);
+    let last = ends.into_iter().fold(f64::NEG_INFINITY, f64::max);
+    last.is_finite().then(|| window.frame().size.width - last)
+}
+
+fn set_toolbar_mode(c: &Ctx, mode: NSToolbarDisplayMode) {
+    if let Some(toolbar) = c.e.window().and_then(|w| w.toolbar()) {
+        toolbar.setDisplayMode(mode);
+    }
+}
+
 fn toolbar_steps() -> Vec<Step> {
     vec![
         applied(|c| {
@@ -1225,6 +1255,28 @@ fn toolbar_steps() -> Vec<Step> {
             );
         }),
         undone("a toolbar command is undone in one step".into()),
+        applied(|c| set_toolbar_mode(c, NSToolbarDisplayMode::LabelOnly)),
+        pause(0.5, "the toolbar reports no end of its layout", |c| {
+            let margin = toolbar_margin(c);
+            let close =
+                c.e.window()
+                    .and_then(|w| w.standardWindowButton(NSWindowButton::CloseButton))
+                    .map(|b| b.convertRect_toView(b.bounds(), None).origin.x);
+            check(
+                "the text-only toolbar stands as far from the edge as the close button",
+                margin.zip(close).is_some_and(|(m, x)| (m - x).abs() <= 2.0),
+                &format!("margin {margin:?}, close button at {close:?}"),
+            );
+            set_toolbar_mode(c, NSToolbarDisplayMode::IconOnly);
+        }),
+        pause(0.5, "the toolbar reports no end of its layout", |c| {
+            let margin = toolbar_margin(c);
+            check(
+                "the toolbar with symbols keeps its place at the edge",
+                margin.is_some_and(|m| (m - 8.0).abs() <= 1.0),
+                &format!("{margin:?}"),
+            );
+        }),
     ]
 }
 
