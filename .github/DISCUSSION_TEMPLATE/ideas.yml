@@ -1,0 +1,11 @@
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: help
+    attributes:
+      label: What would help?

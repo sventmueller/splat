@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Idea
+    url: https://github.com/sventmueller/splat/discussions/new?category=ideas
+    about: Suggest something Splat should do.
+  - name: Question
+    url: https://github.com/sventmueller/splat/discussions
+    about: Ask how to do something in Splat.

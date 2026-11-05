@@ -1,0 +1,39 @@
+name: Report a problem
+description: Something in Splat does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  # A textarea takes .md attachments; GitHub's upload field does not accept that type.
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample file
+      description: Issues are public. Attach a small sample, not a private document.
+  - type: input
+    id: version
+    attributes:
+      label: Splat version
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac
+      placeholder: Apple Silicon or Intel
