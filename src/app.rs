@@ -81,6 +81,11 @@ define_class!(
     }
 
     impl AppDelegate {
+        #[unsafe(method(mdShowAbout:))]
+        fn show_about(&self, _sender: Option<&AnyObject>) {
+            guarded((), || crate::about::show(self.mtm()));
+        }
+
         #[unsafe(method(mdImportWord:))]
         fn import_word(&self, _sender: Option<&AnyObject>) {
             guarded((), || {

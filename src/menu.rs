@@ -11,10 +11,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
     let main = NSMenu::initWithTitle(NSMenu::alloc(mtm), &ns(""));
 
     let (services_item, services) = submenu(mtm, t("Dienste"), vec![]);
-    let mut app_items = vec![
-        item(mtm, t("Über Splat"), Some(sel!(orderFrontStandardAboutPanel:)), ""),
-        separator(mtm),
-    ];
+    let mut app_items = vec![item(mtm, t("Über Splat"), Some(sel!(mdShowAbout:)), ""), separator(mtm)];
     let updates = updates::menu_items(mtm);
     if !updates.is_empty() {
         app_items.extend(updates);

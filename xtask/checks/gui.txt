@@ -67,6 +67,7 @@ source view stays on TextKit 2
 tab moves to next table cell
 tab selects the next placeholder
 table of contents links the headings
+the About window names the version once, the copyright and the license, and the bundle carries the license texts of all it contains
 the app menu checks for updates through Sparkle
 the app menu offers to open Markdown files in Splat, ticked once it does
 the caret at the end brings the last line above the count

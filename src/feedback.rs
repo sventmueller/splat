@@ -6,7 +6,7 @@ use objc2_foundation::{NSBundle, NSProcessInfo, NSString};
 
 use crate::util::ns;
 
-const REPOSITORY: &str = "https://github.com/sventmueller/splat";
+pub(crate) const REPOSITORY: &str = "https://github.com/sventmueller/splat";
 
 fn open(address: &str) {
     if crate::test_hooks::keeps_from_the_browser(address) {

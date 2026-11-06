@@ -4,7 +4,7 @@
 
 pub mod actions;
 mod atom;
-mod attributes;
+pub(crate) mod attributes;
 mod changes;
 mod controller;
 mod counter;
