@@ -7,4 +7,5 @@
 - **A form for metadata:** a click on the metadata line in the preview, or **Format › Edit Metadata…**.
 - **Help** has new items: **Report a Problem…** opens a form on GitHub with the versions of Splat and macOS and the kind of Mac filled in, **Suggest a Feature…** opens one for ideas, and **Splat on GitHub** opens the project page.
 - The update dialog now shows what a new version brings.
+- **PDF export** draws SVG images and formulas with krilla instead of the discontinued svg2pdf: color emoji, repeating gradients and `\style` colors now appear.
 - **Fixed:** after a jump far down a freshly opened document, the preview stopped short of the place the source showed.
