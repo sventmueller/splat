@@ -292,6 +292,7 @@ define_class!(
         fn panes_resized(&self, _notification: &NSNotification) {
             guarded((), || {
                 self.updater().panes_resized();
+                self.panes().remember_sidebar();
                 self.word_counter().place();
                 self.change_marks().redraw();
             });
@@ -408,6 +409,8 @@ define_class!(
         fn md_table_format(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TableFormat, s) }
         #[unsafe(method(mdTogglePreview:))]
         fn md_toggle_preview(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TogglePreview, s) }
+        #[unsafe(method(mdToggleSidebar:))]
+        fn md_toggle_sidebar(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleSidebar, s) }
         #[unsafe(method(mdToggleOutline:))]
         fn md_toggle_outline(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleOutline, s) }
         #[unsafe(method(mdTypography:))]

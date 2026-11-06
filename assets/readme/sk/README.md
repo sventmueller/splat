@@ -164,12 +164,12 @@ Každý dokument sa otvorí vo vlastnom okne alebo ako tab, ak máte radi taby:
 
 - **Vľavo: zdrojový text.** Váš Markdown v písme SF Mono so zvýraznením syntaxe.
 - **Vpravo: náhľad.** Vykreslený dokument pripravený na úpravy.
-- **Bočný panel (voliteľný).** Všetky nadpisy ako strom, kliknutím na nadpis ho zobrazíte v oboch paneloch: **Zobraziť › Zobraziť osnovu** (⌃⌘S). Ďalšie dva taby obsahujú [poznámky v priečinku](#poznámky-v-priečinku) a ich prehľadávanie.
+- **Bočný panel (voliteľný).** Všetky nadpisy ako strom, kliknutím na nadpis ho zobrazíte v oboch paneloch: **Zobraziť › Zobraziť osnovu** (⌃⌘S). Ďalšie dva taby obsahujú [poznámky v priečinku](#poznámky-v-priečinku) a ich prehľadávanie. Tlačidlo vedľa názvu okna ho zobrazí a skryje a nové okná ho otvoria tak, ako ho nechalo posledné okno.
 - **Panel s nástrojmi.** Tlačidlá zoradené podľa toho, čo menia: znaky, odseky a vkladané prvky, potom zapnutie a vypnutie náhľadu, Zdieľať a Nový dokument. Prispôsobíte ho cez **Zobraziť › Prispôsobiť panel s nástrojmi…**.
 
 Potiahnutím deliacej čiary dáte jednej strane viac miesta. **Zobraziť › Skryť náhľad** (⌥⌘P) nechá iba zdrojový text; Splat si to pamätá pre každé okno zvlášť. Oba panely sa posúvajú spolu a výber v jednom z nich sa zvýrazní aj v druhom.
 
-V rohu okna sa zobrazuje počet slov a znakov textu a čas čítania, a kým existuje výber, to isté pre výber. Adresy odkazov, značky HTML, metadáta, komentáre, vzorce a diagramy sa nepočítajú. **Zobraziť › Skryť počet slov** tento údaj odstráni.
+V rohu okna sa zobrazuje počet slov a znakov textu a čas čítania, a kým existuje výber, to isté pre výber. Adresy odkazov, značky HTML, metadáta, komentáre, vzorce a diagramy sa nepočítajú. Údaj je spočiatku skrytý; zobrazí ho **Zobraziť › Zobraziť počet slov**.
 
 ### Dokumenty, taby a verzie
 

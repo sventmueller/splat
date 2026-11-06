@@ -164,12 +164,12 @@ Cada documento se abre en su propia ventana, o en una pestaña si prefieres las 
 
 - **Izquierda: el código fuente.** Tu Markdown en SF Mono con colores de sintaxis.
 - **Derecha: la previsualización.** El documento renderizado, listo para editar.
-- **Barra lateral (opcional).** Todos los encabezamientos en forma de árbol, un clic en uno lo muestra en ambos paneles: **Visualización › Mostrar esquema** (⌃⌘S). Otras dos pestañas contienen las [notas de la carpeta](#notas-en-una-carpeta) y una búsqueda en ellas.
+- **Barra lateral (opcional).** Todos los encabezamientos en forma de árbol, un clic en uno lo muestra en ambos paneles: **Visualización › Mostrar esquema** (⌃⌘S). Otras dos pestañas contienen las [notas de la carpeta](#notas-en-una-carpeta) y una búsqueda en ellas. El botón junto al título de la ventana la muestra y la oculta, y las ventanas nuevas la abren tal como la dejó la última.
 - **Barra de herramientas.** Botones agrupados según lo que cambian: caracteres, párrafos y elementos insertados, y después mostrar u ocultar la previsualización, Compartir y Nuevo documento. Se personaliza con **Visualización › Personalizar barra de herramientas…**.
 
 Arrastra el divisor para dar más espacio a un lado. **Visualización › Ocultar previsualización** (⌥⌘P) deja solo el código fuente; Splat lo recuerda por ventana. Ambos paneles se desplazan a la vez, y la selección en un panel se resalta en el otro.
 
-La esquina de la ventana muestra las palabras y los caracteres del texto y cuánto se tarda en leerlo, y los de la selección mientras la haya. Las direcciones de enlaces, las etiquetas HTML, los metadatos, los comentarios, las fórmulas y los diagramas no cuentan. **Visualización › Ocultar recuento de palabras** lo quita.
+La esquina de la ventana muestra las palabras y los caracteres del texto y cuánto se tarda en leerlo, y los de la selección mientras la haya. Las direcciones de enlaces, las etiquetas HTML, los metadatos, los comentarios, las fórmulas y los diagramas no cuentan. Permanece oculto hasta que **Visualización › Mostrar recuento de palabras** lo activa.
 
 ### Documentos, pestañas y versiones
 

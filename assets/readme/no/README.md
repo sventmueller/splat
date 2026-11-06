@@ -164,12 +164,12 @@ Hvert dokument åpnes i sitt eget vindu, eller som en fane hvis du foretrekker f
 
 - **Til venstre: kildeteksten.** Markdownen din i SF Mono med syntaksfarger.
 - **Til høyre: forhåndsvisningen.** Det gjengitte dokumentet, klart til redigering.
-- **Sidefelt (valgfritt).** Alle overskrifter som et tre, et klikk på en av dem viser den i begge rutene: **Vis › Vis disposisjon** (⌃⌘S). To faner til rommer [notatene i mappen](#notater-i-en-mappe) og et søk i dem.
+- **Sidefelt (valgfritt).** Alle overskrifter som et tre, et klikk på en av dem viser den i begge rutene: **Vis › Vis disposisjon** (⌃⌘S). To faner til rommer [notatene i mappen](#notater-i-en-mappe) og et søk i dem. Knappen ved siden av vindustittelen viser og skjuler det, og nye vinduer åpner det slik det siste vinduet forlot det.
 - **Verktøylinje.** Knapper gruppert etter det de endrer: tegn, avsnitt og innsatte elementer, deretter forhåndsvisning av/på, Del og Nytt dokument. Tilpass den med **Vis › Tilpass verktøylinje…**.
 
 Dra i skillelinjen for å gi den ene siden mer plass. **Vis › Skjul forhåndsvisning** (⌥⌘P) lar bare kildeteksten stå igjen; Splat husker dette per vindu. Begge rutene ruller sammen, og en markering i den ene ruten utheves i den andre.
 
-Hjørnet av vinduet viser ordene og tegnene i teksten og hvor lang tid den tar å lese, og det samme for markeringen så lenge det finnes en. Lenkeadresser, HTML-tagger, metadata, kommentarer, formler og diagrammer teller ikke. **Vis › Skjul antall ord** fjerner visningen.
+Hjørnet av vinduet viser ordene og tegnene i teksten og hvor lang tid den tar å lese, og det samme for markeringen så lenge det finnes en. Lenkeadresser, HTML-tagger, metadata, kommentarer, formler og diagrammer teller ikke. Visningen er skjult til **Vis › Vis antall ord** slår den på.
 
 ### Dokumenter, faner og versjoner
 

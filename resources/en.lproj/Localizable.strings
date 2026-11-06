@@ -190,6 +190,9 @@
 "Schleife" = "Loop";
 "Schließen" = "Close";
 "Schrift" = "Font";
+"Seitenleiste" = "Sidebar";
+"Seitenleiste ein- oder ausblenden" = "Show or hide the sidebar";
+"Seitenleiste einblenden" = "Show Sidebar";
 "Sequenzdiagramm" = "Sequence Diagram";
 "Sichern" = "Save";
 "Spalte einfügen" = "Insert Column";

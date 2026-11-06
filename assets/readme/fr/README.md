@@ -164,12 +164,12 @@ Chaque document s’ouvre dans sa propre fenêtre, ou dans un onglet si vous pr�
 
 - **À gauche : la source.** Votre Markdown en SF Mono avec coloration syntaxique.
 - **À droite : l’aperçu.** Le document rendu, prêt à être modifié.
-- **Barre latérale (facultative).** Tous les titres sous forme d’arborescence, un clic sur l’un d’eux l’affiche dans les deux volets : **Présentation › Afficher le plan** (⌃⌘S). Deux autres onglets contiennent les [notes du dossier](#notes-dans-un-dossier) et une recherche parmi elles.
+- **Barre latérale (facultative).** Tous les titres sous forme d’arborescence, un clic sur l’un d’eux l’affiche dans les deux volets : **Présentation › Afficher le plan** (⌃⌘S). Deux autres onglets contiennent les [notes du dossier](#notes-dans-un-dossier) et une recherche parmi elles. Le bouton à côté du titre de la fenêtre l’affiche et la masque, et les nouvelles fenêtres l’ouvrent telle que la dernière l’a laissée.
 - **Barre d’outils.** Des boutons regroupés selon ce qu’ils modifient : les caractères, les paragraphes et les éléments insérés, puis l’aperçu activé ou désactivé, Partager et Nouveau document. Personnalisez-la avec **Présentation › Personnaliser la barre d’outils…**.
 
 Faites glisser le séparateur pour donner plus de place à l’un ou l’autre côté. **Présentation › Masquer l’aperçu** (⌥⌘P) laisse la source seule ; Splat s’en souvient pour chaque fenêtre. Les deux volets défilent ensemble, et une sélection dans l’un est mise en évidence dans l’autre.
 
-Le coin de la fenêtre affiche les mots et les caractères du texte ainsi que son temps de lecture, et ceux de la sélection tant qu’il y en a une. Les adresses de liens, les balises HTML, les métadonnées, les commentaires, les formules et les diagrammes ne comptent pas. **Présentation › Masquer le nombre de mots** le retire.
+Le coin de la fenêtre affiche les mots et les caractères du texte ainsi que son temps de lecture, et ceux de la sélection tant qu’il y en a une. Les adresses de liens, les balises HTML, les métadonnées, les commentaires, les formules et les diagrammes ne comptent pas. Il reste masqué jusqu’à ce que **Présentation › Afficher le nombre de mots** l’active.
 
 ### Documents, onglets et versions
 

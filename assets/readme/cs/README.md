@@ -164,12 +164,12 @@ Každý dokument se otevře ve vlastním okně, nebo jako panel, pokud dáváte 
 
 - **Vlevo: zdrojový text.** Váš Markdown v písmu SF Mono s barevným zvýrazněním syntaxe.
 - **Vpravo: náhled.** Vykreslený dokument připravený k úpravám.
-- **Postranní panel (volitelný).** Všechny nadpisy jako strom, kliknutí na nadpis ho zobrazí v obou podoknech: **Zobrazení › Zobrazit osnovu** (⌃⌘S). Další dvě karty v něm obsahují [poznámky ve složce](#poznámky-ve-složce) a jejich prohledávání.
+- **Postranní panel (volitelný).** Všechny nadpisy jako strom, kliknutí na nadpis ho zobrazí v obou podoknech: **Zobrazení › Zobrazit osnovu** (⌃⌘S). Další dvě karty v něm obsahují [poznámky ve složce](#poznámky-ve-složce) a jejich prohledávání. Tlačítko vedle názvu okna ho zobrazí a skryje a nová okna ho otevřou tak, jak ho zanechalo poslední okno.
 - **Panel nástrojů.** Tlačítka seskupená podle toho, co mění: znaky, odstavce a vkládané prvky, potom zapnutí a vypnutí náhledu, Sdílet a Nový dokument. Upravíte ho příkazem **Zobrazení › Upravit panel nástrojů…**.
 
 Tažením rozdělovače dáte více místa kterékoli straně. **Zobrazení › Skrýt náhled** (⌥⌘P) nechá jen zdrojový text; Splat si to pamatuje pro každé okno zvlášť. Obě podokna se posouvají společně a výběr v jednom z nich je zvýrazněn i v druhém.
 
-V rohu okna se zobrazuje počet slov a znaků textu a doba čtení, a dokud existuje výběr, totéž pro výběr. Adresy odkazů, značky HTML, metadata, komentáře, vzorce a diagramy se nepočítají. **Zobrazení › Skrýt počet slov** tento údaj odstraní.
+V rohu okna se zobrazuje počet slov a znaků textu a doba čtení, a dokud existuje výběr, totéž pro výběr. Adresy odkazů, značky HTML, metadata, komentáře, vzorce a diagramy se nepočítají. Údaj je zpočátku skrytý; zobrazí ho **Zobrazení › Zobrazit počet slov**.
 
 ### Dokumenty, panely a verze
 

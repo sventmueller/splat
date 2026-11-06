@@ -1,2 +1,4 @@
+a new window opens the sidebar as the last one left it
 a pane can open and close with the source scrolled off its selection
+the sidebar takes its room from source and preview alike
 the source re-wraps while the window is resized

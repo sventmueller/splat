@@ -164,12 +164,12 @@ Ogni documento si apre in una finestra propria, oppure in un pannello se preferi
 
 - **A sinistra: il codice sorgente.** Il tuo Markdown in SF Mono con i colori della sintassi.
 - **A destra: l’anteprima.** Il documento elaborato, pronto per essere modificato.
-- **Barra laterale (facoltativa).** Tutte le intestazioni ad albero, un clic su una la mostra in entrambi i riquadri: **Vista › Mostra struttura** (⌃⌘S). Altri due pannelli contengono le [note della cartella](#note-in-una-cartella) e una ricerca al loro interno.
+- **Barra laterale (facoltativa).** Tutte le intestazioni ad albero, un clic su una la mostra in entrambi i riquadri: **Vista › Mostra struttura** (⌃⌘S). Altri due pannelli contengono le [note della cartella](#note-in-una-cartella) e una ricerca al loro interno. Il pulsante accanto al titolo della finestra la mostra e la nasconde, e le nuove finestre la aprono come l’ha lasciata l’ultima.
 - **Barra strumenti.** Pulsanti raggruppati in base a ciò che modificano: caratteri, paragrafi ed elementi inseriti, poi anteprima sì/no, Condividi e Nuovo documento. Si personalizza con **Vista › Personalizza la barra strumenti…**.
 
 Trascina il divisore per dare più spazio a uno dei due lati. **Vista › Nascondi anteprima** (⌥⌘P) lascia solo il codice sorgente; Splat lo ricorda per ogni finestra. I due riquadri scorrono insieme e una selezione in uno viene evidenziata nell’altro.
 
-L’angolo della finestra mostra le parole e i caratteri del testo e quanto tempo serve per leggerlo, e quelli della selezione finché ce n’è una. Indirizzi dei link, tag HTML, metadati, commenti, formule e diagrammi non contano. **Vista › Nascondi conteggio parole** lo toglie.
+L’angolo della finestra mostra le parole e i caratteri del testo e quanto tempo serve per leggerlo, e quelli della selezione finché ce n’è una. Indirizzi dei link, tag HTML, metadati, commenti, formule e diagrammi non contano. Resta nascosto finché **Vista › Mostra conteggio parole** non lo attiva.
 
 ### Documenti, pannelli e versioni
 

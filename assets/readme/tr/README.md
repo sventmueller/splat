@@ -164,12 +164,12 @@ Her belge kendi penceresinde açılır; sekmeleri tercih ediyorsanız sekme olar
 
 - **Sol: kaynak.** SF Mono yazı tipiyle, sözdizimi renkli Markdown’ınız.
 - **Sağ: önizleme.** Görüntülenmiş belge, düzenlemeye hazır.
-- **Kenar çubuğu (isteğe bağlı).** Tüm başlıklar bir ağaç olarak, birine tıklamak onu iki bölmede de gösterir: **Görüntü › Ana Hattı Göster** (⌃⌘S). İki sekme daha [klasördeki notları](#klasördeki-notlar) ve bunlar içinde aramayı barındırır.
+- **Kenar çubuğu (isteğe bağlı).** Tüm başlıklar bir ağaç olarak, birine tıklamak onu iki bölmede de gösterir: **Görüntü › Ana Hattı Göster** (⌃⌘S). İki sekme daha [klasördeki notları](#klasördeki-notlar) ve bunlar içinde aramayı barındırır. Pencere başlığının yanındaki düğme onu gösterir ve gizler; yeni pencereler onu son pencerenin bıraktığı gibi açar.
 - **Araç çubuğu.** Düğmeler neyi değiştirdiklerine göre gruplanmıştır: karakterler, paragraflar ve eklenen öğeler; ardından önizlemeyi aç/kapat, Paylaş ve Yeni Belge. **Görüntü › Araç Çubuğunu Özelleştir…** ile özelleştirin.
 
 Her iki tarafa daha fazla yer vermek için ayırıcıyı sürükleyin. **Görüntü › Önizlemeyi Gizle** (⌥⌘P) yalnızca kaynağı bırakır; Splat bunu pencere başına hatırlar. İki bölme birlikte kayar ve birinde yaptığınız seçim ötekinde vurgulanır.
 
-Pencerenin köşesi metnin sözcük ve karakter sayısını ve okuma süresini, bir seçim varken aynısını seçim için de gösterir. Bağlantı adresleri, HTML etiketleri, meta veriler, yorumlar, formüller ve diyagramlar sayılmaz. **Görüntü › Sözcük Sayısını Gizle** bu göstergeyi kaldırır.
+Pencerenin köşesi metnin sözcük ve karakter sayısını ve okuma süresini, bir seçim varken aynısını seçim için de gösterir. Bağlantı adresleri, HTML etiketleri, meta veriler, yorumlar, formüller ve diyagramlar sayılmaz. Bu gösterge başta gizlidir; **Görüntü › Sözcük Sayısını Göster** onu açar.
 
 ### Belgeler, sekmeler ve sürümler
 

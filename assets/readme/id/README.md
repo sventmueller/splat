@@ -164,12 +164,12 @@ Setiap dokumen terbuka di jendelanya sendiri, atau sebagai tab jika Anda lebih s
 
 - **Kiri: sumber.** Markdown Anda dalam SF Mono dengan pewarnaan sintaks.
 - **Kanan: pratinjau.** Dokumen yang sudah ditampilkan, siap diedit.
-- **Bilah samping (opsional).** Semua heading sebagai pohon, klik salah satunya untuk menampilkannya di kedua panel: **Lihat › Tampilkan Kerangka** (⌃⌘S). Dua tab lainnya memuat [catatan di folder](#catatan-dalam-folder) dan pencarian di dalamnya.
+- **Bilah samping (opsional).** Semua heading sebagai pohon, klik salah satunya untuk menampilkannya di kedua panel: **Lihat › Tampilkan Kerangka** (⌃⌘S). Dua tab lainnya memuat [catatan di folder](#catatan-dalam-folder) dan pencarian di dalamnya. Tombol di samping judul jendela menampilkan dan menyembunyikannya, dan jendela baru membukanya seperti yang ditinggalkan jendela terakhir.
 - **Bar alat.** Tombol dikelompokkan menurut apa yang diubahnya: karakter, paragraf, dan elemen yang disisipkan, lalu pratinjau hidup/mati, Bagikan, dan Dokumen Baru. Sesuaikan dengan **Lihat › Sesuaikan Bar Alat…**.
 
 Seret pembagi untuk memberi salah satu sisi lebih banyak ruang. **Lihat › Sembunyikan Pratinjau** (⌥⌘P) menyisakan sumber saja; Splat mengingatnya per jendela. Kedua panel bergulir bersama, dan pilihan di satu panel disorot di panel lainnya.
 
-Sudut jendela menampilkan jumlah kata dan karakter teks serta lama waktu membacanya, dan selama ada pilihan, juga jumlah untuk pilihan itu. Alamat tautan, tag HTML, metadata, komentar, rumus, dan diagram tidak dihitung. **Lihat › Sembunyikan Jumlah Kata** menghilangkannya.
+Sudut jendela menampilkan jumlah kata dan karakter teks serta lama waktu membacanya, dan selama ada pilihan, juga jumlah untuk pilihan itu. Alamat tautan, tag HTML, metadata, komentar, rumus, dan diagram tidak dihitung. Awalnya disembunyikan; **Lihat › Tampilkan Jumlah Kata** menampilkannya.
 
 ### Dokumen, tab, dan versi
 

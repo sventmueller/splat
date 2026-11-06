@@ -148,6 +148,33 @@ fn capsule_ends(view: &NSView, out: &mut Vec<f64>) {
     }
 }
 
+/// The horizontal span of the first view under `view` that `wanted` picks, in window coordinates.
+fn span_of(view: &NSView, wanted: &dyn Fn(&NSView) -> bool) -> Option<(f64, f64)> {
+    if wanted(view) {
+        let frame = view.convertRect_toView(view.bounds(), None);
+        return Some((frame.origin.x, frame.origin.x + frame.size.width));
+    }
+    view.subviews().iter().find_map(|sub| span_of(&sub, wanted))
+}
+
+/// Where the zoom button ends, the sidebar button stands and the title begins.
+fn title_row(c: &Ctx) -> Option<(f64, (f64, f64), f64)> {
+    let window = c.e.window()?;
+    let zoom = window.standardWindowButton(NSWindowButton::ZoomButton)?;
+    let zoom_end = zoom.convertRect_toView(zoom.bounds(), None);
+    // SAFETY: Only read here, on the main thread, while the window holds its content view.
+    let frame = unsafe { window.contentView()?.superview() }?;
+    let sidebar = Action::ToggleSidebar.spec().selector;
+    let button = span_of(&frame, &|v| {
+        v.downcast_ref::<objc2_app_kit::NSControl>()
+            .is_some_and(|control| control.action() == Some(sidebar))
+    })?;
+    let title = span_of(&frame, &|v| {
+        v.class().name().to_bytes().ends_with(b"NSToolbarTitleField")
+    })?;
+    Some((zoom_end.origin.x + zoom_end.size.width, button, title.0))
+}
+
 /// How far the toolbar's last capsule stands from the window's right edge.
 fn toolbar_margin(c: &Ctx) -> Option<f64> {
     let window = c.e.window()?;
@@ -236,6 +263,12 @@ pub(super) fn toolbar_steps() -> Vec<Step> {
                 "the toolbar with symbols keeps its place at the edge",
                 margin.is_some_and(|m| (m - 8.0).abs() <= 1.0),
                 &format!("{margin:?}"),
+            );
+            let row = title_row(c);
+            check(
+                "the sidebar button stands between the window buttons and the title",
+                row.is_some_and(|(zoom, (start, end), title)| zoom < start && end <= title),
+                &format!("zoom button ends, sidebar button spans, title begins: {row:?}"),
             );
         }),
     ]

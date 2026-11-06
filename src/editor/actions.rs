@@ -48,6 +48,7 @@ pub enum Action {
     TableAlign,
     TableFormat,
     TogglePreview,
+    ToggleSidebar,
     ToggleOutline,
     Typography,
     ZoomIn,
@@ -97,7 +98,7 @@ pub struct Spec {
 }
 
 impl Action {
-    pub const ALL: [Action; 54] = {
+    pub const ALL: [Action; 55] = {
         use Action::*;
         [
             Bold,
@@ -134,6 +135,7 @@ impl Action {
             TableAlign,
             TableFormat,
             TogglePreview,
+            ToggleSidebar,
             ToggleOutline,
             Typography,
             ZoomIn,
@@ -196,6 +198,7 @@ impl Action {
             TableAlign => (sel!(mdTableAlign:), n("Ausrichtung"), "", "", "", "", InTable),
             TableFormat => (sel!(mdTableFormat:), n("Tabelle bündig ausrichten"), "", "", "", "", InTable),
             TogglePreview => (sel!(mdTogglePreview:), n("Vorschau ausblenden"), n("Vorschau"), n("Vorschau ein- oder ausblenden"), "alt+cmd+p", "rectangle.split.2x1", Always),
+            ToggleSidebar => (sel!(mdToggleSidebar:), n("Seitenleiste einblenden"), n("Seitenleiste"), n("Seitenleiste ein- oder ausblenden"), "", "sidebar.left", Always),
             ToggleOutline => (sel!(mdToggleOutline:), n("Gliederung einblenden"), "", "", "ctrl+cmd+s", "sidebar.left", Always),
             Typography => (sel!(mdTypography:), n("Typografische Satzzeichen"), "", "", "", "", Always),
             ZoomIn => (sel!(mdZoomIn:), n("Vergrößern"), "", "", "cmd++", "", Always),

@@ -164,12 +164,12 @@ Jedes Dokument öffnet in einem eigenen Fenster oder, wenn du Tabs bevorzugst, i
 
 - **Links: der Quelltext.** Dein Markdown in SF Mono mit Syntaxfarben.
 - **Rechts: die Vorschau.** Das dargestellte Dokument, bereit zum Bearbeiten.
-- **Seitenleiste (optional).** Alle Überschriften als Baum, ein Klick auf eine zeigt sie in beiden Bereichen: **Darstellung › Gliederung einblenden** (⌃⌘S). Zwei weitere Tabs enthalten die [Notizen im Ordner](#notizen-in-einem-ordner) und eine Suche darin.
+- **Seitenleiste (optional).** Alle Überschriften als Baum, ein Klick auf eine zeigt sie in beiden Bereichen: **Darstellung › Gliederung einblenden** (⌃⌘S). Zwei weitere Tabs enthalten die [Notizen im Ordner](#notizen-in-einem-ordner) und eine Suche darin. Die Schaltfläche neben dem Fenstertitel blendet sie ein und aus, und neue Fenster öffnen sie so, wie das letzte sie hinterlassen hat.
 - **Symbolleiste.** Schaltflächen, gruppiert danach, was sie ändern: Zeichen, Absätze und eingefügte Elemente, dann Vorschau ein/aus, Teilen und Neues Dokument. Anpassen mit **Darstellung › Symbolleiste anpassen …**.
 
 Ziehe die Trennlinie, um einer Seite mehr Platz zu geben. **Darstellung › Vorschau ausblenden** (⌥⌘P) lässt nur den Quelltext stehen; Splat merkt sich das pro Fenster. Beide Bereiche scrollen gemeinsam, und eine Auswahl in einem Bereich wird im anderen hervorgehoben.
 
-Die Fensterecke zeigt die Wörter und Zeichen des Textes und wie lange das Lesen dauert, und solange es eine Auswahl gibt, auch die der Auswahl. Linkadressen, HTML-Tags, Metadaten, Kommentare, Formeln und Diagramme zählen nicht. **Darstellung › Wortanzahl ausblenden** blendet die Anzeige aus.
+Die Fensterecke zeigt die Wörter und Zeichen des Textes und wie lange das Lesen dauert, und solange es eine Auswahl gibt, auch die der Auswahl. Linkadressen, HTML-Tags, Metadaten, Kommentare, Formeln und Diagramme zählen nicht. Die Anzeige ist zunächst ausgeblendet; **Darstellung › Wortanzahl einblenden** blendet sie ein.
 
 ### Dokumente, Tabs und Versionen
 

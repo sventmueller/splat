@@ -164,12 +164,12 @@ Hvert dokument åbner i sit eget vindue eller som en fane, hvis du foretrækker 
 
 - **Til venstre: kildeteksten.** Din Markdown i SF Mono med syntaksfarver.
 - **Til højre: eksemplet.** Det gengivne dokument, klar til redigering.
-- **Indholdsoversigt (valgfri).** Alle overskrifter som et træ, et klik på en af dem viser den i begge felter: **Oversigt › Vis disposition** (⌃⌘S). To faner mere rummer [noterne i mappen](#noter-i-en-mappe) og en søgning i dem.
+- **Indholdsoversigt (valgfri).** Alle overskrifter som et træ, et klik på en af dem viser den i begge felter: **Oversigt › Vis disposition** (⌃⌘S). To faner mere rummer [noterne i mappen](#noter-i-en-mappe) og en søgning i dem. Knappen ved siden af vinduets titel viser og skjuler den, og nye vinduer åbner den, som det sidste vindue efterlod den.
 - **Værktøjslinje.** Knapper grupperet efter det, de ændrer: tegn, afsnit og indsatte elementer, derefter eksempel til/fra, Del og Nyt dokument. Tilpas den med **Oversigt › Indstil værktøjslinje…**.
 
 Træk i skillelinjen for at give den ene side mere plads. **Oversigt › Skjul eksempel** (⌥⌘P) lader kun kildeteksten stå tilbage; Splat husker det for hvert vindue. Begge felter ruller sammen, og en markering i det ene felt fremhæves i det andet.
 
-Hjørnet af vinduet viser tekstens ord og tegn og dens læsetid og, så længe der er en markering, det samme for markeringen. Linkadresser, HTML-tags, metadata, kommentarer, formler og diagrammer tæller ikke med. **Oversigt › Skjul antal ord** fjerner visningen.
+Hjørnet af vinduet viser tekstens ord og tegn og dens læsetid og, så længe der er en markering, det samme for markeringen. Linkadresser, HTML-tags, metadata, kommentarer, formler og diagrammer tæller ikke med. Visningen er skjult, indtil **Oversigt › Vis antal ord** slår den til.
 
 ### Dokumenter, faner og versioner
 

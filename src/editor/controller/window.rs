@@ -195,7 +195,9 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     if let (Some(left), Some(right)) = (source.enclosingScrollView(), preview.enclosingScrollView()) {
         controller.change_marks().install(&left, &right);
     }
-    controller.panes().install_views(source.clone(), preview, right_item);
+    controller
+        .panes()
+        .install_views(source.clone(), preview, [left_item, right_item]);
     controller.word_counter().install();
     controller.updater().set_zoom(1.0);
     controller.updater().replace_all_text(text);

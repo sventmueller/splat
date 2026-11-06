@@ -2,14 +2,14 @@
 //! `ViewReader` and changes them through `Panes::silently`, so a change of a view that the delegate callbacks are meant
 //! to hear stands out as `Panes::for_appkit`.
 
-use std::cell::{Cell, OnceCell};
+use std::cell::{Cell, OnceCell, RefCell};
 
 use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::sel;
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceCustomization, NSScrollView, NSSplitViewItem, NSTextInputClient, NSTextView, NSWindow,
-    NSWindowStyleMask,
+    NSAppearance, NSAppearanceCustomization, NSLayoutConstraint, NSScrollView, NSSplitViewItem, NSTextInputClient,
+    NSTextView, NSWindow, NSWindowStyleMask,
 };
 use objc2_foundation::{NSCoder, NSRange, NSRect, NSString, NSUserDefaults};
 
@@ -21,6 +21,10 @@ use crate::util::{ns, perform_later, storage};
 
 /// User defaults key of the frame the last moved or resized document window had.
 pub(super) const FRAME_KEY: &str = "DocumentWindowFrame";
+
+/// User defaults keys of whether the sidebar last showed and on which tab, which the next window opens with.
+const SIDEBAR_SHOWN_KEY: &str = "SidebarShown";
+const SIDEBAR_TAB_KEY: &str = "SidebarTab";
 
 /// A little longer than AppKit takes to collapse a pane.
 const PANE_ANIMATION_SECONDS: f64 = 0.6;
@@ -49,9 +53,15 @@ impl Asked {
 pub(super) struct PaneState {
     source: OnceCell<Retained<SourceTextView>>,
     preview: OnceCell<Retained<PreviewTextView>>,
+    source_item: OnceCell<Retained<NSSplitViewItem>>,
     preview_item: OnceCell<Retained<NSSplitViewItem>>,
     sidebar: OnceCell<Sidebar>,
     outline_item: OnceCell<Retained<NSSplitViewItem>>,
+    /// How this window last left its sidebar in the user defaults.
+    remembered: Cell<Option<(bool, SidebarTab)>>,
+    /// AppKit's animation of the sidebar takes all its width from the preview; while it runs, this holds source and
+    /// preview at the share they had.
+    share: RefCell<Option<Retained<NSLayoutConstraint>>>,
     /// Raised while the controller changes its own views; the delegate callbacks then ignore the changes.
     busy: Cell<bool>,
     preview_asked: Asked,
@@ -162,19 +172,25 @@ impl<'a> Panes<'a> {
 }
 
 impl<'a> Panes<'a> {
+    /// Opens the sidebar as the last window left it.
     pub(super) fn install_sidebar(&self, sidebar: Sidebar, item: Retained<NSSplitViewItem>) {
         let _ = self.state.sidebar.set(sidebar);
         let _ = self.state.outline_item.set(item);
+        let defaults = NSUserDefaults::standardUserDefaults();
+        let tab = SidebarTab::of_segment(defaults.integerForKey(&ns(SIDEBAR_TAB_KEY)));
+        self.put_sidebar(defaults.boolForKey(&ns(SIDEBAR_SHOWN_KEY)), tab);
     }
 
     pub(super) fn install_views(
         &self,
         source: Retained<SourceTextView>,
         preview: Retained<PreviewTextView>,
-        preview_item: Retained<NSSplitViewItem>,
+        items: [Retained<NSSplitViewItem>; 2],
     ) {
+        let [source_item, preview_item] = items;
         let _ = self.state.source.set(source);
         let _ = self.state.preview.set(preview);
+        let _ = self.state.source_item.set(source_item);
         let _ = self.state.preview_item.set(preview_item);
     }
 
@@ -297,7 +313,7 @@ impl<'a> Panes<'a> {
             return false;
         };
         let shown_elsewhere = self.sidebar_visible() && self.sidebar_tab() != Some(tab);
-        let shows = shown_elsewhere || self.toggle_pane(item, &self.state.outline_asked);
+        let shows = shown_elsewhere || self.toggle_sidebar_pane(item);
         if shows {
             self.select_tab(tab);
         }
@@ -311,7 +327,7 @@ impl<'a> Panes<'a> {
             return;
         };
         if !self.sidebar_visible() {
-            self.toggle_pane(item, &self.state.outline_asked);
+            self.toggle_sidebar_pane(item);
         }
         self.select_tab(tab);
         self.host.object().invalidateRestorableState();
@@ -322,6 +338,62 @@ impl<'a> Panes<'a> {
         if tab == SidebarTab::Outline {
             self.show_headings();
         }
+        self.remember_sidebar();
+    }
+
+    /// Shows or hides the sidebar on `tab` at once, as a window opens or comes back.
+    fn put_sidebar(&self, shown: bool, tab: SidebarTab) {
+        let Some(item) = self.state.outline_item.get() else {
+            return;
+        };
+        self.with_sidebar(|sidebar| sidebar.select(tab));
+        item.setCollapsed(!shown);
+        self.state.remembered.set(Some((shown, tab)));
+        self.show_headings_if_open();
+    }
+
+    /// Writes how the sidebar stands to the user defaults if that changed, for the next window and the next start.
+    pub(super) fn remember_sidebar(&self) {
+        let now = (self.sidebar_visible(), self.sidebar_tab().unwrap_or_default());
+        if self.state.remembered.replace(Some(now)) == Some(now) {
+            return;
+        }
+        let defaults = NSUserDefaults::standardUserDefaults();
+        defaults.setBool_forKey(now.0, &ns(SIDEBAR_SHOWN_KEY));
+        defaults.setInteger_forKey(now.1.segment(), &ns(SIDEBAR_TAB_KEY));
+    }
+
+    fn toggle_sidebar_pane(&self, item: &NSSplitViewItem) -> bool {
+        self.hold_share();
+        self.toggle_pane(item, &self.state.outline_asked)
+    }
+
+    /// Keeps source and preview at their share of the width until the panes settle.
+    fn hold_share(&self) {
+        let (Some(source), Some(preview)) = (self.state.source_item.get(), self.state.preview_item.get()) else {
+            return;
+        };
+        if preview.isCollapsed() || self.state.share.borrow().is_some() {
+            return;
+        }
+        let mtm = self.host.mtm();
+        let (left, right) = (source.viewController(mtm).view(), preview.viewController(mtm).view());
+        let (left_width, right_width) = (left.frame().size.width, right.frame().size.width);
+        if left_width <= 0.0 || right_width <= 0.0 {
+            return;
+        }
+        let share = left
+            .widthAnchor()
+            .constraintEqualToAnchor_multiplier(&right.widthAnchor(), left_width / right_width);
+        share.setPriority(source.holdingPriority().max(preview.holdingPriority()) + 1.0);
+        share.setActive(true);
+        *self.state.share.borrow_mut() = Some(share);
+    }
+
+    fn release_share(&self) {
+        if let Some(share) = self.state.share.take() {
+            share.setActive(false);
+        }
     }
 
     /// Whether the preview came back and has to catch up.
@@ -329,6 +401,8 @@ impl<'a> Panes<'a> {
         let Some(item) = self.state.preview_item.get() else {
             return false;
         };
+        // A share with a collapsed preview would squeeze the source.
+        self.release_share();
         let shown = self.toggle_pane(item, &self.state.preview_asked);
         if !shown && self.preview_focused() {
             self.host
@@ -365,6 +439,8 @@ impl<'a> Panes<'a> {
         if corrected(&self.state.outline_item, &self.state.outline_asked) == Some(true) && self.outline_visible() {
             self.show_headings();
         }
+        self.release_share();
+        self.remember_sidebar();
         corrected(&self.state.preview_item, &self.state.preview_asked) == Some(true)
     }
 
@@ -426,11 +502,18 @@ impl<'a> Panes<'a> {
         // SAFETY: Window restoration always passes a keyed coder.
         let tab = SidebarTab::of_segment(unsafe { coder.decodeIntegerForKey(&ns("sidebarTab")) });
         // SAFETY: Window restoration always passes a keyed coder.
-        if unsafe { coder.decodeBoolForKey(&ns("outlineShown")) } && !self.tab_visible(tab) {
-            self.show_tab(tab);
-        }
+        let shown = unsafe { coder.decodeBoolForKey(&ns("outlineShown")) };
+        self.put_sidebar(shown, tab);
         (zoom > 0.3).then_some(zoom)
     }
+}
+
+/// Each document of a self-test run opens with the sidebar hidden, whatever the steps before left.
+#[cfg(feature = "selftest")]
+pub(super) fn forget_sidebar() {
+    let defaults = NSUserDefaults::standardUserDefaults();
+    defaults.removeObjectForKey(&ns(SIDEBAR_SHOWN_KEY));
+    defaults.removeObjectForKey(&ns(SIDEBAR_TAB_KEY));
 }
 
 #[cfg(feature = "selftest")]

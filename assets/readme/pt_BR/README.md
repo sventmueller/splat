@@ -164,12 +164,12 @@ Cada documento abre em sua própria janela, ou como aba, se você preferir abas:
 
 - **À esquerda: o código-fonte.** Seu Markdown em SF Mono com cores de sintaxe.
 - **À direita: a pré-visualização.** O documento renderizado, pronto para editar.
-- **Barra lateral (opcional).** Todos os títulos em forma de árvore, um clique em um deles o mostra nos dois painéis: **Visualizar › Mostrar Estrutura** (⌃⌘S). Outras duas abas contêm as [notas da pasta](#notas-em-uma-pasta) e uma busca nelas.
+- **Barra lateral (opcional).** Todos os títulos em forma de árvore, um clique em um deles o mostra nos dois painéis: **Visualizar › Mostrar Estrutura** (⌃⌘S). Outras duas abas contêm as [notas da pasta](#notas-em-uma-pasta) e uma busca nelas. O botão ao lado do título da janela mostra e oculta a barra, e as novas janelas a abrem como a última janela a deixou.
 - **Barra de ferramentas.** Botões agrupados pelo que alteram: caracteres, parágrafos e elementos inseridos, depois pré-visualização ligada/desligada, Compartilhar e Novo Documento. Personalize-a com **Visualizar › Personalizar Barra de Ferramentas…**.
 
 Arraste o divisor para dar mais espaço a qualquer um dos lados. **Visualizar › Ocultar Pré-visualização** (⌥⌘P) deixa só o código-fonte; o Splat lembra disso por janela. Os dois painéis rolam juntos, e uma seleção em um painel é destacada no outro.
 
-O canto da janela mostra as palavras e os caracteres do texto e quanto tempo leva para lê-lo, e os da seleção enquanto houver uma. Endereços de links, tags HTML, metadados, comentários, fórmulas e diagramas não contam. **Visualizar › Ocultar Contagem de Palavras** remove essa informação.
+O canto da janela mostra as palavras e os caracteres do texto e quanto tempo leva para lê-lo, e os da seleção enquanto houver uma. Endereços de links, tags HTML, metadados, comentários, fórmulas e diagramas não contam. Essa informação fica oculta até que **Visualizar › Mostrar Contagem de Palavras** a ative.
 
 ### Documentos, abas e versões
 

@@ -194,7 +194,8 @@ Each document opens in its own window, or as a tab if you prefer tabs:
 - **Left: the source.** Your Markdown in SF Mono with syntax colours.
 - **Right: the preview.** The rendered document, ready to edit.
 - **Sidebar (optional).** All headings as a tree, a click on one shows it in both panes: **View › Show Outline** (⌃⌘S). Two
-  more tabs hold the [notes in the folder](#notes-in-a-folder) and a search through them.
+  more tabs hold the [notes in the folder](#notes-in-a-folder) and a search through them. The button beside the window's
+  title shows and hides it, and new windows open it as the last one left it.
 - **Toolbar.** Buttons grouped by what they change: characters, paragraphs and inserted elements, then preview on/off,
   Share and New Document. Customize it with **View › Customize Toolbar…**.
 
@@ -202,8 +203,8 @@ Drag the divider to give either side more room. **View › Hide Preview** (⌥�
 remembers this per window. Both panes scroll together, and a selection in one pane is highlighted in the other.
 
 The corner of the window shows the words and characters of the text and how long it takes to read, and those of the
-selection while there is one. Link addresses, HTML tags, metadata, comments, formulas and diagrams do not count. **View ›
-Hide Word Count** takes it away.
+selection while there is one. Link addresses, HTML tags, metadata, comments, formulas and diagrams do not count. It
+stays hidden until **View › Show Word Count** turns it on.
 
 ### Documents, tabs and versions
 
