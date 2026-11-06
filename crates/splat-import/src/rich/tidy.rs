@@ -305,12 +305,14 @@ fn trim_end(spans: &mut Vec<Span>) {
     }
 }
 
-/// The spans without bold if all that show it have it: what a heading is anyway does not need saying.
+/// The spans without bold if all that show it have it: what a heading is anyway does not need saying. Runs that bold
+/// alone kept apart become one, so that tidying again changes nothing.
 fn without_whole_bold(mut spans: Vec<Span>) -> Vec<Span> {
     if spans.iter().all(|s| is_neutral(s) || s.marks.has(Mark::Bold)) {
         for span in &mut spans {
             span.marks = span.marks.with(Mark::Bold, false);
         }
+        return trim_and_merge(spans);
     }
     spans
 }

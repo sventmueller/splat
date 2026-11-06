@@ -136,6 +136,39 @@ fn lists_next_to_each_other_stay_two_lists() {
 }
 
 #[test]
+fn a_heading_and_a_table_header_without_their_bold_are_tidy_after_one_pass() {
+    let looks_alike_without_bold = || {
+        vec![
+            Span::of(Piece::Note("1".into())),
+            Span::text(" "),
+            Span::text("a").marked(marks(&[Mark::Bold])),
+        ]
+    };
+    let rich = Rich {
+        blocks: vec![
+            Block::Heading {
+                level: 1,
+                spans: looks_alike_without_bold(),
+                anchor: None,
+            },
+            Block::Table(Table {
+                alignments: vec![Align::Left],
+                rows: vec![vec![Cell {
+                    spans: looks_alike_without_bold(),
+                    columns: 1,
+                }]],
+            }),
+            Block::Note {
+                name: "1".into(),
+                blocks: vec![Block::Paragraph(vec![Span::text("b")])],
+            },
+        ],
+    };
+    let tidy = rich.tidied();
+    assert_eq!(tidy.clone().tidied(), tidy);
+}
+
+#[test]
 fn a_reference_without_a_definition_and_a_definition_without_a_reference_go() {
     let rich = Rich {
         blocks: vec![
