@@ -46,6 +46,10 @@ fn starts_from(group: &str) -> Option<(&'static str, &'static str)> {
         .map(|(_, text, caret)| (*text, *caret))
 }
 
+fn starts_where_it_ends(after: &str, group: &str) -> String {
+    format!("\"{after}\" ends where \"{group}\" starts")
+}
+
 /// Where the caret stands in the source and the preview, and which of them has the keyboard, one per line.
 fn caret_of(c: &Ctx) -> String {
     let at = |r: NSRange| format!("{} {}", r.location, r.length);
@@ -93,14 +97,18 @@ fn put_caret(c: &Ctx, caret: &str) {
 }
 
 /// The steps that set up a group after the first: in a recording run the text it starts from and the caret are
-/// written down, otherwise it gets a document of its own holding that text, with the caret where it was.
-pub(super) fn entry(group: &'static str) -> Vec<Step> {
+/// written down, otherwise it gets a document of its own holding that text, with the caret where it was. In a run of
+/// all groups, `after` names the group before it, whose end state has to be that start.
+pub(super) fn entry(group: &'static str, after: Option<&'static str>) -> Vec<Step> {
     if std::env::var_os("SPLAT_SELFTEST_RECORD").is_some() {
         return vec![applied(move |c| {
             let dir = c.out.join("click-through");
             let _ = std::fs::create_dir_all(&dir);
             let _ = std::fs::write(dir.join(format!("{}.md", entry_stem(group))), source(&c.e));
             let _ = std::fs::write(dir.join(format!("{}.caret", entry_stem(group))), caret_of(c));
+            if let Some(after) = after {
+                check(&starts_where_it_ends(after, group), true, "recorded just now");
+            }
         })];
     }
     let Some((text, caret)) = starts_from(group) else {
@@ -112,7 +120,28 @@ pub(super) fn entry(group: &'static str) -> Vec<Step> {
             );
         })];
     };
-    let mut steps = super::scenarios::document_holding(group, move |_| text.to_string());
+    let mut steps = Vec::new();
+    if let Some(after) = after {
+        steps.push(applied(move |c| {
+            let (same_text, found) = (source(&c.e) == text, caret_of(c));
+            if !same_text || found != caret {
+                let dir = c.out.join("click-through-found");
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = std::fs::write(dir.join(format!("{}.md", entry_stem(group))), source(&c.e));
+                let _ = std::fs::write(dir.join(format!("{}.caret", entry_stem(group))), &found);
+            }
+            check(
+                &starts_where_it_ends(after, group),
+                same_text && found == caret,
+                &format!(
+                    "the text {}, the carets are {:?} and not {caret:?}, both kept in click-through-found of the output; `cargo xtask selftest gui --record` writes the start anew",
+                    if same_text { "is the same" } else { "differs" },
+                    found
+                ),
+            );
+        }));
+    }
+    steps.extend(super::scenarios::document_holding(group, move |_| text.to_string()));
     steps.push(settle(move |c| put_caret(c, caret)));
     steps
 }
@@ -276,6 +305,13 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
                 &format!("{:?}", head(&s, 70)),
             );
         }),
+    ]
+}
+
+const SCREEN_LAGS: &str = "the window server shows what was drawn a frame ago and reports nothing";
+
+pub(super) fn selection_steps() -> Vec<Step> {
+    vec![
         // Like selecting with the mouse: the other view's caret is already where the selection starts, so
         // nothing else redraws the spot.
         applied(|c| {
@@ -284,13 +320,6 @@ pub(super) fn toolbar_and_undo() -> Vec<Step> {
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             e.preview().setSelectedRange(NSRange::new(preview_at, 0));
         }),
-    ]
-}
-
-const SCREEN_LAGS: &str = "the window server shows what was drawn a frame ago and reports nothing";
-
-pub(super) fn selection_steps() -> Vec<Step> {
-    vec![
         pause(0.3, SCREEN_LAGS, |c| {
             let e = &c.e;
             let (preview_at, source_at) = neuer_absatz(e);
@@ -342,6 +371,7 @@ pub(super) fn selection_steps() -> Vec<Step> {
     ]
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn preview_edit_steps() -> Vec<Step> {
     vec![
         applied(|c| {
@@ -458,6 +488,7 @@ pub(super) fn preview_edit_steps() -> Vec<Step> {
     ]
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn formula_editor_steps() -> Vec<Step> {
     vec![
         settle(|c| {
@@ -546,6 +577,7 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
             e.window().unwrap().makeFirstResponder(Some(e.preview()));
             let len = storage(e.preview()).length();
             e.preview().setSelectedRange(NSRange::new(len, 0));
+            *c.before.borrow_mut() = source(e);
             perform(e, sel!(mdInsertFormula:), 0);
             let open = e.atom_editor().open_popover().map(|p| p.isShown());
             check(
@@ -599,12 +631,21 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 s.trim_end().ends_with("$$\n\n$$") && s.matches("$$\n\n$$").count() == 1,
                 &tail(&s, 60),
             );
-            // Back to the document before the formulas: insert, edit, insert, insert, remove.
+            // Undo by count would reach into the edits of the group before when the groups run on one document.
+            let before = c.before.borrow().clone();
             if let Some(undo) = e.undo_manager() {
-                for _ in 0..5 {
+                for _ in 0..10 {
+                    if source(e) == before || !undo.canUndo() {
+                        break;
+                    }
                     undo.undo();
                 }
             }
+            check(
+                "undo leads back to the document before the new formulas",
+                source(e) == before,
+                &tail(&source(e), 60),
+            );
         }),
         applied(|c| check_context_menu(&c.e)),
         applied(|c| check_about_window(c.e.mtm())),
@@ -1087,6 +1128,7 @@ pub(super) fn command_and_link_steps() -> Vec<Step> {
     ]
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn building_block_steps() -> Vec<Step> {
     vec![
         closed(|c| {
@@ -1288,6 +1330,7 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
     ]
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
     vec![
         applied(|c| {

@@ -18,7 +18,7 @@ use super::{EditorController, Ivars};
 use crate::document::MdDocument;
 use crate::editor::OPEN_EDITORS;
 use crate::editor::model::Model;
-use crate::editor::panes::FRAME_KEY;
+use crate::editor::panes::{FRAME_KEY, Side};
 use crate::editor::toolbar::EditorToolbar;
 use crate::editor::views::{PreviewTextView, SourceTextView};
 use crate::i18n::t;
@@ -189,11 +189,16 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     }
 
     storage(&source).setDelegate(Some(ProtocolObject::from_ref(controller)));
-    if let Some(lm) = layout_manager(&preview) {
+    if let Some(lm) = layout_manager(&*preview) {
         lm.setAllowsNonContiguousLayout(true);
     }
     if let (Some(left), Some(right)) = (source.enclosingScrollView(), preview.enclosingScrollView()) {
-        controller.change_marks().install(&left, &right);
+        let bars = |side, scroll: &NSScrollView| {
+            crate::editor::changes::bars_beside(controller.mtm(), controller, side, scroll)
+        };
+        controller
+            .change_marks()
+            .install(bars(Side::Source, &left), bars(Side::Preview, &right));
     }
     controller
         .panes()
@@ -277,14 +282,14 @@ fn configure_text_view(controller: &EditorController, view: &NSTextView, preview
 }
 
 /// Opens a new untitled document as a tab of this window, like the plus button of the tab bar.
-pub(in crate::editor) fn new_tab(controller: &EditorController) {
-    let documents = NSDocumentController::sharedDocumentController(controller.mtm());
+pub(in crate::editor) fn new_tab(mtm: MainThreadMarker, window: Option<&NSWindow>) {
+    let documents = NSDocumentController::sharedDocumentController(mtm);
     let Ok(doc) = documents.openUntitledDocumentAndDisplay_error(false) else {
         return;
     };
     doc.makeWindowControllers();
     let tab = doc.windowControllers().firstObject().and_then(|c| c.window());
-    if let (Some(window), Some(tab)) = (controller.window(), tab) {
+    if let (Some(window), Some(tab)) = (window, tab) {
         window.addTabbedWindow_ordered(&tab, NSWindowOrderingMode::Above);
     }
     doc.showWindows();

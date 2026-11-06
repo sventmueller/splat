@@ -170,7 +170,7 @@ impl Bridge<'_> {
     pub(super) fn backticks_in_code_span(&self, start: Byte, end: Byte, typed: &str) -> Option<Edit> {
         let mut span = None;
         walk_inlines(leaf_at(self.doc, start)?.inlines(), &mut |i: &Inline| {
-            if matches!(i.kind, InlineKind::Code(_)) && i.range.start <= start && end <= i.range.end {
+            if matches!(i.kind(), InlineKind::Code(_)) && i.range().start <= start && end <= i.range().end {
                 span = Some(i);
             }
         });
@@ -185,9 +185,9 @@ impl Bridge<'_> {
             self.text.at(end..inner.end)
         );
         let (open, close) = commands::code_markers(&content);
-        let caret = span.range.start + open.len() + (start - inner.start) + typed.len();
+        let caret = span.range().start + open.len() + (start - inner.start) + typed.len();
         Some(Edit {
-            range: span.range.clone(),
+            range: span.range(),
             replacement: format!("{open}{content}{close}"),
             selection: caret..caret,
         })
@@ -211,13 +211,13 @@ impl Bridge<'_> {
             let mut extra = Vec::new();
             for leaf in &leaves {
                 walk_inlines(leaf.inlines(), &mut |i: &Inline| {
-                    let content = match i.kind {
+                    let content = match i.kind() {
                         InlineKind::Code(_) => i.code_content(self.text),
                         _ if i.is_container() => i.content_range(),
                         _ => return,
                     };
-                    if !content.is_empty() && covered(&content, &deletions) && !covered(&i.range, &deletions) {
-                        extra.push(i.range.clone());
+                    if !content.is_empty() && covered(&content, &deletions) && !covered(&i.range(), &deletions) {
+                        extra.push(i.range());
                     }
                 });
             }

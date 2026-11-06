@@ -10,7 +10,7 @@ use splat_markdown::doc::{BlockKind, Doc};
 use splat_markdown::front_matter::{self, FrontMatter, Value, scalar};
 use splat_markdown::reader::parse;
 use splat_markdown::text::{Byte, TextAt, bytes};
-use splat_notes::{MOST_HITS_PER_FILE, Node, Query, Tree, applied, hits_in_text, renames};
+use splat_notes::{MOST_HITS_PER_FILE, Query, Tree, applied, hits_in_text, renames};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::fuzz_checks::{edit_fits, text_and_steps};
@@ -194,30 +194,9 @@ fn front_matter_holds(text: &str, doc: &Doc, steps: &[Step]) {
 
 /// A tree in memory: this note, the note that gets renamed, and what stands around them.
 fn tree_of(names: &[&str]) -> Tree {
-    let node = |name: &str, path: &str, folder: bool, children: Vec<usize>| Node {
-        name: name.to_string(),
-        path: PathBuf::from(path),
-        folder,
-        children,
-    };
-    let mut nodes = vec![
-        node("sub", "/v/sub", true, vec![1, 2, 3]),
-        node("New.md", "/v/sub/New.md", false, vec![]),
-        node("Other.md", "/v/sub/Other.md", false, vec![]),
-        node("Sub.md", "/v/sub/Sub.md", false, vec![]),
-    ];
-    let mut top = vec![0];
-    for name in names {
-        top.push(nodes.len());
-        nodes.push(node(name, &format!("/v/{name}"), false, vec![]));
-    }
-    Tree {
-        root: PathBuf::from("/v"),
-        nodes,
-        top,
-        cut: false,
-        unreadable: 0,
-    }
+    let mut notes = vec!["sub/New.md", "sub/Other.md", "sub/Sub.md"];
+    notes.extend_from_slice(names);
+    Tree::of_notes(Path::new("/v"), &notes)
 }
 
 fn link_count(text: &str, target: &str, file: &Path, tree: &Tree) -> Option<usize> {

@@ -29,7 +29,7 @@ fn markdown_of(spans: Vec<Span>) -> String {
 /// The inlines of a parsed document as spans.
 fn read_spans(inlines: &[Inline], looks: Marks, link: Option<&Arc<str>>, out: &mut Vec<Span>) {
     for inline in inlines {
-        let piece = match &inline.kind {
+        let piece = match inline.kind() {
             InlineKind::Text(text) => Piece::Text(text.to_string()),
             InlineKind::SoftBreak => Piece::Text(" ".to_string()),
             InlineKind::LineBreak => Piece::Break,
@@ -38,43 +38,43 @@ fn read_spans(inlines: &[Inline], looks: Marks, link: Option<&Arc<str>>, out: &m
             InlineKind::Math { literal, .. } => Piece::Math(literal.to_string()),
             InlineKind::Image { url, .. } => Piece::Image(Image {
                 source: Source::Address(url.to_string()),
-                alt: plain_text(&inline.children),
+                alt: plain_text(inline.children()),
             }),
             InlineKind::Strong => {
-                read_spans(&inline.children, looks.with(Mark::Bold, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Bold, true), link, out);
                 continue;
             }
             InlineKind::Emph => {
-                read_spans(&inline.children, looks.with(Mark::Italic, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Italic, true), link, out);
                 continue;
             }
             InlineKind::Strikethrough => {
-                read_spans(&inline.children, looks.with(Mark::Strike, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Strike, true), link, out);
                 continue;
             }
             InlineKind::Underline => {
-                read_spans(&inline.children, looks.with(Mark::Underline, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Underline, true), link, out);
                 continue;
             }
             InlineKind::Highlight => {
-                read_spans(&inline.children, looks.with(Mark::Highlight, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Highlight, true), link, out);
                 continue;
             }
             InlineKind::Superscript => {
-                read_spans(&inline.children, looks.with(Mark::Superscript, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Superscript, true), link, out);
                 continue;
             }
             InlineKind::Subscript => {
-                read_spans(&inline.children, looks.with(Mark::Subscript, true), link, out);
+                read_spans(inline.children(), looks.with(Mark::Subscript, true), link, out);
                 continue;
             }
             InlineKind::Span => {
-                read_spans(&inline.children, looks, link, out);
+                read_spans(inline.children(), looks, link, out);
                 continue;
             }
             InlineKind::Link { url, .. } => {
                 let url: Arc<str> = url.as_ref().into();
-                read_spans(&inline.children, looks, Some(&url), out);
+                read_spans(inline.children(), looks, Some(&url), out);
                 continue;
             }
             other => Piece::Text(format!("<unexpected {other:?}>")),
@@ -148,7 +148,7 @@ fn html_spans(nodes: &[Node], looks: Marks, link: Option<&Arc<str>>, out: &mut V
 
 fn read_table(literal: &str) -> Option<Table> {
     let nodes = markup::parse(literal);
-    let table = markup::find(&nodes, "table")?;
+    let table = markup::find(&nodes, markup::Role::Table)?;
     let rows = table
         .rows()
         .into_iter()

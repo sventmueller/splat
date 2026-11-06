@@ -635,6 +635,7 @@ flowchart LR
 | [entities](https://github.com/p-jackson/entities) | 1 | أسماء مراجع أحرف HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | فك ضغط ملفات Word وكائنات Git | MIT، Zlib أو Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | قراءة XML في ملفات Word | MIT أو Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | قراءة نصوص RTF المكتوبة بصفحات ترميز قديمة | MIT أو Apache-2.0، BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | الأسماء والبحث عبر الأحرف المركّبة والمفكّكة | MIT أو Apache-2.0، Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | إبقاء النص الشبيه بـ `:shortcode:` حرفيًا في النص المستورد | MIT أو Apache-2.0، Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | عرض الصيغ | Apache-2.0 |

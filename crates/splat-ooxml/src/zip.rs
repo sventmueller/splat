@@ -1,11 +1,17 @@
-//! A reader of ZIP archives, by their central directory, for files from anywhere: it refuses what overlaps, lies outside
-//! the file, is encrypted or needs the 64-bit extension, and it holds inflating to limits while it inflates.
+//! ZIP archives: a reader by their central directory, for files from anywhere, which refuses what overlaps, lies
+//! outside the file, is encrypted or needs the 64-bit extension and holds inflating to limits while it inflates; and a
+//! writer of stored entries for Word.
+
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
+mod write;
 
 use std::cell::Cell;
 use std::collections::HashMap;
 
 use miniz_oxide::inflate::decompress_to_vec_with_limit;
-use splat_markdown::docx::zip::crc32;
+
+pub use write::{TooLarge, Zip};
 
 /// Why an archive or an entry cannot be read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,8 +22,10 @@ pub enum ZipError {
     Encrypted,
     /// An archive that needs the 64-bit extension, which this reader refuses.
     Zip64,
-    /// More entries, or more bytes inflated, than the limits allow.
+    /// More entries than `MOST_ENTRIES`, or more bytes inflated from the archive in all than `MOST_TOTAL_BYTES`.
     TooLarge,
+    /// One entry that inflates to more than `MOST_ENTRY_BYTES`; the others can still be read.
+    EntryTooLarge,
     /// An archive whose records contradict each other or its content.
     Damaged,
 }
@@ -29,6 +37,7 @@ impl std::fmt::Display for ZipError {
             ZipError::Encrypted => "a ZIP archive with encrypted entries",
             ZipError::Zip64 => "a ZIP archive that needs the 64-bit extension",
             ZipError::TooLarge => "a ZIP archive beyond the limits of what is read",
+            ZipError::EntryTooLarge => "an entry of a ZIP archive larger than one entry may be",
             ZipError::Damaged => "a damaged ZIP archive",
         })
     }
@@ -37,11 +46,11 @@ impl std::fmt::Display for ZipError {
 impl std::error::Error for ZipError {}
 
 /// The most entries an archive may have.
-pub(crate) const MOST_ENTRIES: usize = 10_000;
+pub const MOST_ENTRIES: usize = 10_000;
 /// The most bytes an entry may inflate to.
-pub(crate) const MOST_ENTRY_BYTES: u64 = 256 << 20;
+pub const MOST_ENTRY_BYTES: u64 = 256 << 20;
 /// The most bytes all that is read from an archive may inflate to.
-pub(crate) const MOST_TOTAL_BYTES: u64 = 1 << 30;
+pub const MOST_TOTAL_BYTES: u64 = 1 << 30;
 
 const END_SIGNATURE: &[u8; 4] = b"PK\x05\x06";
 const ZIP64_LOCATOR_SIGNATURE: &[u8; 4] = b"PK\x06\x07";
@@ -156,7 +165,7 @@ impl<'a> Archive<'a> {
         Ok(archive)
     }
 
-    /// Takes in the directory record at `at`; where the next one starts.
+    /// Takes in the directory record at `at` and returns the offset of the record behind it.
     fn read_entry(
         &mut self,
         at: usize,
@@ -243,12 +252,12 @@ impl<'a> Archive<'a> {
     }
 
     /// Whether an entry of this name exists.
-    pub(crate) fn contains(&self, name: &str) -> bool {
+    pub fn contains(&self, name: &str) -> bool {
         self.by_name.contains_key(name)
     }
 
     /// What the entry says it inflates to.
-    pub(crate) fn size_of(&self, name: &str) -> Option<u64> {
+    pub fn size_of(&self, name: &str) -> Option<u64> {
         let index = *self.by_name.get(name)?;
         Some(u64::from(self.entries[index].size))
     }
@@ -264,7 +273,10 @@ impl<'a> Archive<'a> {
     fn extract(&self, entry: Entry) -> Result<Vec<u8>, ZipError> {
         let size = u64::from(entry.size);
         let total = self.inflated.get();
-        if size > MOST_ENTRY_BYTES || total.saturating_add(size) > MOST_TOTAL_BYTES {
+        if size > MOST_ENTRY_BYTES {
+            return Err(ZipError::EntryTooLarge);
+        }
+        if total.saturating_add(size) > MOST_TOTAL_BYTES {
             return Err(ZipError::TooLarge);
         }
         let packed = self
@@ -274,7 +286,8 @@ impl<'a> Archive<'a> {
         let content = if entry.method == STORED {
             packed.to_vec()
         } else {
-            // The limit is what the entry says of itself, so a bomb that lies about its size ends here, whatever it holds.
+            // The limit is what the entry says of itself, so a bomb that lies about its size ends here, whatever it
+            // holds.
             decompress_to_vec_with_limit(packed, entry.size as usize).map_err(|_| ZipError::Damaged)?
         };
         if content.len() != entry.size as usize || crc32(&content) != entry.crc {
@@ -296,108 +309,29 @@ fn holds_zip64_field(extra: &[u8]) -> bool {
     false
 }
 
+/// The CRC-32 checksum ZIP stores for each entry.
+pub fn crc32(bytes: &[u8]) -> u32 {
+    static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
+    let table = TABLE.get_or_init(|| {
+        let mut t = [0u32; 256];
+        for (i, entry) in (0u32..).zip(t.iter_mut()) {
+            let mut c = i;
+            for _ in 0..8 {
+                c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
+            }
+            *entry = c;
+        }
+        t
+    });
+    !bytes
+        .iter()
+        .fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xFF) as usize] ^ (c >> 8))
+}
+
 #[cfg(test)]
-pub(crate) mod tests {
-    use miniz_oxide::deflate::compress_to_vec;
-    use splat_markdown::docx::zip::Zip;
-
+mod tests {
+    use super::testing::{Part, archive, deflated, stored};
     use super::*;
-
-    /// One entry of an archive built by hand, with what the tests below get wrong in it.
-    #[derive(Clone)]
-    pub(crate) struct Part {
-        pub(crate) name: String,
-        pub(crate) stored: Vec<u8>,
-        pub(crate) method: u16,
-        pub(crate) crc: u32,
-        pub(crate) size: u32,
-        pub(crate) flags: u16,
-        pub(crate) extra: Vec<u8>,
-        /// Local header with zero sizes and a data descriptor behind the data, as streaming writers make them.
-        pub(crate) descriptor: bool,
-    }
-
-    /// A part as it would be deflated.
-    pub(crate) fn deflated(name: &str, content: &[u8]) -> Part {
-        Part {
-            name: name.to_string(),
-            stored: compress_to_vec(content, 6),
-            method: DEFLATED,
-            crc: crc32(content),
-            size: u32::try_from(content.len()).expect("a small test"),
-            flags: 0,
-            extra: Vec::new(),
-            descriptor: false,
-        }
-    }
-
-    pub(crate) fn stored(name: &str, content: &[u8]) -> Part {
-        Part {
-            stored: content.to_vec(),
-            method: STORED,
-            ..deflated(name, content)
-        }
-    }
-
-    pub(crate) fn archive(parts: &[Part]) -> Vec<u8> {
-        let mut out = Vec::new();
-        let mut directory = Vec::new();
-        for part in parts {
-            let offset = u32::try_from(out.len()).expect("a small test");
-            let compressed = u32::try_from(part.stored.len()).expect("a small test");
-            let name_len = u16::try_from(part.name.len()).expect("a small test");
-            let extra_len = u16::try_from(part.extra.len()).expect("a small test");
-            let descriptor_flag = if part.descriptor { 1 << 3 } else { 0 };
-            out.extend_from_slice(LOCAL_SIGNATURE);
-            for v in [20u16, part.flags | descriptor_flag, part.method, 0, 0x21] {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-            let local_sizes = if part.descriptor {
-                [0, 0, 0]
-            } else {
-                [part.crc, compressed, part.size]
-            };
-            for v in local_sizes {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
-            out.extend_from_slice(&name_len.to_le_bytes());
-            out.extend_from_slice(&0u16.to_le_bytes());
-            out.extend_from_slice(part.name.as_bytes());
-            out.extend_from_slice(&part.stored);
-            if part.descriptor {
-                out.extend_from_slice(b"PK\x07\x08");
-                for v in [part.crc, compressed, part.size] {
-                    out.extend_from_slice(&v.to_le_bytes());
-                }
-            }
-            directory.extend_from_slice(CENTRAL_SIGNATURE);
-            for v in [20u16, 20, part.flags | descriptor_flag, part.method, 0, 0x21] {
-                directory.extend_from_slice(&v.to_le_bytes());
-            }
-            for v in [part.crc, compressed, part.size] {
-                directory.extend_from_slice(&v.to_le_bytes());
-            }
-            for v in [name_len, extra_len, 0, 0, 0] {
-                directory.extend_from_slice(&v.to_le_bytes());
-            }
-            directory.extend_from_slice(&0u32.to_le_bytes());
-            directory.extend_from_slice(&offset.to_le_bytes());
-            directory.extend_from_slice(part.name.as_bytes());
-            directory.extend_from_slice(&part.extra);
-        }
-        let start = u32::try_from(out.len()).expect("a small test");
-        let size = u32::try_from(directory.len()).expect("a small test");
-        out.append(&mut directory);
-        out.extend_from_slice(END_SIGNATURE);
-        let count = u16::try_from(parts.len()).expect("a small test");
-        for v in [0u16, 0, count, count] {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        out.extend_from_slice(&size.to_le_bytes());
-        out.extend_from_slice(&start.to_le_bytes());
-        out.extend_from_slice(&0u16.to_le_bytes());
-        out
-    }
 
     fn end_of(bytes: &[u8]) -> usize {
         bytes.len() - END_SIZE
@@ -432,6 +366,7 @@ pub(crate) mod tests {
             ZipError::Encrypted,
             ZipError::Zip64,
             ZipError::TooLarge,
+            ZipError::EntryTooLarge,
             ZipError::Damaged,
         ];
         let words: std::collections::HashSet<String> = all.iter().map(ToString::to_string).collect();
@@ -448,6 +383,12 @@ pub(crate) mod tests {
         let bytes = zip.finish();
         let read = Archive::read(&bytes).unwrap();
         assert_eq!(read.get("ä/b").unwrap().unwrap(), b"22");
+    }
+
+    #[test]
+    fn crc_matches_the_reference_value() {
+        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
+        assert_eq!(crc32(b""), 0);
     }
 
     #[test]
@@ -624,8 +565,10 @@ pub(crate) mod tests {
     fn a_bomb_is_stopped_by_entry_and_by_total() {
         let mut big_entry = deflated("a", b"x");
         big_entry.size = u32::try_from(MOST_ENTRY_BYTES).unwrap() + 1;
-        let file = archive(&[big_entry]);
-        assert_eq!(Archive::read(&file).unwrap().get("a"), Err(ZipError::TooLarge));
+        let file = archive(&[big_entry, stored("b", b"y")]);
+        let read = Archive::read(&file).unwrap();
+        assert_eq!(read.get("a"), Err(ZipError::EntryTooLarge));
+        assert_eq!(read.get("b").unwrap().unwrap(), b"y", "the others can still be read");
 
         let one = deflated(
             "0",

@@ -237,7 +237,7 @@ impl Table {
 
 /// Applies a structural table operation and returns the edit with the cursor in the target cell.
 pub fn table_edit(doc: &Doc, offset: Byte, op: TableOp) -> Option<Edit> {
-    let (mut table, cell) = table_at(doc, offset)?;
+    let (mut table, cell) = table_at(doc, doc.fit_at(offset))?;
     let target = table.apply(op, cell);
     Some(replace_table(&table, target, false))
 }
@@ -259,7 +259,7 @@ fn replace_table(table: &Table, target: Cell, select: bool) -> Edit {
 
 /// Moves to the next (or previous) cell, appending a row after the last cell. The table is re-aligned.
 pub fn navigate(doc: &Doc, offset: Byte, way: Direction) -> Option<Edit> {
-    let (mut table, cell) = table_at(doc, offset)?;
+    let (mut table, cell) = table_at(doc, doc.fit_at(offset))?;
     let cols = table.aligns.len();
     let index = cell.row * cols + cell.col;
     let target = match way {
@@ -283,7 +283,7 @@ pub fn navigate(doc: &Doc, offset: Byte, way: Direction) -> Option<Edit> {
 
 /// Moves to the same column in the next row, appending a row at the end of the table.
 pub fn move_down(doc: &Doc, offset: Byte) -> Option<Edit> {
-    let (mut table, cell) = table_at(doc, offset)?;
+    let (mut table, cell) = table_at(doc, doc.fit_at(offset))?;
     if cell.row + 1 >= table.rows.len() {
         table.rows.push(vec![String::new(); table.aligns.len()]);
     }

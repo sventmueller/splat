@@ -1,8 +1,7 @@
 //! Scripted end-to-end check of the running app, compiled only with `--features selftest`.
 
-#![allow(
+#![expect(
     clippy::undocumented_unsafe_blocks,
-    clippy::too_many_lines,
     reason = "a script of the app's own calls, one step after the other, whose outcome is what it checks"
 )]
 
@@ -18,7 +17,7 @@ mod saving;
 mod scenarios;
 mod typing;
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 
 use block2::RcBlock;
@@ -38,9 +37,8 @@ use crate::markdown::text::{Byte, TextAt, Utf16Map, bytes};
 use crate::util::{ns, obj, storage};
 
 thread_local! {
+    /// A thread-local and not a field of the `Runner`: every mode of the self-test checks, most of them without steps.
     static FAILURES: Cell<usize> = const { Cell::new(0) };
-    /// Steps have no names; this tells where one that fails to run stands.
-    static LAST_CHECK: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
 }
 
 /// The checks act like the user: what they do to the views is meant to reach the delegate callbacks.
@@ -98,7 +96,6 @@ fn check_in_front(mtm: MainThreadMarker, name: &str, ok: bool, detail: &str) {
 }
 
 fn reported(name: &str) {
-    LAST_CHECK.with(|c| name.clone_into(&mut c.borrow_mut()));
     // A shorter run for one area: SPLAT_SELFTEST_STOP_AFTER names the last check.
     if std::env::var("SPLAT_SELFTEST_STOP_AFTER").is_ok_and(|last| last == name) {
         finish();
@@ -328,28 +325,7 @@ pub fn start(mtm: MainThreadMarker) {
         return;
     }
     if std::env::var_os("SPLAT_PRINT_MENUS").is_some() {
-        if let Some(menu) = NSApplication::sharedApplication(mtm).mainMenu() {
-            for top in menu.itemArray().iter() {
-                let items: Vec<String> = top
-                    .submenu()
-                    .map(|m| {
-                        m.itemArray()
-                            .iter()
-                            .filter(|i| !i.isHidden() && !i.isAlternate())
-                            .map(|i| {
-                                if i.isSeparatorItem() {
-                                    "—".to_string()
-                                } else {
-                                    i.title().to_string()
-                                }
-                            })
-                            .filter(|t| !t.is_empty())
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                eprintln!("MENU {} | {}", top.title(), items.join(" | "));
-            }
-        }
+        print_menus(mtm);
         std::process::exit(0);
     }
     if let Ok(path) = std::env::var("SPLAT_DIALOG_PNG") {
@@ -386,36 +362,7 @@ pub fn start(mtm: MainThreadMarker) {
         return;
     }
     if std::env::var("SPLAT_SELFTEST_EXPECT_OPEN").is_ok() {
-        // Launched by LaunchServices with the file as an open-document event, like a Finder double-click.
-        let opened = {
-            let file = file.clone();
-            move || {
-                NSDocumentController::sharedDocumentController(mtm)
-                    .documents()
-                    .iter()
-                    .any(|d| {
-                        d.fileURL()
-                            .and_then(|u| u.path())
-                            .is_some_and(|p| p.to_string() == file)
-                            && d.downcast::<MdDocument>().is_ok()
-                    })
-            }
-        };
-        let rendered = move || editor(mtm).is_some_and(|e| storage(e.preview()).length() > 100);
-        let (opened_then, rendered_then) = (opened.clone(), rendered);
-        once(
-            0.0,
-            "the file of the open-document event to open and render",
-            move || opened() && rendered(),
-            move || {
-                check(
-                    "double-click opens file in cold-started app",
-                    opened_then() && rendered_then(),
-                    &format!("opened={} rendered={}", opened_then(), rendered_then()),
-                );
-                finish();
-            },
-        );
+        opened_by_an_event(mtm, file);
         return;
     }
     let out = PathBuf::from(std::env::var("SPLAT_SELFTEST_OUT").unwrap_or_else(|_| ".".into()));
@@ -434,6 +381,62 @@ pub fn start(mtm: MainThreadMarker) {
             );
         });
     });
+}
+
+fn print_menus(mtm: MainThreadMarker) {
+    let Some(menu) = NSApplication::sharedApplication(mtm).mainMenu() else {
+        return;
+    };
+    for top in menu.itemArray().iter() {
+        let items: Vec<String> = top
+            .submenu()
+            .map(|m| {
+                m.itemArray()
+                    .iter()
+                    .filter(|i| !i.isHidden() && !i.isAlternate())
+                    .map(|i| {
+                        if i.isSeparatorItem() {
+                            "—".to_string()
+                        } else {
+                            i.title().to_string()
+                        }
+                    })
+                    .filter(|t| !t.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+        eprintln!("MENU {} | {}", top.title(), items.join(" | "));
+    }
+}
+
+/// Launched by LaunchServices with `file` as an open-document event, like a Finder double-click.
+fn opened_by_an_event(mtm: MainThreadMarker, file: String) {
+    let opened = move || {
+        NSDocumentController::sharedDocumentController(mtm)
+            .documents()
+            .iter()
+            .any(|d| {
+                d.fileURL()
+                    .and_then(|u| u.path())
+                    .is_some_and(|p| p.to_string() == file)
+                    && d.downcast::<MdDocument>().is_ok()
+            })
+    };
+    let rendered = move || editor(mtm).is_some_and(|e| storage(e.preview()).length() > 100);
+    let (opened_then, rendered_then) = (opened.clone(), rendered);
+    once(
+        0.0,
+        "the file of the open-document event to open and render",
+        move || opened() && rendered(),
+        move || {
+            check(
+                "double-click opens file in cold-started app",
+                opened_then() && rendered_then(),
+                &format!("opened={} rendered={}", opened_then(), rendered_then()),
+            );
+            finish();
+        },
+    );
 }
 
 fn open_document(mtm: MainThreadMarker, file: &str) {
@@ -538,20 +541,15 @@ struct Ctx {
     out: PathBuf,
     /// The test file as it was before the first edit, which each group of checks starts from.
     template: std::rc::Rc<str>,
+    /// The source before the step under test, for the step that checks or undoes it.
+    before: RefCell<String>,
+    /// The editor the steps after the running one work on, once `work_on` has named it.
+    next: RefCell<Option<Retained<EditorController>>>,
 }
 
-/// The steps from here on work on `e`.
-fn work_on(e: Retained<EditorController>) {
-    CTX.with(|ctx| {
-        let mut ctx = ctx.borrow_mut();
-        if let Some(old) = ctx.take() {
-            *ctx = Some(std::rc::Rc::new(Ctx {
-                e,
-                out: old.out.clone(),
-                template: old.template.clone(),
-            }));
-        }
-    });
+/// The steps that follow the running one work on `e`.
+fn work_on(c: &Ctx, e: Retained<EditorController>) {
+    *c.next.borrow_mut() = Some(e);
 }
 
 /// What the runner waits for before a step, named for the failure when it never comes.
@@ -566,13 +564,85 @@ struct Wait {
 
 type Step = (Wait, Box<dyn Fn(&Ctx)>);
 
+/// The steps of a run in order, each with the name its failures carry: its place in its group.
+#[derive(Default)]
+struct Plan(Vec<(String, Step)>);
+
+impl Plan {
+    fn add(&mut self, group: &str, steps: Vec<Step>) {
+        let done = self
+            .0
+            .iter()
+            .filter(|(label, _)| label.ends_with(&format!(" of \"{group}\"")))
+            .count();
+        for (n, step) in steps.into_iter().enumerate() {
+            self.0.push((format!("step {} of \"{group}\"", done + n + 1), step));
+        }
+    }
+}
+
 /// Longest wait for a condition. Waiting longer fails the run; the step still runs, as its checks tell what is missing.
 const UNTIL_TIMEOUT: f64 = 15.0;
 
-thread_local! {
-    static STEPS: std::cell::RefCell<Vec<Step>> = std::cell::RefCell::new(Vec::new());
-    static CTX: std::cell::RefCell<Option<std::rc::Rc<Ctx>>> = const { std::cell::RefCell::new(None) };
-    static MONITOR: std::cell::RefCell<Option<Retained<objc2::runtime::AnyObject>>> = const { std::cell::RefCell::new(None) };
+/// The steps of a run, the editor they work on and the event monitor that starts them.
+struct Runner {
+    plan: Vec<(String, Step)>,
+    ctx: RefCell<std::rc::Rc<Ctx>>,
+}
+
+impl Runner {
+    fn name_of(&self, i: usize) -> String {
+        self.plan.get(i).map_or_else(String::new, |(label, (wait, _))| {
+            format!("{label} that waits for {}", wait.name)
+        })
+    }
+
+    /// Runs step `i` once its wait is over.
+    fn wait_for(self: &std::rc::Rc<Self>, i: usize) {
+        let Some((_, (step, _))) = self.plan.get(i) else {
+            return;
+        };
+        let ctx = self.ctx.borrow().clone();
+        let (runner, looked_at) = (self.clone(), ctx.clone());
+        let holds = move || runner.plan.get(i).is_none_or(|(_, (w, _))| (w.holds)(&looked_at));
+        let runner = self.clone();
+        wait(step.at_least, UNTIL_TIMEOUT, step.in_a_row, holds, move |held| {
+            let step = runner.name_of(i);
+            if held {
+                copy_is_the_source(&ctx.e, &step);
+            } else {
+                check(&format!("{step} gets it"), false, &format!("waited {UNTIL_TIMEOUT} s"));
+            }
+            post_step(i);
+        });
+    }
+
+    /// Runs step `i`, then asks for the next one or ends the run.
+    fn run_step(self: &std::rc::Rc<Self>, i: usize) {
+        let ctx = self.ctx.borrow().clone();
+        guarded(&self.name_of(i), || (self.plan[i].1.1)(&ctx));
+        if let Some(e) = ctx.next.take() {
+            *self.ctx.borrow_mut() = std::rc::Rc::new(Ctx {
+                e,
+                out: ctx.out.clone(),
+                template: ctx.template.clone(),
+                before: RefCell::new(ctx.before.take()),
+                next: RefCell::new(None),
+            });
+        }
+        if i + 1 < self.plan.len() {
+            self.wait_for(i + 1);
+        } else {
+            let ctx = self.ctx.borrow().clone();
+            let copy = ctx.e.source_text();
+            check(
+                "the patched text copy matches the source view",
+                copy == ctx.e.exact_text(),
+                &format!("{} vs {} bytes", copy.len(), ctx.e.exact_text().len()),
+            );
+            finish();
+        }
+    }
 }
 
 /// Posts an application-defined event that runs step `i`. AppKit closes the automatic undo group after
@@ -593,30 +663,6 @@ fn post_step(i: usize) {
     if let Some(event) = event {
         NSApplication::sharedApplication(mtm).postEvent_atStart(&event, false);
     }
-}
-
-/// Runs step `i` once its wait is over.
-fn wait_for(i: usize) {
-    let Some(ctx) = CTX.with(|c| c.borrow().clone()) else {
-        return;
-    };
-    let (seconds, in_a_row, name) = STEPS.with(|s| {
-        s.borrow().get(i).map_or((0.0, 1, String::new()), |(w, _)| {
-            (w.at_least, w.in_a_row, w.name.clone())
-        })
-    });
-    let looked_at = ctx.clone();
-    let holds = move || STEPS.with(|s| s.borrow().get(i).is_none_or(|(w, _)| (w.holds)(&looked_at)));
-    wait(seconds, UNTIL_TIMEOUT, in_a_row, holds, move |held| {
-        let last = LAST_CHECK.with(|c| c.borrow().clone());
-        let step = format!("the step after \"{last}\" that waits for {name}");
-        if held {
-            copy_is_the_source(&ctx.e, &step);
-        } else {
-            check(&format!("{step} gets it"), false, &format!("waited {UNTIL_TIMEOUT} s"));
-        }
-        post_step(i);
-    });
 }
 
 /// After every step: what the editor thinks the text is, is what the view holds. Going apart is what makes edits land in
@@ -660,47 +706,31 @@ fn settled(e: &EditorController) -> bool {
         })
 }
 
-fn run_steps(ctx: Ctx, list: Vec<Step>) {
-    STEPS.with(|s| *s.borrow_mut() = list);
-    CTX.with(|c| *c.borrow_mut() = Some(std::rc::Rc::new(ctx)));
+fn run_steps(ctx: Ctx, plan: Plan) {
+    let runner = std::rc::Rc::new(Runner {
+        plan: plan.0,
+        ctx: RefCell::new(std::rc::Rc::new(ctx)),
+    });
+    let handler = runner.clone();
     let block = RcBlock::new(
-        |event: std::ptr::NonNull<objc2_app_kit::NSEvent>| -> *mut objc2_app_kit::NSEvent {
+        move |event: std::ptr::NonNull<objc2_app_kit::NSEvent>| -> *mut objc2_app_kit::NSEvent {
             let event = unsafe { event.as_ref() };
             if event.r#type() != objc2_app_kit::NSEventType::ApplicationDefined {
                 return event as *const _ as *mut _;
             }
-            let i = crate::util::to_usize(event.data1());
-            let Some(ctx) = CTX.with(|c| c.borrow().clone()) else {
-                return event as *const _ as *mut _;
-            };
-            let last = LAST_CHECK.with(|c| c.borrow().clone());
-            let name = STEPS.with(|s| s.borrow().get(i).map(|(w, _)| w.name.clone()).unwrap_or_default());
-            guarded(&format!("the step after \"{last}\" that waits for {name}"), || {
-                STEPS.with(|s| (s.borrow()[i].1)(&ctx))
-            });
-            match STEPS.with(|s| s.borrow().len()) {
-                n if i + 1 < n => wait_for(i + 1),
-                _ => {
-                    let copy = ctx.e.source_text();
-                    check(
-                        "the patched text copy matches the source view",
-                        copy == ctx.e.exact_text(),
-                        &format!("{} vs {} bytes", copy.len(), ctx.e.exact_text().len()),
-                    );
-                    finish()
-                }
-            }
+            handler.run_step(crate::util::to_usize(event.data1()));
             std::ptr::null_mut()
         },
     );
+    // SAFETY: The handler answers on the main thread, and the monitor stays for the life of the run.
     let monitor = unsafe {
         objc2_app_kit::NSEvent::addLocalMonitorForEventsMatchingMask_handler(
             objc2_app_kit::NSEventMask::ApplicationDefined,
             &block,
         )
     };
-    MONITOR.with(|m| *m.borrow_mut() = monitor);
-    wait_for(0);
+    std::mem::forget(monitor);
+    runner.wait_for(0);
 }
 
 /// A step that runs once `cond` holds. `name` completes "waited for ...".
@@ -763,10 +793,6 @@ fn closed(f: impl Fn(&Ctx) + 'static) -> Step {
     )
 }
 
-thread_local! {
-    static IGNORING: std::cell::RefCell<Option<Retained<objc2::runtime::AnyObject>>> = const { std::cell::RefCell::new(None) };
-}
-
 /// A key or click of whoever works at the Mac meanwhile would land in the window in front, move its caret and fail checks
 /// that have nothing wrong with them. The run's own events go to the window directly and pass no monitor.
 fn ignore_people(_mtm: MainThreadMarker) {
@@ -779,7 +805,7 @@ fn ignore_people(_mtm: MainThreadMarker) {
         | NSEventMask::ScrollWheel;
     // SAFETY: The handler touches nothing and answers on the main thread, and the monitor stays for the life of the run.
     let monitor = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(input, &drop_it) };
-    IGNORING.with(|m| *m.borrow_mut() = monitor);
+    std::mem::forget(monitor);
 }
 
 fn run(mtm: MainThreadMarker, out: &Path) {
@@ -830,30 +856,35 @@ fn run(mtm: MainThreadMarker, out: &Path) {
         e,
         out: out.to_path_buf(),
         template,
+        before: RefCell::new(String::new()),
+        next: RefCell::new(None),
     };
     let only = std::env::var("SPLAT_SELFTEST_ONLY").ok();
     let click_through_alone = only.as_deref() == Some(CLICK_THROUGH);
     let one_group = clickthrough::groups()
         .iter()
         .any(|(name, _)| only.as_deref() == Some(*name));
+    let mut plan = Plan::default();
     if std::env::var_os("SPLAT_SELFTEST_SCENARIOS").is_some() && !click_through_alone && !one_group {
-        run_steps(ctx, scenarios::steps());
+        scenarios::add_steps(&mut plan);
+        run_steps(ctx, plan);
         return;
     }
     // The first step waits until formulas and diagrams are rendered, so the edits below do not race them.
-    let mut steps = Vec::new();
-    for (i, (name, group)) in clickthrough::groups().into_iter().enumerate() {
+    let mut before_it = None;
+    for (n, (name, group)) in clickthrough::groups().into_iter().enumerate() {
         if !one_group || only.as_deref() == Some(name) {
-            if i > 0 {
-                steps.extend(clickthrough::entry(name));
+            if n > 0 {
+                plan.add(name, clickthrough::entry(name, before_it.filter(|_| !one_group)));
             }
-            steps.extend(group);
+            plan.add(name, group);
         }
+        before_it = Some(name);
     }
     if !click_through_alone && !one_group {
-        steps.extend(scenarios::steps());
+        scenarios::add_steps(&mut plan);
     }
-    run_steps(ctx, steps);
+    run_steps(ctx, plan);
 }
 
 /// The UTF-16 index of the first character in the preview that links to `target`.

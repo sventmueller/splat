@@ -1,0 +1,17 @@
+[package]
+name = "splat-ooxml"
+version = "0.0.0"
+description = "What reading and writing Word files share: ZIP archives, their CRC-32 checksums and XML escaping"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+miniz_oxide = { workspace = true, default-features = false, features = ["with-alloc"] }
+
+[features]
+# Archives built byte by byte, with the faults the tests of a reader need, for the tests of crates that read Word files.
+testing = []

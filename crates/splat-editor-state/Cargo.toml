@@ -1,0 +1,25 @@
+[package]
+name = "splat-editor-state"
+version = "0.0.0"
+description = "What the editor window of Splat knows and decides without a window: its state, text copy, render queue and the meaning of clicks and files"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+splat-file-state.workspace = true
+splat-git.workspace = true
+splat-i18n.workspace = true
+splat-markdown.workspace = true
+splat-notes.workspace = true
+splat-preview.workspace = true
+
+[dev-dependencies]
+splat-testkit.workspace = true
+
+[features]
+# What only the window self-tests of the app call.
+selftest = []

@@ -10,7 +10,7 @@ use objc2_foundation::{NSRange, NSTimer};
 use super::super::EditorController;
 use super::super::actions::Action;
 use super::super::sidebar::SidebarTab;
-use super::{after, check, editor, finish, perform};
+use super::{after, check, editor, finish, perform, wait};
 use crate::document::MdDocument;
 
 /// Drags the window's lower right corner through AppKit's own resize tracking, as a user does, and checks that the
@@ -140,6 +140,26 @@ fn new_window_sidebar(mtm: MainThreadMarker) -> Option<(bool, Option<SidebarTab>
     shown
 }
 
+/// Calls `then` once the panes have moved off `from` and stand still, which they do some time after the sidebar came or
+/// went and report nothing about; panes that never do are a failed check.
+fn after_the_panes_settle(mtm: MainThreadMarker, from: (f64, f64), name: &'static str, then: impl Fn() + 'static) {
+    let last = Cell::new(from);
+    let steady = move || {
+        let Some(e) = editor(mtm) else { return false };
+        if let Some(window) = e.window() {
+            window.layoutIfNeeded();
+        }
+        let now = pane_widths(&e);
+        now != from && now == last.replace(now)
+    };
+    wait(0.0, 5.0, 3, steady, move |settled| {
+        if !settled {
+            check(name, false, "waited 5 s for it");
+        }
+        then();
+    });
+}
+
 /// The divider was moved off the middle above: the sidebar coming and going leaves that share to the source, and a new
 /// window opens the sidebar as the last one left it.
 fn sidebar_keeps_the_ratio(mtm: MainThreadMarker) {
@@ -154,13 +174,14 @@ fn sidebar_keeps_the_ratio(mtm: MainThreadMarker) {
     let toggle = |e: &EditorController| perform(e, Action::ToggleSidebar.spec().selector, 0);
     let before = measure(&e);
     toggle(&e);
-    // Past the time `settlePanes` waits for an animation.
-    after(1.0, move || {
+    let from = (before.0, before.1);
+    after_the_panes_settle(mtm, from, "the panes to settle with the sidebar shown", move || {
         let Some(e) = editor(mtm) else { return };
         let shown = measure(&e);
         let opened_shown = new_window_sidebar(mtm);
         toggle(&e);
-        after(1.0, move || {
+        let from = (shown.0, shown.1);
+        after_the_panes_settle(mtm, from, "the panes to settle with the sidebar hidden", move || {
             let Some(e) = editor(mtm) else { return };
             let hidden = measure(&e);
             let near = |a: f64, b: f64| (a - b).abs() < 0.005;

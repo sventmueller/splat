@@ -11,6 +11,7 @@ use splat_i18n::{t, tf};
 /// Inserts `block` as its own block at the cursor, adding blank lines where needed.
 /// `cursor` is the offset inside `block` where the caret should land.
 pub fn insert_block(text: &str, sel: Range<Byte>, block: &str, cursor: usize) -> Edit {
+    let sel = text.fit(sel);
     let at = if sel.is_empty() { sel.start } else { sel.end };
     let end_of_line = line_end(text, at);
     let line_begin = line_start(text, at);
@@ -48,7 +49,8 @@ pub fn insert_block(text: &str, sel: Range<Byte>, block: &str, cursor: usize) ->
 
 /// A code block fenced for `lang` at the caret, or around the lines of the selection with a fence longer than any run
 /// of backticks in them.
-pub fn insert_code_block(text: &str, sel: Range<Byte>, lang: &str) -> Edit {
+pub(crate) fn insert_code_block(text: &str, sel: Range<Byte>, lang: &str) -> Edit {
+    let sel = text.fit(sel);
     if sel.is_empty() {
         let block = format!("```{lang}\n\n```");
         return insert_block(text, sel, &block, lang.len() + 4);
@@ -67,6 +69,7 @@ pub fn insert_code_block(text: &str, sel: Range<Byte>, lang: &str) -> Edit {
 
 /// Sets the language of the fenced code block at the caret, or inserts a new code block in that language.
 pub fn code_block_language(doc: &Doc, sel: Range<Byte>, lang: &str) -> Edit {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let block = block_path(&doc.blocks, sel.start)
         .into_iter()
@@ -98,6 +101,7 @@ pub fn code_block_language(doc: &Doc, sel: Range<Byte>, lang: &str) -> Edit {
 /// Formats the paragraph at the caret (or the selected lines) as an alert of `kind`, like a quote. On an alert it
 /// changes the type, or removes the alert when it already has this type; on an empty line it inserts a new one.
 pub fn insert_alert(doc: &Doc, sel: Range<Byte>, kind: AlertKind) -> Edit {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let existing = block_path(&doc.blocks, sel.start)
         .into_iter()
@@ -197,6 +201,7 @@ fn remove_alert(text: &str, block: &Range<Byte>) -> Edit {
 
 /// Inserts a linked table of contents, or regenerates the one at the caret. A single top-level title is left out.
 pub fn insert_toc(doc: &Doc, sel: Range<Byte>) -> Option<Edit> {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let mut headings = heading_anchors(doc);
     if headings.iter().filter(|h| h.level == 1).count() == 1 && headings.first().is_some_and(|h| h.level == 1) {
@@ -264,7 +269,8 @@ pub fn insert_table(text: &str, sel: Range<Byte>, rows: usize, cols: usize) -> E
 }
 
 /// `[label](url)` in place of the selection; a blank label takes the address.
-pub fn insert_link(sel: Range<Byte>, url: &str, label: &str) -> Edit {
+pub fn insert_link(text: &str, sel: Range<Byte>, url: &str, label: &str) -> Edit {
+    let sel = text.fit(sel);
     let label = if label.trim().is_empty() { url } else { label };
     let replacement = format!("[{}]({})", escape_label(label), link_destination(url));
     let end = sel.start + replacement.len();
@@ -276,7 +282,8 @@ pub fn insert_link(sel: Range<Byte>, url: &str, label: &str) -> Edit {
 }
 
 /// `![alt](path)` in place of the selection.
-pub fn insert_image(sel: Range<Byte>, alt: &str, path: &str) -> Edit {
+pub fn insert_image(text: &str, sel: Range<Byte>, alt: &str, path: &str) -> Edit {
+    let sel = text.fit(sel);
     let replacement = format!("![{}]({})", escape_label(alt), link_destination(path));
     let end = sel.start + replacement.len();
     Edit {
@@ -301,6 +308,7 @@ pub fn link_destination(url: &str) -> String {
 
 /// `$…$` around a selection inside a line, or a `$$` block at the caret or around a selection over several lines.
 pub fn insert_formula(text: &str, sel: Range<Byte>) -> Edit {
+    let sel = text.fit(sel);
     let selected = text.at(sel.clone());
     if !selected.trim().is_empty() && !selected.contains('\n') {
         let replacement = format!("${}$", selected.trim());
@@ -334,6 +342,7 @@ pub fn insert_diagram(text: &str, sel: Range<Byte>, template: &str) -> Edit {
 /// A reference `[^n]` behind the selection, with the lowest number not in the text yet, and its definition at the end
 /// of the text, where the caret goes.
 pub fn insert_footnote(text: &str, sel: Range<Byte>) -> Edit {
+    let sel = text.fit(sel);
     let mut n = 1;
     while text.contains(&format!("[^{n}]")) {
         n += 1;
@@ -540,12 +549,12 @@ mod tests {
     #[test]
     fn a_new_link_or_image_leaves_the_caret_behind_it_and_quotes_awkward_addresses() {
         let t = "ab cd";
-        let edit = insert_link(bytes(3..3), "u", "");
+        let edit = insert_link(t, bytes(3..3), "u", "");
         let mut out = t.to_string();
         edit.apply_to(&mut out);
         assert_eq!(out, "ab [u](u)cd");
         assert_eq!(edit.selection, bytes(9..9));
-        let edit = insert_image(bytes(3..3), "a", "p q");
+        let edit = insert_image(t, bytes(3..3), "a", "p q");
         let mut out = t.to_string();
         edit.apply_to(&mut out);
         assert_eq!(out, "ab ![a](<p q>)cd");

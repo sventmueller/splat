@@ -20,14 +20,14 @@ use objc2_foundation::{NSArray, NSCoder, NSNotification, NSObjectProtocol, NSRan
 
 use super::actions::Action;
 use super::atom::{self, AtomEditor};
-use super::changes::{self, ChangeMarks, ChangesAnswer};
+use super::changes::{self, ChangeMarks};
 use super::counter::{self, WordCounter};
 use super::editing::{self, Editing};
 use super::export::{self, Sharing};
-use super::images::{self, ImageFile, Pictures};
+use super::images::{self, Pictures};
 use super::model::Model;
 use super::navigation::Links;
-use super::notes::{self, Inherited, NoteAnswer, Notes, RenameRequest};
+use super::notes::{self, Inherited, NoteAnswer, Notes};
 use super::panes::{self, Panes, Side};
 use super::progressive::Progressive;
 use super::scroll::{self, ScrollSync};
@@ -41,8 +41,9 @@ use crate::document::MdDocument;
 use crate::util::guarded;
 use layers::{
     ForAtoms, ForChanges, ForCounter, ForEditing, ForLinks, ForNotes, ForPanes, ForPictures, ForProgressive, ForScroll,
-    ForSelection, ForSharing, ForUpdater,
+    ForSelection, ForSharing, ForUpdater, Message,
 };
+use splat_editor_state::progress;
 
 pub struct Ivars {
     document: Weak<MdDocument>,
@@ -62,7 +63,25 @@ pub struct Ivars {
     closed: std::cell::Cell<bool>,
 }
 
-define_class!(
+/// `define_class!` with `body` and, for every row of `actions::commands!`, the method AppKit finds the command's target by:
+/// it asks who responds to the selector of a menu item.
+macro_rules! class_with_commands {
+    ([$($body:tt)*] $($action:ident = $selector:ident, $applies:ident { $($field:ident: $value:expr),* };)*) => {
+        define_class!(
+            $($body)*
+
+            impl EditorController {
+                $(
+                    #[expect(non_snake_case, reason = "named after the selector AppKit sends")]
+                    #[unsafe(method($selector:))]
+                    fn $selector(&self, s: Option<&AnyObject>) { self.editing().perform(Action::$action, s) }
+                )*
+            }
+        );
+    };
+}
+
+super::actions::commands!(class_with_commands, [
     #[unsafe(super(NSWindowController))]
     #[thread_kind = MainThreadOnly]
     #[name = "MDEditorController"]
@@ -338,121 +357,8 @@ define_class!(
                 }
             });
         }
-
-        // One method per command of `actions`: AppKit finds a menu item's target by asking who responds to its
-        // selector.
-        #[unsafe(method(mdBold:))]
-        fn md_bold(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Bold, s) }
-        #[unsafe(method(mdItalic:))]
-        fn md_italic(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Italic, s) }
-        #[unsafe(method(mdUnderline:))]
-        fn md_underline(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Underline, s) }
-        #[unsafe(method(mdStrikethrough:))]
-        fn md_strike(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Strikethrough, s) }
-        #[unsafe(method(mdHighlight:))]
-        fn md_highlight(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Highlight, s) }
-        #[unsafe(method(mdInlineCode:))]
-        fn md_code(&self, s: Option<&AnyObject>) { self.editing().perform(Action::InlineCode, s) }
-        #[unsafe(method(mdSuperscript:))]
-        fn md_sup(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Superscript, s) }
-        #[unsafe(method(mdSubscript:))]
-        fn md_sub(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Subscript, s) }
-        #[unsafe(method(mdHeading:))]
-        fn md_heading(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Heading, s) }
-        #[unsafe(method(mdBulletList:))]
-        fn md_bullets(&self, s: Option<&AnyObject>) { self.editing().perform(Action::BulletList, s) }
-        #[unsafe(method(mdNumberedList:))]
-        fn md_numbers(&self, s: Option<&AnyObject>) { self.editing().perform(Action::NumberedList, s) }
-        #[unsafe(method(mdTaskList:))]
-        fn md_tasks(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TaskList, s) }
-        #[unsafe(method(mdQuote:))]
-        fn md_quote(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Quote, s) }
-        #[unsafe(method(mdCodeBlock:))]
-        fn md_code_block(&self, s: Option<&AnyObject>) { self.editing().perform(Action::CodeBlock, s) }
-        #[unsafe(method(mdInsertAlert:))]
-        fn md_alert(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Alert, s) }
-        #[unsafe(method(mdRemoveFormatting:))]
-        fn md_clear(&self, s: Option<&AnyObject>) { self.editing().perform(Action::RemoveFormatting, s) }
-        #[unsafe(method(mdEditAtom:))]
-        fn md_edit_atom(&self, s: Option<&AnyObject>) { self.editing().perform(Action::EditAtom, s) }
-        #[unsafe(method(mdInsertLink:))]
-        fn md_link(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Link, s) }
-        #[unsafe(method(mdInsertImage:))]
-        fn md_image(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Image, s) }
-        #[unsafe(method(mdInsertTable:))]
-        fn md_table(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Table, s) }
-        #[unsafe(method(mdInsertFormula:))]
-        fn md_formula(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Formula, s) }
-        #[unsafe(method(mdInsertDiagram:))]
-        fn md_diagram(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Diagram, s) }
-        #[unsafe(method(mdInsertToc:))]
-        fn md_toc(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Toc, s) }
-        #[unsafe(method(mdInsertFootnote:))]
-        fn md_footnote(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Footnote, s) }
-        #[unsafe(method(mdInsertRule:))]
-        fn md_rule(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Rule, s) }
-        #[unsafe(method(mdTableRowAbove:))]
-        fn md_row_above(&self, s: Option<&AnyObject>) { self.editing().perform(Action::RowAbove, s) }
-        #[unsafe(method(mdTableRowBelow:))]
-        fn md_row_below(&self, s: Option<&AnyObject>) { self.editing().perform(Action::RowBelow, s) }
-        #[unsafe(method(mdTableColumnLeft:))]
-        fn md_col_left(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ColumnLeft, s) }
-        #[unsafe(method(mdTableColumnRight:))]
-        fn md_col_right(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ColumnRight, s) }
-        #[unsafe(method(mdTableDeleteRow:))]
-        fn md_del_row(&self, s: Option<&AnyObject>) { self.editing().perform(Action::DeleteRow, s) }
-        #[unsafe(method(mdTableDeleteColumn:))]
-        fn md_del_col(&self, s: Option<&AnyObject>) { self.editing().perform(Action::DeleteColumn, s) }
-        #[unsafe(method(mdTableAlign:))]
-        fn md_align(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TableAlign, s) }
-        #[unsafe(method(mdTableFormat:))]
-        fn md_table_format(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TableFormat, s) }
-        #[unsafe(method(mdTogglePreview:))]
-        fn md_toggle_preview(&self, s: Option<&AnyObject>) { self.editing().perform(Action::TogglePreview, s) }
-        #[unsafe(method(mdToggleSidebar:))]
-        fn md_toggle_sidebar(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleSidebar, s) }
-        #[unsafe(method(mdToggleOutline:))]
-        fn md_toggle_outline(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleOutline, s) }
-        #[unsafe(method(mdTypography:))]
-        fn md_typography(&self, s: Option<&AnyObject>) { self.editing().perform(Action::Typography, s) }
-        #[unsafe(method(mdZoomIn:))]
-        fn md_zoom_in(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ZoomIn, s) }
-        #[unsafe(method(mdZoomOut:))]
-        fn md_zoom_out(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ZoomOut, s) }
-        #[unsafe(method(mdZoomReset:))]
-        fn md_zoom_reset(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ZoomReset, s) }
-        #[unsafe(method(mdNewTab:))]
-        fn md_new_tab(&self, s: Option<&AnyObject>) { self.editing().perform(Action::NewTab, s) }
-        #[unsafe(method(mdExportHTML:))]
-        fn md_export_html(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ExportHtml, s) }
-        #[unsafe(method(mdExportWord:))]
-        fn md_export_word(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ExportWord, s) }
-        #[unsafe(method(mdLoadRemoteImages:))]
-        fn md_load_remote_images(&self, s: Option<&AnyObject>) { self.editing().perform(Action::LoadRemoteImages, s) }
-        #[unsafe(method(mdEditAtomAt:))]
-        fn md_edit_atom_at(&self, s: Option<&AnyObject>) { self.editing().perform(Action::EditAtomAt, s) }
-        #[unsafe(method(mdAtomSnippet:))]
-        fn md_atom_snippet(&self, s: Option<&AnyObject>) { self.editing().perform(Action::AtomSnippet, s) }
-        #[unsafe(method(mdAtomMode:))]
-        fn md_atom_mode(&self, s: Option<&AnyObject>) { self.editing().perform(Action::AtomMode, s) }
-        #[unsafe(method(mdToolbarSegment:))]
-        fn md_toolbar_segment(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToolbarSegment, s) }
-        #[unsafe(method(mdPasteMarkdown:))]
-        fn md_paste_markdown(&self, s: Option<&AnyObject>) { self.editing().perform(Action::PasteMarkdown, s) }
-        #[unsafe(method(mdEditMetadata:))]
-        fn md_edit_metadata(&self, s: Option<&AnyObject>) { self.editing().perform(Action::EditMetadata, s) }
-        #[unsafe(method(mdExportOptions:))]
-        fn md_export_options(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ExportOptions, s) }
-        #[unsafe(method(mdToggleFiles:))]
-        fn md_toggle_files(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleFiles, s) }
-        #[unsafe(method(mdSearchFolder:))]
-        fn md_search_folder(&self, s: Option<&AnyObject>) { self.editing().perform(Action::SearchFolder, s) }
-        #[unsafe(method(mdToggleWordCount:))]
-        fn md_toggle_word_count(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleWordCount, s) }
-        #[unsafe(method(mdToggleChanges:))]
-        fn md_toggle_changes(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleChanges, s) }
     }
-);
+]);
 
 /// What only this module and `layers` may call in the program itself, as a component gets no further than `layers` lets it.
 /// The window self-tests act from outside on everything.
@@ -495,25 +401,47 @@ within_the_controller! {
 
 /// What the rest of the program tells or asks an editor; nothing of it reaches a component in any other way.
 impl EditorController {
+    #[cfg(feature = "selftest")]
     pub(in crate::editor) fn command_applies(&self, action: Sel) -> bool {
         self.editing().validate(Some(action), 0, None)
+    }
+
+    /// What arrived for a component, later or from one below it; see `layers::Message`.
+    pub(in crate::editor) fn handle(&self, message: Message) {
+        match message {
+            Message::LinkChosen { url, label } => self.editing().link_chosen(&url, &label),
+            Message::TableChosen { rows, columns } => self.editing().table_chosen(rows, columns),
+            Message::ImageChosen(path) => self.editing().image_chosen(&path),
+            Message::PicturePasted { written, folder } => self.editing().picture_pasted(written, &folder),
+            Message::MetadataChosen(wanted) => self.metadata_chosen(wanted),
+            Message::Perform(action) => self.perform(action),
+            Message::Notes(answer) => self.note_answer(answer),
+            Message::NotesFolder(folder) => self.use_notes_folder(folder),
+            Message::RenameChosen { from, to } => self.note_rename_chosen(from, to),
+            Message::RenameConfirmed(request, rewrites) => self.notes().rename(request, rewrites),
+            Message::RevealPlace { line, column } => self.links().reveal_place(line, column),
+            Message::Changes(answer) => self.change_marks().answer(answer),
+            Message::ImageLoaded(path, file) => self.pictures().image_loaded(path, file),
+            Message::ImagesChanged(changed) => self.pictures().read_images_again(changed),
+            Message::Parsed {
+                generation,
+                text,
+                background,
+            } => self.updater().parse_ended(generation, &text, background.map(|b| *b)),
+            Message::ExportTo { format, path, title } => {
+                self.sharing().export_to(self.export_source(), format, path, title);
+            }
+            Message::ExportFailed(failure) => self.report_export_failure(&failure),
+        }
     }
 
     pub(in crate::editor) fn reveal_source(&self, start: crate::markdown::text::Byte) {
         self.links().reveal_source(start);
     }
 
-    pub(in crate::editor) fn image_loaded(&self, path: PathBuf, file: ImageFile) {
-        self.pictures().image_loaded(path, file);
-    }
-
     /// What the images of a preview that shows hold, for a look at their files.
     pub(in crate::editor) fn images_shown(&self) -> Option<&std::cell::RefCell<images::ImageStore>> {
         self.panes().preview_visible().then(|| self.pictures().store())
-    }
-
-    pub(in crate::editor) fn read_images_again(&self, changed: Vec<(PathBuf, crate::util::Stamp)>) {
-        self.pictures().read_images_again(changed);
     }
 
     /// Whether the document has views to hold a text yet, and the version of that text.
@@ -570,34 +498,6 @@ impl EditorController {
         self.atom_editor().cancel();
     }
 
-    /// A sheet that asked for a link closed.
-    pub(in crate::editor) fn link_chosen(&self, url: &str, label: &str) {
-        self.editing().link_chosen(url, label);
-    }
-
-    /// A sheet that asked for a table closed.
-    pub(in crate::editor) fn table_chosen(&self, rows: usize, columns: usize) {
-        self.editing().table_chosen(rows, columns);
-    }
-
-    /// A panel that asked for an image closed.
-    pub(in crate::editor) fn image_chosen(&self, path: &Path) {
-        self.editing().image_chosen(path);
-    }
-
-    pub(in crate::editor) fn picture_pasted(&self, written: Option<PathBuf>, folder: &Path) {
-        self.editing().picture_pasted(written, folder);
-    }
-
-    pub(in crate::editor) fn parse_ended(
-        &self,
-        generation: u64,
-        text: &std::sync::Arc<str>,
-        background: Option<super::state::Background>,
-    ) {
-        self.updater().parse_ended(generation, text, background);
-    }
-
     pub(in crate::editor) fn export_source(&self) -> export::ExportSource {
         self.sharing().export_source()
     }
@@ -617,10 +517,6 @@ impl EditorController {
 
     pub(in crate::editor) fn look_at_repository(&self) {
         self.change_marks().look();
-    }
-
-    pub(in crate::editor) fn changes_answer(&self, answer: ChangesAnswer) {
-        self.change_marks().answer(answer);
     }
 
     pub(in crate::editor) fn draw_change_bars(&self, side: Side, bars: &objc2_app_kit::NSView) {
@@ -653,10 +549,6 @@ impl EditorController {
 
     pub(in crate::editor) fn note_rename_chosen(&self, from: PathBuf, to: PathBuf) {
         self.notes().rename_chosen(from, to);
-    }
-
-    pub(in crate::editor) fn note_rename_confirmed(&self, request: RenameRequest, rewrites: Vec<splat_notes::Rewrite>) {
-        self.notes().rename(request, rewrites);
     }
 
     /// Changes this document's text by `replacements`, if it still is `before`.
@@ -694,7 +586,7 @@ impl EditorController {
         if matches!(why, Invalidate::Zoom | Invalidate::Appearance | Invalidate::Layout) {
             self.updater().schedule_render_requests();
         }
-        if update::updates_at_once(why, self.panes().source().length()) {
+        if progress::updates_at_once(why, self.panes().source().length()) {
             self.updater().update_now();
         } else {
             self.updater().catch_up();

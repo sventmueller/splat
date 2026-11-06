@@ -3,10 +3,11 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use super::{
-    Atom, Builder, CharMap, Ctx, Embeds, Layout, Marker, Para, ParaKind, ParaStyle, Resolver, Run, RunMap, RunStyle,
-    TopBlock,
+    Atom, Builder, CharMap, Ctx, Embeds, ItemMarker, Layout, Para, ParaKind, ParaStyle, Resolver, Run, RunMap,
+    RunStyle, TopBlock,
 };
 use splat_markdown::doc::{Align, Block, BlockKind, Doc};
+use splat_markdown::markup::Role;
 use splat_markdown::text::{
     Byte, TextAt, count32, line_end, line_start, lines_with_ends, next_line_start, shifted, units,
 };
@@ -125,13 +126,12 @@ pub(super) fn build(
 fn shows_definition(paras: &[Para]) -> bool {
     paras
         .first()
-        .is_some_and(|p| matches!(p.style.marker, Some(Marker::Footnote(..))))
+        .is_some_and(|p| matches!(p.style.marker, Some(ItemMarker::Footnote(..))))
 }
 
 /// Only a paragraph ending on the caret's line can show trailing spaces.
 fn show_spaces_at_the_caret(text: &str, parts: &mut [Part], c: Byte) {
-    let c_in_text = c.min(text.end());
-    let line = line_start(text, c_in_text)..line_end(text, c_in_text);
+    let line = line_start(text, c)..line_end(text, c);
     for part in parts
         .iter_mut()
         .filter(|p| p.src().start <= line.end && p.src().end >= line.start)
@@ -315,9 +315,9 @@ fn html_wrappers(blocks: &[Block]) -> Vec<Wrapper> {
             let wrapper = Wrapper {
                 align: e
                     .align()
-                    .or((e.name == "center").then_some(Align::Center))
+                    .or((e.role == Role::Center).then_some(Align::Center))
                     .unwrap_or(around.align),
-                hidden: around.hidden || (e.name == "details" && e.attr("open").is_none()),
+                hidden: around.hidden || (e.role == Role::Details && e.attr("open").is_none()),
             };
             open.open(e.name.clone(), wrapper);
         }
@@ -352,18 +352,18 @@ fn shift_para(p: &mut Para, delta: isize) {
         mirrored: _,
     } = style;
     match marker {
-        Some(Marker::Task {
+        Some(ItemMarker::Task {
             checked: _,
             symbol: Some(symbol),
         }) => *symbol = at(*symbol),
         Some(
-            Marker::Task {
+            ItemMarker::Task {
                 checked: _,
                 symbol: None,
             }
-            | Marker::Bullet(_)
-            | Marker::Number(_)
-            | Marker::Footnote(..),
+            | ItemMarker::Bullet(_)
+            | ItemMarker::Number(_)
+            | ItemMarker::Footnote(..),
         )
         | None => {}
     }
@@ -552,7 +552,7 @@ fn render_hash(p: &Para, h: &mut impl Hasher) {
     )
         .hash(h);
     match &s.marker {
-        Some(Marker::Task { checked, .. }) => (1u8, checked).hash(h),
+        Some(ItemMarker::Task { checked, .. }) => (1u8, checked).hash(h),
         other => (0u8, other).hash(h),
     }
     for r in &p.runs {

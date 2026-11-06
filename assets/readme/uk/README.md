@@ -635,6 +635,7 @@ Splat залишається чутливим із документами на �
 | [entities](https://github.com/p-jackson/entities) | 1 | назви символьних посилань HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | розпакування файлів Word і об’єктів Git | MIT, Zlib або Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | читання XML файлів Word | MIT або Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | читання тексту RTF у старих кодових сторінках | MIT або Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | назви й пошук незалежно від складених і розкладених літер | MIT або Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | збереження тексту на кшталт `:shortcode:` дослівно в імпортованому тексті | MIT або Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | відображення формул | Apache-2.0 |

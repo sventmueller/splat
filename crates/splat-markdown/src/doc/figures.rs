@@ -6,7 +6,7 @@ use super::{BlockKind, Doc, InlineKind, walk_blocks, walk_inlines};
 use crate::text::Byte;
 
 /// The formula or diagram a code block with this info string holds.
-pub fn code_figure<'a>(info: &str, literal: &'a str) -> Option<Figure<'a>> {
+pub(crate) fn code_figure<'a>(info: &str, literal: &'a str) -> Option<Figure<'a>> {
     match diagram_kind(info) {
         Some(kind) => Some(Figure::Diagram { source: literal, kind }),
         None if is_math_fence(info) => Some(Figure::Math {
@@ -145,6 +145,7 @@ pub fn figures(doc: &Doc) -> Vec<(Range<Byte>, Figure<'_>)> {
 
 /// The innermost formula or diagram whose source contains `at`, ends included.
 pub fn figure_at(doc: &Doc, at: Byte) -> Option<(Range<Byte>, Figure<'_>)> {
+    let at = doc.fit_at(at);
     figures(doc)
         .into_iter()
         .rev()

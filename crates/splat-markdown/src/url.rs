@@ -46,6 +46,27 @@ pub fn is_harmless(url: &str) -> bool {
     scheme(url).is_none() || is_web_or_mail(url)
 }
 
+/// `text` with its `%XX` escapes decoded, as the path of an address means it. A `%` without two hex digits behind it
+/// stays as it stands, and bytes that make no UTF-8 become U+FFFD.
+pub fn percent_decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let hex = |at: usize| bytes.get(at).and_then(|b| char::from(*b).to_digit(16));
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] == b'%'
+            && let (Some(high), Some(low)) = (hex(at + 1), hex(at + 2))
+        {
+            out.extend(u8::try_from(high * 16 + low));
+            at += 3;
+        } else {
+            out.push(bytes[at]);
+            at += 1;
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,5 +121,18 @@ mod tests {
             assert!(!is_harmless(url), "{url:?}");
         }
         assert!(is_web_or_mail("https://a.de") && !is_web_or_mail("bild.png"));
+    }
+
+    #[test]
+    fn escapes_are_decoded_and_those_that_are_none_stay_as_they_stand() {
+        assert_eq!(percent_decode("a%20b%2"), "a b%2");
+        assert_eq!(percent_decode("%€.png"), "%€.png");
+        assert_eq!(percent_decode("%C3%A4"), "ä");
+        assert_eq!(percent_decode("%c3%a4"), "ä");
+        assert_eq!(percent_decode("%zz%"), "%zz%");
+        assert_eq!(percent_decode("100%25"), "100%");
+        assert_eq!(percent_decode("a%2520b"), "a%20b", "decoded once");
+        assert_eq!(percent_decode("%FF%41"), "\u{FFFD}A");
+        assert_eq!(percent_decode(""), "");
     }
 }

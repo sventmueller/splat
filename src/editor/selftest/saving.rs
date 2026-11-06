@@ -440,13 +440,13 @@ fn what_a_save_leaves_of_the_file(mtm: MainThreadMarker, dir: &Path) {
     // Only once the run loop went on: until then its autorelease pool holds what AppKit handed out while closing.
     let editor = objc2::rc::Weak::from_retained(&e);
     drop(e);
-    super::after(6.0, move || {
-        check(
-            "a closed document lets go of its editor and all it holds",
-            editor.load().is_none(),
-            "",
-        );
-    });
+    super::wait(
+        0.0,
+        6.0,
+        1,
+        move || editor.load().is_none(),
+        |gone| check("a closed document lets go of its editor and all it holds", gone, ""),
+    );
 }
 
 /// A folder that takes nothing is what a document's own file meets on a disk or share that became read-only: neither the

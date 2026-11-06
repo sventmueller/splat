@@ -635,6 +635,7 @@ Compilarea, testarea, structura codului și regulile pe care le urmează sunt de
 | [entities](https://github.com/p-jackson/entities) | 1 | numele referințelor de caractere HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | despachetarea fișierelor Word și a obiectelor Git | MIT, Zlib sau Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | citirea XML-ului din fișierele Word | MIT sau Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | citirea textului RTF scris în pagini de cod mai vechi | MIT sau Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nume și căutare peste litere compuse și descompuse | MIT sau Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | păstrarea literală a textului de tip `:shortcode:` în textul importat | MIT sau Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | randarea formulelor | Apache-2.0 |

@@ -635,6 +635,7 @@ Splat은 수 메가바이트의 문서에서도 반응성을 유지합니다.
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 문자 참조의 이름 | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Word 파일과 Git 객체의 압축 해제 | MIT, Zlib or Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Word 파일의 XML 읽기 | MIT or Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | 이전 코드 페이지로 작성된 RTF 텍스트 읽기 | MIT or Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | 조합된 문자와 분해된 문자를 아우르는 이름과 검색 | MIT or Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | 가져온 텍스트에서 `:shortcode:`와 비슷한 텍스트를 글자 그대로 유지 | MIT or Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | 수식 렌더링 | Apache-2.0 |

@@ -842,6 +842,7 @@ Bygge, testning, kodens uppbyggnad och de regler den följer beskrivs i [docs/de
 | [entities](https://github.com/p-jackson/entities) | 1 | namnen på HTML-teckenreferenser | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | uppackning av Word-filer och Git-objekt | MIT, Zlib eller Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | läsning av XML:en i Word-filer | MIT eller Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | läsning av RTF-text i äldre teckentabeller | MIT eller Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | namn och sökning över sammansatta och uppdelade bokstäver | MIT eller Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | håller text som liknar `:shortcode:` bokstavlig i importerad text | MIT eller Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | rendering av formler | Apache-2.0 |

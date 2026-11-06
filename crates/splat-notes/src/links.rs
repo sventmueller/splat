@@ -48,8 +48,8 @@ pub(crate) fn links_of(doc: &Doc) -> Vec<Link<'_>> {
 }
 
 fn link_of<'d>(text: &str, inline: &'d Inline) -> Option<Link<'d>> {
-    let whole = offsets(&inline.range);
-    let says = match &inline.kind {
+    let whole = offsets(&inline.range());
+    let says = match inline.kind() {
         InlineKind::WikiLink { target, embed } => {
             let source = text.get(whole.clone())?;
             let open = if *embed { "![[" } else { "[[" };
@@ -74,7 +74,7 @@ fn link_of<'d>(text: &str, inline: &'d Inline) -> Option<Link<'d>> {
 
 /// Where the address of a Markdown link stands; `None` if it stands in a definition.
 fn written_address(text: &str, inline: &Inline) -> Option<Written> {
-    let (from, end) = (inline.content_range().end.get(), inline.range.end.get());
+    let (from, end) = (inline.content_range().end.get(), inline.range().end.get());
     let open = from + text.get(from..end)?.find(']')? + 1;
     text[open..end].strip_prefix('(')?;
     destination(text, open + 1, end)

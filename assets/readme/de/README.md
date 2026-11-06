@@ -635,6 +635,7 @@ Bauen, Testen, der Aufbau des Codes und die Regeln, denen er folgt, stehen in [d
 | [entities](https://github.com/p-jackson/entities) | 1 | die Namen der HTML-Zeichenverweise | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Entpacken von Word-Dateien und Git-Objekten | MIT, Zlib oder Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Lesen des XML von Word-Dateien | MIT oder Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | Lesen von RTF-Text in älteren Codepages | MIT oder Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | Namen und Suche über zusammengesetzte und zerlegte Buchstaben hinweg | MIT oder Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | Text wie `:shortcode:` in importiertem Text wörtlich belassen | MIT oder Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | Formeln darstellen | Apache-2.0 |

@@ -11,7 +11,7 @@ use super::package::{A, M, MC, OFFICE, R, V, W, WP, child_w, chosen_content, w_a
 use super::styles::RunProps;
 use super::{Media, MissingPicture, MissingReason};
 use crate::rich::{Image, Mark, Marks, Piece, Source, Span};
-use crate::zip::ZipError;
+use splat_ooxml::zip::ZipError;
 
 /// More of a field's instruction than a link in it needs.
 const LONGEST_INSTRUCTION: usize = 1 << 16;
@@ -606,7 +606,8 @@ impl Walker<'_, '_, '_> {
             return known.clone();
         }
         let destination = match self.archive.get(&part) {
-            // Everything else read so far has used up the budget: the file as a whole is too large.
+            // What was read before this picture used up what the archive may inflate in all, so the file as a whole is
+            // too large; a picture too large on its own is only missing.
             Err(ZipError::TooLarge) => {
                 self.over_budget = true;
                 None
@@ -631,6 +632,7 @@ impl Walker<'_, '_, '_> {
         let bytes = match read {
             Ok(Some(bytes)) => bytes,
             Ok(None) => return Err(MissingReason::Absent),
+            Err(ZipError::EntryTooLarge) => return Err(MissingReason::TooLarge),
             Err(_) => return Err(MissingReason::Damaged),
         };
         let extension = picture_extension(&bytes).ok_or(MissingReason::UnknownFormat)?;

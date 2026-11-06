@@ -2,9 +2,9 @@
 
 use std::fmt;
 
-use crate::ReadError;
 use crate::inflate::Inflater;
 use crate::source::Source;
+use crate::{MAX_TEXT_BYTES, ReadError};
 
 /// The SHA-1 name of an object.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -16,9 +16,9 @@ impl fmt::Display for Oid {
     }
 }
 
-/// The largest blob that is read: the 32 MiB of text that the app compares at most (`MOST_BYTES` in
-/// `src/editor/changes.rs`), written as UTF-16 behind a byte order mark.
-pub(crate) const MAX_OBJECT: u64 = 2 * (32 << 20) + 2;
+/// The largest blob that is read: the longest text compared with the last commit, written as UTF-16 behind a byte order
+/// mark.
+pub(crate) const MAX_OBJECT: u64 = 2 * MAX_TEXT_BYTES as u64 + 2;
 /// The largest tree, commit or tag that is read; a tree this large already lists about a million and a half files.
 pub(crate) const MAX_METADATA: u64 = 64 << 20;
 

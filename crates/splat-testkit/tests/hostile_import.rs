@@ -1,10 +1,10 @@
-//! Files and pasteboards built to hurt the importers: nesting that overflows a stack, patterns that take quadratic time,
-//! archives that inflate to far more than they hold. Each runs at two sizes on a small stack, whose times must grow about as
-//! the input does; a thread named after the input tells which one ended the test run.
+//! Files and pasteboards built to hurt the importers: nesting that overflows a stack, patterns that take quadratic time or
+//! memory, archives that inflate to far more than they hold. Each runs at two sizes on a small stack, whose time and memory
+//! must grow about as the input does; a thread named after the input tells which one ended the test run.
 
 use std::fmt::Write;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::sync::Arc;
+use std::time::Duration;
 
 use miniz_oxide::deflate::compress_to_vec;
 use splat_import::docx::import;
@@ -12,15 +12,16 @@ use splat_import::html::from_html;
 use splat_import::rtf::from_rtf;
 use splat_import::tabular::from_text;
 use splat_import::template::apply_template;
-use splat_markdown::docx::zip::{Zip, crc32};
+use splat_ooxml::zip::{Zip, crc32};
 use splat_testkit::fuzz_import::{Part, generated, word_file};
+use splat_testkit::memory::{self, peak_of};
+use splat_testkit::timing::{Input, LIMIT, NOTICEABLE, Scaled, Stages, alone, grows_too_fast, holds_to_time, scales};
 
-const STACK: usize = 2 << 20;
-const LIMIT: Duration = Duration::from_secs(if cfg!(debug_assertions) { 200 } else { 60 });
-/// Below this nothing hurts, and short times say little.
-const NOTICEABLE: Duration = Duration::from_millis(400);
-const SHORTEST: Duration = Duration::from_millis(20);
-const NOISE: f64 = 2.25;
+#[global_allocator]
+static COUNTING: memory::Counting = memory::Counting;
+
+/// The pieces of each input at full size; an unoptimized build takes ten times as long for the same work.
+const SIZE: usize = if cfg!(debug_assertions) { 10_000 } else { 80_000 };
 
 const W: &str = "xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" \
     xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" \
@@ -91,59 +92,33 @@ struct Case {
     run: fn(&[u8]) -> usize,
 }
 
-impl Case {
-    /// How long the importer takes on a thread of its own.
-    fn timed(&self) -> Result<Duration, String> {
-        let (done, finished) = mpsc::channel();
-        let input = self.input.clone();
-        let run = self.run;
-        std::thread::Builder::new()
-            .name(self.name.to_string())
-            .stack_size(STACK)
-            .spawn(move || {
-                let started = Instant::now();
-                std::hint::black_box(run(&input));
-                let _ = done.send(started.elapsed());
-            })
-            .map_err(|error| format!("{}: {error}", self.name))?;
-        finished.recv_timeout(LIMIT).map_err(|error| match error {
-            mpsc::RecvTimeoutError::Timeout => format!("{}: over {LIMIT:?}", self.name),
-            mpsc::RecvTimeoutError::Disconnected => format!("{}: panicked", self.name),
-        })
+/// A Word file or template grows by what its parts hold, which deflating hides.
+impl Input for Case {
+    fn size(&self) -> usize {
+        let unpacked = splat_ooxml::zip::Archive::read(&self.input).map_or(0, |archive| {
+            let names: Vec<String> = archive.names().map(str::to_string).collect();
+            names
+                .iter()
+                .map(|name| archive.get(name).ok().flatten().map_or(0, |part| part.len()))
+                .sum()
+        });
+        unpacked.max(self.input.len())
     }
 }
 
-fn grows_too_fast(small: Duration, large: Duration, small_len: usize, large_len: usize) -> bool {
-    #[expect(clippy::cast_precision_loss, reason = "a ratio of input lengths far below 2^52")]
-    let allowed = large_len as f64 / small_len.max(1) as f64 * NOISE;
-    large > NOTICEABLE && large.as_secs_f64() > small.max(SHORTEST).as_secs_f64() * allowed
+fn imported(case: &Case) -> Stages {
+    let mut stages = Stages::default();
+    stages.time("reading", || std::hint::black_box((case.run)(&case.input)));
+    stages
 }
 
-/// An input at a fourth of its size and at full size; a small run that got held up would make any growth look fine, and a
-/// large one may have been held up by other programs, so a suspect is run again.
-fn scales(small: &Case, large: &Case) -> Result<(), String> {
-    let mut small_took = small.timed()?;
-    let mut large_took = large.timed()?;
-    // A measured build counts every line it runs, which says nothing about how the real one grows.
-    if cfg!(coverage) {
-        return Ok(());
+fn scaled(small: Case, large: Case) -> Scaled<Case> {
+    Scaled {
+        name: small.name,
+        small: Arc::new(small),
+        large: Arc::new(large),
+        work: imported,
     }
-    for _ in 0..3 {
-        if !grows_too_fast(small_took, large_took, small.input.len(), large.input.len()) {
-            return Ok(());
-        }
-        small_took = small_took.min(small.timed()?);
-        large_took = large_took.min(large.timed()?);
-    }
-    if grows_too_fast(small_took, large_took, small.input.len(), large.input.len()) {
-        return Err(format!(
-            "{}: {small_took:?} at {} bytes, {large_took:?} at {} bytes",
-            small.name,
-            small.input.len(),
-            large.input.len()
-        ));
-    }
-    Ok(())
 }
 
 fn html_cases(n: usize) -> Vec<Case> {
@@ -394,7 +369,7 @@ fn big_template(n: usize) -> Vec<u8> {
     );
     let mut zip = Zip::default();
     let original = word_file(&numbering_many(n).into_bytes(), Part::Numbering);
-    let archive = splat_import::zip::Archive::read(&original).expect("a file just made");
+    let archive = splat_ooxml::zip::Archive::read(&original).expect("a file just made");
     let names: Vec<String> = archive.names().map(str::to_string).collect();
     for name in names {
         let content = archive.get(&name).expect("a part").expect("a part");
@@ -466,27 +441,14 @@ fn cases(n: usize) -> Vec<Case> {
 }
 
 #[test]
-fn hostile_inputs_neither_overflow_the_stack_nor_take_quadratic_time() {
-    let size = splat_testkit::rounds(if cfg!(debug_assertions) { 10_000 } else { 80_000 });
-    let pairs: Vec<(Case, Case)> = cases(size / 4).into_iter().zip(cases(size)).collect();
-    let queue = std::sync::Mutex::new(pairs);
-    let problems = std::sync::Mutex::new(Vec::new());
-    let workers = std::thread::available_parallelism().map_or(2, |n| n.get().min(4));
-    std::thread::scope(|scope| {
-        for _ in 0..workers {
-            scope.spawn(|| {
-                loop {
-                    let Some((small, large)) = queue.lock().expect("no panic").pop() else {
-                        return;
-                    };
-                    if let Err(problem) = scales(&small, &large) {
-                        problems.lock().expect("no panic").push(problem);
-                    }
-                }
-            });
-        }
-    });
-    let problems = problems.into_inner().expect("no panic");
+fn memory_is_counted() {
+    assert!(memory::counts());
+}
+
+#[test]
+fn hostile_inputs_neither_overflow_the_stack_nor_take_quadratic_time_or_memory() {
+    let pairs = cases(SIZE / 4).into_iter().zip(cases(SIZE));
+    let problems = scales(pairs.map(|(small, large)| scaled(small, large)).collect());
     assert!(problems.is_empty(), "{problems:#?}");
 }
 
@@ -571,22 +533,31 @@ fn word_bomb(document: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn a_bomb_takes_time_as_it_inflates_and_stops_at_the_limits() {
+fn a_bomb_takes_time_and_memory_as_it_inflates_and_stops_at_the_limits() {
     let quarter = vec![b' '; 32 << 20];
     let whole = vec![b' '; 128 << 20];
     let (small, large) = (word_bomb(&quarter), word_bomb(&whole));
     assert!(large.len() < 2 << 20, "{}", large.len());
-    let timed = |file: &[u8]| {
-        let started = Instant::now();
-        assert!(import(file, "p").is_err());
-        started.elapsed()
+    let alone = alone();
+    let measured = |file: &[u8]| {
+        let mut peak = 0;
+        let took = alone.fastest(3, || {
+            let (refused, held) = peak_of(|| import(file, "p").is_err());
+            assert!(refused);
+            peak = held;
+        });
+        (took, peak)
     };
-    let small_took = timed(&small);
-    let large_took = timed(&large);
+    let (small_took, small_peak) = measured(&small);
+    let (large_took, large_peak) = measured(&large);
     assert!(large_took < LIMIT, "{large_took:?}");
     assert!(
-        cfg!(coverage) || !grows_too_fast(small_took, large_took, 32, 128),
+        !holds_to_time() || !grows_too_fast(NOTICEABLE, small_took, large_took, 32, 128),
         "{small_took:?} {large_took:?}"
+    );
+    assert!(
+        !memory::grows_too_much(small_peak, large_peak, 32, 128),
+        "{small_peak} bytes, then {large_peak} bytes"
     );
 
     let lying = bomb(&[
@@ -597,19 +568,119 @@ fn a_bomb_takes_time_as_it_inflates_and_stops_at_the_limits() {
         ),
         ("word/document.xml", &whole, 1024),
     ]);
-    let started = Instant::now();
-    assert_eq!(
-        import(&lying, "p").err(),
-        Some(splat_import::docx::ImportError::Damaged)
-    );
+    let mut peak = 0;
+    let took = alone.fastest(1, || {
+        let (refused, held) = peak_of(|| import(&lying, "p").err());
+        assert_eq!(refused, Some(splat_import::WordError::Damaged));
+        peak = held;
+    });
     assert!(
-        started.elapsed() < Duration::from_secs(1),
-        "stops when it passes what it said"
+        peak < 1 << 20 && (!holds_to_time() || took < Duration::from_secs(1)),
+        "stops when it passes what it said: {peak} bytes, {took:?}"
     );
 
     let too_much = vec![b' '; (128 << 20) + 1];
     assert_eq!(
         import(&word_bomb(&too_much), "p").err(),
-        Some(splat_import::docx::ImportError::TooLarge)
+        Some(splat_import::WordError::TooLarge)
     );
+}
+
+/// A page from Cocoa whose style sheet names one class `count` times, for declarations as long.
+fn cocoa_style_sheet(count: usize) -> Case {
+    let page = format!(
+        "<html><head><meta name=\"Generator\" content=\"Cocoa HTML Writer\"><style type=\"text/css\">{}{{{}}}</style>\
+         </head><body><p class=\"c\">a</p></body></html>",
+        ".c,".repeat(count),
+        "font-weight: bold; ".repeat(count),
+    );
+    Case {
+        name: "a style sheet from Cocoa that names one class many times",
+        input: page.into_bytes(),
+        run: |input| from_html(&String::from_utf8_lossy(input)).into_markdown().len(),
+    }
+}
+
+#[test]
+fn a_style_sheet_that_names_one_class_many_times_takes_memory_as_its_text_does() {
+    let problems = scales(vec![scaled(cocoa_style_sheet(500), cocoa_style_sheet(2_000))]);
+    assert!(problems.is_empty(), "{problems:#?}");
+}
+
+/// Just under the nodes the XML budget of one import allows.
+const NEARLY_ALL_NODES: usize = 15_990_000;
+
+/// A Word file whose document holds `in_document` and whose four other parts each hold `in_others` elements that no
+/// importer reads.
+fn crowded_word_file(in_document: usize, in_others: usize) -> Vec<u8> {
+    let relationship = |id: usize, kind: &str| {
+        format!(
+            "<Relationship Id=\"rId{id}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/{kind}\" \
+             Target=\"{kind}.xml\"/>"
+        )
+    };
+    let kinds = ["styles", "numbering", "footnotes", "endnotes"];
+    let rels = format!(
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">{}</Relationships>",
+        kinds
+            .iter()
+            .enumerate()
+            .map(|(id, kind)| relationship(id, kind))
+            .collect::<String>()
+    );
+    let part = |root: &str, inside: (&str, &str), nodes: usize| -> Vec<u8> {
+        format!(
+            "<w:{root} {W}>{}{}{}</w:{root}>",
+            inside.0,
+            "<w:a/>".repeat(nodes),
+            inside.1
+        )
+        .into_bytes()
+    };
+    let mut parts = vec![
+        ("[Content_Types].xml".to_string(), TYPES.as_bytes().to_vec()),
+        ("word/_rels/document.xml.rels".to_string(), rels.into_bytes()),
+        (
+            "word/document.xml".to_string(),
+            part("document", ("<w:body>", "</w:body>"), in_document),
+        ),
+    ];
+    for kind in kinds {
+        parts.push((format!("word/{kind}.xml"), part(kind, ("", ""), in_others)));
+    }
+    let entries: Vec<(&str, &[u8], u32)> = parts
+        .iter()
+        .map(|(name, content)| {
+            let size = u32::try_from(content.len()).expect("within the size of a part");
+            (name.as_str(), content.as_slice(), size)
+        })
+        .collect();
+    bomb(&entries)
+}
+
+/// Several parts of a Word file are in memory at once, so the XML of all of them shares one budget: a file full in
+/// every part takes about what a file with one full part takes, not five times as much.
+#[test]
+#[cfg_attr(
+    debug_assertions,
+    ignore = "an unoptimized build takes minutes to make and read the eighty million nodes"
+)]
+fn a_word_file_full_in_every_part_takes_no_more_memory_than_one_full_part() {
+    const PARTS: usize = 5;
+    let one_full = crowded_word_file(NEARLY_ALL_NODES, 0);
+    let spread = crowded_word_file(NEARLY_ALL_NODES / PARTS, NEARLY_ALL_NODES / PARTS);
+    let all_full = crowded_word_file(NEARLY_ALL_NODES, NEARLY_ALL_NODES);
+    let _alone = alone();
+    let (one_read, one_peak) = peak_of(|| import(&one_full, "p").is_ok());
+    let (spread_read, spread_peak) = peak_of(|| import(&spread, "p").is_ok());
+    let (all_refused, all_peak) = peak_of(|| import(&all_full, "p").err());
+    eprintln!("one full part: {one_peak} bytes; spread: {spread_peak} bytes; all full: {all_peak} bytes");
+    assert!(one_read && spread_read, "within the budget is read");
+    assert_eq!(all_refused, Some(splat_import::WordError::TooLarge));
+    for (what, peak) in [("spread over the parts", spread_peak), ("full in every part", all_peak)] {
+        assert!(
+            peak <= one_peak / 2 * 3,
+            "{what}: {peak} bytes against {one_peak} bytes for one full part"
+        );
+    }
 }

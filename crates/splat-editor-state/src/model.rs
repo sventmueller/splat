@@ -5,35 +5,45 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
-use super::state::State;
-use super::sync::{Snapshot, SourceCopy};
 use crate::markdown::text::U16;
+use crate::state::State;
+use crate::sync::{Snapshot, SourceCopy};
 
-/// The closures must be `Send` because the controller and its views are not, so none of them can call a view while the
-/// state is borrowed or keep the text across a change of the source, which would copy all of it.
-pub(super) struct Model {
+/// The state and the copy of the source text, lent to closures only. They must be `Send` because the controller and its
+/// views are not, so none of them can call a view while the state is borrowed or keep the text across a change of the
+/// source, which would copy all of it.
+pub struct Model {
     state: RefCell<State>,
     copy: SourceCopy,
 }
 
+impl Default for Model {
+    fn default() -> Model {
+        Model::new()
+    }
+}
+
 impl Model {
-    pub(super) fn new() -> Model {
+    /// The model of an empty document.
+    pub fn new() -> Model {
         Model {
             state: RefCell::new(State::new()),
             copy: SourceCopy::default(),
         }
     }
 
-    pub(super) fn read<R>(&self, f: impl for<'a> FnOnce(&'a State) -> R + Send) -> R {
+    /// What `f` makes of the state.
+    pub fn read<R>(&self, f: impl for<'a> FnOnce(&'a State) -> R + Send) -> R {
         f(&self.state.borrow())
     }
 
-    pub(super) fn change<R>(&self, f: impl for<'a> FnOnce(&'a mut State) -> R + Send) -> R {
+    /// Lets `f` change the state.
+    pub fn change<R>(&self, f: impl for<'a> FnOnce(&'a mut State) -> R + Send) -> R {
         f(&mut self.state.borrow_mut())
     }
 
     /// Lends the current text, which `read_view` gets from the view when edits could not patch the copy, and the state.
-    pub(super) fn with_text<R>(
+    pub fn with_text<R>(
         &self,
         read_view: impl FnOnce() -> (String, usize),
         f: impl for<'a> FnOnce(&'a Snapshot, &'a State) -> R + Send,
@@ -43,7 +53,7 @@ impl Model {
     }
 
     /// Like `with_text`, for a change of the state that depends on the text.
-    pub(super) fn change_with_text<R>(
+    pub fn change_with_text<R>(
         &self,
         read_view: impl FnOnce() -> (String, usize),
         f: impl for<'a> FnOnce(&'a Snapshot, &'a mut State) -> R + Send,
@@ -52,36 +62,44 @@ impl Model {
         f(&snap, &mut self.state.borrow_mut())
     }
 
-    pub(super) fn source_edited(&self, range: Range<U16>, delta: isize, inserted: &str, length: usize) {
+    /// An edit of the source, as `SourceCopy::edited` takes it.
+    pub fn source_edited(&self, range: Range<U16>, delta: isize, inserted: &str, length: usize) {
         self.copy.edited(range, delta, inserted, length);
     }
 
-    pub(super) fn text_version(&self) -> u64 {
+    /// How many edits the source has had.
+    pub fn text_version(&self) -> u64 {
         self.copy.version()
     }
 
-    pub(super) fn next_generation(&self) -> u64 {
+    /// Starts an update, and outdates every older one.
+    pub fn next_generation(&self) -> u64 {
         self.copy.next_generation()
     }
 
-    pub(super) fn latest_generation(&self) -> Arc<AtomicU64> {
+    /// The newest update as a background job can read it.
+    pub fn latest_generation(&self) -> Arc<AtomicU64> {
         self.copy.latest_generation()
     }
 
-    pub(super) fn is_latest(&self, generation: u64) -> bool {
+    /// Whether `generation` is the newest update.
+    pub fn is_latest(&self, generation: u64) -> bool {
         self.copy.is_latest(generation)
     }
 
-    pub(super) fn schedule_update(&self) -> bool {
+    /// Whether this call is the one that has to schedule the update.
+    pub fn schedule_update(&self) -> bool {
         self.copy.schedule_update()
     }
 
-    pub(super) fn update_ran(&self) {
+    /// The scheduled update ran.
+    pub fn update_ran(&self) {
         self.copy.update_ran();
     }
 
+    /// Whether an update is scheduled and has not run yet.
     #[cfg(feature = "selftest")]
-    pub(super) fn update_is_scheduled(&self) -> bool {
+    pub fn update_is_scheduled(&self) -> bool {
         self.copy.update_is_scheduled()
     }
 }
@@ -98,7 +116,7 @@ mod tests {
 
     #[test]
     fn a_change_of_the_state_is_what_the_next_read_sees() {
-        let model = Model::new();
+        let model = Model::default();
         assert_eq!(model.read(|st| st.zoom()), 1.0);
         let answer = model.change(|st| {
             st.set_zoom(1.5);

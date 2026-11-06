@@ -9,10 +9,10 @@ use super::numbering::Numbering;
 use super::package::{MC, W, child_w, chosen_content, w_attr, w_val};
 use super::runs::{Field, Line, RunContext};
 use super::styles::{ListPlace, RunProps, Style, Styles};
-use super::{ImportError, Media, MissingPicture};
+use super::{Media, MissingPicture, WordError};
 use crate::package::Relationships;
 use crate::rich::{Align, Block, FlatItem, Item, ListKind, Mark, Piece, Span, marker_kind, marker_task, visit_spans};
-use crate::zip::Archive;
+use splat_ooxml::zip::Archive;
 
 /// How deep the walker goes before it takes what is left as plain text. Each level costs stack, and neither Word nor
 /// anyone else nests this deep in anything that is not made to hurt.
@@ -333,9 +333,9 @@ impl<'a, 'n, 'i> Walker<'a, 'n, 'i> {
     }
 
     /// The pictures of the document and those it goes without, unless reading them took more than the archive may give.
-    pub(super) fn finish(self) -> Result<(Vec<Media>, Vec<MissingPicture>), ImportError> {
+    pub(super) fn finish(self) -> Result<(Vec<Media>, Vec<MissingPicture>), WordError> {
         if self.over_budget {
-            return Err(ImportError::TooLarge);
+            return Err(WordError::TooLarge);
         }
         Ok((self.media, self.missing))
     }

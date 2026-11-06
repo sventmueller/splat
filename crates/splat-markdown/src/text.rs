@@ -123,7 +123,8 @@ pub const fn offsets(range: &Range<Byte>) -> Range<usize> {
     range.start.0..range.end.0
 }
 
-/// Slicing a source text by source positions.
+/// Slicing a source text by source positions, which panics at a position outside the text or inside a character;
+/// [`TextAt::fit`] brings one from outside into it.
 pub trait TextAt {
     /// The part of the text in `range`.
     fn at(&self, range: Range<Byte>) -> &str;
@@ -135,9 +136,22 @@ pub trait TextAt {
     fn boundary(&self, at: Byte) -> bool;
     /// The position behind the last byte.
     fn end(&self) -> Byte;
+    /// `range` brought into the text: each end at most at its end and moved back to the start of the character it falls
+    /// into, and a range that ends in front of its start empty at its end. What reads the text by a range from outside,
+    /// which may be stale, takes it through this first.
+    fn fit(&self, range: Range<Byte>) -> Range<Byte> {
+        let (start, end) = (self.fit_at(range.start), self.fit_at(range.end));
+        start.min(end)..end
+    }
+    /// `at` brought into the text as [`TextAt::fit`] brings the ends of a range.
+    fn fit_at(&self, at: Byte) -> Byte;
 }
 
 impl TextAt for str {
+    fn fit_at(&self, at: Byte) -> Byte {
+        Byte(self.floor_char_boundary(at.0))
+    }
+
     fn at(&self, range: Range<Byte>) -> &str {
         &self[range.start.0..range.end.0]
     }
@@ -245,7 +259,7 @@ impl<'a> TextPart<'a> {
     }
 
     /// The position in the part of what stands at `at` in the whole text; `None` for what lies in front of the part.
-    pub(crate) fn inside(self, at: Byte) -> Option<Byte> {
+    pub(crate) fn in_part(self, at: Byte) -> Option<Byte> {
         at.get().checked_sub(self.start.get()).map(Byte::new)
     }
 }
@@ -265,12 +279,10 @@ pub(crate) fn next_quote_mark(line: &str, from: usize) -> Option<usize> {
 
 /// Where a line's quote marks end, behind its last one; 0 without one.
 pub(crate) fn behind_quote_marks(line: &str) -> usize {
-    let (mut end, mut from) = (0, 0);
-    while let Some(mark) = next_quote_mark(line, from) {
-        end = mark + 1;
-        from = end + usize::from(line[end..].starts_with([' ', '\t']));
-    }
-    end
+    line_marks(line)
+        .take_while(|mark| mark.kind == ContainerMark::Quote)
+        .last()
+        .map_or(0, |mark| mark.range.end)
 }
 
 /// A mark that opens a container at the start of what is left of a source line.
@@ -282,6 +294,70 @@ pub enum ContainerMark {
     Bullet,
     /// Digits followed by `.` or `)`, which open an ordered list item.
     Number,
+    /// `[ ]`, `[x]` or `[X]` behind a list marker, which makes the item a task.
+    Task,
+}
+
+/// A mark at the start of a source line that opens a container, as [`line_marks`] finds it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LineMark {
+    /// What the mark opens.
+    pub kind: ContainerMark,
+    /// Where the mark stands in the line, without the indentation in front of it and the space behind it.
+    pub range: Range<usize>,
+}
+
+/// Behind `end`, where a mark ends in `line`, and the one space or tab that belongs to it.
+pub(crate) fn with_its_space(line: &str, end: usize) -> usize {
+    end + usize::from(line[end..].starts_with([' ', '\t']))
+}
+
+/// The marks that open containers at the start of `line`, in order, as CommonMark reads them: a quote mark behind at
+/// most three spaces, a list marker behind any indentation, of at most nine digits and followed by a space, a tab or
+/// the end of the line, and a task's checkbox right behind a list marker, after which only text follows.
+pub(crate) fn line_marks(line: &str) -> impl Iterator<Item = LineMark> + '_ {
+    let mut from = Some(0);
+    let mut behind_list_marker = false;
+    std::iter::from_fn(move || {
+        let at = from?;
+        if let Some(quote) = next_quote_mark(line, at) {
+            from = Some(with_its_space(line, quote + 1));
+            behind_list_marker = false;
+            return Some(LineMark {
+                kind: ContainerMark::Quote,
+                range: quote..quote + 1,
+            });
+        }
+        let start = at + indent_len(&line[at..]);
+        let rest = &line[start..];
+        if behind_list_marker && let Some(task) = ["[ ]", "[x]", "[X]"].iter().find(|task| rest.starts_with(**task)) {
+            from = None;
+            return Some(LineMark {
+                kind: ContainerMark::Task,
+                range: start..start + task.len(),
+            });
+        }
+        let ends = |len: usize| {
+            rest[len..]
+                .chars()
+                .next()
+                .is_none_or(|c| matches!(c, ' ' | '\t' | '\n' | '\r'))
+        };
+        let Some((kind, len)) = container_mark(rest).filter(|&(kind, len)| match kind {
+            ContainerMark::Bullet => ends(len),
+            ContainerMark::Number => len <= 10 && ends(len),
+            ContainerMark::Quote | ContainerMark::Task => false,
+        }) else {
+            from = None;
+            return None;
+        };
+        from = Some(with_its_space(line, start + len));
+        behind_list_marker = true;
+        Some(LineMark {
+            kind,
+            range: start..start + len,
+        })
+    })
 }
 
 /// The mark `s` starts with and how long it is. Whether it opens a container also depends on what stands behind it, which
@@ -319,22 +395,24 @@ pub fn changed(old: &str, new: &str) -> (Range<Byte>, Range<Byte>) {
 /// would start a list item of its own.
 pub fn continuation_of(prefix: &str) -> String {
     let mut out = String::new();
-    let mut rest = prefix;
-    loop {
-        let indent = indent_len(rest);
-        out.push_str(&rest[..indent]);
-        rest = &rest[indent..];
-        let Some((mark, len)) = container_mark(rest) else {
-            // A checkbox or a footnote's label stands in the first line only; what follows stays in line with its text.
-            out.extend(rest.chars().map(|_| ' '));
-            return out;
-        };
-        match mark {
+    let mut at = 0;
+    for mark in line_marks(prefix) {
+        out.push_str(&prefix[at..mark.range.start]);
+        match mark.kind {
             ContainerMark::Quote => out.push('>'),
-            ContainerMark::Bullet | ContainerMark::Number => out.extend(std::iter::repeat_n(' ', len)),
+            // A checkbox stands in the first line only; what follows stays in line with its text.
+            ContainerMark::Bullet | ContainerMark::Number | ContainerMark::Task => {
+                out.extend(std::iter::repeat_n(' ', mark.range.len()));
+            }
         }
-        rest = &rest[len..];
+        at = mark.range.end;
     }
+    let rest = &prefix[at..];
+    let indent = indent_len(rest);
+    out.push_str(&rest[..indent]);
+    // So does a footnote's label.
+    out.extend(rest[indent..].chars().map(|_| ' '));
+    out
 }
 
 /// A position moved along with an edit before it. An edit cannot move text before the start of the document.
@@ -591,7 +669,7 @@ impl<'a> Utf16Cursor<'a> {
 
     /// The position of `byte`, or of the character `byte` falls into; fastest for increasing positions.
     pub fn at(&mut self, byte: Byte) -> U16 {
-        let byte = Byte(self.text.floor_char_boundary(byte.0.min(self.text.len())));
+        let byte = self.text.fit_at(byte);
         if byte < self.byte {
             self.byte = Byte(0);
             self.u16 = U16(0);
@@ -646,6 +724,56 @@ mod tests {
         assert!(is_quote_prefix(" >\t"));
         assert!(!is_quote_prefix("> a"));
         assert_eq!(indent_len(" \ta"), 2);
+    }
+
+    #[test]
+    fn the_marks_of_a_line_are_read_as_commonmark_reads_them() {
+        use ContainerMark::{Bullet, Number, Quote, Task};
+        for (line, wanted, why) in [
+            ("a", vec![], "text"),
+            ("> a", vec![(Quote, 0..1)], ""),
+            ("   > a", vec![(Quote, 3..4)], "three spaces"),
+            ("    > a", vec![], "four spaces make code"),
+            ("\t> a", vec![], "so does a tab"),
+            (
+                ">\t> a",
+                vec![(Quote, 0..1), (Quote, 2..3)],
+                "a tab belongs to the mark",
+            ),
+            (">> a", vec![(Quote, 0..1), (Quote, 1..2)], "without a space"),
+            ("- a", vec![(Bullet, 0..1)], ""),
+            ("    * a", vec![(Bullet, 4..5)], "an item nested in another"),
+            ("+\ta", vec![(Bullet, 0..1)], ""),
+            ("-a", vec![], "no space behind"),
+            ("-", vec![(Bullet, 0..1)], "an empty item"),
+            ("-\r\nb", vec![(Bullet, 0..1)], "an empty item before more lines"),
+            ("1. a", vec![(Number, 0..2)], ""),
+            ("123456789) a", vec![(Number, 0..10)], "nine digits"),
+            ("1234567890. a", vec![], "ten digits"),
+            ("1.a", vec![], "no space behind"),
+            ("2024 [x] a", vec![], "a year"),
+            ("[x] a", vec![], "a checkbox only behind a list marker"),
+            ("> - [x] a", vec![(Quote, 0..1), (Bullet, 2..3), (Task, 4..7)], ""),
+            ("- [X]a", vec![(Bullet, 0..1), (Task, 2..5)], ""),
+            (
+                "- [ ] - a",
+                vec![(Bullet, 0..1), (Task, 2..5)],
+                "only text behind a checkbox",
+            ),
+            ("- > 1. a", vec![(Bullet, 0..1), (Quote, 2..3), (Number, 4..6)], ""),
+            ("-     > a", vec![(Bullet, 0..1)], "code inside the item"),
+        ] {
+            let found: Vec<(ContainerMark, Range<usize>)> = line_marks(line).map(|m| (m.kind, m.range)).collect();
+            assert_eq!(found, wanted, "{line:?}: {why}");
+        }
+    }
+
+    #[test]
+    fn a_continuation_line_repeats_quotes_and_keeps_in_line_with_the_text() {
+        assert_eq!(continuation_of("-\t"), " \t", "a tab stays a tab");
+        assert_eq!(continuation_of("- > "), "  > ");
+        assert_eq!(continuation_of("    - > "), "      > ");
+        assert_eq!(continuation_of("1234567890. "), "            ");
     }
 
     #[test]

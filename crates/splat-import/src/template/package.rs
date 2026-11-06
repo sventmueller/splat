@@ -1,11 +1,12 @@
 //! A Word file as a package: which part is what, by its content type and by the relationships between parts.
 
 use roxmltree::Node;
+use splat_ooxml::xml::escape_attribute;
 
-use super::TemplateError;
-use super::serialize::{DECLARATION, Edits, Names, escape_attribute};
+use super::WordError;
+use super::serialize::{DECLARATION, Edits, Names};
 use crate::package::{DOCUMENT_TYPE, Package, Relationships, TEMPLATE_TYPE, folder_of, rels_name};
-use crate::xml;
+use crate::xml::{self, XmlBudget};
 
 const PACKAGE_RELATIONSHIPS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
 
@@ -24,14 +25,14 @@ pub(super) struct Word<'a> {
 
 impl<'a> Word<'a> {
     /// A document or a template in `bytes`; a file with macros would carry them into a document that cannot have them.
-    pub(super) fn open(bytes: &'a [u8]) -> Result<Word<'a>, TemplateError> {
-        let package = Package::open(bytes, &[DOCUMENT_TYPE, TEMPLATE_TYPE])?;
+    pub(super) fn open(bytes: &'a [u8], budget: &'a XmlBudget) -> Result<Word<'a>, WordError> {
+        let package = Package::open(bytes, &[DOCUMENT_TYPE, TEMPLATE_TYPE], budget)?;
         let rels = package.relationships(&package.main)?;
         Ok(Word { package, rels })
     }
 
     /// The part the main part relates to by a type whose last word is `kind`, as `styles`.
-    pub(super) fn related(&self, kind: &str) -> Result<Option<PartText>, TemplateError> {
+    pub(super) fn related(&self, kind: &str) -> Result<Option<PartText>, WordError> {
         let Some((rel, name)) = self.rels.of_type(kind).and_then(|rel| Some((rel, rel.part.clone()?))) else {
             return Ok(None);
         };
@@ -67,11 +68,11 @@ pub(super) struct RelsPart {
 
 impl RelsPart {
     /// What the template has for its part `part`, and if `part` is not there yet, nothing.
-    pub(super) fn of(word: &Word, part: &str) -> Result<RelsPart, TemplateError> {
+    pub(super) fn of(word: &Word, part: &str) -> Result<RelsPart, WordError> {
         let name = rels_name(part);
         let existing = word.package.text(&name)?;
         let highest = match &existing {
-            Some(text) => Relationships::read(text, "")?
+            Some(text) => Relationships::read(text, "", word.package.budget)?
                 .iter()
                 .filter_map(|rel| rel.id.strip_prefix("rId")?.parse::<u32>().ok())
                 .max()
@@ -96,14 +97,14 @@ impl RelsPart {
         id
     }
 
-    /// The part's text if something was added.
-    pub(super) fn finish(self) -> Result<Option<(String, String)>, TemplateError> {
+    /// The part's text if something was added; reading what the template has takes from `budget`.
+    pub(super) fn finish(self, budget: &XmlBudget) -> Result<Option<(String, String)>, WordError> {
         if self.added.is_empty() {
             return Ok(None);
         }
         let text = match &self.existing {
             Some(text) => {
-                let doc = xml::parse(text)?;
+                let doc = xml::parse(text, budget)?;
                 let root = doc.root_element();
                 let mut names = Names::of(root);
                 let mut element = String::new();
@@ -143,8 +144,9 @@ pub(super) fn merged_types(
     main: &str,
     defaults: &[(String, String)],
     overrides: &[(String, String)],
-) -> Result<String, TemplateError> {
-    let doc = xml::parse(text)?;
+    budget: &XmlBudget,
+) -> Result<String, WordError> {
+    let doc = xml::parse(text, budget)?;
     let root = doc.root_element();
     let mut edits = Edits::new(text);
     let main_override = root.children().find(|node| {
@@ -229,6 +231,7 @@ mod tests {
             "m.xml",
             &[("png".to_string(), "image/png".to_string())],
             &[("x.xml".to_string(), "b\"".to_string())],
+            &XmlBudget::default(),
         )
         .unwrap();
         assert_eq!(

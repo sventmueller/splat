@@ -11,7 +11,8 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSArray, NSError, NSURL};
 use objc2_uniform_type_identifiers::UTType;
-use splat_import::docx::{ImportError, import};
+use splat_import::WordError;
+use splat_import::docx::import;
 
 use crate::i18n::t;
 use crate::util::{contained, guarded, main_soon, ns, read_regular_file};
@@ -23,7 +24,7 @@ const MOST_BYTES: u64 = 1 << 30;
 #[derive(Debug)]
 pub(crate) enum ImportFailure {
     NotRead,
-    Refused(ImportError),
+    Refused(WordError),
     /// A bug in the conversion, which the panic hook has reported.
     NotConverted,
     NotWritten(std::io::Error),
@@ -33,14 +34,14 @@ impl ImportFailure {
     fn reason(&self) -> String {
         match self {
             ImportFailure::NotRead => t("Die Datei ließ sich nicht lesen.").to_string(),
-            ImportFailure::Refused(ImportError::NotAWordFile) => {
+            ImportFailure::Refused(WordError::NotAWordFile) => {
                 t("Das ist kein Word-Dokument im Format .docx.").to_string()
             }
-            ImportFailure::Refused(ImportError::Encrypted) => {
+            ImportFailure::Refused(WordError::Encrypted) => {
                 t("Das Dokument ist mit einem Kennwort geschützt.").to_string()
             }
-            ImportFailure::Refused(ImportError::TooLarge) => t("Das Dokument ist zu groß.").to_string(),
-            ImportFailure::Refused(ImportError::Damaged) => t("Das Dokument ist beschädigt.").to_string(),
+            ImportFailure::Refused(WordError::TooLarge) => t("Das Dokument ist zu groß.").to_string(),
+            ImportFailure::Refused(WordError::Damaged) => t("Das Dokument ist beschädigt.").to_string(),
             ImportFailure::NotConverted => t("Das Dokument ließ sich nicht umwandeln.").to_string(),
             ImportFailure::NotWritten(error) => error.to_string(),
         }
@@ -222,7 +223,7 @@ mod tests {
         let (word, target) = (dir.join("a.docx"), dir.join("a.md"));
         std::fs::write(&word, "kein Word").unwrap();
         let failure = import_file(&word, &target).unwrap_err();
-        assert!(matches!(failure, ImportFailure::Refused(ImportError::NotAWordFile)));
+        assert!(matches!(failure, ImportFailure::Refused(WordError::NotAWordFile)));
         assert!(!failure.reason().is_empty());
         assert!(!target.exists());
         assert!(matches!(
@@ -258,8 +259,8 @@ mod tests {
             },
         )
         .unwrap();
-        let archive = splat_import::zip::Archive::read(&word).unwrap();
-        let mut zip = crate::markdown::docx::zip::Zip::default();
+        let archive = splat_ooxml::zip::Archive::read(&word).unwrap();
+        let mut zip = splat_ooxml::zip::Zip::default();
         for name in archive.names().filter(|name| !leave_out(name)) {
             zip.add(name, &archive.get(name).unwrap().unwrap()).unwrap();
         }
@@ -297,10 +298,10 @@ mod tests {
     fn every_failure_says_in_its_own_words_what_went_wrong() {
         let failures = [
             ImportFailure::NotRead,
-            ImportFailure::Refused(ImportError::NotAWordFile),
-            ImportFailure::Refused(ImportError::Encrypted),
-            ImportFailure::Refused(ImportError::TooLarge),
-            ImportFailure::Refused(ImportError::Damaged),
+            ImportFailure::Refused(WordError::NotAWordFile),
+            ImportFailure::Refused(WordError::Encrypted),
+            ImportFailure::Refused(WordError::TooLarge),
+            ImportFailure::Refused(WordError::Damaged),
             ImportFailure::NotConverted,
             ImportFailure::NotWritten(std::io::Error::other("voll")),
         ];

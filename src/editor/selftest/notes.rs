@@ -77,6 +77,7 @@ fn fields_of_sheet(c: &Ctx) -> Vec<Retained<objc2_app_kit::NSTextField>> {
     fields
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn word_count_steps() -> Vec<Step> {
     let reads = |c: &Ctx, needle: &str| {
         c.e.word_counter()
@@ -375,6 +376,18 @@ fn note_is_open(c: &Ctx, name: &str) -> bool {
 }
 
 pub(super) fn note_steps() -> Vec<Step> {
+    [
+        sidebar_steps(),
+        link_and_search_steps(),
+        rename_steps(),
+        name_taken_steps(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn sidebar_steps() -> Vec<Step> {
     vec![
         applied(|c| {
             write_notes(&doc_dir(c));
@@ -444,6 +457,11 @@ pub(super) fn note_steps() -> Vec<Step> {
                 c.e.note_event(NoteEvent::Search("#pruefung".to_string()));
             },
         ),
+    ]
+}
+
+fn link_and_search_steps() -> Vec<Step> {
+    vec![
         when(
             "the search for a tag",
             |c| !c.e.notes().is_searching() && c.e.notes().hit_paths().len() == 1,
@@ -486,6 +504,11 @@ pub(super) fn note_steps() -> Vec<Step> {
                 );
             },
         ),
+    ]
+}
+
+fn rename_steps() -> Vec<Step> {
+    vec![
         when(
             SHEET_ASKS,
             |c| sheet(c).is_some(),
@@ -551,6 +574,12 @@ pub(super) fn note_steps() -> Vec<Step> {
                 c.e.note_rename_chosen(doc_dir(c).join("Erste.md"), doc_dir(c).join("Unterordner/Gamma.md"));
             },
         ),
+    ]
+}
+
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
+fn name_taken_steps() -> Vec<Step> {
+    vec![
         when(
             "the alert about a name that is taken",
             |c| sheet(c).is_some(),
@@ -669,6 +698,7 @@ pub(super) fn note_steps() -> Vec<Step> {
 
 const SHEET_ASKS: &str = "the sheet asking about the rename";
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn metadata_steps() -> Vec<Step> {
     const FRONT: &str = "---\n# ein Kommentar\ntitle: Alt\ntags: [a, b]\nnested:\n  x: 1\n---\n\nText\n";
     vec![
@@ -879,6 +909,7 @@ fn pdf_text(pdf: &Path) -> Option<String> {
     Some(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn export_option_steps() -> Vec<Step> {
     vec![
         applied(|c| {

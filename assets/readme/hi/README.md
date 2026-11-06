@@ -635,6 +635,7 @@ Splat कई मेगाबाइट के दस्तावेज़ों �
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML कैरेक्टर रेफ़रेंस के नाम | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Word फ़ाइलों और Git ऑब्जेक्ट को अनपैक करना | MIT, Zlib या Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Word फ़ाइलों का XML पढ़ना | MIT या Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | पुराने कोड पेज में लिखे RTF टेक्स्ट को पढ़ना | MIT या Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | संयुक्त और विघटित अक्षरों के पार नाम और खोज | MIT या Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | इंपोर्ट किए गए टेक्स्ट में `:shortcode:` जैसे टेक्स्ट को ज्यों का त्यों रखना | MIT या Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | सूत्र रेंडर करना | Apache-2.0 |

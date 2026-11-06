@@ -12,80 +12,27 @@ mod styles;
 mod tests;
 
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 
 use roxmltree::{Document, Node};
-use splat_markdown::docx::TooLarge;
-use splat_markdown::docx::zip::Zip;
 
-use crate::package::{PackageError, Relationships, TYPES_PART};
-use crate::xml::{self, XmlError};
-use crate::zip::ZipError;
+use crate::package::{Relationships, TYPES_PART, WordError};
+use crate::xml::{self, XmlBudget};
 use notes::{KINDS, NoteKind};
 use package::{PartText, RelsPart, Word, merged_types, target_from};
 use serialize::{Edits, Names, RELATIONSHIPS, Rewrite, WORD, is_word, standalone, with_children_added, write_tree};
-
-/// Why a template cannot be applied.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TemplateError {
-    /// One of the two files is of another kind, a Word file with macros among them.
-    NotAWordFile,
-    /// One of the two files is protected by a password.
-    Encrypted,
-    /// One of the two files, or what they make together, is larger than a merge may hold.
-    TooLarge,
-    /// One of the two files has a broken structure.
-    Damaged,
-}
-
-impl fmt::Display for TemplateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            TemplateError::NotAWordFile => "not a Word document or template without macros",
-            TemplateError::Encrypted => "a Word file protected by a password",
-            TemplateError::TooLarge => "larger than a Word template may be applied to",
-            TemplateError::Damaged => "a damaged Word file",
-        })
-    }
-}
-
-impl std::error::Error for TemplateError {}
-
-impl From<PackageError> for TemplateError {
-    fn from(error: PackageError) -> TemplateError {
-        match error {
-            PackageError::NotAWordFile => TemplateError::NotAWordFile,
-            PackageError::Encrypted => TemplateError::Encrypted,
-            PackageError::TooLarge => TemplateError::TooLarge,
-            PackageError::Damaged => TemplateError::Damaged,
-        }
-    }
-}
-
-impl From<ZipError> for TemplateError {
-    fn from(error: ZipError) -> TemplateError {
-        PackageError::from(error).into()
-    }
-}
-
-impl From<XmlError> for TemplateError {
-    fn from(error: XmlError) -> TemplateError {
-        PackageError::from(error).into()
-    }
-}
-
-impl From<TooLarge> for TemplateError {
-    fn from(_: TooLarge) -> TemplateError {
-        TemplateError::TooLarge
-    }
-}
+use splat_ooxml::zip::Zip;
 
 /// A valid .docx with the text of `generated`, which `to_docx` wrote, in the look of `template`, a .docx or .dotx.
-pub fn apply_template(generated: &[u8], template: &[u8]) -> Result<Vec<u8>, TemplateError> {
-    let generated = Word::open(generated)?;
-    let template = Word::open(template)?;
+pub fn apply_template(generated: &[u8], template: &[u8]) -> Result<Vec<u8>, WordError> {
+    apply_within(generated, template, &XmlBudget::default())
+}
+
+/// `apply_template` with the XML of both files coming out of one `budget`.
+fn apply_within(generated: &[u8], template: &[u8], budget: &XmlBudget) -> Result<Vec<u8>, WordError> {
+    let generated = Word::open(generated, budget)?;
+    let template = Word::open(template, budget)?;
     let texts = Texts::read(&generated, &template)?;
-    let parts = Parts::parse(&texts)?;
+    let parts = Parts::parse(&texts, budget)?;
     let mut merge = Merge::new(&generated, &template);
     merge.merge_all(&parts)?;
     merge.package()
@@ -104,19 +51,19 @@ struct Texts {
 }
 
 impl Texts {
-    fn read(generated: &Word, template: &Word) -> Result<Texts, TemplateError> {
-        let notes = |word: &Word| -> Result<Vec<Option<PartText>>, TemplateError> {
+    fn read(generated: &Word, template: &Word) -> Result<Texts, WordError> {
+        let notes = |word: &Word| -> Result<Vec<Option<PartText>>, WordError> {
             KINDS.iter().map(|kind| word.related(kind.suffix)).collect()
         };
         Ok(Texts {
             generated_document: generated
                 .package
                 .text(&generated.package.main)?
-                .ok_or(TemplateError::Damaged)?,
+                .ok_or(WordError::Damaged)?,
             template_document: template
                 .package
                 .text(&template.package.main)?
-                .ok_or(TemplateError::Damaged)?,
+                .ok_or(WordError::Damaged)?,
             generated_styles: generated.related("styles")?,
             template_styles: template.related("styles")?,
             generated_numbering: generated.related("numbering")?,
@@ -133,13 +80,13 @@ struct Part<'t> {
     doc: Document<'t>,
 }
 
-fn parse_part(part: Option<&PartText>) -> Result<Option<Part<'_>>, TemplateError> {
+fn parse_part<'t>(part: Option<&'t PartText>, budget: &XmlBudget) -> Result<Option<Part<'t>>, WordError> {
     let Some(source) = part else {
         return Ok(None);
     };
     Ok(Some(Part {
         source,
-        doc: xml::parse(&source.text)?,
+        doc: xml::parse(&source.text, budget)?,
     }))
 }
 
@@ -157,18 +104,18 @@ struct Parts<'t> {
 }
 
 impl<'t> Parts<'t> {
-    fn parse(texts: &'t Texts) -> Result<Parts<'t>, TemplateError> {
-        let notes = |parts: &'t [Option<PartText>]| -> Result<Vec<Option<Part<'t>>>, TemplateError> {
-            parts.iter().map(|part| parse_part(part.as_ref())).collect()
+    fn parse(texts: &'t Texts, budget: &XmlBudget) -> Result<Parts<'t>, WordError> {
+        let notes = |parts: &'t [Option<PartText>]| -> Result<Vec<Option<Part<'t>>>, WordError> {
+            parts.iter().map(|part| parse_part(part.as_ref(), budget)).collect()
         };
         Ok(Parts {
-            generated_document: xml::parse(&texts.generated_document)?,
-            template_document: xml::parse(&texts.template_document)?,
+            generated_document: xml::parse(&texts.generated_document, budget)?,
+            template_document: xml::parse(&texts.template_document, budget)?,
             template_text: &texts.template_document,
-            generated_styles: parse_part(texts.generated_styles.as_ref())?,
-            template_styles: parse_part(texts.template_styles.as_ref())?,
-            generated_numbering: parse_part(texts.generated_numbering.as_ref())?,
-            template_numbering: parse_part(texts.template_numbering.as_ref())?,
+            generated_styles: parse_part(texts.generated_styles.as_ref(), budget)?,
+            template_styles: parse_part(texts.template_styles.as_ref(), budget)?,
+            generated_numbering: parse_part(texts.generated_numbering.as_ref(), budget)?,
+            template_numbering: parse_part(texts.template_numbering.as_ref(), budget)?,
             generated_notes: notes(&texts.generated_notes)?,
             template_notes: notes(&texts.template_notes)?,
         })
@@ -176,14 +123,14 @@ impl<'t> Parts<'t> {
 }
 
 /// The body of a main document.
-fn body_of<'a, 'i>(doc: &'a Document<'i>) -> Result<Node<'a, 'i>, TemplateError> {
+fn body_of<'a, 'i>(doc: &'a Document<'i>) -> Result<Node<'a, 'i>, WordError> {
     let root = doc.root_element();
     if !is_word(&root, "document") {
-        return Err(TemplateError::Damaged);
+        return Err(WordError::Damaged);
     }
     root.children()
         .find(|node| is_word(node, "body"))
-        .ok_or(TemplateError::Damaged)
+        .ok_or(WordError::Damaged)
 }
 
 /// The final section properties of a body.
@@ -272,7 +219,7 @@ impl<'w, 'a> Merge<'w, 'a> {
         }
     }
 
-    fn merge_all(&mut self, parts: &Parts) -> Result<(), TemplateError> {
+    fn merge_all(&mut self, parts: &Parts) -> Result<(), WordError> {
         let body = body_of(&parts.generated_document)?;
         let template_body = body_of(&parts.template_document)?;
         let used_notes: Vec<Option<&Part>> = KINDS
@@ -376,7 +323,7 @@ impl<'w, 'a> Merge<'w, 'a> {
         plan: &notes::NotePlan,
         kind: NoteKind,
         rels: &mut RelsPart,
-    ) -> Result<(), TemplateError> {
+    ) -> Result<(), WordError> {
         let source_rels = self.generated.package.relationships(&generated.source.name)?;
         let Some(template) = template else {
             let new_name = self.unique_name("word", kind.stem, "xml");
@@ -429,7 +376,7 @@ impl<'w, 'a> Merge<'w, 'a> {
         source: &Relationships,
         used: &[String],
         target: &mut RelsPart,
-    ) -> Result<HashMap<String, String>, TemplateError> {
+    ) -> Result<HashMap<String, String>, WordError> {
         let mut map = HashMap::new();
         for id in used {
             let Some(rel) = source.get(id) else {
@@ -458,7 +405,7 @@ impl<'w, 'a> Merge<'w, 'a> {
 
     /// Copies a picture once; its name in the template comes from the file name alone, so no name leads out of the media
     /// folder, whatever the generated file says.
-    fn copy_media(&mut self, source: &str) -> Result<Option<String>, TemplateError> {
+    fn copy_media(&mut self, source: &str) -> Result<Option<String>, WordError> {
         if let Some(done) = self.media.get(source) {
             return Ok(Some(done.clone()));
         }
@@ -513,8 +460,8 @@ impl<'w, 'a> Merge<'w, 'a> {
         }
     }
 
-    fn put_rels(&mut self, rels: RelsPart) -> Result<(), TemplateError> {
-        if let Some((name, text)) = rels.finish()? {
+    fn put_rels(&mut self, rels: RelsPart) -> Result<(), WordError> {
+        if let Some((name, text)) = rels.finish(self.template.package.budget)? {
             if !self.template.package.archive.contains(&name) && self.known_extensions.insert("rels".to_string()) {
                 self.new_defaults.push((
                     "rels".to_string(),
@@ -558,12 +505,13 @@ impl<'w, 'a> Merge<'w, 'a> {
         edits.finish()
     }
 
-    fn package(self) -> Result<Vec<u8>, TemplateError> {
+    fn package(self) -> Result<Vec<u8>, WordError> {
         let types = merged_types(
             &self.template.package.types,
             &self.template.package.main,
             &self.new_defaults,
             &self.new_overrides,
+            self.template.package.budget,
         )?;
         let mut zip = Zip::default();
         zip.add(TYPES_PART, types.as_bytes())?;

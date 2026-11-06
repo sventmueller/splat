@@ -24,6 +24,7 @@ fn untitled_alert(c: &Ctx) -> Option<Retained<NSWindow>> {
         .and_then(|w| w.attachedSheet())
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn paste_steps() -> Vec<Step> {
     vec![
         applied(|c| {

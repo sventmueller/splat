@@ -1,10 +1,11 @@
 use std::ops::Range;
 
 use super::{ATTACHMENT, Atom, Builder, CharMap, ImageAtom, LINE_SEPARATOR, Link, Run, RunMap, RunStyle};
+use splat_markdown::aligner::{Aligner, Gaps, Spelling};
 use splat_markdown::doc::{Inline, Piece};
 use splat_markdown::style::{Baseline, TextStyle};
-use splat_markdown::text::{Byte, TextAt, count32, decode_entity};
-use splat_markdown::typography::{Running, TextMark, Within, citation_shown, typographic_source};
+use splat_markdown::text::{Byte, TextAt, count32};
+use splat_markdown::typography::{Running, Shorthand, Typesetting, Within, citation_shown};
 
 impl Builder<'_> {
     pub(super) fn inlines(&self, inlines: &[Inline], style: &RunStyle) -> Vec<Run> {
@@ -17,25 +18,28 @@ impl Builder<'_> {
 
     fn inline(&self, i: &Inline, style: &RunStyle, runs: &mut Vec<Run>) {
         let nested = |s: RunStyle, runs: &mut Vec<Run>| {
-            for c in &i.children {
+            for c in i.children() {
                 self.inline(c, &s, runs);
             }
         };
-        let at = i.range.clone();
+        let at = i.range();
         match i.piece() {
             Piece::Text(t) => self.text_runs(t, at, style, runs),
             Piece::SoftBreak => runs.push(atom_styled(Atom::Text, " ", at, style)),
             Piece::LineBreak => runs.push(atom_styled(Atom::Text, &LINE_SEPARATOR.to_string(), at, style)),
-            Piece::Code(literal) => runs.push(self.aligned(literal, i.code_content(self.text), style.code())),
+            Piece::Code(literal) => {
+                runs.push(self.aligned(literal, i.code_content(self.text), Spelling::CodeSpan, style.code()))
+            }
             Piece::Html(h) => runs.push(self.aligned(
                 h,
                 at,
+                Spelling::Verbatim,
                 RunStyle {
                     html: true,
                     ..style.clone()
                 },
             )),
-            Piece::Styled => nested(style.with_text(|text| text.inside(&i.kind)), runs),
+            Piece::Styled => nested(style.with_text(|text| text.nested_in(i.kind())), runs),
             Piece::Picture(picture) => runs.push(atom_styled(
                 Atom::Image(Box::new(ImageAtom {
                     url: picture.url.into(),
@@ -98,17 +102,17 @@ impl Builder<'_> {
             html: style.html,
         };
         let mut open = self.open.get();
-        let Running { shown, marks: found } = Running::of(
-            self.text,
-            literal,
-            src.start,
-            within,
-            self.resolver.quotes(),
-            &mut open,
-            self.resolver.references(),
-        );
+        let setting = Typesetting {
+            source: self.text,
+            quotes: self.resolver.quotes(),
+            references: self.resolver.references(),
+        };
+        let Running {
+            shown,
+            shorthands: found,
+        } = Running::of(&setting, literal, src.start, within, &mut open);
         self.open.set(open);
-        let whole = self.aligned(&shown, src.clone(), style.clone());
+        let whole = self.aligned(&shown, src.clone(), Spelling::Typographic, style.clone());
         if found.is_empty() {
             runs.push(whole);
             return;
@@ -117,20 +121,22 @@ impl Builder<'_> {
             runs.push(whole);
             return;
         };
-        self.marked_runs(&shown, chars, *end, found, style, runs);
+        self.shorthand_runs(&shown, chars, *end, found, style, runs);
     }
 
-    /// `shown`, mapped to the source by `chars`, as runs of its own for what `found` marks in it and for what lies between.
-    fn marked_runs(
+    /// `shown`, mapped to the source by `chars`, as runs of its own for the shorthands `found` in it and for what lies
+    /// between.
+    fn shorthand_runs(
         &self,
         shown: &str,
         chars: &CharMap,
         end: Byte,
-        found: Vec<(Range<usize>, TextMark)>,
+        found: Vec<(Range<usize>, Shorthand)>,
         style: &RunStyle,
         runs: &mut Vec<Run>,
     ) {
-        // Marks come in text order, and counting from the start each time would take quadratic time in a long paragraph.
+        // Shorthands come in text order, and counting from the start each time would take quadratic time in a long
+        // paragraph.
         let counted = std::cell::Cell::new((0, 0));
         let char_at = |byte: usize| {
             let (from, before) = Some(counted.get()).filter(|(from, _)| *from <= byte).unwrap_or((0, 0));
@@ -169,18 +175,18 @@ impl Builder<'_> {
             }
         };
         let mut at = 0;
-        for (range, mark) in found {
+        for (range, shorthand) in found {
             if range.start > at {
                 runs.push(piece(at..range.start, style.clone()));
             }
             let mut marked = style.clone();
-            match &mark {
-                TextMark::Tag(name) => marked.link = Some(Link::Tag(format!("#{name}").into())),
-                TextMark::Reference(target) => marked.link = Some(Link::Reference(target.as_str().into())),
-                TextMark::Citation(_) => marked.citation = true,
+            match &shorthand {
+                Shorthand::Tag(name) => marked.link = Some(Link::Tag(format!("#{name}").into())),
+                Shorthand::Reference(target) => marked.link = Some(Link::Reference(target.as_str().into())),
+                Shorthand::Citation(_) => marked.citation = true,
             }
-            let resolved = match &mark {
-                TextMark::Citation(keys) => citation_shown(keys, |key| self.resolver.citation(key)),
+            let resolved = match &shorthand {
+                Shorthand::Citation(keys) => citation_shown(keys, |key| self.resolver.citation(key)),
                 _ => None,
             };
             match resolved {
@@ -199,8 +205,8 @@ impl Builder<'_> {
         }
     }
 
-    pub(super) fn aligned(&self, literal: &str, src: Range<Byte>, style: RunStyle) -> Run {
-        match align(literal, self.text, src.clone()) {
+    pub(super) fn aligned(&self, literal: &str, src: Range<Byte>, spelling: Spelling, style: RunStyle) -> Run {
+        match align(literal, self.text, src.clone(), spelling) {
             Some(chars) => Run {
                 text: literal.to_string(),
                 style,
@@ -227,82 +233,28 @@ pub(super) fn atom_styled(atom: Atom, shown: &str, src: Range<Byte>, style: &Run
     }
 }
 
-/// Source offset of every char of `literal` inside `text[src]`, past what only the source has: escapes, entities and
-/// container prefixes. `None` if the source does not spell the literal, as a position would then be a guess, and an
-/// edit made from it would land in the wrong place.
-pub(crate) fn align(literal: &str, text: &str, src: Range<Byte>) -> Option<CharMap> {
+/// Source offset of every char of `literal`, spelled from `text[src]` as `spelling` says, past what only the source has
+/// between characters: whitespace and the prefixes of quotes. `None` if the source does not spell the literal, as a
+/// position would then be a guess, and an edit made from it would land in the wrong place.
+pub(crate) fn align(literal: &str, text: &str, src: Range<Byte>, spelling: Spelling) -> Option<CharMap> {
     let source = text.at(src.clone());
     if source == literal {
         return Some(CharMap::Verbatim(src.start));
     }
+    let line_start = src.start == Byte::default() || text.upto(src.start).ends_with(['\n', '\r']);
+    let mut aligner = Aligner::new(source, spelling, Gaps::LinePrefixes, line_start);
     let mut out = Vec::with_capacity(literal.chars().count());
-    let mut i = 0;
     let mut shown = literal;
-    // Between the start of a source line and its text, where the prefix of a quote stands.
-    let mut in_prefix = src.start == Byte::default() || text.upto(src.start).ends_with('\n');
-    while let Some(c) = shown.chars().next() {
-        let mut used = c.len_utf8();
-        loop {
-            let at = src.start + i;
-            let rest = &source[i..];
-            let Some(sc) = rest.chars().next() else {
-                if !c.is_whitespace() {
-                    return None;
-                }
-                out.push(src.end);
-                break;
-            };
-            // Code spans and code blocks keep a reference as it stands; everywhere else the literal has what it means.
-            if sc == '&'
-                && let Some((decoded, len)) = decode_entity(rest)
-                && !shown.starts_with(&rest[..len])
-            {
-                let same = shown.starts_with(&*decoded);
-                if same || typographic_source(c, &decoded).is_some() {
-                    let count = if same { decoded.chars().count() } else { 1 };
-                    out.extend(std::iter::repeat_n(at, count));
-                    used = if same { decoded.len() } else { used };
-                    i += len;
-                    in_prefix = false;
-                    break;
-                }
-            }
-            if sc == c || (c == ' ' && sc == '\n') {
-                out.push(at);
-                i += sc.len_utf8();
-                in_prefix = sc == '\n';
-                break;
-            }
-            let escaped = rest
-                .strip_prefix('\\')
-                .and_then(|r| r.chars().next())
-                .filter(char::is_ascii_punctuation);
-            if escaped == Some(c) {
-                out.push(at);
-                i += 1 + c.len_utf8();
-                in_prefix = false;
-                break;
-            }
-            if let Some(len) = typographic_source(c, rest) {
-                out.push(at);
-                i += len;
-                in_prefix = false;
-                break;
-            }
-            if sc == '\n' {
-                in_prefix = true;
-                i += 1;
-            } else if sc.is_whitespace() || escaped.is_some() || (in_prefix && sc == '>') {
-                i += sc.len_utf8();
-            } else if c.is_whitespace() {
-                // The indentation of an HTML block's first line stands before its range.
-                out.push(at);
-                break;
-            } else {
-                return None;
-            }
+    while !shown.is_empty() {
+        let step = aligner.next(shown)?;
+        let (taken, rest) = shown.split_at(step.in_literal);
+        let at = src.start + step.at;
+        if taken.len() == 1 {
+            out.push(at);
+        } else {
+            out.extend(std::iter::repeat_n(at, taken.chars().count()));
         }
-        shown = &shown[used..];
+        shown = rest;
     }
     let base = out.first().copied().unwrap_or(src.start);
     Some(CharMap::Offsets(base, out.iter().map(|&o| count32(o - base)).collect()))
@@ -311,7 +263,7 @@ pub(crate) fn align(literal: &str, text: &str, src: Range<Byte>) -> Option<CharM
 #[cfg(test)]
 mod tests {
     use super::super::tests::{Everything, Surroundings, laid, paras};
-    use super::super::{Marker, NoImages, Para, Resolver, layout};
+    use super::super::{ItemMarker, NoImages, Para, Resolver, layout};
     use super::*;
     use splat_markdown::doc::DiagramKind;
     use splat_markdown::reader::parse;
@@ -319,7 +271,7 @@ mod tests {
     use splat_markdown::typography::Quotes;
 
     #[test]
-    fn marks_in_a_mapped_text_find_their_place_in_the_source() {
+    fn shorthands_in_a_mapped_text_find_their_place_in_the_source() {
         struct Marks;
         impl Resolver for Marks {
             fn math_ready(&self, _: &str, _: bool) -> bool {
@@ -358,19 +310,34 @@ mod tests {
 
     #[test]
     fn a_literal_the_source_does_not_spell_is_no_map() {
-        assert!(align("xyz", "abc", bytes(0..3)).is_none());
-        assert!(align("Café", "Caf&unbekannt;", bytes(0..14)).is_none());
-        assert!(align("ab cd", "ab", bytes(0..2)).is_none());
+        let text = Spelling::Typographic;
+        assert!(align("xyz", "abc", bytes(0..3), text).is_none());
+        assert!(align("Café", "Caf&unbekannt;", bytes(0..14), text).is_none());
+        assert!(align("ab cd", "ab", bytes(0..2), text).is_none());
         // Whitespace is what both sides may have without the other.
-        assert!(align("  a\n", "a", bytes(0..1)).is_some());
-        assert!(align("a  b", "a\n> b", bytes(0..5)).is_some());
+        assert!(align("  a\n", "a", bytes(0..1), Spelling::Verbatim).is_some());
+        assert!(align("a  b", "a\n> b", bytes(0..5), text).is_some());
+        assert!(align("a b", "a\n> b", bytes(0..5), Spelling::CodeSpan).is_some());
         // Inside code a reference stays as it stands.
         let code = "&amp;\n> x";
-        let Some(CharMap::Offsets(base, offsets)) = align("&amp;\nx", code, bytes(0..code.len())) else {
+        let Some(CharMap::Offsets(base, offsets)) = align("&amp;\nx", code, bytes(0..code.len()), Spelling::Verbatim)
+        else {
             panic!()
         };
         assert_eq!(base, Byte::new(0));
         assert_eq!(offsets.last().map(|&o| o as usize), code.find('x'));
+    }
+
+    #[test]
+    fn a_lone_carriage_return_in_a_code_span_is_the_place_of_its_space() {
+        let t = "x `a\rb` y\n";
+        let l = laid(t);
+        let run = paras(&l)[0].runs.iter().find(|r| r.text == "a b").unwrap();
+        let RunMap::Text { chars, .. } = &run.map else {
+            panic!("{run:?}");
+        };
+        assert_eq!(chars.get(&run.text, 1), Some(Byte::new(4)));
+        assert_eq!(chars.get(&run.text, 2), Some(Byte::new(5)));
     }
 
     #[test]
@@ -386,7 +353,7 @@ mod tests {
             embeds: 0,
             embeds_refused: false,
         };
-        let run = b.aligned("xyz", bytes(0..3), RunStyle::default());
+        let run = b.aligned("xyz", bytes(0..3), Spelling::Typographic, RunStyle::default());
         assert_eq!(
             run.map,
             RunMap::Atom {
@@ -435,6 +402,13 @@ mod tests {
     }
 
     #[test]
+    fn an_escaped_backslash_stands_where_its_escape_starts() {
+        let (offsets, text) = map_of("a\\\\b\n");
+        assert_eq!(text, "a\\b");
+        assert_eq!(offsets, [Byte::new(0), Byte::new(1), Byte::new(3)]);
+    }
+
+    #[test]
     fn escapes_and_entities_align_to_source() {
         let t = "a \\* b &amp; c\n";
         let d = parse(t);
@@ -450,7 +424,10 @@ mod tests {
         assert_eq!(lit[6], '&');
         assert_eq!(t.at(chars[6]..chars[6] + 5), "&amp;");
         assert_eq!(chars[8], Byte::new(t.find(" c").unwrap() + 1));
-        assert_eq!(decode_entity(&format!("&{}😀;", "a".repeat(38))), None);
+        assert_eq!(
+            splat_markdown::text::decode_entity(&format!("&{}😀;", "a".repeat(38))),
+            None
+        );
     }
 
     #[test]
@@ -470,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn running_text_marks_and_embedded_notes() {
+    fn running_text_shorthands_and_embedded_notes() {
         let t = "Er sagte \"Ja\" -- #idee, #12 von @anna [@doe] [@fehlt]\n\n![[Notiz]]\n";
         let d = parse(t);
         let l = layout(&d, &Surroundings, None);
@@ -504,7 +481,7 @@ mod tests {
         );
         assert!(matches!(
             embedded[1].style.marker,
-            Some(Marker::Task { symbol: None, .. })
+            Some(ItemMarker::Task { symbol: None, .. })
         ));
         assert!(
             embedded[2]
@@ -551,7 +528,7 @@ mod tests {
     }
 
     #[test]
-    fn a_mark_at_either_end_of_a_text_leaves_no_empty_run() {
+    fn a_shorthand_at_either_end_of_a_text_leaves_no_empty_run() {
         for t in ["#tag x\n", "x #tag\n", "#tag\n"] {
             let l = layout(&parse(t), &Everything, None);
             assert!(paras(&l)[0].runs.iter().all(|r| !r.text.is_empty()), "{t}");

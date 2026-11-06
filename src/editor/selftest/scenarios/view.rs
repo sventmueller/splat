@@ -132,7 +132,7 @@ pub(super) fn view_steps() -> Vec<Step> {
         }),
         applied(|c| {
             undo(c);
-            check("the typing is undone", source(&c.e) == before(), &sizes(c));
+            check("the typing is undone", source(&c.e) == before(c), &sizes(c));
         }),
     ]
 }
@@ -330,7 +330,13 @@ pub(super) fn outline_without_preview_steps() -> Vec<Step> {
         when(
             "the preview to show and settle",
             |c| c.e.panes().preview_visible() && super::super::settled(&c.e),
-            |c| check("the outline check leaves the text", source(&c.e) == before(), &sizes(c)),
+            |c| {
+                check(
+                    "the outline check leaves the text",
+                    source(&c.e) == before(c),
+                    &sizes(c),
+                )
+            },
         ),
     ]
 }

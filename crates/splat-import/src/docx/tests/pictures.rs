@@ -170,6 +170,7 @@ fn a_picture_left_out_is_named_once_with_the_reason() {
     for reason in [
         MissingReason::NoPart,
         MissingReason::Damaged,
+        MissingReason::TooLarge,
         MissingReason::UnknownFormat,
     ] {
         assert!(!reason.to_string().is_empty());

@@ -344,6 +344,13 @@ impl PreviewTextView {
     }
 }
 
+/// The preview and the print view are made with a text system of TextKit 1, in `text_system`.
+impl crate::util::TextKitOne for PreviewTextView {
+    fn text_view(&self) -> &NSTextView {
+        self
+    }
+}
+
 /// The width a text container has to take for a view of `view_width`, unless it stands there already.
 fn followed_width(view_width: f64, inset: f64, container_width: f64) -> Option<f64> {
     let width = view_width - 2.0 * inset;
@@ -387,7 +394,7 @@ pub fn print_view(mtm: MainThreadMarker, width: f64) -> Retained<PreviewTextView
 }
 
 /// Where the line of a character ends, in a view with its whole text laid out.
-pub fn line_bottom(view: &NSTextView, index: usize) -> f64 {
+pub fn line_bottom(view: &PreviewTextView, index: usize) -> f64 {
     let Some(lm) = crate::util::layout_manager(view) else {
         return 0.0;
     };
@@ -397,7 +404,7 @@ pub fn line_bottom(view: &NSTextView, index: usize) -> f64 {
     line.origin.y + line.size.height + view.textContainerOrigin().y
 }
 
-pub fn fit_height(view: &NSTextView) {
+pub fn fit_height(view: &PreviewTextView) {
     let (Some(lm), Some(tc)) = (crate::util::layout_manager(view), crate::util::text_container(view)) else {
         return;
     };

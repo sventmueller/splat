@@ -22,14 +22,14 @@ const MAX_ALTERNATES_FILE: u64 = 1 << 20;
 const MAX_PACKS: usize = 4096;
 /// How many bytes one call may inflate and copy: the largest blob at the end of a chain as deep as Git makes by default,
 /// which copies a whole version for each link, with room for its deltas and for the commit and the trees on the way.
-const MOST_BYTES: u64 = (GIT_PACK_DEPTH + 1) * MAX_OBJECT + MAX_METADATA;
+const MAX_BYTES_PER_CALL: u64 = (GIT_PACK_DEPTH + 1) * MAX_OBJECT + MAX_METADATA;
 /// An index up to this size is read whole, so that keeping it keeps no file open.
 const SMALL_INDEX: u64 = 256 << 10;
 /// How many bytes of indexes read whole one store keeps.
-const MOST_INDEX_BYTES: u64 = 16 << 20;
+const MAX_INDEX_BYTES: u64 = 16 << 20;
 /// How many larger indexes one store keeps open: an app on macOS starts with a limit of 256 open files, which the files
 /// another thread saves count against as well.
-const MOST_OPEN_INDEXES: usize = 16;
+const MAX_OPEN_INDEXES: usize = 16;
 
 /// Where an object lies.
 pub(crate) enum Located {
@@ -42,7 +42,7 @@ pub(crate) trait Locate {
     fn locate(&self, oid: &Oid) -> Result<Located, ReadError>;
 }
 
-/// What is left of `MOST_BYTES`.
+/// What is left of `MAX_BYTES_PER_CALL`.
 pub(crate) struct Budget(Cell<u64>);
 
 impl Budget {
@@ -147,7 +147,7 @@ impl Store {
         Ok(Store {
             folders,
             last_pack: RefCell::new(None),
-            budget: Budget(Cell::new(MOST_BYTES)),
+            budget: Budget(Cell::new(MAX_BYTES_PER_CALL)),
             index_bytes: Cell::new(0),
             open_indexes: Cell::new(0),
         })
@@ -173,7 +173,7 @@ impl Store {
             return kept.clone();
         }
         let (index, holds_file) = self.load_index(&known.path);
-        if !holds_file || self.open_indexes.get() < MOST_OPEN_INDEXES {
+        if !holds_file || self.open_indexes.get() < MAX_OPEN_INDEXES {
             self.open_indexes.set(self.open_indexes.get() + usize::from(holds_file));
             let _ = known.kept.set(index.clone());
         }
@@ -187,7 +187,7 @@ impl Store {
             other => return (other.map(|_| None), false),
         };
         let size = file.size();
-        if size <= SMALL_INDEX && self.index_bytes.get() + size <= MOST_INDEX_BYTES {
+        if size <= SMALL_INDEX && self.index_bytes.get() + size <= MAX_INDEX_BYTES {
             self.index_bytes.set(self.index_bytes.get() + size);
             let whole = read_whole(&file).and_then(|bytes| Idx::parse(Box::new(bytes)));
             return (whole.map(|idx| Some(Rc::new(idx))), false);
@@ -485,7 +485,12 @@ mod tests {
     #[test]
     fn the_largest_blob_at_the_end_of_a_chain_as_deep_as_git_makes_one_reads_in_one_call() {
         let depth = u8::try_from(GIT_PACK_DEPTH).unwrap();
-        let object = read_object(&largest_under(depth), &Budget(Cell::new(MOST_BYTES)), &Oid([9; 20])).unwrap();
+        let object = read_object(
+            &largest_under(depth),
+            &Budget(Cell::new(MAX_BYTES_PER_CALL)),
+            &Oid([9; 20]),
+        )
+        .unwrap();
         assert_eq!(object.data.len() as u64, MAX_OBJECT);
         assert_eq!(object.data[..2], [depth, b'x']);
     }
@@ -493,7 +498,11 @@ mod tests {
     #[test]
     fn the_largest_blob_one_link_deeper_is_too_large_for_one_call() {
         let depth = u8::try_from(GIT_PACK_DEPTH).unwrap() + 1;
-        let read = read_object(&largest_under(depth), &Budget(Cell::new(MOST_BYTES)), &Oid([9; 20]));
+        let read = read_object(
+            &largest_under(depth),
+            &Budget(Cell::new(MAX_BYTES_PER_CALL)),
+            &Oid([9; 20]),
+        );
         assert_eq!(read.err(), Some(ReadError::TooLarge));
     }
 
@@ -576,7 +585,7 @@ mod tests {
         let (pack, idx) = many_empty_blobs(9000, None);
         let size = idx.len() as u64;
         assert!(size <= SMALL_INDEX);
-        let kept = usize::try_from(MOST_INDEX_BYTES / size).unwrap() + MOST_OPEN_INDEXES;
+        let kept = usize::try_from(MAX_INDEX_BYTES / size).unwrap() + MAX_OPEN_INDEXES;
         for number in 0..kept {
             repo.raw_pack_files(&format!("a{number:03}"), &idx, &pack);
         }
@@ -593,7 +602,7 @@ mod tests {
         }
         assert_eq!(store.read(&numbered(0), Kind::Blob), Ok(Vec::new()));
         assert_eq!(store.read(&last, Kind::Blob), Err(ReadError::Damaged));
-        assert_eq!(store.open_indexes.get(), MOST_OPEN_INDEXES);
+        assert_eq!(store.open_indexes.get(), MAX_OPEN_INDEXES);
     }
 
     #[test]

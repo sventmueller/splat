@@ -5,11 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::sync::Arc;
 
+pub use super::doc::facts::memory_estimate;
+pub(crate) use super::doc::facts::stays_plain;
 use super::doc::facts::{
     BlocksByPosition, MOST_MEMORY, TextFacts, Unclosed, ends_footnote_label, expansions_fit, footnote_label,
     holds_loose_comment, link_definitions, may_define_links, reads_alone, reference_expansions, unclosed_after_change,
 };
-pub use super::doc::facts::{memory_estimate, stays_plain};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, shift_block, walk_blocks, walk_inlines};
 use super::highlight::{Style, highlight, highlight_blocks, rehighlight};
 use super::reader::{UNCLOSED_MARKS, parse_part, parse_shared};
@@ -124,7 +125,8 @@ fn with_definitions_in_window(
     spans
 }
 
-fn looks_like_definitions(text: &str) -> usize {
+/// How many `[^label]:` stand in `text`, which are footnote definitions unless they stand in code.
+fn count_footnote_definitions(text: &str) -> usize {
     text.match_indices("]:")
         .filter(|&(i, _)| ends_footnote_label(text, i))
         .count()
@@ -270,8 +272,8 @@ fn may_hide_reference<'a>(blocks: impl IntoIterator<Item = &'a Block>, part: Tex
             } = &b.kind
             {
                 let line = part
-                    .inside(marker.start)
-                    .zip(part.inside(marker.end))
+                    .in_part(marker.start)
+                    .zip(part.in_part(marker.end))
                     .and_then(|(start, end)| part.text.get(start.get()..end.get()));
                 found |= title.contains("[^")
                     || title.contains("^[")
@@ -382,7 +384,7 @@ fn opens_front_matter(text: &str) -> bool {
 /// found in the new part.
 fn read_as_a_whole(facts: &TextFacts, new_unclosed: Unclosed) -> Option<WholeParse> {
     let limited = |unclosed: Unclosed| unclosed.latex > UNCLOSED_MARKS || unclosed.code > UNCLOSED_MARKS;
-    if facts.marks.inline_notes > UNCLOSED_MARKS || limited(facts.unclosed_formulas) || limited(new_unclosed) {
+    if facts.counts.inline_notes > UNCLOSED_MARKS || limited(facts.unclosed_formulas) || limited(new_unclosed) {
         return Some(WholeParse::SwitchedOff);
     }
     facts.loose_comment.then_some(WholeParse::LooseComment)
@@ -495,7 +497,7 @@ impl<'c> Change<'c> {
         }
         // A definition without a reference is not in the tree, but the references in it gave other notes their numbers.
         let written = part.in_window.iter().filter(|&&i| i >= self.text_blocks).count();
-        if looks_like_definitions(part.old) != written {
+        if count_footnote_definitions(part.old) != written {
             return Err(WholeParse::Footnotes);
         }
         if may_hide_reference(self.old_blocks(part), part.old_stretch()) {
@@ -640,8 +642,8 @@ pub(crate) fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice
     let old_text: &str = &shared;
     let facts = doc.facts().clone();
     let (old_change, new_change) = changed(old_text, new_text);
-    let marks = facts.marks.after_change(old_text, new_text, &old_change, &new_change);
-    if marks.memory >= MOST_MEMORY {
+    let counts = facts.counts.after_change(old_text, new_text, &old_change, &new_change);
+    if counts.memory >= MOST_MEMORY {
         return Err(WholeParse::TooMuch);
     }
     let unclosed = unclosed_after_change(facts.unclosed_formulas, old_text, new_text, &old_change, &new_change);
@@ -706,11 +708,11 @@ pub(crate) fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice
     let new = old.start..old.start + part.len();
     replace_blocks(doc, old.clone(), part, &old_change, delta);
     // A `]:` is told from a footnote's by its line, which lies in the part parsed again.
-    let touched_a_mark = old_text.at(old_window).contains("]:") || new_text.at(window.clone()).contains("]:");
+    let touched_a_definition = old_text.at(old_window).contains("]:") || new_text.at(window.clone()).contains("]:");
     let facts = TextFacts {
-        marks,
+        counts,
         unclosed_formulas: unclosed,
-        may_define_links: if touched_a_mark {
+        may_define_links: if touched_a_definition {
             may_define_links(new_text)
         } else {
             facts.may_define_links
@@ -1128,7 +1130,10 @@ mod tests {
 
     #[test]
     fn what_looks_like_a_definition_is_counted() {
-        assert_eq!(looks_like_definitions("[^1]: a\n\n[r]: u\n\n```\n[^2]: b\n```\n"), 2);
+        assert_eq!(
+            count_footnote_definitions("[^1]: a\n\n[r]: u\n\n```\n[^2]: b\n```\n"),
+            2
+        );
     }
 
     #[test]

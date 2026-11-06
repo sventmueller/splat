@@ -12,6 +12,14 @@ pub mod fuzz_checks;
 pub mod fuzz_git;
 pub mod fuzz_import;
 pub mod fuzz_notes;
+pub mod memory;
+#[cfg(feature = "sources")]
+pub mod sources;
+pub mod timing;
+
+#[cfg(test)]
+#[global_allocator]
+static COUNTING: memory::Counting = memory::Counting;
 
 /// Rounds per test.
 pub fn rounds(default: usize) -> usize {

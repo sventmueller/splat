@@ -9,16 +9,23 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# The sources of the workspace as syntax trees, for the tests that read them; the fuzz targets go without.
+sources = ["dep:proc-macro2", "dep:syn"]
+
 [dependencies]
-roxmltree = "0.21"
-splat-file-state = { path = "../splat-file-state" }
-splat-git = { path = "../splat-git" }
-splat-import = { path = "../splat-import" }
-splat-markdown = { path = "../splat-markdown", features = ["selftest"] }
-splat-notes = { path = "../splat-notes" }
-splat-preview = { path = "../splat-preview" }
-unicode-normalization = "0.1"
+proc-macro2 = { workspace = true, features = ["span-locations"], optional = true }
+roxmltree.workspace = true
+splat-file-state.workspace = true
+splat-git.workspace = true
+splat-import.workspace = true
+splat-markdown = { workspace = true, features = ["selftest"] }
+splat-notes.workspace = true
+splat-ooxml.workspace = true
+splat-preview.workspace = true
+syn = { workspace = true, features = ["full", "parsing", "printing", "visit", "visit-mut"], optional = true }
+unicode-normalization.workspace = true
 
 [dev-dependencies]
-miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
-splat-i18n = { path = "../splat-i18n" }
+miniz_oxide = { workspace = true, default-features = false, features = ["with-alloc"] }
+splat-i18n.workspace = true

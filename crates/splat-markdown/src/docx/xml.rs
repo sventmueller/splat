@@ -3,6 +3,8 @@
 
 use std::fmt::Write;
 
+use splat_ooxml::xml::escape_text;
+
 use crate::doc::Align;
 use crate::doc::InlineKind;
 use crate::style::{Baseline, TextStyle};
@@ -122,9 +124,9 @@ pub(super) struct Props {
 }
 
 impl Props {
-    pub(super) fn inside(self, kind: &InlineKind) -> Props {
+    pub(super) fn nested_in(self, kind: &InlineKind) -> Props {
         Props {
-            text: self.text.inside(kind),
+            text: self.text.nested_in(kind),
             ..self
         }
     }
@@ -225,7 +227,7 @@ impl Runs {
             self.xml,
             "<w:r><w:rPr>{}</w:rPr><w:t xml:space=\"preserve\">{}</w:t></w:r>",
             props.to_xml(),
-            escape_xml(text)
+            escape_text(text)
         );
         self.text.push_str(text);
     }
@@ -248,23 +250,6 @@ impl Runs {
         self.xml.push_str(&other.xml);
         self.text.push_str(&other.text);
     }
-}
-
-/// Escapes text for XML and drops the control characters XML 1.0 does not allow.
-pub(super) fn escape_xml(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\t' | '\n' | '\r' => out.push(c),
-            c if (c as u32) < 0x20 || c == '\u{FFFE}' || c == '\u{FFFF}' => {}
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 #[cfg(test)]
@@ -343,11 +328,5 @@ mod tests {
         runs.line_break();
         assert_eq!(runs.xml(), "<w:r><w:br/></w:r>");
         assert!(!runs.is_empty());
-    }
-
-    #[test]
-    fn characters_xml_cannot_hold_are_left_out() {
-        assert_eq!(escape_xml("a\u{1}b\u{1f}\u{FFFE}c\u{FFFF}"), "abc");
-        assert_eq!(escape_xml("a\u{20}\u{FFFD}\t"), "a \u{FFFD}\t");
     }
 }

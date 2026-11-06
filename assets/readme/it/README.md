@@ -635,6 +635,7 @@ La compilazione, i test, la struttura del codice e le regole che segue sono desc
 | [entities](https://github.com/p-jackson/entities) | 1 | i nomi dei riferimenti a caratteri HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | decomprimere file Word e oggetti Git | MIT, Zlib o Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | leggere l’XML dei file Word | MIT o Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | lettura di testo RTF scritto in vecchie code page | MIT o Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nomi e ricerca tra lettere composte e scomposte | MIT o Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | mantenere letterale il testo simile a `:shortcode:` nel testo importato | MIT o Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | rendering delle formule | Apache-2.0 |

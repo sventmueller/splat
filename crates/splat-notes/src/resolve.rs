@@ -5,22 +5,17 @@ use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::{Component, Path, PathBuf};
 
-use splat_markdown::url::scheme;
-use unicode_normalization::UnicodeNormalization;
+use splat_git::folded_name;
+use splat_markdown::url::{percent_decode, scheme};
 
 use crate::tree::Tree;
 
 /// How many folders below a document a wiki link reaches.
 const SEARCH_DEPTH: usize = 8;
 
-/// What makes two names the same to the volumes of a Mac: neither the case of ASCII letters nor the normal form of what
-/// is not.
-fn name_key(name: &str) -> String {
-    name.nfc().map(|c| c.to_ascii_lowercase()).collect()
-}
-
+/// A path as the volumes of a Mac compare it.
 fn path_key(path: &Path) -> String {
-    name_key(&path.to_string_lossy())
+    folded_name(&path.to_string_lossy())
 }
 
 /// `path` without its `.` and `..`, as far as the path itself tells them.
@@ -46,26 +41,6 @@ fn strip_suffixes(target: &str) -> &str {
     &target[..target.find(['?', '#']).unwrap_or(target.len())]
 }
 
-/// Decodes `%XX` escapes; invalid escapes and bytes stay as they are.
-fn percent_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let hex = |at: usize| bytes.get(at).and_then(|b| char::from(*b).to_digit(16));
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut at = 0;
-    while at < bytes.len() {
-        if bytes[at] == b'%'
-            && let (Some(high), Some(low)) = (hex(at + 1), hex(at + 2))
-        {
-            out.extend(u8::try_from(high * 16 + low));
-            at += 3;
-        } else {
-            out.push(bytes[at]);
-            at += 1;
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 /// Answers where links lead in a tree. Making one goes through all of the tree once, and each answer then takes no
 /// longer than its link is, so it is what to use for more than a few links.
 pub(crate) struct Resolver<'t> {
@@ -84,27 +59,24 @@ impl<'t> Resolver<'t> {
         let mut resolver = Resolver {
             exact: HashMap::new(),
             loose: HashMap::new(),
-            folders: HashMap::from([(tree.root.as_path(), 0)]),
+            folders: HashMap::from([(tree.root(), 0)]),
             names: HashMap::new(),
             nearest: HashMap::new(),
         };
-        let mut seen = vec![false; tree.nodes.len()];
         // Folders from the root down to where the walk stands; children go on the stack with how many folders stand
         // above them.
         let mut chain = vec![0];
-        let mut stack: Vec<(usize, usize)> = tree.top.iter().rev().map(|&at| (at, 1)).collect();
+        let mut stack: Vec<(usize, usize)> = tree.top().iter().rev().map(|&at| (at, 1)).collect();
         while let Some((at, depth)) = stack.pop() {
-            let Some(node) = tree.nodes.get(at).filter(|_| !std::mem::replace(&mut seen[at], true)) else {
-                continue;
-            };
+            let node = &tree.nodes()[at];
             chain.truncate(depth);
-            if node.folder {
+            if node.is_folder() {
                 chain.push(resolver.folders.len());
                 let id = resolver.folders.len();
-                resolver.folders.insert(&node.path, id);
-                stack.extend(node.children.iter().rev().map(|&child| (child, depth + 1)));
+                resolver.folders.insert(node.path(), id);
+                stack.extend(node.children().iter().rev().map(|&child| (child, depth + 1)));
             } else {
-                resolver.add_note(&node.path, &chain);
+                resolver.add_note(node.path(), &chain);
             }
         }
         resolver
@@ -113,7 +85,7 @@ impl<'t> Resolver<'t> {
     fn add_note(&mut self, path: &'t Path, chain: &[usize]) {
         self.exact.entry(path).or_insert(path);
         self.loose.entry(path_key(path)).or_insert(path);
-        let name = name_key(&path.file_name().unwrap_or_default().to_string_lossy());
+        let name = folded_name(&path.file_name().unwrap_or_default().to_string_lossy());
         let next_id = self.names.len();
         let name = *self.names.entry(name).or_insert(next_id);
         for (depth, &folder) in chain.iter().rev().enumerate().take(SEARCH_DEPTH + 1) {
@@ -149,7 +121,7 @@ impl<'t> Resolver<'t> {
         }
         let file = Path::new(name).file_name().and_then(OsStr::to_str)?;
         let folder = *self.folders.get(dir)?;
-        [name_key(file), name_key(&format!("{file}.md"))]
+        [folded_name(file), folded_name(&format!("{file}.md"))]
             .iter()
             .filter_map(|key| self.nearest.get(&(folder, *self.names.get(key)?)))
             .min_by_key(|(depth, _)| *depth)
@@ -213,7 +185,7 @@ mod tests {
 
     use super::*;
     use crate::search::tests::Folder;
-    use crate::tree::{Node, scan};
+    use crate::tree::scan;
 
     /// Where a link leads, written as a document holds it: `[[Note|Title]]` and `![[Note]]` are wiki links; anything
     /// else is an address and, if that leads to no note of the tree, the bare name of a wiki link.
@@ -243,41 +215,8 @@ mod tests {
         link(&resolver, link_target, from_file).is_some_and(|leads_to| resolver.same(&leads_to, target))
     }
 
-    /// A tree that exists only in memory.
-    pub(crate) fn tree_of(root: &str, notes: &[&str]) -> Tree {
-        let mut tree = Tree {
-            root: PathBuf::from(root),
-            ..Tree::default()
-        };
-        for note in notes {
-            let mut list_owner: Option<usize> = None;
-            let mut path = PathBuf::from(root);
-            let parts: Vec<&str> = note.split('/').collect();
-            for (at, part) in parts.iter().enumerate() {
-                path.push(part);
-                let list = match list_owner {
-                    Some(owner) => &tree.nodes[owner].children,
-                    None => &tree.top,
-                };
-                let known = list.iter().copied().find(|&child| tree.nodes[child].name == *part);
-                let index = known.unwrap_or_else(|| {
-                    let index = tree.nodes.len();
-                    tree.nodes.push(Node {
-                        name: (*part).to_string(),
-                        path: path.clone(),
-                        folder: at + 1 < parts.len(),
-                        children: Vec::new(),
-                    });
-                    match list_owner {
-                        Some(owner) => tree.nodes[owner].children.push(index),
-                        None => tree.top.push(index),
-                    }
-                    index
-                });
-                list_owner = Some(index);
-            }
-        }
-        tree
+    fn tree_of(root: &str, notes: &[&str]) -> Tree {
+        Tree::of_notes(Path::new(root), notes)
     }
 
     fn leads(tree: &Tree, link: &str, from: &str) -> Option<String> {
@@ -322,6 +261,8 @@ mod tests {
             ("[[My Note]]", "/v/My Note.md"),
             ("[[Other.markdown]]", "/v/Other.markdown"),
             ("[[Mu\u{308}ller]]", "/v/Müller.md"),
+            ("[[MÜLLER]]", "/v/Müller.md"),
+            ("[[MU\u{308}LLER.md]]", "/v/Müller.md"),
             ("[[sub/Deep]]", "/v/sub/Deep.md"),
             ("[[sub/Deep.md]]", "/v/sub/Deep.md"),
             ("[[Deep]]", "/v/sub/Deep.md"),
@@ -484,18 +425,6 @@ mod tests {
     }
 
     #[test]
-    fn a_tree_of_any_shape_gets_answers() {
-        let mut tree = tree_of("/v", &["a/N.md"]);
-        tree.nodes[0].children.push(0);
-        tree.top.push(99);
-        assert_eq!(
-            leads(&tree, "[[N]]", "/v/from.md").as_deref(),
-            Some("/v/a/N.md"),
-            "a cycle and a wrong index"
-        );
-    }
-
-    #[test]
     fn the_answers_from_the_tree_are_those_of_the_disk_the_app_reads() {
         let folder = Folder::new("disk");
         for note in ["Note.md", "sub/Deep.md", "sub/below/Lower.md"] {
@@ -514,11 +443,7 @@ mod tests {
     }
 
     #[test]
-    fn escapes_that_are_none_stay_as_they_stand() {
-        assert_eq!(percent_decode("a%20b%2"), "a b%2");
-        assert_eq!(percent_decode("%€.png"), "%€.png");
-        assert_eq!(percent_decode("%C3%A4"), "ä");
-        assert_eq!(percent_decode("%zz%"), "%zz%");
+    fn suffixes_and_dots_leave_a_path() {
         assert_eq!(strip_suffixes("a.md?b#c"), "a.md");
         assert_eq!(tidied(Path::new("../a/./b/../c")), Path::new("../a/c"));
         assert_eq!(tidied(Path::new("../../a")), Path::new("../../a"));

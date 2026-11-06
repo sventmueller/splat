@@ -363,7 +363,11 @@ pub(crate) fn check_library() -> Result<(), String> {
         "--package",
         "splat-import",
         "--package",
+        "splat-ooxml",
+        "--package",
         "splat-preview",
+        "--package",
+        "splat-editor-state",
         "--target",
         "x86_64-unknown-linux-gnu",
     ]))

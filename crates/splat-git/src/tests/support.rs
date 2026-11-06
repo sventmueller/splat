@@ -418,7 +418,8 @@ pub(crate) fn commit_text(tree: &Oid) -> String {
     )
 }
 
-/// Whether the real `git` can be run; a test without it says so and passes.
+/// Whether the real `git` can be run. Without it a test that compares with it fails, unless `SPLAT_WITHOUT_GIT=1` lets
+/// it pass without comparing.
 pub(crate) fn git_is_here() -> bool {
     static HERE: OnceLock<bool> = OnceLock::new();
     let here = *HERE.get_or_init(|| {
@@ -428,7 +429,11 @@ pub(crate) fn git_is_here() -> bool {
             .is_ok_and(|out| out.status.success())
     });
     if !here {
-        eprintln!("git is absent: skipped");
+        assert!(
+            std::env::var_os("SPLAT_WITHOUT_GIT").is_some_and(|value| value == "1"),
+            "git is absent, so this test cannot compare with it; SPLAT_WITHOUT_GIT=1 lets it pass without"
+        );
+        eprintln!("git is absent: skipped, as SPLAT_WITHOUT_GIT=1 allows");
     }
     here
 }
@@ -477,6 +482,7 @@ pub(crate) struct Real {
 }
 
 impl Real {
+    /// `None` only where `SPLAT_WITHOUT_GIT=1` lets a test go without `git`, as [`git_is_here`] says.
     pub(crate) fn new() -> Option<Real> {
         Real::with_init_args(&[])
     }

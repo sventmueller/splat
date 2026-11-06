@@ -6,24 +6,43 @@ use std::ops::Range;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use super::scroll::ScrollSpan;
-use super::sync::{BlockDiff, Blocks, Snapshot};
+use crate::lanes::{contained, free_in_background};
 use crate::markdown::commands::Pending;
 use crate::markdown::doc::Doc;
 use crate::markdown::doc::Splice;
 use crate::markdown::highlight::Style;
 use crate::markdown::incremental::{Parsed, parse_and_color, parse_shared_and_color, reparse_part_and_color};
 use crate::markdown::text::{Byte, U16};
+use crate::preview::bridge::Bridge;
+use crate::preview::layout::ParaKind;
 use crate::preview::layout::{
-    Layout, Marker, Resolver, TopBlock, caret_shapes_layout, layout, relayout, reusable, reusable_behind_caret,
+    ItemMarker, Layout, Resolver, TopBlock, caret_shapes_layout, layout, relayout, reusable, reusable_behind_caret,
 };
 use crate::preview::map::Index;
 use crate::preview::map::Shown;
-use crate::util::{contained, free_in_background};
+use crate::sync::{BlockDiff, Blocks, Snapshot};
+
+/// Where one top-level block stands in the source and in the preview, as UTF-16 ranges, for keeping their scroll
+/// positions in step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScrollSpan {
+    /// The start and end of the block in the source view.
+    pub source: (usize, usize),
+    /// The start and end of the block in the preview view.
+    pub preview: (usize, usize),
+}
+
+#[cfg(feature = "selftest")]
+impl ScrollSpan {
+    /// Where the block ends in the source view.
+    pub fn source_end(&self) -> usize {
+        self.source.1
+    }
+}
 
 /// Why the editor redraws although the source text did not change.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(super) enum Invalidate {
+pub enum Invalidate {
     /// The whole text was replaced, e.g. after loading or reverting.
     Text,
     /// The fonts changed.
@@ -57,7 +76,8 @@ const PARTS_ON_MAIN_UP_TO: usize = 2 << 20;
 
 /// What the preview view shows for the text; only blocks can be edited.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) enum PreviewMode {
+pub enum PreviewMode {
+    /// The blocks of the text.
     #[default]
     Shows,
     /// Parsing or laying out this text panicked; the preview says so, and the text stays editable in the source.
@@ -66,8 +86,9 @@ pub(super) enum PreviewMode {
     TooLarge,
 }
 
+/// What the controller knows about the document: the parsed text, its layout and what the preview view shows of it.
 #[derive(Default)]
-pub(super) struct State {
+pub struct State {
     version: u64,
     doc: Doc,
     layout: Layout,
@@ -160,53 +181,66 @@ fn preview_work(f: PreviewFacts<'_>) -> PreviewWork<'_> {
 
 /// What the views say when an update starts.
 #[derive(Clone, Copy)]
-pub(super) struct ViewFacts {
+pub struct ViewFacts {
     /// Where the source caret stands, while the preview has the focus and shows it.
     pub caret_at: Option<U16>,
     /// The preview is not collapsed.
     pub visible: bool,
     /// The current length of the preview text.
     pub shown_len: usize,
+    /// The views show the dark appearance.
     pub dark: bool,
 }
 
 /// What the background thread made of a text.
-pub(super) struct Background {
+pub struct Background {
+    /// The tree and the syntax colours.
     pub parsed: Parsed,
     /// Laid out if the preview showed, without a caret.
     pub layout: Option<(Layout, Index)>,
+    /// Parsing or laying out panicked.
     pub failed: bool,
 }
 
 /// What the views need after the state advanced.
 #[must_use]
-pub(super) struct Update {
+pub struct Update {
+    /// The syntax colours to change in the source, if any.
     pub recolor: Option<Recolor>,
+    /// What the preview view has to change, if anything.
     pub preview: Option<PreviewChange>,
+    /// The update took over a new text.
     pub text_changed: bool,
     /// The preview last showed the other appearance.
     pub appearance_switched: bool,
 }
 
 /// How the preview view gets to show the new layout.
-pub(super) struct PreviewChange {
+pub struct PreviewChange {
     /// The changed blocks, of which the first stands at `diff.prefix`.
     pub blocks: Vec<Arc<TopBlock>>,
+    /// Which of the shown blocks the changed ones replace.
     pub diff: BlockDiff,
+    /// What the preview shows for the text.
     pub mode: PreviewMode,
+    /// The zoom the blocks are laid out at.
     pub zoom: f64,
 }
 
 /// The colors of the source to change after a new parse.
-pub(super) struct Recolor {
+pub struct Recolor {
+    /// The text the source view was coloured for.
     pub old_text: Arc<str>,
+    /// The colours it has.
     pub old_spans: Spans,
+    /// The text it holds now.
     pub text: Arc<str>,
+    /// The colours of that text.
     pub spans: Spans,
 }
 
 /// The layout of a text, which has none when it stays plain; `None` if it panicked.
-pub(super) fn laid_out(doc: &Doc, resolver: &dyn Resolver, caret: Option<Byte>) -> Option<Layout> {
+pub fn laid_out(doc: &Doc, resolver: &dyn Resolver, caret: Option<Byte>) -> Option<Layout> {
     if doc.is_too_large() {
         return Some(Layout::nothing_of(doc));
     }
@@ -235,94 +269,109 @@ fn panic_if_a_test_asks() {
 }
 
 impl State {
-    pub(super) fn new() -> State {
+    /// The state of an empty document at the zoom of 1.
+    pub fn new() -> State {
         State {
             zoom: 1.0,
             ..State::default()
         }
     }
 
-    pub(super) fn text(&self) -> &str {
+    /// The text the state was computed from.
+    pub fn text(&self) -> &str {
         self.doc.text()
     }
 
-    pub(super) fn version(&self) -> u64 {
+    /// The version of the source text the state was computed from.
+    pub fn version(&self) -> u64 {
         self.version
     }
 
-    pub(super) fn doc(&self) -> &Doc {
+    /// The parsed text.
+    pub fn doc(&self) -> &Doc {
         &self.doc
     }
 
-    pub(super) fn layout(&self) -> &Layout {
+    /// The layout of the preview.
+    pub fn layout(&self) -> &Layout {
         &self.layout
     }
 
-    pub(super) fn index(&self) -> &Index {
+    /// Where the paragraphs of the layout start in the preview text.
+    pub fn index(&self) -> &Index {
         &self.index
     }
 
-    pub(super) fn blocks(&self) -> &Blocks {
+    /// The blocks the preview view shows.
+    pub fn blocks(&self) -> &Blocks {
         &self.blocks
     }
 
     /// What the formulas of the document define for each other, as of the last request for them.
-    pub(super) fn macros(&self) -> Arc<str> {
+    pub fn macros(&self) -> Arc<str> {
         self.macros.clone()
     }
 
-    pub(super) fn set_macros(&mut self, macros: Arc<str>) {
+    /// Remembers what the formulas define, as a request for them found it.
+    pub fn set_macros(&mut self, macros: Arc<str>) {
         self.macros = macros;
     }
 
-    pub(super) fn caret(&self) -> Option<Byte> {
+    /// The caret the layout was made for, while the preview has the focus.
+    pub fn caret(&self) -> Option<Byte> {
         self.caret
     }
 
-    pub(super) fn zoom(&self) -> f64 {
+    /// The zoom of both views.
+    pub fn zoom(&self) -> f64 {
         self.zoom
     }
 
-    pub(super) fn rendered_dark(&self) -> Option<bool> {
+    /// Whether the preview last showed the dark appearance; `None` before it showed anything.
+    pub fn rendered_dark(&self) -> Option<bool> {
         self.rendered_dark
     }
 
-    pub(super) fn pending(&self) -> Option<&(Pending, String)> {
+    /// The styles for the next typed text, with the text they were set for.
+    pub fn pending(&self) -> Option<&(Pending, String)> {
         self.pending.as_ref()
     }
 
-    pub(super) fn preview_mode(&self) -> PreviewMode {
+    /// What the preview shows for the text.
+    pub fn preview_mode(&self) -> PreviewMode {
         self.mode
     }
 
-    pub(super) fn stale_layout(&self) -> bool {
+    /// Whether the next update lays the preview out anew although the text stayed.
+    pub fn stale_layout(&self) -> bool {
         self.stale.layout
     }
 
     /// Where the paragraph of the footnote called `name` starts in the preview, and its length.
-    pub(super) fn footnote_paragraph(&self, name: &str) -> Option<(Shown, usize)> {
+    pub fn footnote_paragraph(&self, name: &str) -> Option<(Shown, usize)> {
         self.index
             .paras
             .iter()
             .enumerate()
             .find(|(i, _)| {
-                matches!(&self.index.para(&self.layout, *i).style.marker, Some(Marker::Footnote(n, _)) if &**n == name)
+                let marker = &self.index.para(&self.layout, *i).style.marker;
+                matches!(marker, Some(ItemMarker::Footnote(n, _)) if &**n == name)
             })
             .map(|(_, paragraph)| (paragraph.start, paragraph.len))
     }
 
     /// The state was computed from the text `snap` holds; equal versions save comparing the texts.
-    pub(super) fn is_current(&self, snap: &Snapshot) -> bool {
+    pub fn is_current(&self, snap: &Snapshot) -> bool {
         self.version == snap.version || self.doc.text() == snap.text
     }
 
     /// The layout and what the view shows are of an older text, after an edit while the preview was hidden.
-    pub(super) fn preview_is_behind(&self) -> bool {
+    pub fn preview_is_behind(&self) -> bool {
         self.layout.doc_version != self.doc.version()
     }
 
     /// Marks what `why` made outdated.
-    pub(super) fn invalidate(&mut self, why: Invalidate) {
+    pub fn invalidate(&mut self, why: Invalidate) {
         match why {
             Invalidate::Text | Invalidate::Zoom | Invalidate::Appearance => {
                 self.stale.colors = true;
@@ -353,7 +402,7 @@ impl State {
     }
 
     /// Renders those shown blocks again that `arrived` says show a picture that just came in; whether there are any.
-    pub(super) fn mark_arrived(&mut self, arrived: impl Fn(&TopBlock) -> bool) -> bool {
+    pub fn mark_arrived(&mut self, arrived: impl Fn(&TopBlock) -> bool) -> bool {
         if self.blocks.placeholders.len() != self.layout.blocks.len() {
             return false;
         }
@@ -368,7 +417,7 @@ impl State {
     }
 
     /// The given blocks went into the preview view rendered; whether placeholders are left in `window`.
-    pub(super) fn rendered(&mut self, done: &[usize], window: Range<usize>) -> bool {
+    pub fn rendered(&mut self, done: &[usize], window: Range<usize>) -> bool {
         let placeholders = &mut self.blocks.placeholders;
         for &i in done {
             placeholders[i] = false;
@@ -376,35 +425,40 @@ impl State {
         placeholders[window].iter().any(|p| *p)
     }
 
-    pub(super) fn set_zoom(&mut self, zoom: f64) {
+    /// Takes over a new zoom; `invalidate` says what it makes outdated.
+    pub fn set_zoom(&mut self, zoom: f64) {
         self.zoom = zoom;
     }
 
-    pub(super) fn clear_pending(&mut self) {
+    /// Forgets the styles for the next typed text.
+    pub fn clear_pending(&mut self) {
         self.pending = None;
     }
 
-    pub(super) fn set_pending(&mut self, pending: Option<(Pending, String)>) {
+    /// Sets the styles for the next typed text, with the text they are for.
+    pub fn set_pending(&mut self, pending: Option<(Pending, String)>) {
         self.pending = pending;
     }
 
     /// The user edited the preview itself.
-    pub(super) fn note_preview_edit(&mut self, dirty: (Range<Shown>, isize)) {
+    pub fn note_preview_edit(&mut self, dirty: (Range<Shown>, isize)) {
         self.dirty_preview = Some(dirty);
     }
 
-    pub(super) fn scroll_spans(&self) -> Option<Rc<Vec<ScrollSpan>>> {
+    /// The places of the blocks for the scroll sync, if they were computed for this layout.
+    pub fn scroll_spans(&self) -> Option<Rc<Vec<ScrollSpan>>> {
         self.scroll_spans.clone()
     }
 
-    pub(super) fn remember_scroll_spans(&mut self, spans: Rc<Vec<ScrollSpan>>) {
+    /// Keeps the places of the blocks until the layout changes.
+    pub fn remember_scroll_spans(&mut self, spans: Rc<Vec<ScrollSpan>>) {
         self.scroll_spans = Some(spans);
     }
 
     /// Brings everything known about the document in line with the text of `snap`, parsing it here unless the
     /// background thread did: doc, layout, index and blocks belong together again when this returns. `resolver` says
     /// what is rendered already, for the text it is given.
-    pub(super) fn advance<R: Resolver>(
+    pub fn advance<R: Resolver>(
         &mut self,
         snap: &Snapshot,
         views: ViewFacts,
@@ -424,7 +478,7 @@ impl State {
 
     /// Like `advance`, if a text of moderate size can be parsed around its edit right away; else `None`, and the next
     /// update parses all of it.
-    pub(super) fn advance_in_part<R: Resolver>(
+    pub fn advance_in_part<R: Resolver>(
         &mut self,
         snap: &Snapshot,
         views: ViewFacts,
@@ -608,19 +662,37 @@ impl State {
         })
     }
 
+    /// The translation of edits in the preview into the source; `None` while the preview has not caught up with the
+    /// document, or shows a notice instead of it.
+    pub fn bridge(&self) -> Option<Bridge<'_>> {
+        if self.mode != PreviewMode::Shows {
+            return None;
+        }
+        Bridge::new(&self.doc, &self.layout, &self.index)
+    }
+
+    /// Whether the preview position `p` lies in a code block, where a tab is text.
+    pub fn preview_in_code(&self, p: Shown) -> bool {
+        self.index
+            .para_at(p)
+            .is_some_and(|i| matches!(self.index.para(&self.layout, i).style.kind, ParaKind::Code { .. }))
+    }
+
     /// The preview view now shows the last change, with the blocks of `changed` outside `eager` as plain text; whether
     /// any are left to render.
-    pub(super) fn preview_shown(&mut self, changed: Range<usize>, eager: &Range<usize>) -> bool {
+    pub fn preview_shown(&mut self, changed: Range<usize>, eager: &Range<usize>) -> bool {
         self.blocks.left_plain(changed, eager);
         self.blocks.pending()
     }
 }
 
-pub(super) fn shows_image(block: &TopBlock) -> bool {
+/// Whether the block shows a picture.
+pub fn shows_image(block: &TopBlock) -> bool {
     images_of(block).next().is_some()
 }
 
-pub(super) fn images_of(block: &TopBlock) -> impl Iterator<Item = &str> {
+/// The addresses of the pictures the block shows.
+pub fn images_of(block: &TopBlock) -> impl Iterator<Item = &str> {
     use crate::preview::layout::{Atom, RunMap};
     block.paras.iter().flat_map(|p| &p.runs).filter_map(|r| match &r.map {
         RunMap::Atom {
@@ -633,7 +705,6 @@ pub(super) fn images_of(block: &TopBlock) -> impl Iterator<Item = &str> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::editing::bridge;
     use super::*;
     use crate::markdown::doc::DiagramKind;
     use crate::preview::layout::NoImages;
@@ -993,7 +1064,7 @@ mod tests {
     }
 
     fn with_panicking_parser<R>(f: impl FnOnce() -> R) -> R {
-        PARSING_PANICS.with(|panics| crate::util::with_raised(panics, f))
+        PARSING_PANICS.with(|panics| crate::lanes::with_raised(panics, f))
     }
 
     #[test]
@@ -1006,11 +1077,11 @@ mod tests {
         let change = failed.preview.expect("the preview says so");
         assert_eq!(change.mode, PreviewMode::Failed);
         belongs_together(&state);
-        assert!(bridge(&state).is_none(), "nothing shown stands for the text");
+        assert!(state.bridge().is_none(), "nothing shown stands for the text");
         let good = update(&mut state, "Gut\n", 3).preview.expect("a preview");
         assert_eq!(good.mode, PreviewMode::Shows);
         assert_eq!(state.preview_mode(), PreviewMode::Shows);
-        assert!(bridge(&state).is_some());
+        assert!(state.bridge().is_some());
         assert_eq!(good.blocks[0].paras[0].runs[0].text, "Gut");
         belongs_together(&state);
     }
@@ -1081,5 +1152,39 @@ mod tests {
         let done = state.advance(&snapshot("Neu\n", 2), facts, Some(background), |_| NoImages);
         assert_eq!(done.preview.expect("the preview says so").mode, PreviewMode::Failed);
         belongs_together(&state);
+    }
+
+    #[test]
+    fn what_the_state_keeps_beside_the_text_stays_until_it_changes() {
+        let text = "Text\n\n```\ncode\n```\n";
+        let mut state = shown(text);
+        assert_eq!(state.rendered_dark(), Some(false));
+        assert!(state.macros().is_empty());
+        state.set_macros("\\def\\x{1}".into());
+        assert_eq!(&*state.macros(), "\\def\\x{1}");
+        let pending = Pending {
+            at: Byte::new(2),
+            styles: Vec::new(),
+        };
+        state.set_pending(Some((pending.clone(), text.to_string())));
+        assert_eq!(state.pending(), Some(&(pending, text.to_string())));
+        state.clear_pending();
+        assert_eq!(state.pending(), None);
+        let spans = Rc::new(vec![ScrollSpan {
+            source: (0, 5),
+            preview: (0, 5),
+        }]);
+        state.remember_scroll_spans(spans.clone());
+        assert_eq!(state.scroll_spans(), Some(spans));
+        let shown_len: usize = state.blocks.lens.iter().sum();
+        assert!(!state.preview_in_code(Shown::new(0)));
+        assert!((0..shown_len).any(|at| state.preview_in_code(Shown::new(at))));
+        assert!(update(&mut state, text, 1).preview.is_none(), "nothing changed");
+        state.note_preview_edit((Shown::new(0)..Shown::new(1), 1));
+        assert!(
+            update(&mut state, text, 1).preview.is_some(),
+            "the preview no longer shows what its blocks say"
+        );
+        assert_eq!(state.scroll_spans(), None, "a new layout places the blocks anew");
     }
 }

@@ -5,7 +5,7 @@ use std::cell::{Cell, RefCell};
 use std::ops::Range;
 
 use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::runtime::AnyObject;
 use objc2::{MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
     NSAccessibility, NSAutoresizingMaskOptions, NSBezelStyle, NSButton, NSColor, NSControlSize, NSFont,
@@ -414,7 +414,7 @@ impl AtomEditor<'_> {
         let size = NSSize::new(width, 30.0 + editor_height + 26.0);
         let root = NSView::initWithFrame(NSView::alloc(mtm), NSRect::new(NSPoint::new(0.0, 0.0), size));
 
-        let target: &AnyObject = self.host.object();
+        let target = self.host.object().target();
         let mut row = Row {
             view: NSView::initWithFrame(
                 NSView::alloc(mtm),
@@ -501,7 +501,7 @@ impl AtomEditor<'_> {
         popover.setAnimates(crate::test_hooks::ANIMATES);
         popover.setContentViewController(Some(&controller));
         popover.setContentSize(size);
-        popover.setDelegate(Some(ProtocolObject::from_ref(self.host.object())));
+        popover.setDelegate(Some(self.host.object().popover_delegate()));
         popover
     }
 
@@ -561,7 +561,7 @@ impl AtomEditor<'_> {
         } else {
             t("LaTeX-Formel")
         })));
-        view.setDelegate(Some(ProtocolObject::from_ref(self.host.object())));
+        view.setDelegate(Some(self.host.object().text_view_delegate()));
         scroll.setDocumentView(Some(&view));
         (scroll, view)
     }
@@ -595,12 +595,12 @@ impl AtomEditor<'_> {
                 root.addSubview(&field.web);
             }
             field.web.setHidden(false);
-            field.attach(self.host.object(), &latex);
+            self.host.object().attach_formula_field(&field, &latex);
             if let Some(w) = field.web.window() {
                 w.makeFirstResponder(Some(&field.web));
             }
         } else {
-            mathfield::detach_if_started(self.host.object());
+            self.host.object().detach_formula_field_if_started();
             if let Some(w) = view.window() {
                 w.makeFirstResponder(Some(&view));
             }

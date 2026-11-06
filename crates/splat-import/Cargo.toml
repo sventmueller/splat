@@ -10,10 +10,12 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-emojis = "0.9"
-miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
-roxmltree = "0.21"
-splat-markdown = { path = "../splat-markdown" }
+emojis.workspace = true
+encoding_rs.workspace = true
+roxmltree.workspace = true
+splat-markdown.workspace = true
+splat-ooxml.workspace = true
 
 [dev-dependencies]
-splat-testkit = { path = "../splat-testkit" }
+splat-ooxml = { workspace = true, features = ["testing"] }
+splat-testkit.workspace = true

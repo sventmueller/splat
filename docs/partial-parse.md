@@ -12,9 +12,9 @@ So nothing here relies on blank lines ending anything. It relies on two argument
 
 1. **Resynchronising.** A top-level block is what comrak makes of its lines given how the block before it ended. The part
    parsed again includes one unchanged block on each side (`Change::neighbours_hold`), with the lines of link definitions
-   right above the first of them, which comrak reads out of the same paragraph (`lines_it_was_written_with`). If those come
-   out exactly as they were, moved by the length of the change, the parser was in the same state at both ends, and what lies
-   outside cannot have changed. If they do not, the part grows on both sides and is tried again.
+   right above the first of them, which comrak reads out of the same paragraph (`block_start_with_definitions`). If
+   those come out exactly as they were, moved by the length of the change, the parser was in the same state at both ends,
+   and what lies outside cannot have changed. If they do not, the part grows on both sides and is tried again.
 2. **Global effects are enumerated.** Everything that the argument above does not cover is a rule below. If a rule cannot be
    shown to hold, the whole text is parsed, and `WholeParse` names why.
 

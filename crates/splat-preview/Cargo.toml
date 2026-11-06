@@ -10,5 +10,5 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-splat-i18n = { path = "../splat-i18n" }
-splat-markdown = { path = "../splat-markdown" }
+splat-i18n.workspace = true
+splat-markdown.workspace = true

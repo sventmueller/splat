@@ -3,65 +3,36 @@
 //! handles it hands out make it the one module everybody knows, so it does not count here.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+
+use splat_testkit::sources::{self, Crate, Source, Without, named, resolve, root};
 
 type Graph = BTreeMap<String, BTreeSet<String>>;
 
-fn sources(dir: &Path, found: &mut Vec<std::path::PathBuf>) {
-    for entry in std::fs::read_dir(dir).unwrap() {
-        let path = entry.unwrap().path();
-        if path.is_dir() {
-            sources(&path, found);
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            found.push(path);
-        }
-    }
-}
-
-/// The names `path` stands in front of in `text`, in `path::name` as in `path::{a, b::c}`.
-fn named_behind<'a>(text: &'a str, path: &str) -> Vec<&'a str> {
-    let word = |s: &'a str| s.split(|c: char| !c.is_alphanumeric() && c != '_').next().unwrap_or("");
-    let mut names = Vec::new();
-    for (at, _) in text.match_indices(path) {
-        let rest = &text[at + path.len()..];
-        match rest.strip_prefix('{') {
-            Some(group) => {
-                let group = group.split('}').next().unwrap_or("");
-                names.extend(group.split(',').map(|name| word(name.trim())));
-            }
-            None => names.push(word(rest)),
-        }
-    }
-    names
-}
-
-/// The modules below `folder`, each with those it names; `own` is how the code names what lies directly in that folder.
-fn graph(folder: &str, own: &str, leave_out: &[&str]) -> Graph {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(folder);
-    let mut files = Vec::new();
-    sources(&root, &mut files);
-    let module_of = |path: &Path| {
-        let inside = path.strip_prefix(&root).unwrap();
-        let first = inside.components().next().unwrap().as_os_str().to_string_lossy();
-        first.trim_end_matches(".rs").to_string()
+/// The modules directly in `within`, each with those of them it names; `leave_out` count for none.
+fn graph(krate: &Crate, within: &[&str], leave_out: &[&str]) -> Graph {
+    let within: Vec<String> = within.iter().map(ToString::to_string).collect();
+    let node = |module: &[String]| {
+        (module.len() > within.len() && module.starts_with(&within))
+            .then(|| module[within.len()].clone())
+            .filter(|name| !leave_out.contains(&name.as_str()))
     };
-    let is_module = |name: &str| !["mod", "lib"].contains(&name) && !leave_out.contains(&name);
-    let modules: BTreeSet<String> = files.iter().map(|f| module_of(f)).filter(|m| is_module(m)).collect();
-    let mut graph: Graph = modules.iter().map(|m| (m.clone(), BTreeSet::new())).collect();
-    for file in &files {
-        let module = module_of(file);
-        if !modules.contains(&module) {
-            continue;
-        }
-        let text = std::fs::read_to_string(file).unwrap();
-        let product = text.split("#[cfg(test)]\nmod tests").next().unwrap();
-        let nested = file.strip_prefix(&root).unwrap().components().count() > 1;
-        let parent = if nested { "super::super::" } else { "super::" };
-        let mut named = named_behind(product, own);
-        named.extend(named_behind(product, parent));
-        for name in named {
-            if name != module && modules.contains(name) {
-                graph.get_mut(&module).unwrap().insert(name.to_string());
+    let mut graph: Graph = krate
+        .modules
+        .iter()
+        .filter(|module| module.len() == within.len() + 1)
+        .filter_map(|module| node(module))
+        .map(|name| (name, BTreeSet::new()))
+        .collect();
+    for source in &krate.sources {
+        for name in named(source) {
+            let (Some(from), Some(to)) = (
+                node(&name.module),
+                resolve(&name.module, &name.path, &krate.modules).and_then(|path| node(&path)),
+            ) else {
+                continue;
+            };
+            if from != to && graph.contains_key(&to) {
+                graph.get_mut(&from).expect("a module of the graph").insert(to);
             }
         }
     }
@@ -93,27 +64,44 @@ fn cycle(graph: &Graph) -> Option<Vec<String>> {
 }
 
 #[test]
-fn the_modules_of_the_model_depend_downwards_only() {
-    let graph = graph("crates/splat-markdown/src", "crate::", &[]);
-    assert!(graph.len() > 10, "{graph:?}");
-    assert!(
-        graph["html"].contains("doc"),
-        "the look at the sources sees {:?}",
-        graph["html"]
-    );
-    assert_eq!(cycle(&graph), None);
-}
-
-#[test]
-fn the_modules_of_the_preview_depend_downwards_only() {
-    let graph = graph("crates/splat-preview/src", "crate::", &[]);
-    assert!(graph["map"].contains("layout"), "{graph:?}");
-    assert_eq!(cycle(&graph), None);
+fn the_modules_of_every_crate_depend_downwards_only() {
+    let roots = sources::crate_roots();
+    assert!(roots.len() >= 8, "{roots:?}");
+    let mut ways_round = Vec::new();
+    for crate_root in roots {
+        let graph = graph(&Crate::read(&crate_root, Without::Tests), &[], &[]);
+        let name = crate_root
+            .strip_prefix(root())
+            .unwrap_or(&crate_root)
+            .display()
+            .to_string();
+        if name.contains("splat-markdown") {
+            assert!(graph.len() > 10, "{graph:?}");
+            assert!(
+                graph["html"].contains("doc"),
+                "the look at the sources sees {:?}",
+                graph["html"]
+            );
+            assert!(
+                graph["commands"].contains("doc"),
+                "from a folder: {:?}",
+                graph["commands"]
+            );
+        }
+        if name.contains("splat-preview") {
+            assert!(graph["map"].contains("layout"), "{graph:?}");
+        }
+        if let Some(found) = cycle(&graph) {
+            ways_round.push(format!("{name}: {}", found.join(" -> ")));
+        }
+    }
+    assert!(ways_round.is_empty(), "{ways_round:#?}");
 }
 
 #[test]
 fn the_modules_of_the_editor_depend_downwards_only() {
-    let graph = graph("src/editor", "crate::editor::", &["layers", "selftest"]);
+    let app = Crate::read(&root().join("src/main.rs"), Without::Tests);
+    let graph = graph(&app, &["editor"], &["layers", "selftest"]);
     assert!(graph["remote"].contains("picture"), "{:?}", graph["remote"]);
     assert_eq!(cycle(&graph), None);
 }
@@ -132,30 +120,89 @@ fn a_way_round_is_found() {
     assert_eq!(found, ["a", "b", "c"]);
 }
 
+fn crate_of(files: &[(&[&str], &str)]) -> Crate {
+    Crate::of(
+        files
+            .iter()
+            .map(|(module, text)| {
+                let module = module.iter().map(ToString::to_string).collect();
+                Source::parse("a.rs", module, (*text).to_string(), Without::Tests)
+            })
+            .collect(),
+    )
+}
+
 #[test]
-fn names_are_found_in_either_way_of_writing_them() {
-    let text = "use super::doc::{A, B};\nuse super::{doc, text::Byte};\ncrate::url::x();\n";
-    assert_eq!(named_behind(text, "super::"), ["doc", "doc", "text"]);
-    assert_eq!(named_behind(text, "crate::"), ["url"]);
+fn a_dependency_is_found_however_far_up_it_is_written() {
+    let krate = crate_of(&[
+        (&[], "mod doc; mod text; mod commands; mod deep;"),
+        (&["doc"], ""),
+        (&["text"], ""),
+        (&["commands"], "use super::doc::Block;"),
+        (&["deep"], "mod a;"),
+        (&["deep", "a"], "mod b;"),
+        (&["deep", "a", "b"], "fn f() { super::super::super::text::x(); }"),
+    ]);
+    let graph = graph(&krate, &[], &[]);
+    assert!(graph["commands"].contains("doc"), "a folder's mod.rs: {graph:?}");
+    assert!(graph["deep"].contains("text"), "three levels up: {graph:?}");
+}
+
+#[test]
+fn what_only_tests_build_is_no_dependency() {
+    let krate = crate_of(&[
+        (&[], "mod a; mod b; mod c; mod d;"),
+        (&["b"], ""),
+        (&["c"], ""),
+        (&["d"], ""),
+        (
+            &["a"],
+            "#[cfg(test)]\nmod order_tests { use super::super::b; }\n\
+             #[cfg(test)]\nfn helper() { crate::c::x(); }\n\
+             fn after_the_tests() { crate::d::y(); }\n",
+        ),
+    ]);
+    assert_eq!(graph(&krate, &[], &[])["a"], BTreeSet::from(["d".to_string()]));
+}
+
+/// The places outside `reader/` that name comrak in code.
+fn names_the_parser(source: &Source) -> Vec<String> {
+    named(source)
+        .into_iter()
+        .filter(|name| name.path.iter().find(|s| *s != "::").is_some_and(|s| s == "comrak"))
+        .map(|name| format!("{}:{}", source.name, name.line))
+        .collect()
 }
 
 #[test]
 fn only_the_reader_names_the_parser() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = Vec::new();
-    for dir in ["src", "crates", "tests", "xtask"] {
-        sources(&root.join(dir), &mut files);
-    }
-    assert!(files.len() > 50, "{} files found", files.len());
+    let root = root();
     let reader = root.join("crates/splat-markdown/src/reader");
-    let this_test = root.join(file!());
-    for file in files.iter().filter(|f| !f.starts_with(&reader) && **f != this_test) {
-        for (n, line) in std::fs::read_to_string(file).unwrap().lines().enumerate() {
-            let code = line.trim_start();
-            let names = code.contains("comrak::") || (code.contains("use ") && code.contains("comrak"));
-            assert!(code.starts_with("//") || !names, "{}:{}: {line}", file.display(), n + 1);
-        }
-    }
+    let files: Vec<_> = ["src", "crates", "tests", "xtask"]
+        .iter()
+        .flat_map(|dir| sources::rust_files(&root.join(dir)))
+        .filter(|file| !file.starts_with(&reader))
+        .collect();
+    assert!(files.len() > 50, "{} files found", files.len());
+    let found: Vec<String> = files
+        .iter()
+        .flat_map(|file| names_the_parser(&Source::read(file, Without::Nothing)))
+        .collect();
+    assert!(found.is_empty(), "{found:#?}");
+}
+
+#[test]
+fn the_parser_is_found_however_it_is_named() {
+    let found = |text: &str| names_the_parser(&Source::parse("a.rs", Vec::new(), text.to_string(), Without::Nothing));
+    assert_eq!(found("use comrak::Options;"), ["a.rs:1"]);
+    assert_eq!(found("use {comrak};").len(), 1);
+    assert_eq!(found("fn f() {\n    ::comrak::parse();\n}").len(), 1);
+    assert_eq!(
+        found("fn f() { format!(\"{:?}\", comrak::Options::default()); }").len(),
+        1
+    );
+    assert_eq!(found("extern crate comrak;").len(), 1);
+    assert!(found("// comrak::parse\nconst A: &str = \"comrak::parse\";").is_empty());
 }
 
 /// Where a doc comment stops short of the width and goes on with a new sentence: a text that is filled would have gone on on
@@ -179,11 +226,11 @@ fn doc_lines_that_do_not_belong_together(text: &str, width: usize) -> Vec<usize>
 
 #[test]
 fn a_doc_comment_stays_with_what_it_describes() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut files = Vec::new();
-    for dir in ["src", "crates", "tests", "xtask/src"] {
-        sources(&root.join(dir), &mut files);
-    }
+    let root = root();
+    let files: Vec<_> = ["src", "crates", "tests", "xtask/src"]
+        .iter()
+        .flat_map(|dir| sources::rust_files(&root.join(dir)))
+        .collect();
     assert!(files.len() > 50, "{} files found", files.len());
     for file in files {
         let found = doc_lines_that_do_not_belong_together(&std::fs::read_to_string(&file).unwrap(), 120);
@@ -202,4 +249,48 @@ fn a_doc_comment_left_over_is_found() {
     );
     assert!(doc_lines_that_do_not_belong_together("/// One.\n/// and on.\n", 120).is_empty());
     assert!(doc_lines_that_do_not_belong_together("/// One.\n///\n/// Two.\n", 120).is_empty());
+}
+
+/// The names in backticks in the first column of the tables of `doc`, split at `::` and `.`, that `words` lacks.
+fn names_the_code_lacks(doc: &str, words: &BTreeSet<String>) -> Vec<String> {
+    let is_name = |s: &str| {
+        s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    };
+    doc.lines()
+        .filter_map(|line| line.strip_prefix("| ")?.split('|').next())
+        .flat_map(|first| first.split('`').skip(1).step_by(2))
+        .flat_map(|ticked| ticked.split(['.', ':']).map(|part| part.trim_end_matches("()")))
+        .filter(|name| is_name(name) && !words.contains(*name))
+        .map(String::from)
+        .collect()
+}
+
+#[test]
+fn the_documentation_names_only_what_the_code_has() {
+    let mut words = BTreeSet::new();
+    for dir in ["src", "crates", "xtask/src", "tests"] {
+        for file in sources::rust_files(&root().join(dir)) {
+            let text = std::fs::read_to_string(&file).unwrap();
+            words.extend(
+                text.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                    .map(String::from),
+            );
+        }
+    }
+    assert!(words.contains("EditorController"), "{} words", words.len());
+    for doc in ["docs/glossary.md", "docs/development.md", "docs/partial-parse.md"] {
+        let missing = names_the_code_lacks(&std::fs::read_to_string(root().join(doc)).unwrap(), &words);
+        assert!(
+            missing.is_empty(),
+            "{doc} names what the code no longer has: {missing:?}"
+        );
+    }
+}
+
+#[test]
+fn a_name_the_code_lacks_is_found() {
+    let words: BTreeSet<String> = ["Doc", "parse"].map(String::from).into();
+    let doc = "| `Doc::parse`, `Gone` (`splat-x`) | text with `Missing` |\n| `Doc.parse()` | |\nnot a table `Other`\n";
+    assert_eq!(names_the_code_lacks(doc, &words), ["Gone"]);
 }

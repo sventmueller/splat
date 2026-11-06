@@ -1,6 +1,7 @@
 //! What a document knows about its file, without a window: how the file encodes the text, which text it holds, what a save
 //! under way writes, and what to do about a file that changed.
 
+#![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
 use std::time::SystemTime;
@@ -154,17 +155,18 @@ impl FailedReads {
     }
 }
 
-/// Tells texts and files apart without keeping a copy of them. Nothing depends on it holding against someone who means
-/// to fool it: two files that collide only miss a reload.
+/// The length and a hash of a text or a file, which tell texts and files apart without keeping a copy of them. Nothing
+/// depends on it holding against someone who means to fool it: two files that collide only miss a reload.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub struct Print {
+pub struct Fingerprint {
     len: usize,
     hash: u64,
 }
 
-impl Print {
-    /// A gigabyte takes about a tenth of a second, which is what lets a save take this on the main thread.
-    pub fn of(bytes: &[u8]) -> Print {
+impl Fingerprint {
+    /// The fingerprint of `bytes`. A gigabyte takes about a tenth of a second, which is what lets a save take this on
+    /// the main thread.
+    pub fn of(bytes: &[u8]) -> Fingerprint {
         const FACTOR: u64 = 0x9E37_79B9_7F4A_7C15;
         let mix = |hash: u64, word: u64| (hash ^ word).wrapping_mul(FACTOR).rotate_left(29);
         let (words, rest) = bytes.as_chunks::<8>();
@@ -174,12 +176,13 @@ impl Print {
         let mut last = [0u8; 8];
         last[..rest.len()].copy_from_slice(rest);
         hash = mix(hash, u64::from_le_bytes(last));
-        Print { len: bytes.len(), hash }
+        Fingerprint { len: bytes.len(), hash }
     }
 
-    /// The hash is looked at only if the length fits, which while typing it rarely does.
+    /// Whether this is the fingerprint of `bytes`. The hash is looked at only if the length fits, which while typing it
+    /// rarely does.
     pub fn is_of(self, bytes: &[u8]) -> bool {
-        self.len == bytes.len() && self == Print::of(bytes)
+        self.len == bytes.len() && self == Fingerprint::of(bytes)
     }
 }
 
@@ -187,12 +190,57 @@ impl Print {
 #[derive(Clone, Copy, Default, Debug)]
 struct Version {
     revision: u64,
-    text: Print,
-    file: Print,
+    text: Fingerprint,
+    file: Fingerprint,
 }
+
+/// What a save took: the version of the text and the bytes that hold it.
+struct Taken {
+    version: Version,
+    bytes: Vec<u8>,
+}
+
+/// A save that has begun and not yet ended. `FileState::begin_save` hands it out, and `end_save` or `end_save_that_asks`
+/// takes it back by value, so that a save ends once:
+///
+/// ```compile_fail,E0382
+/// let mut state = splat_file_state::FileState::default();
+/// let save = state.begin_save();
+/// state.end_save(save);
+/// state.end_save(save);
+/// ```
+///
+/// ```compile_fail,E0599
+/// let mut state = splat_file_state::FileState::default();
+/// let save = state.begin_save();
+/// state.end_save(save.clone());
+/// state.end_save_that_asks(save);
+/// ```
+#[must_use = "a save that never ends keeps every later look at the file from counting"]
+#[derive(Debug)]
+pub struct SaveTicket(());
+
+/// What a look at the file asked for hands in when it comes back, to tell whether a save has touched the file since.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LookTicket(Option<u64>);
 
 /// Which text the file holds, kept apart from AppKit's change count, which follows undo steps: while typing goes on
 /// through a save, no new step opens and the count stays at zero with text that no file holds.
+///
+/// A save goes through `begin_save`, `take_text`, then `start_writing` on its writing thread or `writes_at_once` on the
+/// main thread, `written` if it wrote the document's file, and `end_save` or `end_save_that_asks`. Saves may overlap.
+///
+/// ```
+/// use splat_file_state::{FileState, Fingerprint, OnFile};
+/// let mut state = FileState::default();
+/// state.text_changed();
+/// let save = state.begin_save();
+/// state.take_text(Fingerprint::of(b"Text"), Some(b"Text".to_vec()));
+/// assert_eq!(state.start_writing(), Some(&b"Text"[..]));
+/// state.written();
+/// state.end_save(save);
+/// assert_eq!(state.on_file(), OnFile::Yes);
+/// ```
 #[derive(Default)]
 pub struct FileState {
     /// Counts the changes of the text.
@@ -201,9 +249,8 @@ pub struct FileState {
     /// The text came from elsewhere than the document's file, as a restored draft does, and no file holds it yet.
     from_elsewhere: bool,
     /// What the newest save took. A save that takes its text before an earlier one has started writing writes the newest
-    /// text in both, so this and `bytes` go with the last of them.
-    taken: Option<Version>,
-    bytes: Option<Vec<u8>>,
+    /// text in both, so this goes with the last of them.
+    taken: Option<Taken>,
     /// What the save on its way to the file writes, which the newest may have taken over from it only for later ones.
     writing: Option<Version>,
     under_way: usize,
@@ -222,12 +269,11 @@ impl FileState {
     fn question_is_over(&mut self) {
         if std::mem::take(&mut self.asking) && self.under_way == 0 {
             self.taken = None;
-            self.bytes = None;
         }
     }
 
     /// The text now is what was read; `file` is what it was read from, if anything.
-    pub fn loaded(&mut self, text: Print, file: Option<Print>) {
+    pub fn loaded(&mut self, text: Fingerprint, file: Option<Fingerprint>) {
         self.from_elsewhere &= file.is_none();
         self.on_file = Version {
             revision: self.revision,
@@ -242,33 +288,36 @@ impl FileState {
     }
 
     /// A save starts, before it takes the text.
-    pub fn begin_save(&mut self) {
+    pub fn begin_save(&mut self) -> SaveTicket {
         self.under_way += 1;
         self.saves_begun += 1;
+        SaveTicket(())
     }
 
     /// A save takes the text, or `None` once there is none it could write.
-    pub fn take_text(&mut self, text: Print, bytes: Option<Vec<u8>>) {
-        self.taken = bytes.as_deref().map(|written| Version {
-            revision: self.revision,
-            text,
-            file: Print::of(written),
+    pub fn take_text(&mut self, text: Fingerprint, bytes: Option<Vec<u8>>) {
+        self.taken = bytes.map(|bytes| Taken {
+            version: Version {
+                revision: self.revision,
+                text,
+                file: Fingerprint::of(&bytes),
+            },
+            bytes,
         });
-        self.bytes = bytes;
     }
 
     /// A save asks for what to write on its writing thread: the text it took, or a newer one that a later save took.
     pub fn start_writing(&mut self) -> Option<&[u8]> {
-        self.writing = self.taken;
-        self.bytes.as_deref()
+        self.writing = self.taken.as_ref().map(|taken| taken.version);
+        self.bytes()
     }
 
     /// A save writes what it got on the main thread, right now.
-    pub fn writes_at_once(&mut self, text: Print, written: &[u8]) {
+    pub fn writes_at_once(&mut self, text: Fingerprint, written: &[u8]) {
         self.writing = Some(Version {
             revision: self.revision,
             text,
-            file: Print::of(written),
+            file: Fingerprint::of(written),
         });
     }
 
@@ -282,11 +331,11 @@ impl FileState {
     }
 
     /// A save is over, however it went: one that failed reports only this.
-    pub fn end_save(&mut self) {
+    pub fn end_save(&mut self, save: SaveTicket) {
+        let SaveTicket(()) = save;
         self.under_way = self.under_way.saturating_sub(1);
         if self.under_way == 0 {
             self.taken = None;
-            self.bytes = None;
             self.writing = None;
         }
         self.asking = false;
@@ -294,14 +343,15 @@ impl FileState {
 
     /// A save is over, and AppKit now asks what to do about it, as for a file another program changed. Its answer "save
     /// anyway" writes on another thread with neither a new save nor a new token, so the text stays until the next change.
-    pub fn end_save_that_asks(&mut self) {
+    pub fn end_save_that_asks(&mut self, save: SaveTicket) {
+        let SaveTicket(()) = save;
         self.under_way = self.under_way.saturating_sub(1);
         self.asking = true;
     }
 
     /// The bytes the newest save took, as long as a save may still write them.
     pub fn bytes(&self) -> Option<&[u8]> {
-        self.bytes.as_deref()
+        self.taken.as_ref().map(|taken| taken.bytes.as_slice())
     }
 
     /// Whether the file holds the text, as far as that can be told without looking at the text.
@@ -321,30 +371,30 @@ impl FileState {
     }
 
     /// What a look at the file asked for now hands in to count; asked for during a save, it never does.
-    pub fn look_ticket(&self) -> Option<u64> {
-        (self.under_way == 0).then_some(self.saves_begun)
+    pub fn look_ticket(&self) -> LookTicket {
+        LookTicket((self.under_way == 0).then_some(self.saves_begun))
     }
 
     /// Whether a look at the file says something about it: bytes read around a save may be from before it.
-    pub fn look_counts(&self, ticket: Option<u64>) -> bool {
-        self.under_way == 0 && ticket == Some(self.saves_begun)
+    pub fn look_counts(&self, ticket: LookTicket) -> bool {
+        self.under_way == 0 && ticket.0 == Some(self.saves_begun)
     }
 
-    /// Whether `file` is what Splat itself last wrote or read.
-    pub fn holds(&self, file: Print) -> bool {
+    /// Whether a file with this fingerprint is what Splat itself last wrote or read.
+    pub fn is_own_file(&self, file: Fingerprint) -> bool {
         self.on_file.file == file
     }
 }
 
-/// See `FileState::on_file`.
+/// Whether the file holds the text, as `FileState::on_file` tells it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OnFile {
     /// No change of the text since the file held it.
     Yes,
     /// No file holds the text, whatever it is.
     No,
-    /// Only if the text has this print.
-    IfTextIs(Print),
+    /// Only if the text has this fingerprint.
+    IfTextIs(Fingerprint),
 }
 
 /// What to do about the change mark.
@@ -401,7 +451,7 @@ mod tests {
     impl Doc {
         fn opened(text: &str) -> Doc {
             let mut state = FileState::default();
-            state.loaded(Print::of(text.as_bytes()), Some(Print::of(text.as_bytes())));
+            state.loaded(Fingerprint::of(text.as_bytes()), Some(Fingerprint::of(text.as_bytes())));
             Doc {
                 state,
                 text: text.to_string(),
@@ -447,10 +497,13 @@ mod tests {
             self.follow(true);
         }
 
-        fn take(&mut self) {
-            self.state.begin_save();
-            self.state
-                .take_text(Print::of(self.text.as_bytes()), Some(self.text.clone().into_bytes()));
+        fn take(&mut self) -> SaveTicket {
+            let save = self.state.begin_save();
+            self.state.take_text(
+                Fingerprint::of(self.text.as_bytes()),
+                Some(self.text.clone().into_bytes()),
+            );
+            save
         }
 
         fn write(&mut self) {
@@ -458,21 +511,23 @@ mod tests {
         }
 
         /// AppKit clears the mark after a save, whatever happened to the text during it.
-        fn finish(&mut self) {
+        fn finish(&mut self, save: SaveTicket) {
             self.write();
             self.state.written();
             self.edited = false;
             self.follow(false);
-            self.state.end_save();
+            self.state.end_save(save);
         }
 
         fn save(&mut self) {
-            self.take();
-            self.finish();
+            let save = self.take();
+            self.finish(save);
         }
 
         fn reaction_to(&self, file: &str) -> Reaction {
-            reaction(self.state.holds(Print::of(file.as_bytes())), || file == self.text)
+            reaction(self.state.is_own_file(Fingerprint::of(file.as_bytes())), || {
+                file == self.text
+            })
         }
     }
 
@@ -490,9 +545,9 @@ mod tests {
     fn text_typed_while_a_save_writes_stays_unsaved_when_it_ends() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.take();
+        let save = doc.take();
         doc.change("abc");
-        doc.finish();
+        doc.finish(save);
         assert_eq!(doc.file, b"ab");
         assert!(doc.edited, "AppKit cleared the mark, the text says otherwise");
         assert_eq!(
@@ -520,7 +575,7 @@ mod tests {
     #[test]
     fn a_draft_stays_marked_when_the_window_controllers_come_after_it() {
         let mut doc = Doc::restored("Entwurf");
-        doc.state.loaded(Print::of(b"Entwurf"), None);
+        doc.state.loaded(Fingerprint::of(b"Entwurf"), None);
         doc.change("x");
         doc.change("Entwurf");
         assert!(doc.edited);
@@ -529,7 +584,8 @@ mod tests {
     #[test]
     fn reading_the_documents_own_file_ends_a_draft() {
         let mut doc = Doc::restored("Entwurf");
-        doc.state.loaded(Print::of(b"Datei"), Some(Print::of(b"Datei")));
+        doc.state
+            .loaded(Fingerprint::of(b"Datei"), Some(Fingerprint::of(b"Datei")));
         doc.text = "Datei".into();
         doc.edited = false;
         doc.change("x");
@@ -541,18 +597,18 @@ mod tests {
     fn an_older_save_gets_no_credit_for_a_newer_text() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.take();
+        let older = doc.take();
         doc.write();
         doc.change("abc");
-        doc.take();
+        let newer = doc.take();
         doc.state.written();
-        doc.state.end_save();
+        doc.state.end_save(older);
         assert_eq!(doc.file, b"ab");
-        assert_eq!(doc.state.on_file(), OnFile::IfTextIs(Print::of(b"ab")));
+        assert_eq!(doc.state.on_file(), OnFile::IfTextIs(Fingerprint::of(b"ab")));
         doc.follow(false);
         assert!(doc.edited, "the file is behind the text");
-        assert!(doc.state.holds(Print::of(b"ab")));
-        doc.state.end_save();
+        assert!(doc.state.is_own_file(Fingerprint::of(b"ab")));
+        doc.state.end_save(newer);
         assert_eq!(doc.state.bytes(), None);
         doc.change("ab");
         assert!(
@@ -565,25 +621,27 @@ mod tests {
     fn a_save_that_waited_writes_the_newest_text_and_gets_credit_for_it() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.take();
+        let older = doc.take();
         doc.change("abc");
-        doc.take();
+        let newer = doc.take();
         doc.write();
         doc.state.written();
-        doc.state.end_save();
+        doc.state.end_save(older);
         assert_eq!(doc.file, b"abc");
-        assert!(doc.state.holds(Print::of(b"abc")));
+        assert!(doc.state.is_own_file(Fingerprint::of(b"abc")));
+        doc.state.end_save(newer);
+        assert_eq!(doc.state.on_file(), OnFile::Yes);
     }
 
     #[test]
     fn a_save_on_the_main_thread_gets_credit_for_what_it_wrote() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.state.begin_save();
-        doc.state.writes_at_once(Print::of(b"ab"), b"ab");
+        let save = doc.state.begin_save();
+        doc.state.writes_at_once(Fingerprint::of(b"ab"), b"ab");
         doc.state.written();
-        doc.state.end_save();
-        assert!(doc.state.holds(Print::of(b"ab")));
+        doc.state.end_save(save);
+        assert!(doc.state.is_own_file(Fingerprint::of(b"ab")));
         assert_eq!(doc.state.on_file(), OnFile::Yes);
     }
 
@@ -591,12 +649,12 @@ mod tests {
     fn a_write_that_is_not_to_the_file_gets_no_credit_later() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.take();
+        let save = doc.take();
         doc.write();
-        doc.state.end_save();
+        doc.state.end_save(save);
         doc.state.written();
         assert!(
-            doc.state.holds(Print::of(b"a")),
+            doc.state.is_own_file(Fingerprint::of(b"a")),
             "a copy elsewhere, which ended without touching the file"
         );
     }
@@ -640,19 +698,20 @@ mod tests {
     #[test]
     fn a_save_that_asks_can_still_write_what_it_took_and_nothing_else() {
         let mut state = FileState::default();
-        let print = Print::of(b"Text");
-        state.begin_save();
+        let print = Fingerprint::of(b"Text");
+        let save = state.begin_save();
         state.take_text(print, Some(b"Text".to_vec()));
-        state.end_save_that_asks();
+        state.end_save_that_asks(save);
         assert_eq!(state.bytes(), Some(&b"Text"[..]), "for the answer to save anyway");
+        assert!(state.look_counts(state.look_ticket()), "no save is under way");
         assert_eq!(state.start_writing(), Some(&b"Text"[..]));
         state.written();
         assert_eq!(state.bytes(), None, "written, and no copy stays");
-        assert!(state.holds(Print::of(b"Text")));
+        assert!(state.is_own_file(Fingerprint::of(b"Text")));
 
-        state.begin_save();
+        let save = state.begin_save();
         state.take_text(print, Some(b"Text".to_vec()));
-        state.end_save_that_asks();
+        state.end_save_that_asks(save);
         state.text_changed();
         assert_eq!(
             state.bytes(),
@@ -665,20 +724,21 @@ mod tests {
     #[test]
     fn a_change_of_the_text_leaves_what_a_save_under_way_took() {
         let mut state = FileState::default();
-        state.begin_save();
-        state.take_text(Print::of(b"Text"), Some(b"Text".to_vec()));
+        let save = state.begin_save();
+        state.take_text(Fingerprint::of(b"Text"), Some(b"Text".to_vec()));
         state.text_changed();
         assert_eq!(state.start_writing(), Some(&b"Text"[..]));
+        state.end_save(save);
     }
 
     #[test]
     fn a_failed_save_leaves_the_file_as_it_was_and_keeps_no_copy() {
         let mut doc = Doc::opened("a");
         doc.change("ab");
-        doc.take();
-        doc.state.end_save();
+        let save = doc.take();
+        doc.state.end_save(save);
         assert!(doc.state.bytes().is_none());
-        assert_eq!(doc.state.on_file(), OnFile::IfTextIs(Print::of(b"a")));
+        assert_eq!(doc.state.on_file(), OnFile::IfTextIs(Fingerprint::of(b"a")));
         assert!(doc.state.look_counts(doc.state.look_ticket()), "looks go on afterwards");
         assert_eq!(doc.reaction_to("a"), Reaction::TakeDate);
     }
@@ -686,28 +746,70 @@ mod tests {
     #[test]
     fn the_text_of_a_save_goes_with_the_last_save_under_way() {
         let mut state = FileState::default();
-        state.begin_save();
-        state.take_text(Print::default(), Some(vec![1]));
-        state.begin_save();
-        state.take_text(Print::default(), Some(vec![2]));
-        state.end_save();
-        assert_eq!(state.bytes(), Some(&[2][..]), "the second save has yet to read it");
-        state.end_save();
+        let first = state.begin_save();
+        state.take_text(Fingerprint::default(), Some(vec![1]));
+        let second = state.begin_save();
+        state.take_text(Fingerprint::default(), Some(vec![2]));
+        state.end_save(second);
+        assert_eq!(state.bytes(), Some(&[2][..]), "the first save has yet to read it");
+        assert_eq!(state.start_writing(), Some(&[2][..]));
+        state.end_save(first);
         assert_eq!(state.bytes(), None);
-        state.end_save();
-        state.begin_save();
-        state.take_text(Print::default(), Some(vec![3]));
-        assert_eq!(state.bytes(), Some(&[3][..]), "an end too many counts for nothing");
+        let third = state.begin_save();
+        state.take_text(Fingerprint::default(), Some(vec![3]));
+        assert_eq!(state.bytes(), Some(&[3][..]));
+        state.end_save(third);
+    }
+
+    #[test]
+    fn overlapping_saves_hold_back_looks_until_the_last_ends_in_whatever_order() {
+        for order in [[0, 1, 2], [2, 1, 0], [1, 0, 2], [1, 2, 0]] {
+            let mut doc = Doc::opened("a");
+            let mut saves: Vec<Option<SaveTicket>> = Vec::new();
+            for text in ["ab", "abc", "abcd"] {
+                doc.change(text);
+                saves.push(Some(doc.take()));
+            }
+            for (ended, at) in order.into_iter().enumerate() {
+                assert!(
+                    !doc.state.look_counts(doc.state.look_ticket()),
+                    "{order:?}: {ended} ended"
+                );
+                assert_eq!(doc.state.bytes(), Some(&b"abcd"[..]), "{order:?}: {ended} ended");
+                doc.state.end_save(saves[at].take().unwrap());
+            }
+            assert!(doc.state.look_counts(doc.state.look_ticket()), "{order:?}");
+            assert_eq!(doc.state.bytes(), None, "{order:?}");
+        }
+    }
+
+    #[test]
+    fn a_save_that_asks_while_another_is_under_way_keeps_the_text_for_both() {
+        let mut state = FileState::default();
+        let asking = state.begin_save();
+        state.take_text(Fingerprint::of(b"Text"), Some(b"Text".to_vec()));
+        let other = state.begin_save();
+        state.end_save_that_asks(asking);
+        state.text_changed();
+        assert_eq!(
+            state.bytes(),
+            Some(&b"Text"[..]),
+            "the save still under way has yet to write it"
+        );
+        state.end_save(other);
+        assert_eq!(state.bytes(), None);
+        assert!(state.look_counts(state.look_ticket()));
     }
 
     #[test]
     fn a_save_without_text_to_write_changes_nothing_when_it_ends() {
         let mut doc = Doc::opened("a");
-        doc.state.begin_save();
-        doc.state.take_text(Print::of(b"x"), None);
+        let save = doc.state.begin_save();
+        doc.state.take_text(Fingerprint::of(b"x"), None);
         assert!(doc.state.start_writing().is_none());
         doc.state.written();
-        assert!(doc.state.holds(Print::of(b"a")));
+        doc.state.end_save(save);
+        assert!(doc.state.is_own_file(Fingerprint::of(b"a")));
     }
 
     #[test]
@@ -715,19 +817,19 @@ mod tests {
         let mut doc = Doc::opened("a");
         let asked = doc.state.look_ticket();
         assert!(doc.state.look_counts(asked));
-        doc.state.begin_save();
+        let save = doc.state.begin_save();
         assert!(!doc.state.look_counts(asked), "under way");
         assert!(
             !doc.state.look_counts(doc.state.look_ticket()),
             "under way, and asked after it began"
         );
-        doc.state.end_save();
+        doc.state.end_save(save);
         assert!(!doc.state.look_counts(asked), "asked before it");
         assert!(doc.state.look_counts(doc.state.look_ticket()));
 
-        doc.state.begin_save();
+        let save = doc.state.begin_save();
         let during = doc.state.look_ticket();
-        doc.state.end_save();
+        doc.state.end_save(save);
         assert!(
             !doc.state.look_counts(during),
             "asked during it, so the bytes may be from before it"
@@ -756,18 +858,18 @@ mod tests {
     }
 
     #[test]
-    fn prints_tell_texts_apart_and_look_at_every_byte() {
+    fn fingerprints_tell_texts_apart_and_look_at_every_byte() {
         let text = "Grüße aus dem Text, länger als ein Wort.".as_bytes();
-        assert_eq!(Print::of(text), Print::of(text));
-        assert!(Print::of(text).is_of(text));
-        assert!(!Print::of(text).is_of(&text[1..]));
+        assert_eq!(Fingerprint::of(text), Fingerprint::of(text));
+        assert!(Fingerprint::of(text).is_of(text));
+        assert!(!Fingerprint::of(text).is_of(&text[1..]));
         for at in 0..text.len() {
             let mut other = text.to_vec();
             other[at] ^= 1;
-            assert_ne!(Print::of(text), Print::of(&other), "byte {at}");
-            assert!(!Print::of(text).is_of(&other));
+            assert_ne!(Fingerprint::of(text), Fingerprint::of(&other), "byte {at}");
+            assert!(!Fingerprint::of(text).is_of(&other));
         }
-        assert_ne!(Print::of(b""), Print::of(b"\0"), "the length counts");
+        assert_ne!(Fingerprint::of(b""), Fingerprint::of(b"\0"), "the length counts");
     }
 
     #[test]

@@ -5,8 +5,9 @@
 
 use std::ops::Range;
 
+use crate::aligner::{Aligner, Gaps, Spelling};
 use crate::doc::{Inline, InlineKind};
-use crate::text::{Byte, TextAt, decode_entity, offsets};
+use crate::text::{Byte, TextAt, offsets};
 
 /// Inlines of a leaf after the check: `None` if their positions could not be told, so the caller keeps them from being
 /// edited by showing the source as it stands.
@@ -36,7 +37,7 @@ fn plausible(text: &str, i: &Inline) -> bool {
     let spelled = match &i.kind {
         InlineKind::Text(literal) => literal.chars().next().is_none_or(|first| {
             source.starts_with(first)
-                || source.starts_with(['\\', '&', '\0'])
+                || source.starts_with(['\\', '&'])
                 || (first.is_whitespace() && source.starts_with(char::is_whitespace))
         }),
         InlineKind::SoftBreak | InlineKind::LineBreak => {
@@ -232,27 +233,12 @@ fn opening_of_link(rest: &str) -> Option<usize> {
 
 /// How many bytes of `source` spell `literal`, past what only the source has: escapes and character references.
 fn spelled_len(literal: &str, source: &str) -> Option<usize> {
-    let mut used = 0;
+    let mut aligner = Aligner::new(source, Spelling::Text, Gaps::Closed, false);
     let mut shown = literal;
-    while let Some(c) = shown.chars().next() {
-        let rest = &source[used..];
-        if let Some((decoded, len)) = decode_entity(rest).filter(|(_, len)| !shown.starts_with(&rest[..*len])) {
-            shown = shown.strip_prefix(&*decoded)?;
-            used += len;
-        } else if rest.starts_with(c) {
-            used += c.len_utf8();
-            shown = &shown[c.len_utf8()..];
-        } else if c == '\u{FFFD}' && rest.starts_with('\0') {
-            used += 1;
-            shown = &shown[c.len_utf8()..];
-        } else if c.is_ascii_punctuation() && rest.strip_prefix('\\').is_some_and(|r| r.starts_with(c)) {
-            used += 1 + c.len_utf8();
-            shown = &shown[c.len_utf8()..];
-        } else {
-            return None;
-        }
+    while !shown.is_empty() {
+        shown = &shown[aligner.next(shown)?.in_literal..];
     }
-    Some(used)
+    Some(aligner.position())
 }
 
 /// A line end with what stands before it, as far as it belongs to the break: spaces, a backslash or a `<br>`.
@@ -576,6 +562,7 @@ mod tests {
         use super::{Walker, spelled_len};
         assert_eq!(spelled_len("a&b", "a&amp;b"), Some(7));
         assert_eq!(spelled_len("a*b", "a\\*b"), Some(4));
+        assert_eq!(spelled_len("a\\b", "a\\\\b"), Some(4), "an escaped backslash");
         assert_eq!(spelled_len("ab", "ax"), None);
         let mut walker = Walker {
             text: "nichts",

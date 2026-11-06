@@ -1,6 +1,8 @@
 //! Word's formulas in RTF spell OMML's elements as control words, `{\mf{\mnum …}{\mden …}}` for `<m:f>`; they are turned
 //! back into OMML for the reader of Word files to make LaTeX of.
 
+use splat_ooxml::xml::escape_text;
+
 /// OMML's elements and properties, which a group's first control word names with an `m` in front.
 const ELEMENTS: &[&str] = &[
     "acc",
@@ -206,7 +208,7 @@ fn write_run(text: &str, upright: bool, normal: bool, out: &mut String) {
         out.push_str("</m:rPr>");
     }
     out.push_str("<m:t>");
-    escape_into(text, out);
+    out.push_str(&escape_text(text));
     out.push_str("</m:t></m:r>");
 }
 
@@ -282,7 +284,7 @@ impl Formula {
             Some(element) if VALUED.contains(&element) => {
                 outer.flush();
                 outer.xml.push_str(&format!("<m:{element} m:val=\""));
-                escape_into(&group.text, &mut outer.xml);
+                outer.xml.push_str(&escape_text(&group.text));
                 outer.xml.push_str("\"/>");
             }
             Some(element) => {
@@ -308,19 +310,4 @@ impl Formula {
 
 fn element_named(name: &str) -> Option<&'static str> {
     ELEMENTS.iter().copied().find(|element| *element == name)
-}
-
-/// `text` as XML text, without what XML cannot hold.
-fn escape_into(text: &str, out: &mut String) {
-    for c in text.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\t' | '\n' | '\r' => out.push(c),
-            c if c < ' ' || matches!(c, '\u{FFFE}' | '\u{FFFF}') => {}
-            c => out.push(c),
-        }
-    }
 }

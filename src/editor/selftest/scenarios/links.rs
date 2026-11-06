@@ -67,6 +67,7 @@ fn find_bar(c: &Ctx) -> (Option<String>, bool) {
     )
 }
 
+#[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]
 pub(super) fn link_steps() -> Vec<Step> {
     vec![
         applied(|c| {
@@ -175,6 +176,42 @@ pub(super) fn link_steps() -> Vec<Step> {
                 check("a link to another app asks first", sheet(c).is_some(), "no alert");
                 end_sheet(c, NSAlertFirstButtonReturn);
             },
+        ),
+        applied(|c| {
+            if let Some(window) = c.e.window() {
+                window.makeKeyAndOrderFront(None);
+            }
+            check("wiki links are links", cmd_click(c, "splat-wiki:andere"), "");
+        }),
+        when(
+            "the note the wiki link names to open",
+            |c| {
+                documents(c.e.mtm())
+                    .iter()
+                    .any(|d| d.displayName().to_string().starts_with("andere"))
+            },
+            |c| {
+                let other = documents(c.e.mtm())
+                    .into_iter()
+                    .find(|d| d.displayName().to_string().starts_with("andere"));
+                check(
+                    "⌘-click on a wiki link opens the note it names in Splat",
+                    other.as_ref().is_some_and(|d| d.text() == "# Andere\n"),
+                    "",
+                );
+                if let Some(d) = other {
+                    d.close();
+                }
+            },
+        ),
+        when(
+            "the note to close",
+            |c| {
+                !documents(c.e.mtm())
+                    .iter()
+                    .any(|d| d.displayName().to_string().starts_with("andere"))
+            },
+            |_| {},
         ),
     ]
 }

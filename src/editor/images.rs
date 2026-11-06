@@ -4,16 +4,17 @@ use std::path::{Component, Path, PathBuf};
 
 use block2::RcBlock;
 use dispatch2::{DispatchObject, DispatchRetained, DispatchSource};
-use objc2::rc::{Retained, Weak};
+use objc2::rc::Retained;
 use objc2::runtime::Bool;
-use objc2::{MainThreadMarker, MainThreadOnly, Message, sel};
+use objc2::{MainThreadMarker, MainThreadOnly, Message as _, sel};
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSCompositingOperation, NSImage, NSView};
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSUserDefaults};
 
-use super::layers::ForPictures;
+use super::EditorController;
+use super::layers::{ForPictures, Message, Messenger};
+use super::links::locate;
 use super::picture::{LOADERS, Rendered, Sizing, allowed_side, count_decoded, room_for_more, set_low_memory};
 use super::safe_image::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
-use super::{EditorController, OPEN_EDITORS};
 use crate::i18n::t;
 use crate::markdown::url;
 use crate::util::{BusyVolumes, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
@@ -182,7 +183,7 @@ fn without_detours(path: &Path) -> PathBuf {
 }
 
 fn local_path(raw: &str, doc_dir: Option<&Path>) -> Option<PathBuf> {
-    let decoded = super::links::percent_decode(raw);
+    let decoded = crate::markdown::url::percent_decode(raw);
     let path = PathBuf::from(&decoded);
     if path.is_absolute() {
         return Some(path);
@@ -248,7 +249,7 @@ impl ImageStore {
             };
         };
         self.files.insert(path.clone(), ImageLoad::Loading);
-        read_again(path, doc_dir, requester);
+        read_again(path, doc_dir, Messenger::of(requester));
         None
     }
 
@@ -340,8 +341,7 @@ impl ImageStore {
 }
 
 /// Reads the image in the background; whoever shows it hears when it arrives, and until then it stays as it is.
-fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorController) {
-    let me = dispatch2::MainThreadBound::new(Weak::from(requester), requester.mtm());
+fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: Messenger) {
     let doc_dir = doc_dir.map(Path::to_path_buf);
     let volume = volume_of(&path);
     // An image on a volume that may stop answering must not take up a place that other images wait for.
@@ -361,14 +361,7 @@ fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &EditorControlle
         },
         move |file| {
             let file = file.unwrap_or_else(|| ImageFile::failed(path.clone()));
-            crate::util::main_soon(move || {
-                let Some(mtm) = MainThreadMarker::new() else {
-                    return;
-                };
-                if let Some(c) = me.get(mtm).load() {
-                    c.image_loaded(path, file);
-                }
-            });
+            requester.send_soon(Message::ImageLoaded(path, file));
         },
     );
 }
@@ -383,11 +376,10 @@ thread_local! {
 
 /// Compares the images of open previews with their files, so one that was replaced, or one that appeared only after
 /// the document named it, shows without opening the document again.
-pub fn look_at_images(mtm: MainThreadMarker) {
+pub fn look_at_images(_mtm: MainThreadMarker) {
     super::remote::try_failed_again();
     let look = LOOKS.with(|n| n.replace(n.get().wrapping_add(1)));
-    let editors: Vec<Retained<EditorController>> =
-        OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
+    let editors = super::open_editors();
     let mut by_volume: BTreeMap<String, Vec<LookAtEditor>> = BTreeMap::new();
     for (e, store) in editors.iter().filter_map(|e| Some((e, e.images_shown()?))) {
         let mut store = store.borrow_mut();
@@ -402,7 +394,7 @@ pub fn look_at_images(mtm: MainThreadMarker) {
         }
         for (volume, watched) in watched_on {
             by_volume.entry(volume).or_default().push(LookAtEditor {
-                editor: dispatch2::MainThreadBound::new(Weak::from(&**e), mtm),
+                editor: Messenger::of(e),
                 watched,
                 retry: retry.clone(),
             });
@@ -427,24 +419,17 @@ pub fn look_at_images(mtm: MainThreadMarker) {
                     (request.editor, changed)
                 })
                 .collect();
-            crate::util::main_soon(move || {
-                drop(on_volume);
-                let Some(mtm) = MainThreadMarker::new() else {
-                    return;
-                };
-                for (editor, changed) in changed {
-                    if let Some(editor) = editor.get(mtm).load() {
-                        editor.read_images_again(changed);
-                    }
-                }
-            });
+            crate::util::main_soon(move || drop(on_volume));
+            for (editor, changed) in changed {
+                editor.send_soon(Message::ImagesChanged(changed));
+            }
         });
     }
 }
 
 /// The images of one editor on one volume.
 struct LookAtEditor {
-    editor: dispatch2::MainThreadBound<Weak<EditorController>>,
+    editor: Messenger,
     watched: Vec<(PathBuf, PathBuf, Stamp)>,
     retry: Option<PathBuf>,
 }
@@ -511,7 +496,7 @@ impl<'a> Pictures<'a> {
         let doc_dir = self.host.doc_dir();
         for (path, now) in changed {
             self.state.images.borrow_mut().note_seen(&path, now);
-            read_again(path, doc_dir.as_deref(), self.host.object());
+            read_again(path, doc_dir.as_deref(), self.host.object().messenger());
         }
     }
 
@@ -542,7 +527,7 @@ impl<'a> Pictures<'a> {
         let button = unsafe {
             objc2_app_kit::NSButton::buttonWithTitle_target_action(
                 &ns(t("Bilder laden")),
-                Some(self.host.object()),
+                Some(self.host.object().target()),
                 Some(sel!(mdLoadRemoteImages:)),
                 mtm,
             )
@@ -595,17 +580,9 @@ impl<'a> Pictures<'a> {
             return;
         }
         banner.setHidden(!show);
-        // SAFETY: the banner sits in the preview pane for the window's lifetime, so its superview is alive.
-        let container = unsafe { banner.superview() };
-        let (Some(container), Some(scroll)) = (container, self.host.panes().preview().enclosing_scroll_view()) else {
-            return;
-        };
-        let bounds = container.bounds();
-        let height = bounds.size.height - if show { BANNER_HEIGHT } else { 0.0 };
-        scroll.setFrame(NSRect::new(
-            bounds.origin,
-            NSSize::new(bounds.size.width, height.max(0.0)),
-        ));
+        self.host
+            .panes()
+            .leave_room_above_preview(if show { BANNER_HEIGHT } else { 0.0 });
     }
 
     /// The user allowed images from the web for this document; it is remembered for the file.
@@ -637,21 +614,6 @@ fn rendered(loaded: Decoded) -> Option<Rendered> {
 
 /// How long the main thread waits for a picture to print; printing goes on without one from a volume that hangs.
 const PAPER_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
-
-/// The file an image link names; a picture Obsidian embeds as `![[name.png]]` may sit in any folder below the
-/// document's. Only there is it searched for, so a document cannot fish for a file name across the disk.
-pub fn locate(path: &Path, doc_dir: Option<&Path>) -> PathBuf {
-    let below_document = doc_dir
-        .and_then(|dir| path.strip_prefix(dir).ok())
-        .is_some_and(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))));
-    if path.exists() || !below_document {
-        return path.to_path_buf();
-    }
-    path.parent()
-        .zip(path.file_name().and_then(|n| n.to_str()))
-        .and_then(|(dir, name)| super::links::find_note(dir, name))
-        .unwrap_or_else(|| path.to_path_buf())
-}
 
 /// Whether what leaves the Mac as a file may take this one along: a document from someone else must not pull what it names
 /// from the user's folders into a file that gets sent on. Its own folder and its repository are what a document brings along.

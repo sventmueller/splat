@@ -1,5 +1,5 @@
 use super::*;
-use crate::zip::tests::{archive, stored};
+use splat_ooxml::zip::testing::{archive, stored};
 
 const WORD_TYPES: &str = "<Types><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>";
 
@@ -13,16 +13,16 @@ fn file_of(parts: &[(&str, &str)]) -> Vec<u8> {
 
 #[test]
 fn a_document_of_too_many_nodes_is_too_large() {
-    assert_eq!(PackageError::from(XmlError::TooLarge), PackageError::TooLarge);
+    assert_eq!(WordError::from(XmlError::TooLarge), WordError::TooLarge);
 }
 
 #[test]
 fn zip_errors_say_what_they_mean_for_a_word_file() {
-    assert_eq!(PackageError::from(ZipError::NotAnArchive), PackageError::NotAWordFile);
-    assert_eq!(PackageError::from(ZipError::Encrypted), PackageError::Encrypted);
-    assert_eq!(PackageError::from(ZipError::Zip64), PackageError::TooLarge);
-    assert_eq!(PackageError::from(ZipError::TooLarge), PackageError::TooLarge);
-    assert_eq!(PackageError::from(ZipError::Damaged), PackageError::Damaged);
+    assert_eq!(WordError::from(ZipError::NotAnArchive), WordError::NotAWordFile);
+    assert_eq!(WordError::from(ZipError::Encrypted), WordError::Encrypted);
+    assert_eq!(WordError::from(ZipError::Zip64), WordError::TooLarge);
+    assert_eq!(WordError::from(ZipError::TooLarge), WordError::TooLarge);
+    assert_eq!(WordError::from(ZipError::Damaged), WordError::Damaged);
 }
 
 #[test]
@@ -63,6 +63,7 @@ fn relationships_without_a_target_or_an_id_are_no_relationships() {
         "<Relationships><Relationship Id=\"a\"/><Relationship Target=\"b\"/>\
          <Relationship Id=\"c\" Target=\"d\" TargetMode=\"External\"/><x/></Relationships>",
         "word",
+        &XmlBudget::default(),
     )
     .unwrap();
     assert_eq!(rels.iter().count(), 1);
@@ -84,6 +85,7 @@ fn relationships_are_found_by_id_and_by_the_last_word_of_their_type() {
          <Relationship Id=\"a\" Type=\"urn:t/image\" Target=\"media/p.png\"/>\
          <Relationship Id=\"r\" Type=\"urn:t/root\" Target=\"..\"/></Relationships>",
         "word",
+        &XmlBudget::default(),
     )
     .unwrap();
     assert_eq!(
@@ -103,7 +105,7 @@ fn relationships_are_found_by_id_and_by_the_last_word_of_their_type() {
 fn a_byte_order_mark_is_left_out_and_other_encodings_are_damage() {
     assert_eq!(into_text(b"\xEF\xBB\xBF<a/>".to_vec()), Ok("<a/>".to_string()));
     assert_eq!(into_text(b"<a/>".to_vec()), Ok("<a/>".to_string()));
-    assert_eq!(into_text(b"\xFF\xFE<".to_vec()), Err(PackageError::Damaged));
+    assert_eq!(into_text(b"\xFF\xFE<".to_vec()), Err(WordError::Damaged));
 }
 
 #[test]
@@ -155,14 +157,15 @@ fn a_package_names_its_main_part_and_what_types_it_has() {
         <Override PartName=\"/word/styles.xml\" ContentType=\"x\"/>\
         <Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>";
     let file = file_of(&[(TYPES_PART, types), ("word/document.xml", "<a/>")]);
-    let package = Package::open(&file, &[DOCUMENT_TYPE]).unwrap();
+    let budget = XmlBudget::default();
+    let package = Package::open(&file, &[DOCUMENT_TYPE], &budget).unwrap();
     assert_eq!(package.main, "word/document.xml");
     assert_eq!(package.defaults["png"], "image/png");
     assert_eq!(package.overrides["word/styles.xml"], "x");
     assert_eq!(package.types, types);
     assert!(matches!(
-        Package::open(&file, &[TEMPLATE_TYPE]),
-        Err(PackageError::NotAWordFile)
+        Package::open(&file, &[TEMPLATE_TYPE], &budget),
+        Err(WordError::NotAWordFile)
     ));
     assert_eq!(package.text("word/none.xml"), Ok(None));
     assert_eq!(
@@ -174,16 +177,44 @@ fn a_package_names_its_main_part_and_what_types_it_has() {
 }
 
 #[test]
+fn the_parts_of_a_package_share_one_budget_and_each_is_refused_before_it_is_inflated() {
+    let document = format!("<a>{}</a>", "x".repeat(500));
+    let file = file_of(&[
+        (TYPES_PART, WORD_TYPES),
+        ("word/document.xml", &document),
+        ("word/styles.xml", &document),
+    ]);
+    let room = u64::try_from(WORD_TYPES.len() + document.len()).unwrap();
+    let budget = XmlBudget::new(room, u32::MAX);
+    let package = Package::open(&file, &[DOCUMENT_TYPE], &budget).unwrap();
+    assert_eq!(package.text("word/document.xml"), Ok(Some(document.clone())));
+    assert_eq!(package.text("word/styles.xml"), Err(WordError::TooLarge));
+    let alone = XmlBudget::new(room, u32::MAX);
+    let package = Package::open(&file, &[DOCUMENT_TYPE], &alone).unwrap();
+    assert_eq!(
+        package.text("word/styles.xml"),
+        Ok(Some(document)),
+        "either part alone fits"
+    );
+    let without_room = XmlBudget::new(u64::try_from(WORD_TYPES.len()).unwrap() - 1, u32::MAX);
+    assert!(matches!(
+        Package::open(&file, &[DOCUMENT_TYPE], &without_room),
+        Err(WordError::TooLarge)
+    ));
+}
+
+#[test]
 fn what_is_no_package_says_why() {
-    let open = |bytes: &[u8]| Package::open(bytes, &[DOCUMENT_TYPE]).map(|package| package.main);
-    assert_eq!(open(b""), Err(PackageError::NotAWordFile));
+    let budget = XmlBudget::default();
+    let open = |bytes: &[u8]| Package::open(bytes, &[DOCUMENT_TYPE], &budget).map(|package| package.main);
+    assert_eq!(open(b""), Err(WordError::NotAWordFile));
     let mut old = OLE_MAGIC.to_vec();
     old.extend_from_slice(b"WordDocument");
-    assert_eq!(open(&old), Err(PackageError::NotAWordFile));
+    assert_eq!(open(&old), Err(WordError::NotAWordFile));
     let mut encrypted = OLE_MAGIC.to_vec();
     encrypted.extend("xEncryptedPackagey".encode_utf16().flat_map(u16::to_le_bytes));
-    assert_eq!(open(&encrypted), Err(PackageError::Encrypted));
-    assert_eq!(open(&file_of(&[("a", "b")])), Err(PackageError::NotAWordFile));
-    assert_eq!(open(&file_of(&[(TYPES_PART, WORD_TYPES)])), Err(PackageError::Damaged));
-    assert_eq!(open(&file_of(&[(TYPES_PART, "<Types")])), Err(PackageError::Damaged));
+    assert_eq!(open(&encrypted), Err(WordError::Encrypted));
+    assert_eq!(open(&file_of(&[("a", "b")])), Err(WordError::NotAWordFile));
+    assert_eq!(open(&file_of(&[(TYPES_PART, WORD_TYPES)])), Err(WordError::Damaged));
+    assert_eq!(open(&file_of(&[(TYPES_PART, "<Types")])), Err(WordError::Damaged));
 }

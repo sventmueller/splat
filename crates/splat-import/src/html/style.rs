@@ -1,7 +1,7 @@
 //! What an element says about the look of what it holds, by its name, class and inline style. Looks from style sheets
 //! count only in what Cocoa writes, which keeps strikethrough and fonts there; Excel's describe cells as nobody sees them.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::rich::{Mark, Marks, is_monospace_font};
@@ -48,11 +48,39 @@ pub(super) struct Style {
     pub(super) note: Option<Arc<str>>,
 }
 
-/// The rules of a style sheet for classes, as `p.p1 {…}` or `.s1 {…}` give them: by class, the element they are for and
-/// their declarations.
+/// The most bytes a sheet keeps: its declaration blocks, each once however many selectors share it, its rules and the
+/// names of their classes and elements.
+pub(super) const MOST_SHEET_BYTES: usize = 1 << 20;
+/// The most rules a class keeps; Cocoa writes one rule for each class.
+pub(super) const MOST_RULES_PER_CLASS: usize = 16;
+/// The most bytes of declarations an element takes from the sheet, far more than Cocoa writes for one class.
+pub(super) const MOST_ELEMENT_BYTES: usize = 4 << 10;
+
+/// A rule for one class: the element it is limited to, if any, and its declaration block, which every other rule with
+/// the same declarations shares.
+#[derive(Debug)]
+struct Rule {
+    element: Option<Box<str>>,
+    declarations: Arc<str>,
+}
+
+/// A declaration block being read, and whether the sheet keeps it already.
+struct Block {
+    declarations: Arc<str>,
+    kept: bool,
+}
+
+/// The rules of a style sheet for classes, as `p.p1 {…}` or `.s1 {…}` give them, by class. Equal declaration blocks are
+/// kept once, and what the sheet keeps and gives an element is capped, so a sheet that repeats one block for thousands
+/// of selectors costs no more than its length.
 #[derive(Debug, Default)]
 pub(super) struct Sheet {
-    rules: HashMap<String, Vec<(Option<String>, String)>>,
+    rules: HashMap<String, Vec<Rule>>,
+    blocks: HashSet<Arc<str>>,
+    /// What counts against `MOST_SHEET_BYTES`.
+    bytes: usize,
+    /// A rule did not fit, so the sheet takes no more.
+    full: bool,
 }
 
 impl Sheet {
@@ -63,8 +91,11 @@ impl Sheet {
             let Some(close) = rest[open..].find('}').map(|close| open + close) else {
                 return;
             };
-            let declarations = rest[open + 1..close].trim().to_ascii_lowercase();
+            let mut block: Option<Block> = None;
             for selector in rest[..open].split(',') {
+                if self.full {
+                    return;
+                }
                 let selector = selector.trim().trim_start_matches("<!--").trim();
                 if let Some((element, class)) = selector.split_once('.')
                     && !class.is_empty()
@@ -73,32 +104,93 @@ impl Sheet {
                         .chain(element.bytes())
                         .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
                 {
-                    let element = (!element.is_empty()).then(|| element.to_ascii_lowercase());
-                    self.rules
-                        .entry(class.to_string())
-                        .or_default()
-                        .push((element, declarations.clone()));
+                    let block = block.get_or_insert_with(|| self.block(&rest[open + 1..close]));
+                    self.add(class, element, block);
                 }
             }
             rest = &rest[close + 1..];
         }
     }
 
-    /// The declarations the classes of an element called `name` give it.
+    /// The declarations `text` holds, as the block the sheet keeps already if it has an equal one.
+    fn block(&self, text: &str) -> Block {
+        let declarations = text.trim().to_ascii_lowercase();
+        match self.blocks.get(declarations.as_str()) {
+            Some(kept) => Block {
+                declarations: Arc::clone(kept),
+                kept: true,
+            },
+            None => Block {
+                declarations: declarations.into(),
+                kept: false,
+            },
+        }
+    }
+
+    /// Keeps a rule unless its class has its fill of rules; a rule the class has already moves behind the others, as
+    /// the later of two equal rules is the one in force. If the rule does not fit, the sheet is full.
+    fn add(&mut self, class: &str, element: &str, block: &mut Block) {
+        let element = (!element.is_empty()).then(|| element.to_ascii_lowercase().into_boxed_str());
+        let known = self.rules.get_mut(class);
+        let new_class = known.is_none();
+        if let Some(rules) = known {
+            let same = rules
+                .iter()
+                .position(|rule| rule.element == element && Arc::ptr_eq(&rule.declarations, &block.declarations));
+            if let Some(same) = same {
+                rules[same..].rotate_left(1);
+                return;
+            }
+            if rules.len() >= MOST_RULES_PER_CLASS {
+                return;
+            }
+        }
+        let mut cost = size_of::<Rule>() + element.as_ref().map_or(0, |element| element.len());
+        if new_class {
+            cost += class.len() + size_of::<(String, Vec<Rule>)>();
+        }
+        if !block.kept {
+            cost += block.declarations.len() + size_of::<Arc<str>>();
+        }
+        if self.bytes + cost > MOST_SHEET_BYTES {
+            self.full = true;
+            return;
+        }
+        self.bytes += cost;
+        if !block.kept {
+            self.blocks.insert(Arc::clone(&block.declarations));
+            block.kept = true;
+        }
+        self.rules.entry(class.to_string()).or_default().push(Rule {
+            element,
+            declarations: Arc::clone(&block.declarations),
+        });
+    }
+
+    /// The declarations the classes of an element called `name` give it, as far as `MOST_ELEMENT_BYTES` allows.
     pub(super) fn declarations(&self, name: &str, attrs: &Attributes) -> String {
         let mut css = String::new();
         if self.rules.is_empty() {
             return css;
         }
         for class in attr(attrs, "class").unwrap_or("").split_ascii_whitespace() {
-            for (element, declarations) in self.rules.get(class).into_iter().flatten() {
-                if element.as_deref().is_none_or(|element| element == name) {
-                    css.push_str(declarations);
+            for rule in self.rules.get(class).into_iter().flatten() {
+                if rule.element.as_deref().is_none_or(|element| element == name) {
+                    if css.len() + rule.declarations.len() + 1 > MOST_ELEMENT_BYTES {
+                        return css;
+                    }
+                    css.push_str(&rule.declarations);
                     css.push(';');
                 }
             }
         }
         css
+    }
+
+    /// How many rules and distinct declaration blocks the sheet keeps, and the bytes that count against its limit.
+    #[cfg(test)]
+    pub(super) fn kept(&self) -> (usize, usize, usize) {
+        (self.rules.values().map(Vec::len).sum(), self.blocks.len(), self.bytes)
     }
 }
 

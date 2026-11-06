@@ -593,3 +593,40 @@ fn links_may_expand_to_100_kb_however_short_the_text() {
     let many = format!("{}\n\n[a]: {address}\n", "[a] ".repeat(60));
     assert_eq!(links(&many), 100_000 / address.len());
 }
+
+/// The literal of the first code span or code block.
+fn code(text: &str) -> String {
+    first(text, |value| match value {
+        NodeValue::Code(code) => Some(code.literal.clone()),
+        NodeValue::CodeBlock(block) => Some(block.literal.clone()),
+        _ => None,
+    })
+}
+
+/// `aligner::spelled` needs no rule for NUL: comrak keeps it in text and code, unlike the U+FFFD that HTML asks for.
+#[test]
+fn a_nul_stays_as_it_stands() {
+    assert_eq!(tree("a\0b\n")[1], "  \"a\\0b\" 1:1-1:3");
+    assert_eq!(code("`a\0b`\n"), "a\0b");
+    assert_eq!(code("```\na\0b\n```\n"), "a\0b\n");
+}
+
+/// `aligner::spelled` takes both backslashes of an escaped one for the one comrak reads, in a text joined with the text
+/// around it.
+#[test]
+fn an_escaped_backslash_is_one_in_the_text_around_it() {
+    assert_eq!(tree("a\\\\b\n")[1], "  \"a\\\\b\" 1:1-1:4");
+}
+
+/// `Spelling::CodeSpan` in `aligner.rs`: a line ending reads as a space in a code span only, a lone carriage return as
+/// well, while the one in front of a line feed stays; references, escapes and the line ends of code blocks stay as
+/// written.
+#[test]
+fn a_code_span_reads_its_line_endings_as_spaces() {
+    assert_eq!(code("`a\nb`\n"), "a b");
+    assert_eq!(code("`a\rb`\n"), "a b");
+    assert_eq!(code("`a\r\nb`\n"), "a\r b");
+    assert_eq!(code("> `a\n> b`\n"), "a b", "the prefix of a quote is gone");
+    assert_eq!(code("`&amp; \\*`\n"), "&amp; \\*");
+    assert_eq!(code("```\na\r\nb\r\n```\r\n"), "a\r\nb\r\n");
+}

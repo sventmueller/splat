@@ -14,12 +14,11 @@ mod editing;
 mod env;
 mod export;
 mod export_options;
+mod geometry;
 mod images;
 mod js;
-mod links;
 mod mathfield;
 mod metadata;
-mod model;
 mod navigation;
 mod notes;
 mod outline;
@@ -28,7 +27,6 @@ mod picture;
 mod progressive;
 mod remote;
 mod render;
-mod render_queue;
 mod safe_image;
 mod scroll;
 mod selection;
@@ -36,9 +34,7 @@ mod selection;
 pub mod selftest;
 mod shadow;
 mod sidebar;
-mod state;
 mod style;
-mod sync;
 mod toolbar;
 mod update;
 mod views;
@@ -56,6 +52,7 @@ use objc2_foundation::NSRange;
 use crate::util::ns;
 use actions::Action;
 use controller::{layers, window};
+use splat_editor_state::{links, model, render_queue, state, sync};
 
 pub use crate::util::panic_is_contained;
 pub use controller::EditorController;
@@ -70,15 +67,19 @@ thread_local! {
 
 /// Lays out every open preview again, after a setting they all follow changed.
 fn relayout_all() {
-    let editors: Vec<Retained<EditorController>> =
-        OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
-    for editor in editors {
+    for editor in open_editors() {
         editor.invalidate(Invalidate::Layout);
     }
 }
 
+/// The editors whose windows are open.
 fn open_editors() -> Vec<Retained<EditorController>> {
-    OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect())
+    // The panic `emergency_save` runs from may have struck while the list was borrowed.
+    OPEN_EDITORS.with(|e| {
+        e.try_borrow()
+            .map(|e| e.iter().filter_map(Weak::load).collect())
+            .unwrap_or_default()
+    })
 }
 
 /// A setting every window follows changed.
@@ -135,12 +136,7 @@ pub fn emergency_save() -> Vec<PathBuf> {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
-    // The panic this runs from may have struck while the list was borrowed.
-    let editors: Vec<Retained<EditorController>> = OPEN_EDITORS.with(|e| {
-        e.try_borrow()
-            .map(|e| e.iter().filter_map(Weak::load).collect())
-            .unwrap_or_default()
-    });
+    let editors = open_editors();
     let mut written = Vec::new();
     let mut failed = false;
     for (n, editor) in editors.iter().enumerate() {
@@ -226,40 +222,26 @@ fn string_of(s: &objc2_foundation::NSString) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use splat_testkit::sources::syn::{ImplItem, Item, Type};
+    use splat_testkit::sources::{Crate, Source, Without, root};
 
     /// The most methods the class may have outside `define_class!`; what does more belongs to a component.
     const MOST_METHODS: usize = 58;
 
-    fn sources(dir: &Path) -> Vec<std::path::PathBuf> {
-        let mut found = Vec::new();
-        for entry in std::fs::read_dir(dir).unwrap().flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                found.extend(sources(&path));
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                found.push(path);
-            }
-        }
-        found
-    }
-
-    /// Items at the top level of a file: inside `define_class!` the selector methods stand deeper.
-    fn methods_on_the_class(text: &str) -> usize {
-        let mut inside = false;
-        let mut methods = 0;
-        for line in text.lines() {
-            if inside {
-                inside = line != "}";
-                let item = line.strip_prefix("    ").filter(|l| !l.starts_with([' ', '/', '#']));
-                if item.is_some_and(|l| l.starts_with("fn ") || l.contains(" fn ")) {
-                    methods += 1;
-                }
-            } else {
-                inside = line.starts_with("impl EditorController");
-            }
-        }
-        methods
+    /// Methods of the blocks `impl EditorController` at the top level of a file: those in `define_class!` are the
+    /// selectors AppKit calls, and a trait's methods add nothing anyone else calls.
+    fn methods_on_the_class(source: &Source) -> usize {
+        source
+            .syntax
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Impl(block) if block.trait_.is_none() => Some(block),
+                _ => None,
+            })
+            .filter(|block| matches!(&*block.self_ty, Type::Path(ty) if ty.path.is_ident("EditorController")))
+            .map(|block| block.items.iter().filter(|i| matches!(i, ImplItem::Fn(_))).count())
+            .sum()
     }
 
     #[test]
@@ -274,10 +256,17 @@ impl EditorController {
     pub(super) fn b(
         &self,
     ) {}
+
+    #[cfg(test)]
+    fn only_for_tests() {}
 }
 
 impl Other {
     fn c() {}
+}
+
+impl Drop for EditorController {
+    fn drop(&mut self) {}
 }
 
 define_class!(
@@ -285,20 +274,26 @@ define_class!(
         fn d(&self) {}
     }
 );
+
+#[cfg(test)]
+fn helper() {}
+
+impl EditorController {
+    fn after_the_tests(&self) {}
+}
 "#;
-        assert_eq!(methods_on_the_class(text), 2);
+        let source = Source::parse("a.rs", Vec::new(), text.to_string(), Without::Tests);
+        assert_eq!(methods_on_the_class(&source), 3);
     }
 
     #[test]
     fn the_controller_only_forwards() {
-        let editor = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/editor");
-        let methods: usize = sources(&editor)
+        let app = Crate::read(&root().join("src/main.rs"), Without::Tests);
+        let methods: usize = app
+            .sources
             .iter()
-            .filter(|f| !f.to_string_lossy().contains("selftest"))
-            .map(|f| {
-                let text = std::fs::read_to_string(f).unwrap();
-                methods_on_the_class(text.split("#[cfg(test)]").next().unwrap_or(""))
-            })
+            .filter(|s| s.module.first().is_some_and(|m| m == "editor") && !s.module.iter().any(|m| m == "selftest"))
+            .map(methods_on_the_class)
             .sum();
         assert!(methods > 10, "the count looks at the wrong place: {methods}");
         assert!(

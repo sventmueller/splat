@@ -635,6 +635,7 @@ Derleme, test, kodun yapısı ve uyduğu kurallar [docs/development.md](../../..
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML karakter başvurularının adları | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Word dosyalarını ve Git nesnelerini açma | MIT, Zlib veya Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Word dosyalarının XML’ini okuma | MIT veya Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | eski kod sayfalarıyla yazılmış RTF metnini okuma | MIT veya Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | birleşik ve ayrışık harfler arasında adlar ve arama | MIT veya Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | içe aktarılan metinde `:shortcode:` benzeri metni olduğu gibi koruma | MIT veya Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | formülleri görüntüleme | Apache-2.0 |

@@ -21,9 +21,13 @@ fn notes_are_asked_for_once_and_in_order_and_only_those_that_change_are_named() 
             texts.get(path.to_str().unwrap()).map(ToString::to_string)
         },
     );
-    assert_eq!(asked, ["/v/a.md", "/v/Old.md", "/v/z/b.md", "/v/z/c.md"]);
+    assert_eq!(
+        asked,
+        ["/v/z/b.md", "/v/z/c.md", "/v/a.md", "/v/Old.md"],
+        "in the order of the tree"
+    );
     let changed: Vec<&Path> = rewrites.iter().map(|rewrite| rewrite.path.as_path()).collect();
-    assert_eq!(changed, [Path::new("/v/a.md"), Path::new("/v/z/b.md")]);
+    assert_eq!(changed, [Path::new("/v/z/b.md"), Path::new("/v/a.md")]);
 }
 
 #[test]

@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unreachable_pub)]
 
+pub mod aligner;
 pub mod code;
 pub mod commands;
 pub mod counts;

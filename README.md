@@ -835,6 +835,7 @@ Building, testing, the layout of the code and the rules it follows are described
 | [entities](https://github.com/p-jackson/entities) | 1 | the names of HTML character references | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | unpacking Word files and Git objects | MIT, Zlib or Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | reading the XML of Word files | MIT or Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | reading RTF text written in older code pages | MIT or Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | names and search across composed and decomposed letters | MIT or Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | keeping `:shortcode:`-like text literal in imported text | MIT or Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | rendering formulas | Apache-2.0 |

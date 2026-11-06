@@ -10,6 +10,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-caseless = "0.2"
-splat-markdown = { path = "../splat-markdown" }
-unicode-normalization = "0.1"
+caseless.workspace = true
+splat-git.workspace = true
+splat-markdown.workspace = true
+unicode-normalization.workspace = true

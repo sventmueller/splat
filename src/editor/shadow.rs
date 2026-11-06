@@ -10,10 +10,10 @@ use std::sync::OnceLock;
 
 use block2::RcBlock;
 use objc2::MainThreadMarker;
-use objc2::rc::{Retained, Weak};
+use objc2::rc::Retained;
 use objc2_foundation::NSTimer;
 
-use super::{EditorController, OPEN_EDITORS, recovery_dir};
+use super::recovery_dir;
 use crate::util::{Lane, file_name_of, process_exists};
 
 /// How often unsaved text is copied, and so how much a crash can cost at most.
@@ -160,8 +160,7 @@ pub fn keep_copies(_mtm: MainThreadMarker) {
 /// Copies the text of every document with changes since its last copy, and removes the copies nobody needs anymore.
 pub(super) fn copy_unsaved() {
     let Some(folder) = own_folder() else { return };
-    let editors: Vec<Retained<EditorController>> =
-        OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect());
+    let editors = super::open_editors();
     let mut unsaved = Vec::new();
     for editor in &editors {
         let edited = editor.document().is_some_and(|d| d.isDocumentEdited());

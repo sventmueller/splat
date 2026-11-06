@@ -635,6 +635,7 @@ Cara membangun, menguji, struktur kode, dan aturan yang diikutinya dijelaskan di
 | [entities](https://github.com/p-jackson/entities) | 1 | nama referensi karakter HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | membongkar file Word dan objek Git | MIT, Zlib atau Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | membaca XML file Word | MIT atau Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | membaca teks RTF dalam halaman kode lama | MIT atau Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nama dan pencarian lintas huruf tersusun dan terurai | MIT atau Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | menjaga teks mirip `:shortcode:` apa adanya dalam teks yang diimpor | MIT atau Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | menampilkan rumus | Apache-2.0 |

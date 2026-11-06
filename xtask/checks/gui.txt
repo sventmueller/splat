@@ -1,3 +1,16 @@
+"building blocks" ends where "empty lines and caret" starts
+"commands and links" ends where "building blocks" starts
+"empty lines and caret" ends where "reload and hidden preview" starts
+"first edits" ends where "toolbar and undo" starts
+"formula editor" ends where "scrolling, dark mode and web pictures" starts
+"input method" ends where "toolbar buttons" starts
+"pending format" ends where "input method" starts
+"preview edits" ends where "formula editor" starts
+"scrolling, dark mode and web pictures" ends where "tables and spaces" starts
+"selection" ends where "preview edits" starts
+"tables and spaces" ends where "pending format" starts
+"toolbar and undo" ends where "selection" starts
+"toolbar buttons" ends where "commands and links" starts
 LaTeX code in a formula popover starts no visual editor
 a click into the source keeps the new formula and the focus
 a click on ▸ unfolds the callout
@@ -80,8 +93,11 @@ the update settings in the app menu switch Sparkle's options, installing only wi
 toolbar offers new tab, share and more formats
 typed markdown characters are escaped
 typing in preview edits heading
+undo leads back to the document before the new formulas
 undo removes bold only
 undo takes back typed text together with its markers
 visual edits reach the document
 visual formula editor loads
+wiki links are links
 ⌘-click on a link to a heading jumps there
+⌘-click on a wiki link opens the note it names in Splat

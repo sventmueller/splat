@@ -70,8 +70,8 @@ pub struct ParaStyle {
     pub quote_depth: u8,
     /// How deep it stands in lists.
     pub list_depth: u8,
-    /// Marker drawn before the first paragraph of a list item or footnote definition.
-    pub marker: Option<Marker>,
+    /// What is drawn before the first paragraph of a list item or footnote definition.
+    pub marker: Option<ItemMarker>,
     /// Paragraphs sharing a group id share one background or border block (code, quotes, tables).
     pub group: usize,
     /// It stands in a tight list, whose paragraphs go without spacing.
@@ -90,9 +90,10 @@ pub struct ParaStyle {
     pub mirrored: bool,
 }
 
-/// What stands in front of the first paragraph of a list item or a footnote's definition.
+/// What stands in front of the first paragraph of a list item or a footnote's definition: its bullet, number,
+/// checkbox or label.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Marker {
+pub enum ItemMarker {
     /// A bullet, whose shape changes with the list depth it gives.
     Bullet(u8),
     /// The number of an item of an ordered list.
@@ -195,7 +196,7 @@ impl RunStyle {
 pub enum Atom {
     /// Text that represents source without being editable character by character.
     Text,
-    /// List bullet, number, checkbox or footnote label in front of a paragraph.
+    /// The [`ItemMarker`] in front of a paragraph: a list bullet, number, checkbox or footnote label.
     Marker,
     /// Boxed, as the largest kind would otherwise size every run.
     Image(Box<ImageAtom>),
@@ -459,7 +460,7 @@ impl Resolver for NoImages {
 }
 
 /// The list or footnote marker the next paragraph starts with.
-type LeadingMarker = Option<(Marker, Range<Byte>)>;
+type LeadingMarker = Option<(ItemMarker, Range<Byte>)>;
 
 struct Builder<'a> {
     text: &'a str,
@@ -491,7 +492,7 @@ struct Ctx {
 /// Lays out the document for the preview. `caret` is the source caret: when it sits on a blank line
 /// between blocks, an empty paragraph is shown there so a new paragraph can be typed.
 pub fn layout(doc: &Doc, resolver: &dyn Resolver, caret: Option<Byte>) -> Layout {
-    build::build(doc, resolver, caret, Vec::new(), &|_| None)
+    build::build(doc, resolver, caret.map(|c| doc.fit_at(c)), Vec::new(), &|_| None)
 }
 
 /// Like `layout`, but takes over the laid-out blocks of `old` for the document blocks `reuse` returns the offset
@@ -503,7 +504,7 @@ pub fn relayout(
     old: Layout,
     reuse: &dyn Fn(usize) -> Option<isize>,
 ) -> Layout {
-    build::build(doc, resolver, caret, old.blocks, reuse)
+    build::build(doc, resolver, caret.map(|c| doc.fit_at(c)), old.blocks, reuse)
 }
 
 /// The `reuse` argument of `relayout` after a partial parse of the new `doc`: blocks outside the splice keep their
@@ -531,7 +532,7 @@ pub fn reusable_behind_caret<'a>(doc: &'a Doc, old_caret: Option<Byte>) -> impl 
 /// Whether a caret there can change what a layout shows: an empty line then shows as a paragraph, and spaces at the end of
 /// a line as text. Anywhere else a caret that moves leaves the layout as it is.
 pub fn caret_shapes_layout(text: &str, caret: Byte) -> bool {
-    let at = caret.min(text.end());
+    let at = text.fit_at(caret);
     let line = text.at(line_start(text, at)..line_end(text, at));
     line.trim().is_empty() || line.ends_with([' ', '\t'])
 }
@@ -757,6 +758,24 @@ mod tests {
         assert_eq!(inner.citation("x"), None);
         let none = WithoutEmbeds(&NoImages);
         assert!(none.quotes().is_none() && !none.references());
+    }
+
+    #[test]
+    fn a_stale_caret_lays_out_as_one_in_the_text() {
+        let text = "Füße  \n\n\nü\n";
+        let doc = parse(text);
+        for caret in [2, 9, text.len() + 5] {
+            let at = Some(Byte::new(caret));
+            assert_eq!(
+                texts(&layout(&doc, &NoImages, at)),
+                texts(&layout(&doc, &NoImages, at.map(|c| doc.fit_at(c)))),
+                "{caret}"
+            );
+            let _ = caret_shapes_layout(text, Byte::new(caret));
+        }
+        let old = layout(&doc, &NoImages, None);
+        let again = relayout(&doc, &NoImages, Some(Byte::new(2)), old, &|_| None);
+        assert_eq!(again.doc_version, doc.version());
     }
 
     #[test]

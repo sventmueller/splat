@@ -230,6 +230,109 @@ fn bytes_are_windows_1252() {
 }
 
 #[test]
+fn bytes_are_read_in_the_code_page_of_the_document() {
+    let cocoa_in_russian = r"{\rtf1\ansi\ansicpg1251\cocoartf2822{\fonttbl\f0\fswiss\fcharset0 Helvetica;}\f0\fs24 \'cf\'f0\'e8\'e2\'e5\'f2}";
+    assert_eq!(markdown(cocoa_in_russian), "Привет\n", "ANSI fonts take the document's");
+    let raw = [&b"{\\rtf1\\ansi\\ansicpg1251 "[..], &[0xCF, 0xF0, 0xE8], b"}"].concat();
+    assert_eq!(from_rtf(&raw).into_markdown(), "При\n");
+    assert_eq!(markdown(r"{\rtf1\ansi\ansicpg1253 \'c1\'e8\'de\'ed\'e1}"), "Αθήνα\n");
+    assert_eq!(markdown(r"{\rtf1\ansi\ansicpg936 \'d6\'d0\'ce\'c4}"), "中文\n");
+    assert_eq!(markdown(r"{\rtf1\ansi\ansicpg20866 \'fb}"), "Ш\n");
+    assert_eq!(markdown(r"{\rtf1\mac \'8a}"), "ä\n");
+    assert_eq!(markdown(r"{\rtf1\pc \'84\'e1}"), "äß\n");
+    assert_eq!(markdown(r"{\rtf1\pca \'9b\'84}"), "øä\n");
+    assert_eq!(markdown(r"{\rtf1\pca\ansi \'e4}"), "ä\n", "the last word counts");
+    for unknown in [r"\ansicpg1361", r"\ansicpg99999", r"\ansicpg"] {
+        assert_eq!(
+            markdown(&format!(r"{{\rtf1\ansi{unknown} \'e4\'81}}")),
+            "ä\u{FFFD}\n",
+            "{unknown}"
+        );
+    }
+    assert_eq!(
+        markdown(r"{\rtf1\ansi\ansicpg1253 \'aa}"),
+        "\u{FFFD}\n",
+        "a byte the code page leaves out"
+    );
+}
+
+#[test]
+fn a_font_names_the_code_page_of_its_text() {
+    let rtf = r"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fnil\fcharset0 Arial;}{\f1\fnil\fcharset204 Arial Cyr;}
+{\f2\fnil\fcharset161 Arial Greek;}{\f3\fnil\fcharset134 SimSun;}{\f4\fnil\cpg1251 Other;}{\f5\fnil\fcharset2 Symbol;}
+{\f6\fnil\fcharset1 Default;}{\f7\fnil\fcharset128\fcharset0 Again;}}
+\f0 Gr\'fc\'df\'65 \f1 \'cf\'f0\'e8\'e2\'e5\'f2 \f2 \'c1\'e8\'de\'ed\'e1 \f3 \'d6\'d0\'ce\'c4 \f4 \'cf{\f0 \'e4}\'cf \f5 \'b7\f6 \'e4\f7 \'e4}";
+    assert_eq!(markdown(rtf), "Grüße Привет Αθήνα 中文 ПäП ·ää\n");
+    let in_greek = r"{\rtf1\ansi\ansicpg1253{\fonttbl{\f0\fcharset0 A;}{\f1\fcharset77 B;}}\f0 \'e1\f1 \'8a}";
+    assert_eq!(markdown(in_greek), "αä\n");
+}
+
+#[test]
+fn a_character_of_two_bytes_takes_them_however_they_are_written() {
+    let japanese = |body: &str| {
+        markdown(&format!(
+            r"{{\rtf1\ansi\ansicpg1252{{\fonttbl{{\f0\fnil\fcharset0 Arial;}}{{\f1\fnil\fcharset128 MS Mincho;}}}}\f1 {body}}}"
+        ))
+    };
+    assert_eq!(japanese(r"\'93\'fa\'96\'7b\'8c\'ea"), "日本語\n");
+    assert_eq!(japanese(r"\'93\'fa\'96\{\'8c\'ea"), "日本語\n", "an escaped brace");
+    assert_eq!(japanese(r"\'83e\'83X\'83g"), "テスト\n", "as ASCII");
+    assert_eq!(japanese(r"\'95\\\'83\\"), "表ソ\n", "an escaped backslash");
+    assert_eq!(japanese("\\'93\n\\'fa"), "日\n", "a line end between them");
+    let raw = [
+        &b"{\\rtf1{\\fonttbl{\\f1\\fcharset128 M;}}\\f1 "[..],
+        &[0x93, 0xFA, 0x96, b'{'],
+        b"}",
+    ]
+    .concat();
+    assert_eq!(
+        from_rtf(&raw).into_markdown(),
+        "日\u{FFFD}\n",
+        "a group cannot be the second byte"
+    );
+    assert_eq!(japanese(r"\'93\par x"), "\u{FFFD}\n\nx\n");
+    assert_eq!(japanese(r"\'93 x"), "\u{FFFD} x\n");
+    assert_eq!(japanese(r"{\'93}\'fa"), "\u{FFFD}\u{FFFD}\n");
+    assert_eq!(japanese(r"\'93{\f0 \'e4}"), "\u{FFFD}ä\n");
+    assert_eq!(japanese(r"\'93"), "\u{FFFD}\n");
+    assert_eq!(japanese(r"a\'b1"), "aｱ\n", "a half-width katakana takes one byte");
+}
+
+#[test]
+fn a_broken_character_ends_where_the_decoder_says() {
+    let utf8 = |body: &str| markdown(&format!(r"{{\rtf1\ansi\ansicpg65001 {body}}}"));
+    assert_eq!(utf8(r"\'e6\'97\'a5"), "日\n");
+    assert_eq!(
+        utf8(r"\'e6\'e6a\'97\'a5"),
+        "\u{FFFD}\u{FFFD}a\u{FFFD}\u{FFFD}\n",
+        "the second start waits too, so the letter behind it is no part of a character"
+    );
+    assert_eq!(utf8(r"\'e6\'e6\par x"), "\u{FFFD}\u{FFFD}\n\nx\n");
+    assert_eq!(utf8(r"\'e6\'97{\'a5}"), "\u{FFFD}\u{FFFD}\n");
+}
+
+#[test]
+fn unicode_escapes_skip_their_fallback_in_any_code_page() {
+    let japanese = |body: &str| {
+        markdown(&format!(
+            r"{{\rtf1\ansi{{\fonttbl{{\f1\fnil\fcharset128 MS Mincho;}}}}\f1 {body}}}"
+        ))
+    };
+    assert_eq!(japanese(r"\uc2\u26085\'93\'fa\u26412\'96\'7b"), "日本\n");
+    assert_eq!(japanese(r"\uc1\u26085?\'8c\'ea"), "日語\n");
+    assert_eq!(japanese(r"\uc0\u26085\'8c\'ea"), "日語\n");
+    assert_eq!(
+        japanese(r"\'93\u26085?"),
+        "\u{FFFD}日\n",
+        "an escape ends the character before it"
+    );
+    assert_eq!(
+        markdown(r"{\rtf1\ansi\ansicpg936\uc2 \u20013\'d6\'d0\u25991\'ce\'c4}"),
+        "中文\n"
+    );
+}
+
+#[test]
 fn symbols_and_words_for_characters_read_as_those() {
     assert_eq!(
         markdown(&doc(

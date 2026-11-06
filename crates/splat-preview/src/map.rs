@@ -284,7 +284,7 @@ fn text_span(doc: &Doc, para: &Para) -> Range<Byte> {
     let leaf = leaf_at(doc, para.src.start);
     let inlines = leaf.map_or(&[][..], |leaf| leaf.inlines());
     match (inlines.first(), inlines.last()) {
-        (Some(first), Some(last)) => first.range.start.min(first_shown)..last.range.end.max(last_shown),
+        (Some(first), Some(last)) => first.range().start.min(first_shown)..last.range().end.max(last_shown),
         _ => first_shown..last_shown,
     }
 }
@@ -489,7 +489,7 @@ mod order_tests {
         let footnotes = with_caret
             .blocks
             .iter()
-            .position(|b| matches!(b.paras[0].style.marker, Some(crate::layout::Marker::Footnote(..))))
+            .position(|b| matches!(b.paras[0].style.marker, Some(crate::layout::ItemMarker::Footnote(..))))
             .unwrap();
         assert!(last_text < footnotes);
     }

@@ -14,7 +14,9 @@ use objc2_foundation::{
 };
 
 use super::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
-use super::images::{ImageStore, locate, may_carry_along, resolve_path};
+use super::images::{ImageStore, may_carry_along, resolve_path};
+use super::layers::Object;
+use super::links::locate;
 use super::picture::{Rendered, Sizing};
 use super::style::{PREVIEW_SIZE, token_color};
 use super::{js, remote};
@@ -23,7 +25,7 @@ use crate::markdown::doc::AlertKind;
 use crate::markdown::doc::Align;
 use crate::markdown::style::Baseline;
 use crate::markdown::text::{Utf16Map, bytes};
-use crate::preview::layout::{Atom, Link, Marker, Para, ParaKind, ParaStyle, Run, RunMap, RunStyle, TopBlock};
+use crate::preview::layout::{Atom, ItemMarker, Link, Para, ParaKind, ParaStyle, Run, RunMap, RunStyle, TopBlock};
 use crate::util::byte_range_to_ns;
 use crate::util::constant;
 use crate::util::ns;
@@ -36,7 +38,7 @@ pub struct RenderCtx<'a> {
     pub max_image_width: f64,
     pub dark: bool,
     /// Receives a re-render once a remote image has loaded; print rendering passes `None`.
-    pub controller: Option<&'a super::EditorController>,
+    pub controller: Option<Object<'a>>,
     /// Images from the web load only once the user allowed it for the document.
     pub remote_images: bool,
     /// What leaves the Mac as a file shows only the local images `may_carry_along` allows.
@@ -57,12 +59,16 @@ pub trait Drawn {
 
 /// The app's downloads and WebKit's drawings; `requester` hears when a picture it asked for arrives.
 pub struct Live<'a> {
-    pub requester: Option<&'a super::EditorController>,
+    pub requester: Option<Object<'a>>,
 }
 
 impl Drawn for Live<'_> {
     fn web_picture(&self, url: &str) -> Option<Rendered> {
-        remote::get(url, self.requester).flatten()
+        match self.requester {
+            Some(requester) => requester.web_picture(url),
+            None => remote::get(url, None),
+        }
+        .flatten()
     }
 
     fn drawing(&self, key: &js::Key) -> Option<Rendered> {
@@ -603,7 +609,7 @@ impl RenderCtx<'_> {
             }
         }
         if let RunMap::Atom { atom: Atom::Marker, .. } = &run.map
-            && let Some(Marker::Task { .. }) = &para.style.marker
+            && let Some(ItemMarker::Task { .. }) = &para.style.marker
         {
             attributes.push(Attribute::link_text(&Link::Task.attribute()));
         }
@@ -640,9 +646,11 @@ impl RenderCtx<'_> {
                 } else if self.leaves_the_mac && !may_leave_with_the_document(url, self.doc_dir) {
                     None
                 } else {
-                    self.images
-                        .borrow_mut()
-                        .file(url, self.doc_dir, self.dark, self.controller)
+                    let mut images = self.images.borrow_mut();
+                    match self.controller {
+                        Some(controller) => controller.image_file(&mut images, url, self.doc_dir, self.dark),
+                        None => images.file(url, self.doc_dir, self.dark, None),
+                    }
                 };
                 let r = found
                     .map(|r| sized(r, image.width, image.height))
@@ -1179,7 +1187,7 @@ mod tests {
         );
         let item = ParaStyle {
             list_depth: 2,
-            marker: Some(Marker::Bullet(0)),
+            marker: Some(ItemMarker::Bullet(0)),
             tight: true,
             ..style(ParaKind::Body)
         };
@@ -1247,7 +1255,7 @@ mod tests {
         let in_quote = |kind| ParaStyle {
             quote_depth: 2,
             list_depth: 1,
-            marker: Some(Marker::Bullet(0)),
+            marker: Some(ItemMarker::Bullet(0)),
             ..style(kind)
         };
         let code_look = para_look(&in_quote(code()), 10.0, false);
@@ -1281,7 +1289,7 @@ mod tests {
         assert_eq!(inside.spacing, 5.0);
         assert_eq!(para_look(&quoted, 10.0, false).spacing, 0.0, "the frame ends here");
         let item = ParaStyle {
-            marker: Some(Marker::Bullet(0)),
+            marker: Some(ItemMarker::Bullet(0)),
             ..quoted
         };
         let look = para_look(&item, 10.0, false);
@@ -1293,7 +1301,7 @@ mod tests {
         );
         let unlisted_marker = ParaStyle {
             quote_depth: 1,
-            marker: Some(Marker::Footnote("a".into(), "1".into())),
+            marker: Some(ItemMarker::Footnote("a".into(), "1".into())),
             ..style(ParaKind::Body)
         };
         assert_eq!(

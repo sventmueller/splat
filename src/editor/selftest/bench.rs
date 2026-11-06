@@ -45,9 +45,27 @@ fn bench(mtm: MainThreadMarker) {
         "BENCH source on TextKit 2: {}",
         e.source().textLayoutManager().is_some()
     );
+    time_the_background_parts(&text);
+    time_keystrokes(&e, &text);
+    time_source_jumps(&e);
+    let (pending, blocks) = e.model().read(|st| {
+        (
+            st.blocks().placeholders.iter().filter(|p| **p).count(),
+            st.layout().blocks.len(),
+        )
+    });
+    eprintln!("BENCH preview blocks: {blocks}, still plain text: {pending}");
+    check_sync_after_source_scrolls();
+    time_preview_jumps_without_sync();
+    time_preview_jumps_with_sync();
+    after_the_images_settled();
+    after_the_late_checks();
+}
+
+fn time_the_background_parts(text: &str) {
     let parsed = std::cell::RefCell::new(None);
     timed("parse + colors (background part 1)", || {
-        *parsed.borrow_mut() = Some(crate::markdown::incremental::parse_and_color(&text))
+        *parsed.borrow_mut() = Some(crate::markdown::incremental::parse_and_color(text))
     });
     let parsed = parsed.into_inner().unwrap();
     timed("preview layout (background part 2)", || {
@@ -61,25 +79,28 @@ fn bench(mtm: MainThreadMarker) {
             None,
         );
     });
+}
+
+fn time_keystrokes(e: &EditorController, text: &str) {
     let mut at = text.len() / 2;
     while !text.is_char_boundary(at) {
         at -= 1;
     }
-    let map = Utf16Map::new(&text);
+    let map = Utf16Map::new(text);
     e.window().unwrap().makeFirstResponder(Some(e.source()));
     e.source()
         .setSelectedRange(NSRange::new(map.to_u16(Byte::new(at)).get(), 0));
     timed("keystroke in the middle + synchronous update", || {
-        type_in_source(&e, "x");
+        type_in_source(e, "x");
         e.updater().update_now();
     });
     for _ in 0..3 {
         timed("  another one", || {
-            type_in_source(&e, "x");
+            type_in_source(e, "x");
             e.updater().update_now();
         });
     }
-    timed("keystroke in the source view alone", || type_in_source(&e, "y"));
+    timed("keystroke in the source view alone", || type_in_source(e, "y"));
     timed("handing the text to the background", || {
         e.updater().update_in_background()
     });
@@ -88,6 +109,9 @@ fn bench(mtm: MainThreadMarker) {
             e.editing().validate(Some(sel!(mdBold:)), 0, None);
         }
     });
+}
+
+fn time_source_jumps(e: &EditorController) {
     let clip = e.source().enclosingScrollView().unwrap().contentView();
     let y = e.source().bounds().size.height / 2.0;
     timed("scroll source to the middle + sync preview", || {
@@ -109,13 +133,10 @@ fn bench(mtm: MainThreadMarker) {
         e.scroll_sync().follow_source_next();
         timed("  sync of the preview to it", || e.scroll_sync().sync_scroll());
     }
-    let (pending, blocks) = e.model().read(|st| {
-        (
-            st.blocks().placeholders.iter().filter(|p| **p).count(),
-            st.layout().blocks.len(),
-        )
-    });
-    eprintln!("BENCH preview blocks: {blocks}, still plain text: {pending}");
+}
+
+/// Scrolls the source and, a moment later, tells which block each pane shows.
+fn check_sync_after_source_scrolls() {
     for (n, fraction) in [0.3, 0.6, 0.85, 0.15].into_iter().enumerate() {
         after(3.0 + n as f64 * 0.6, move || {
             let e = editor(MainThreadMarker::new().unwrap()).unwrap();
@@ -152,6 +173,9 @@ fn bench(mtm: MainThreadMarker) {
             );
         });
     }
+}
+
+fn time_preview_jumps_without_sync() {
     for (n, fraction) in [0.35, 0.65, 0.05, 0.95].into_iter().enumerate() {
         after(2.0 + n as f64 * 0.25, move || {
             let e = editor(MainThreadMarker::new().unwrap()).unwrap();
@@ -174,6 +198,9 @@ fn bench(mtm: MainThreadMarker) {
             e.scroll_sync().hold(false);
         });
     }
+}
+
+fn time_preview_jumps_with_sync() {
     for (n, fraction) in [0.4, 0.7, 0.2].into_iter().enumerate() {
         after(5.5 + n as f64 * 0.6, move || {
             let e = editor(MainThreadMarker::new().unwrap()).unwrap();
@@ -223,6 +250,9 @@ fn bench(mtm: MainThreadMarker) {
             );
         });
     }
+}
+
+fn after_the_images_settled() {
     after(8.0, move || {
         let e = editor(MainThreadMarker::new().unwrap()).unwrap();
         eprintln!("BENCH -- second keystroke after the images settled");
@@ -257,6 +287,9 @@ fn bench(mtm: MainThreadMarker) {
             }
         }
     });
+}
+
+fn after_the_late_checks() {
     after(11.0, move || {
         let e = editor(MainThreadMarker::new().unwrap()).unwrap();
         let clip = e.preview().enclosingScrollView().unwrap().contentView();

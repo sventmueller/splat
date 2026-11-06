@@ -1,6 +1,7 @@
-//! The outline sidebar: the document's headings as a tree, a click on one shows it in both panes.
+//! The outline sidebar: the document's headings as a tree, a click on one shows it in both panes. Also the objects that
+//! stand for the rows of this and the other lists of the sidebar.
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::ops::Range;
 
 use objc2::rc::{Retained, Weak};
@@ -10,49 +11,76 @@ use objc2_app_kit::{
     NSControlTextEditingDelegate, NSLineBreakMode, NSOutlineView, NSOutlineViewDataSource, NSOutlineViewDelegate,
     NSScrollView, NSTableColumn, NSTableViewStyle, NSTextField, NSView,
 };
-use objc2_foundation::{NSNotification, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize};
+use objc2_foundation::{NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize};
+use splat_editor_state::outline::{Node, tree};
 
 use super::EditorController;
 use crate::markdown::text::Byte;
 use crate::util::{guarded, ns};
 
-/// One heading of the tree.
-#[derive(Debug, PartialEq)]
-pub struct Node {
-    pub title: String,
-    pub start: Byte,
-    pub children: Vec<usize>,
+define_class!(
+    /// The item of one row of an outline view, which knows the row by its place in the list's data.
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MDOutlineRow"]
+    #[ivars = usize]
+    pub struct RowItem;
+
+    unsafe impl NSObjectProtocol for RowItem {}
+);
+
+impl RowItem {
+    fn new(mtm: MainThreadMarker, row: usize) -> Retained<RowItem> {
+        // SAFETY: NSObject's initializer, called once on the newly allocated object.
+        unsafe { msg_send![super(RowItem::alloc(mtm).set_ivars(row)), init] }
+    }
 }
 
-/// Headings as `(level, title, source range)` in document order, nested under the closest heading of a higher
-/// level above them. Returns the nodes and the indexes of the top-level ones.
-pub fn tree(headings: &[(u8, String, Range<Byte>)]) -> (Vec<Node>, Vec<usize>) {
-    let mut nodes: Vec<Node> = Vec::with_capacity(headings.len());
-    let mut roots = Vec::new();
-    let mut open: Vec<(u8, usize)> = Vec::new();
-    for (level, title, range) in headings {
-        while open.last().is_some_and(|(l, _)| l >= level) {
-            open.pop();
-        }
-        let i = nodes.len();
-        nodes.push(Node {
-            title: title.clone(),
-            start: range.start,
-            children: Vec::new(),
-        });
-        match open.last() {
-            Some(&(_, parent)) => nodes[parent].children.push(i),
-            None => roots.push(i),
-        }
-        open.push((*level, i));
+/// One object per row for as long as the data it stands for: an outline view keeps its items without retaining them and
+/// tells them apart by identity.
+#[derive(Default)]
+pub(super) struct RowItems {
+    items: RefCell<Vec<Retained<RowItem>>>,
+    /// What `child:ofItem:` hands out when asked for a row the data does not have, as it has to hand out an object.
+    none: OnceCell<Retained<RowItem>>,
+}
+
+impl RowItems {
+    /// Gives `rows` rows objects of their own; the old ones stay alive until `reload`, which shows the new rows, is done.
+    pub(super) fn replace<R>(&self, mtm: MainThreadMarker, rows: usize, reload: impl FnOnce() -> R) -> R {
+        let old = self
+            .items
+            .replace((0..rows).map(|row| RowItem::new(mtm, row)).collect());
+        let reloaded = reload();
+        drop(old);
+        reloaded
     }
-    (nodes, roots)
+
+    /// The object of `row`.
+    pub(super) fn item(&self, row: usize) -> Option<Retained<AnyObject>> {
+        self.items.borrow().get(row).map(|item| item.clone().into())
+    }
+
+    /// The object of `row`, or one that stands for no row.
+    pub(super) fn item_or_none(&self, mtm: MainThreadMarker, row: Option<usize>) -> Retained<AnyObject> {
+        row.and_then(|row| self.item(row))
+            .unwrap_or_else(|| self.none.get_or_init(|| RowItem::new(mtm, usize::MAX)).clone().into())
+    }
+
+    /// The row `item` stands for, if it is one of the current rows: an item of rows that were replaced stands for none.
+    pub(super) fn row_of(&self, item: &AnyObject) -> Option<usize> {
+        let row = *item.downcast_ref::<RowItem>()?.ivars();
+        let items = self.items.borrow();
+        let current: &AnyObject = items.get(row)?;
+        std::ptr::eq(item, current).then_some(row)
+    }
 }
 
 #[derive(Default)]
 pub struct SourceIvars {
     nodes: RefCell<Vec<Node>>,
     roots: RefCell<Vec<usize>>,
+    items: RowItems,
     /// The tree as last shown, to tell a new heading from text moving the existing ones.
     shown: RefCell<Vec<(u8, String)>>,
     controller: RefCell<Option<Weak<EditorController>>>,
@@ -77,13 +105,10 @@ define_class!(
 
         #[unsafe(method_id(outlineView:child:ofItem:))]
         fn child(&self, _view: &NSOutlineView, index: isize, item: Option<&AnyObject>) -> Retained<AnyObject> {
-            let i = guarded(0, || {
-                self.children_of(item)
-                    .get(crate::util::to_usize(index))
-                    .copied()
-                    .unwrap_or(0)
+            let row = guarded(None, || {
+                self.children_of(item).get(crate::util::to_usize(index)).copied()
             });
-            crate::util::obj(NSNumber::new_usize(i))
+            self.ivars().items.item_or_none(self.mtm(), row)
         }
 
         #[unsafe(method(outlineView:isItemExpandable:))]
@@ -103,13 +128,12 @@ define_class!(
             item: &AnyObject,
         ) -> Option<Retained<NSView>> {
             guarded(None, || {
-                let title = index_of(item).and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.title.clone()));
-                title.map(|title| {
-                    let label = NSTextField::labelWithString(&ns(&title), self.mtm());
-                    label.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
-                    label.setToolTip(Some(&ns(&title)));
-                    Retained::into_super(Retained::into_super(label))
-                })
+                let row = self.ivars().items.row_of(item)?;
+                let title = self.ivars().nodes.borrow().get(row)?.title.clone();
+                let label = NSTextField::labelWithString(&ns(&title), self.mtm());
+                label.setLineBreakMode(NSLineBreakMode::ByTruncatingTail);
+                label.setToolTip(Some(&ns(&title)));
+                Some(Retained::into_super(Retained::into_super(label)))
             })
         }
 
@@ -124,8 +148,8 @@ define_class!(
                 };
                 let start = view
                     .itemAtRow(view.selectedRow())
-                    .and_then(|item| index_of(&item))
-                    .and_then(|i| self.ivars().nodes.borrow().get(i).map(|n| n.start));
+                    .and_then(|item| self.ivars().items.row_of(&item))
+                    .and_then(|row| self.ivars().nodes.borrow().get(row).map(|n| n.start));
                 let controller = self.ivars().controller.borrow().as_ref().and_then(Weak::load);
                 if let (Some(start), Some(c)) = (start, controller) {
                     c.reveal_source(start);
@@ -135,21 +159,16 @@ define_class!(
     }
 );
 
-fn index_of(item: &AnyObject) -> Option<usize> {
-    item.downcast_ref::<NSNumber>().map(|n| n.as_usize())
-}
-
 impl OutlineSource {
     fn children_of(&self, item: Option<&AnyObject>) -> Vec<usize> {
-        match item.and_then(index_of) {
-            Some(i) => self
-                .ivars()
-                .nodes
-                .borrow()
-                .get(i)
-                .map(|n| n.children.clone())
+        let ivars = self.ivars();
+        match item {
+            Some(item) => ivars
+                .items
+                .row_of(item)
+                .and_then(|row| ivars.nodes.borrow().get(row).map(|n| n.children.clone()))
                 .unwrap_or_default(),
-            None => self.ivars().roots.borrow().clone(),
+            None => ivars.roots.borrow().clone(),
         }
     }
 }
@@ -200,39 +219,18 @@ impl Outline {
         let (nodes, roots) = tree(headings);
         let shape: Vec<(u8, String)> = headings.iter().map(|(l, t, _)| (*l, t.clone())).collect();
         let changed = *ivars.shown.borrow() != shape;
+        let count = nodes.len();
         *ivars.nodes.borrow_mut() = nodes;
         *ivars.roots.borrow_mut() = roots;
         if changed {
             *ivars.shown.borrow_mut() = shape;
-            crate::util::with_raised(&ivars.reloading, || {
-                self.view.reloadData();
-                // SAFETY: a missing item means every top-level item, which the method accepts.
-                unsafe { self.view.expandItem_expandChildren(None, true) };
+            ivars.items.replace(self.source.mtm(), count, || {
+                crate::util::with_raised(&ivars.reloading, || {
+                    self.view.reloadData();
+                    // SAFETY: a missing item means every top-level item, which the method accepts.
+                    unsafe { self.view.expandItem_expandChildren(None, true) };
+                });
             });
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::markdown::text::bytes;
-
-    #[test]
-    fn headings_nest_under_the_closest_higher_level() {
-        let h = |level, title: &str, start| (level, title.to_string(), bytes(start..start + 1));
-        let (nodes, roots) = tree(&[
-            h(2, "a", 0),
-            h(3, "a1", 5),
-            h(4, "a1x", 9),
-            h(3, "a2", 12),
-            h(1, "b", 20),
-            h(3, "b1", 30),
-        ]);
-        assert_eq!(roots, [0, 4]);
-        assert_eq!(nodes[0].children, [1, 3]);
-        assert_eq!(nodes[1].children, [2]);
-        assert_eq!(nodes[4].children, [5]);
-        assert_eq!(nodes[3].start, Byte::new(12));
     }
 }

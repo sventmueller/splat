@@ -6,15 +6,15 @@ use std::ops::Range;
 use objc2_foundation::NSRange;
 
 use super::State;
-use super::attributes::{Attribute, add_attribute, add_temporary_attribute};
-use super::editing::bridge;
+use super::attributes::Attribute;
+use super::geometry::TextGeometry;
 use super::layers::ForSelection;
 use super::panes::Side;
 use super::sync::Snapshot;
 use crate::markdown::text::{Byte, U16};
 use crate::preview::map::{Shown, preview_offset};
 use crate::util::constant;
-use crate::util::{contained, from_nsrange, layout_manager, shown_from_ns, shown_to_ns, storage};
+use crate::util::{contained, from_nsrange, shown_from_ns, shown_to_ns};
 
 /// The selection of the focused view, shown as highlight in the other one.
 #[derive(Default)]
@@ -64,7 +64,7 @@ impl ViewSelection {
     pub(super) fn in_source(&self, snap: &Snapshot, st: &State) -> Range<Byte> {
         self.preview
             .clone()
-            .and_then(|shown| contained(|| bridge(st).map(|b| b.source_selection(shown))).flatten())
+            .and_then(|shown| contained(|| st.bridge().map(|b| b.source_selection(shown))).flatten())
             .unwrap_or_else(|| snap.byte_range(&self.source))
     }
 }
@@ -187,24 +187,18 @@ impl Selection<'_> {
         let len = view.length();
         let clamp = |r: NSRange| clamped(r, len);
         let key = constant!(objc2_app_kit::NSBackgroundColorAttributeName);
-        // TextKit 2 resets rendering attributes whenever it lays a line out again, so the source gets the colour in
-        // its text storage, like the syntax colours: no undo step, and the next recolouring clears it as well.
-        let in_storage = view.uses_text_kit_2();
         if let Some(old) = slot.take() {
             let old = clamp(old);
             panes.silently(|views| {
-                let view = views.of(side);
-                if in_storage {
-                    storage(view).removeAttribute_range(key, old);
-                } else if let Some(lm) = layout_manager(view) {
-                    lm.removeTemporaryAttribute_forCharacterRange(key, old);
+                if let Some(layout) = TextGeometry::of(views.of(side)) {
+                    layout.remove_highlight(key, old);
                 }
             });
         }
         let Some(range) = range.map(clamp).filter(|r| r.length > 0) else {
             return;
         };
-        let key_window = view.window().is_some_and(|w| w.isKeyWindow());
+        let key_window = view.in_key_window();
         let color = if key_window {
             objc2_app_kit::NSColor::selectedTextBackgroundColor()
         } else {
@@ -212,11 +206,8 @@ impl Selection<'_> {
         };
         let highlight = Attribute::background(&color);
         panes.silently(|views| {
-            let view = views.of(side);
-            if in_storage {
-                add_attribute(&storage(view), &highlight, range);
-            } else if let Some(lm) = layout_manager(view) {
-                add_temporary_attribute(&lm, &highlight, range);
+            if let Some(layout) = TextGeometry::of(views.of(side)) {
+                layout.highlight(&highlight, range);
             }
         });
         slot.set(Some(range));

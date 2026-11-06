@@ -6,8 +6,8 @@ use super::Reader;
 use super::notes::INLINE_NOTE;
 use super::positions::inline_note_len;
 use crate::doc::{Inline, InlineKind};
+use crate::markup::{self, AddressFor, Destination, Role, destination};
 use crate::text::{Byte, TextAt};
-use crate::{markup, style, url};
 
 impl Reader<'_> {
     pub(super) fn inlines<'a>(&self, node: comrak::nodes::Node<'a>) -> Vec<Inline> {
@@ -154,23 +154,32 @@ fn html_tag(html: &str) -> Option<HtmlTag> {
     };
     let attr = |key: &str| attrs.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str());
     let pixels = |key: &str| attr(key).and_then(markup::pixels);
-    let kind = match name.as_str() {
-        "br" if !closing => return Some(HtmlTag::Alone(InlineKind::LineBreak)),
-        "img" if !closing => {
-            let url = attr("src").filter(|u| url::is_harmless(u))?;
+    let leads = |key: &str, used_for: AddressFor| {
+        attr(key).filter(|url| {
+            matches!(
+                destination(url, used_for),
+                Destination::Web | Destination::Mail | Destination::Relative
+            )
+        })
+    };
+    let kind = match Role::of(&name) {
+        Role::LineBreak if !closing => return Some(HtmlTag::Alone(InlineKind::LineBreak)),
+        Role::Picture if !closing => {
             return Some(HtmlTag::Alone(InlineKind::HtmlImage {
-                url: url.into(),
+                url: leads("src", AddressFor::Picture)?.into(),
                 alt: attr("alt").unwrap_or("").into(),
                 width: pixels("width"),
                 height: pixels("height"),
             }));
         }
         _ if self_closing => return None,
-        "a" => InlineKind::Link {
-            url: attr("href").filter(|u| url::is_harmless(u)).unwrap_or("").into(),
+        Role::Link => InlineKind::Link {
+            url: leads("href", AddressFor::Link).unwrap_or("").into(),
             title: attr("title").unwrap_or("").into(),
         },
-        name => style::styled_element(name)?,
+        Role::Look(look) => look.inline_kind(),
+        Role::Presentational => InlineKind::Span,
+        _ => return None,
     };
     Some(HtmlTag::Container { closing, kind })
 }
@@ -258,6 +267,21 @@ mod tests {
     fn an_html_link_without_an_address_is_no_link() {
         let doc = parse("<a>x</a> <a href=\"javascript:y\">z</a>\n");
         assert!(matches!(doc.blocks[0].inlines()[0].kind, InlineKind::Span));
+    }
+
+    #[test]
+    fn an_html_picture_needs_an_address_a_picture_may_come_from() {
+        let picture = |t: &str| {
+            parse(t).blocks[0]
+                .inlines()
+                .iter()
+                .any(|i| matches!(i.kind, InlineKind::HtmlImage { .. }))
+        };
+        assert!(picture("a <img src=\"b.png\"> c\n"));
+        assert!(picture("a <img src=\"https://x.de/b.png\"> c\n"));
+        for src in ["mailto:a@b.de", "javascript:x", "data:image/png;base64,AA"] {
+            assert!(!picture(&format!("a <img src=\"{src}\"> c\n")), "{src}");
+        }
     }
 
     #[test]

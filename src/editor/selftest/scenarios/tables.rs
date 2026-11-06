@@ -32,7 +32,7 @@ pub(super) fn table_steps() -> Vec<Step> {
             );
         }));
         steps.push(applied(|c| {
-            if source(&c.e) != before() {
+            if source(&c.e) != before(c) {
                 undo(c);
             }
         }));

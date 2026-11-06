@@ -18,7 +18,7 @@ use super::render_queue::{Owner, RenderQueue};
 use super::safe_image::Decoded;
 use super::webkit::{self, ScriptValue};
 use crate::markdown::doc::DiagramKind;
-use crate::util::{guarded, main_after, main_soon, ns, to_isize};
+use crate::util::{Process, guarded, main_after, main_soon, ns, to_isize};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Key {
@@ -173,22 +173,38 @@ impl Renderer {
     }
 }
 
-/// The number a document's requests go by.
-fn owner_of(controller: &EditorController) -> Owner {
-    std::ptr::from_ref(controller) as usize
-}
-
 /// A document has closed.
 pub(super) fn forget(controller: &EditorController) {
     if let Some(r) = renderer_if_started() {
-        r.forget(owner_of(controller));
+        let owner = r.owner_of(controller);
+        r.forget(owner);
     }
 }
 
 /// A document that shows no formula or diagram any more, which is no reason to start the renderer.
 pub(super) fn asks_for_nothing(controller: &EditorController) {
-    if let Some(r) = renderer_if_started() {
-        r.request(owner_of(controller), Vec::new());
+    if let Some(r) = renderer_if_started()
+        && let Some(owner) = r.owner_of(controller)
+    {
+        r.request(owner, Vec::new());
+    }
+}
+
+/// The program of the processes WebKit shows pages in.
+const WEB_CONTENT: &str = "com.apple.WebKit.WebContent";
+
+/// Ends the web process of `web` at once. WebKit has no public way to stop a page's process, and its private
+/// `_killWebContentProcess` leaves a busy one running; the private process number is used where it exists, and only for
+/// the process it named, as that is no child of the app and its number may go to another.
+pub(super) fn end_web_process(web: &WKWebView) {
+    if !web.respondsToSelector(objc2::sel!(_webProcessIdentifier)) {
+        return;
+    }
+    let asked = std::time::SystemTime::now();
+    // SAFETY: A WKWebView method without arguments that returns a pid_t, present as just checked.
+    let pid: i32 = unsafe { msg_send![web, _webProcessIdentifier] };
+    if let Some(process) = Process::named(pid, asked, WEB_CONTENT) {
+        process.end();
     }
 }
 
@@ -281,26 +297,41 @@ impl Renderer {
         }
     }
 
-    /// `controller` hears when renders arrive; what it asks for goes by the number this returns.
+    /// `controller` hears when renders arrive; what it asks for goes by the owner this returns.
     pub fn listen(&self, controller: &EditorController) -> Owner {
-        let owner = owner_of(controller);
-        let gone: Vec<Owner> = {
+        let (owner, gone) = {
             let mut listeners = self.listeners.borrow_mut();
-            let gone = listeners
+            let gone: Vec<Owner> = listeners
                 .iter()
                 .filter(|(_, w)| w.load().is_none())
                 .map(|(owner, _)| *owner)
                 .collect();
             listeners.retain(|(_, w)| w.load().is_some());
-            if !listeners.iter().any(|(known, _)| *known == owner) {
+            let known = listeners
+                .iter()
+                .find(|(_, w)| w.load().is_some_and(|l| std::ptr::eq(&*l, controller)))
+                .map(|(owner, _)| *owner);
+            let owner = known.unwrap_or_else(|| {
+                let owner = Owner::unique();
                 listeners.push((owner, Weak::from(controller)));
-            }
-            gone
+                owner
+            });
+            (owner, gone)
         };
         for owner in gone {
             self.queue.borrow_mut().forget(owner);
         }
         owner
+    }
+
+    /// The owner `controller` asks as, while it listens. A weak reference that still loads is the controller itself, so
+    /// one that is freed and another that comes to its address are never taken for each other.
+    fn owner_of(&self, controller: &EditorController) -> Option<Owner> {
+        self.listeners
+            .borrow()
+            .iter()
+            .find(|(_, w)| w.load().is_some_and(|l| std::ptr::eq(&*l, controller)))
+            .map(|(owner, _)| *owner)
     }
 
     /// All that `owner` needs now, in the order it needs it.
@@ -353,13 +384,7 @@ impl Renderer {
     fn replace_view(&self) {
         let stuck = self.web.borrow().clone();
         webkit::detach_delegate(&stuck);
-        // WebKit has no public way to stop a page's process, and its private `_killWebContentProcess` leaves a
-        // busy one running; the private process number is used where it exists.
-        if stuck.respondsToSelector(objc2::sel!(_webProcessIdentifier)) {
-            // SAFETY: A WKWebView method without arguments that returns a pid_t, present as just checked.
-            let pid: i32 = unsafe { msg_send![&*stuck, _webProcessIdentifier] };
-            crate::util::end_process(pid);
-        }
+        end_web_process(&stuck);
         let web = web_view(&self.window, &self._delegate);
         load_page(&self.window, &web);
         *self.web.borrow_mut() = web;
@@ -431,9 +456,11 @@ impl Renderer {
     }
 
     /// A document has closed: what only it needed stops rendering and lets go of its memory.
-    fn forget(&self, owner: Owner) {
-        self.listeners.borrow_mut().retain(|(known, _)| *known != owner);
-        self.queue.borrow_mut().forget(owner);
+    fn forget(&self, owner: Option<Owner>) {
+        if let Some(owner) = owner {
+            self.listeners.borrow_mut().retain(|(known, _)| *known != owner);
+            self.queue.borrow_mut().forget(owner);
+        }
         self.evict(0, 0);
         self.notify_if_idle();
     }
@@ -729,6 +756,12 @@ mod tests {
         assert_eq!(Answer::<PlacedPicture>::read(Ok(Some(&flat))).value, None);
         let found = answer(&[("x", &one), ("y", &one), ("w", &one), ("h", &one)]);
         assert!(Answer::<PlacedPicture>::read(Ok(Some(&found))).value.is_some());
+    }
+
+    #[test]
+    fn no_two_documents_ask_as_the_same_owner() {
+        let owners: HashSet<Owner> = (0..1000).map(|_| Owner::unique()).collect();
+        assert_eq!(owners.len(), 1000);
     }
 
     #[test]

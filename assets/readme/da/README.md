@@ -635,6 +635,7 @@ Bygning, test, kodens opbygning og de regler, den følger, er beskrevet i [docs/
 | [entities](https://github.com/p-jackson/entities) | 1 | navnene på HTML-tegnreferencer | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | udpakning af Word-filer og Git-objekter | MIT, Zlib eller Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | læsning af XML i Word-filer | MIT eller Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | læsning af RTF-tekst i ældre tegnsæt | MIT eller Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | navne og søgning på tværs af sammensatte og opdelte bogstaver | MIT eller Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | holder tekst, der ligner `:shortcode:`, bogstavelig i importeret tekst | MIT eller Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | gengivelse af formler | Apache-2.0 |

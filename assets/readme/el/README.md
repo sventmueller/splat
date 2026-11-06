@@ -635,6 +635,7 @@ flowchart LR
 | [entities](https://github.com/p-jackson/entities) | 1 | τα ονόματα των αναφορών χαρακτήρων HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | αποσυμπίεση αρχείων Word και αντικειμένων Git | MIT, Zlib ή Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | ανάγνωση του XML των αρχείων Word | MIT ή Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | ανάγνωση κειμένου RTF σε παλαιότερες κωδικοσελίδες | MIT ή Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | ονόματα και αναζήτηση ανεξάρτητα από σύνθετα ή αποσυντεθειμένα γράμματα | MIT ή Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | διατήρηση κειμένου τύπου `:shortcode:` αυτολεξεί στο εισαγόμενο κείμενο | MIT ή Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | απόδοση τύπων | Apache-2.0 |

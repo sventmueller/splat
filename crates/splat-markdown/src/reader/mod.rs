@@ -105,8 +105,13 @@ pub fn parse_shared(text: Arc<str>) -> Doc {
     Doc::new(text, blocks)
 }
 
+/// A part of a document read into a tree of its own; only the document's start may hold front matter.
+pub fn parse_as_part(text: &str, at_start: bool) -> Doc {
+    Doc::new(text.into(), parse_part(text, at_start))
+}
+
 /// The top-level blocks of a part of a document; only the document's start may hold front matter.
-pub fn parse_part(text: &str, at_start: bool) -> Vec<Block> {
+pub(crate) fn parse_part(text: &str, at_start: bool) -> Vec<Block> {
     let arena = Arena::new();
     let mut opts = options();
     if !at_start {

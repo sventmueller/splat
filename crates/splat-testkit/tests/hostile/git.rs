@@ -1,8 +1,7 @@
 //! Files of a repository built to hurt what reads them.
 
 use splat_git::raw as git;
-
-use super::common::{NOTICEABLE, grows_too_fast, shortest_of_three};
+use splat_testkit::timing::{NOTICEABLE, alone, grows_too_fast, holds_to_time};
 
 type Reading = Box<dyn Fn()>;
 
@@ -63,9 +62,11 @@ fn reading_the_files_of_a_repository_takes_linear_time() {
         .into_iter()
         .zip(git_files_that_hurt(400_000));
     for ((name, small_len, small), (_, large_len, large)) in cases {
-        let small = shortest_of_three(&small);
-        let large = shortest_of_three(&large);
-        if cfg!(target_arch = "aarch64") && !cfg!(debug_assertions) && !cfg!(coverage) {
+        let alone = alone();
+        let small = alone.fastest(3, &small);
+        let large = alone.fastest(3, &large);
+        drop(alone);
+        if holds_to_time() {
             let too_fast = grows_too_fast(NOTICEABLE, small, large, small_len, large_len);
             assert!(!too_fast, "{name}: {small:?}, then {large:?}");
         }

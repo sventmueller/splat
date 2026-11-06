@@ -254,7 +254,7 @@ fn seen_from(tokens: &[Token], tags: &[bool], from: Option<usize>, backwards: bo
     '\n'
 }
 
-/// Moves markers that cannot stay what they are to tags; whether it found any.
+/// Moves markers that cannot stay what they are to tags, and returns whether it found any.
 fn look_at_markers(tokens: &[Token], partners: &[usize], tags: &mut [bool], one_line: bool) -> bool {
     let mut changed = false;
     let mut at = 0;
