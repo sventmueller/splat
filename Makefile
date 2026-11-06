@@ -19,7 +19,7 @@ lint: ## Formatting and clippy, also with the selftest feature, warnings fail; t
 	cargo clippy --release --package splat-app --all-targets --features selftest -- -D warnings
 	cargo xtask check-library
 
-check: lint ## lint, all cargo tests, vendored scripts; what CI runs, needs no keychain and no window
+check: lint ## lint, all cargo tests, vendored scripts; what CI runs before coverage-library, needs no keychain and no window
 	cargo test --release --workspace
 	cargo xtask vendor check
 
@@ -57,5 +57,5 @@ bench: ## Open, type and scroll timings: make bench FILE=<file.md>
 	@test -n "$(FILE)" || { echo "usage: make bench FILE=<file.md>"; exit 2; } $(if $(KEYSTROKE_MS),--keystroke-ms $(KEYSTROKE_MS))
 	cargo xtask selftest bench "$(FILE)"
 
-release: test ## After make test, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
+release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
 	cargo xtask dmg

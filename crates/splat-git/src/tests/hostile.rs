@@ -533,3 +533,17 @@ fn head_that_disappeared_after_finding_the_repository_cannot_be_believed() {
     assert_eq!(repository.head_commit(), Err(ReadError::Damaged));
     assert_eq!(repository.head_version(&file), Err(ReadError::Damaged));
 }
+
+#[test]
+fn an_error_says_in_words_what_went_wrong() {
+    let all = [
+        ReadError::Unsupported,
+        ReadError::Damaged,
+        ReadError::TooLarge,
+        ReadError::Io(std::io::ErrorKind::PermissionDenied),
+    ];
+    let words: std::collections::HashSet<String> = all.iter().map(ToString::to_string).collect();
+    assert_eq!(words.len(), all.len());
+    let error: Box<dyn std::error::Error> = Box::new(ReadError::Io(std::io::ErrorKind::PermissionDenied));
+    assert!(error.to_string().contains("permission denied"));
+}

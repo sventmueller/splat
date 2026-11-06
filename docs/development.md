@@ -23,7 +23,7 @@ The [Makefile](../Makefile) holds short entry points; `make help` lists them all
 ```sh
 make build                  # target/release/Splat.app, same as cargo xtask bundle --release
 make universal              # target/splat-universal for Apple Silicon and Intel, as the disk image carries it
-make check                  # formatting, clippy without warnings, all tests, vendored libraries; what CI runs
+make check                  # formatting, clippy without warnings, all tests, vendored libraries; CI runs it before coverage-library
 make test                   # make check, then the self-test without a window
 make test-gui               # self-tests with a window; they occupy the Mac for about four minutes
 make test-long              # longer randomised search and the 10 MB partial-update check
@@ -31,7 +31,7 @@ make fuzz                   # random input for the partial parse and every outpu
 make coverage               # line coverage of all tests and self-tests, with a floor per module
 make coverage-library       # the same floors for the modules without a window, as in CI
 make bench FILE=<file.md>   # timings for opening, typing and scrolling a large file
-make release                # make test first, then the notarized disk image
+make release                # make test and coverage-library first, then the notarized disk image
 ```
 
 The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
@@ -59,7 +59,7 @@ next build gets exactly that.
 
 ## Distribution
 
-`cargo xtask dmg` (or `make release`, which runs `make test` first) builds a release, signs it with your Developer ID,
+`cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) builds a release, signs it with your Developer ID,
 notarizes the app with Apple and staples the ticket, packs it into a compressed, read-only disk image with a link to
 Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
