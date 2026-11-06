@@ -164,12 +164,12 @@ Minden dokumentum saját ablakban nyílik meg, vagy lapként, ha jobban szereti 
 
 - **Balra: a forráskód.** A Markdown SF Mono betűtípussal, szintaxiskiemeléssel.
 - **Jobbra: az előnézet.** A megjelenített dokumentum, szerkesztésre készen.
-- **Oldalsáv (nem kötelező).** Az összes címsor fastruktúrában, egy kattintás mindkét panelen megmutatja a kiválasztottat: **Nézet › Vázlat megjelenítése** (⌃⌘S). Két további lap a [mappában lévő jegyzeteket](#jegyzetek-egy-mappában) és a bennük való keresést tartalmazza.
+- **Oldalsáv (nem kötelező).** Az összes címsor fastruktúrában, egy kattintás mindkét panelen megmutatja a kiválasztottat: **Nézet › Vázlat megjelenítése** (⌃⌘S). Két további lap a [mappában lévő jegyzeteket](#jegyzetek-egy-mappában) és a bennük való keresést tartalmazza. Az ablak címe melletti gomb megjeleníti és elrejti, az új ablakok pedig úgy nyitják meg, ahogy az utolsó ablak hagyta.
 - **Eszközsor.** A gombok aszerint vannak csoportosítva, hogy mit módosítanak: karaktereket, bekezdéseket és beszúrt elemeket, majd az előnézet be- és kikapcsolását, a megosztást és az új dokumentumot. A **Nézet › Eszközsor testreszabása…** paranccsal alakíthatja át.
 
 Az elválasztót húzva bármelyik oldalnak több helyet adhat. A **Nézet › Előnézet elrejtése** (⌥⌘P) csak a forráskódot hagyja meg; a Splat ezt ablakonként megjegyzi. A két panel együtt görget, és az egyikben kijelölt rész a másikban is ki van emelve.
 
-Az ablak sarka mutatja a szöveg szavainak és karaktereinek számát és az olvasási időt, valamint ugyanezt a kijelölésre, amíg van kijelölés. A linkcímek, a HTML-címkék, a metaadatok, a megjegyzések, a képletek és a diagramok nem számítanak bele. A **Nézet › Szószám elrejtése** eltünteti a kijelzőt.
+Az ablak sarka mutatja a szöveg szavainak és karaktereinek számát és az olvasási időt, valamint ugyanezt a kijelölésre, amíg van kijelölés. A linkcímek, a HTML-címkék, a metaadatok, a megjegyzések, a képletek és a diagramok nem számítanak bele. A kijelző alapból rejtve van; a **Nézet › Szószám megjelenítése** jeleníti meg.
 
 ### Dokumentumok, lapok és verziók
 

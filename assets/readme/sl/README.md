@@ -164,12 +164,12 @@ Vsak dokument se odpre v svojem oknu ali, če imate raje zavihke, v zavihku:
 
 - **Levo: izvorno besedilo.** Vaš Markdown v pisavi SF Mono z barvanjem sintakse.
 - **Desno: predogled.** Upodobljeni dokument, pripravljen za urejanje.
-- **Stranska vrstica (izbirno).** Vsi naslovi kot drevo, klik na naslov ga prikaže v obeh podoknih: **Prikaz › Prikaži oris** (⌃⌘S). Še dva zavihka vsebujeta [zapiske v mapi](#zapiski-v-mapi) in iskanje po njih.
+- **Stranska vrstica (izbirno).** Vsi naslovi kot drevo, klik na naslov ga prikaže v obeh podoknih: **Prikaz › Prikaži oris** (⌃⌘S). Še dva zavihka vsebujeta [zapiske v mapi](#zapiski-v-mapi) in iskanje po njih. Gumb ob naslovu okna jo prikaže in skrije, nova okna pa jo odprejo tako, kot jo je pustilo zadnje okno.
 - **Orodna vrstica.** Gumbi, razvrščeni po tem, kaj spreminjajo: znake, odstavke in vstavljene elemente, nato vklop in izklop predogleda, deljenje in nov dokument. Prilagodite jo z **Prikaz › Prilagodi orodno vrstico …**.
 
 Z vlečenjem razdelilnika dajte eni ali drugi strani več prostora. **Prikaz › Skrij predogled** (⌥⌘P) pusti samo izvorno besedilo; Splat si to zapomni za vsako okno posebej. Obe podokni se pomikata skupaj, izbor v enem podoknu pa je označen tudi v drugem.
 
-V kotu okna so prikazane besede in znaki besedila ter čas branja, dokler obstaja izbor, pa enaki podatki tudi za izbor. Naslovi povezav, oznake HTML, metapodatki, komentarji, formule in diagrami se ne štejejo. **Prikaz › Skrij število besed** to odstrani.
+V kotu okna so prikazane besede in znaki besedila ter čas branja, dokler obstaja izbor, pa enaki podatki tudi za izbor. Naslovi povezav, oznake HTML, metapodatki, komentarji, formule in diagrami se ne štejejo. Sprva je skrito; **Prikaz › Prikaži število besed** to vklopi.
 
 ### Dokumenti, zavihki in različice
 

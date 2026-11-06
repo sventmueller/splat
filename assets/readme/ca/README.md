@@ -164,12 +164,12 @@ Cada document s’obre en una finestra pròpia, o en una pestanya si prefereixes
 
 - **Esquerra: el codi font.** El teu Markdown en SF Mono amb colors de sintaxi.
 - **Dreta: la previsualització.** El document renderitzat, a punt per editar.
-- **Barra lateral (opcional).** Totes les capçaleres en forma d’arbre, un clic en una la mostra als dos panells: **Mostra › Mostra l’esquema** (⌃⌘S). Dues pestanyes més contenen les [notes de la carpeta](#notes-en-una-carpeta) i una cerca entre elles.
+- **Barra lateral (opcional).** Totes les capçaleres en forma d’arbre, un clic en una la mostra als dos panells: **Mostra › Mostra l’esquema** (⌃⌘S). Dues pestanyes més contenen les [notes de la carpeta](#notes-en-una-carpeta) i una cerca entre elles. El botó al costat del títol de la finestra la mostra i l’oculta, i les finestres noves l’obren tal com la va deixar l’última.
 - **Barra d’eines.** Botons agrupats segons el que canvien: caràcters, paràgrafs i elements inserits, i després previsualització activada o desactivada, Comparteix i Nou document. Personalitza-la amb **Mostra › Personalitza la barra d’eines…**.
 
 Arrossega el separador per donar més espai a un costat o a l’altre. **Mostra › Oculta la previsualització** (⌥⌘P) deixa només el codi font; el Splat ho recorda per a cada finestra. Els dos panells es desplacen alhora, i una selecció en un es ressalta a l’altre.
 
-La cantonada de la finestra mostra les paraules i els caràcters del text i quant es triga a llegir-lo, i els de la selecció mentre n’hi hagi una. Les adreces d’enllaços, les etiquetes HTML, les metadades, els comentaris, les fórmules i els diagrames no compten. **Mostra › Oculta el recompte de paraules** el treu.
+La cantonada de la finestra mostra les paraules i els caràcters del text i quant es triga a llegir-lo, i els de la selecció mentre n’hi hagi una. Les adreces d’enllaços, les etiquetes HTML, les metadades, els comentaris, les fórmules i els diagrames no compten. Resta ocult fins que **Mostra › Mostra el recompte de paraules** l’activa.
 
 ### Documents, pestanyes i versions
 

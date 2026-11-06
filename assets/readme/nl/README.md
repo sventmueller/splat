@@ -200,7 +200,8 @@ Elk document opent in een eigen venster, of als tabblad als je liever tabbladen 
 - **Rechts: de voorvertoning.** Het weergegeven document, klaar om te bewerken.
 - **Zijbalk (optioneel).** Alle koppen als boom, een klik op een kop toont die in beide deelvensters: **Weergave › Toon
   structuur** (⌃⌘S). Twee andere tabbladen bevatten de [notities in de map](#notities-in-een-map) en een zoekfunctie
-  daarin.
+  daarin. De knop naast de titel van het venster toont en verbergt de zijbalk, en nieuwe vensters openen hem zoals het
+  laatste venster hem achterliet.
 - **Knoppenbalk.** Knoppen gegroepeerd naar wat ze wijzigen: tekens, alinea's en ingevoegde onderdelen, daarna
   voorvertoning aan/uit, Deel en Nieuw document. Pas de balk aan met **Weergave › Pas knoppenbalk aan…**.
 
@@ -209,8 +210,8 @@ de bron staan; Splat onthoudt dit per venster. Beide deelvensters scrollen samen
 wordt in het andere gemarkeerd.
 
 De hoek van het venster toont de woorden en tekens van de tekst en hoe lang het lezen duurt, en die van de selectie
-zolang er een is. Linkadressen, HTML-tags, metadata, opmerkingen, formules en diagrammen tellen niet mee. **Weergave ›
-Verberg aantal woorden** haalt dit weg.
+zolang er een is. Linkadressen, HTML-tags, metadata, opmerkingen, formules en diagrammen tellen niet mee. Dit is eerst
+verborgen; **Weergave › Toon aantal woorden** zet het aan.
 
 ### Documenten, tabbladen en versies
 

@@ -195,7 +195,8 @@ Varje dokument öppnas i ett eget fönster, eller som flik om du föredrar flika
 - **Höger: förhandsvisningen.** Det renderade dokumentet, redo att redigeras.
 - **Sidofält (valfritt).** Alla rubriker som ett träd, ett klick på en visar den i båda rutorna: **Innehåll › Visa
   disposition** (⌃⌘S). Två flikar till innehåller [anteckningarna i mappen](#anteckningar-i-en-mapp) och en sökning i
-  dem.
+  dem. Knappen bredvid fönstrets titel visar och gömmer det, och nya fönster öppnar det så som det senaste fönstret
+  lämnade det.
 - **Verktygsfält.** Knappar grupperade efter vad de ändrar: tecken, stycken och infogade element, därefter förhandsvisning på/av,
   Dela och Nytt dokument. Anpassa det med **Innehåll › Anpassa verktygsfältet…**.
 
@@ -203,8 +204,8 @@ Dra i avgränsaren för att ge någon sida mer utrymme. **Innehåll › Göm fö
 minns detta per fönster. Båda rutorna rullar tillsammans, och en markering i den ena rutan framhävs i den andra.
 
 Fönstrets hörn visar textens ord och tecken och hur lång tid den tar att läsa, och samma sak för markeringen så länge
-det finns en. Länkadresser, HTML-taggar, metadata, kommentarer, formler och diagram räknas inte. **Innehåll › Göm antal
-ord** tar bort det.
+det finns en. Länkadresser, HTML-taggar, metadata, kommentarer, formler och diagram räknas inte. Det är dolt tills
+**Innehåll › Visa antal ord** slår på det.
 
 ### Dokument, flikar och versioner
 

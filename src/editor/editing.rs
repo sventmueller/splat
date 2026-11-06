@@ -232,6 +232,7 @@ impl Editing<'_> {
             }
             TableFormat => self.table_op(TableOp::Format, t("Tabelle ausrichten")),
             TogglePreview => self.host.toggle_preview(),
+            ToggleSidebar => self.host.toggle_sidebar(),
             ToggleOutline => self.host.panes().toggle_outline(),
             Typography => {
                 super::env::set_typography(!super::env::typography_on());

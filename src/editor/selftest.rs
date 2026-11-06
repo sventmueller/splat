@@ -313,6 +313,9 @@ fn head(s: &str, n: usize) -> String {
 }
 
 pub fn start(mtm: MainThreadMarker) {
+    super::panes::forget_sidebar();
+    // The checks look at the count in the corner, which windows hide until someone asks for it.
+    super::counter::set_on(true);
     if std::env::var_os("SPLAT_RENDER_PROBE").is_some() {
         probe::run(mtm);
         return;
@@ -427,6 +430,7 @@ pub fn start(mtm: MainThreadMarker) {
 }
 
 fn open_document(mtm: MainThreadMarker, file: &str) {
+    super::panes::forget_sidebar();
     let controller = NSDocumentController::sharedDocumentController(mtm);
     let url = NSURL::fileURLWithPath(&ns(file));
     let done = RcBlock::new(

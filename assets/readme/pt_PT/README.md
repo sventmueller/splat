@@ -164,12 +164,12 @@ Cada documento abre na sua própria janela ou, se preferir separadores, num sepa
 
 - **À esquerda: o código-fonte.** O seu Markdown em SF Mono com cores de sintaxe.
 - **À direita: a pré-visualização.** O documento apresentado, pronto a editar.
-- **Barra lateral (opcional).** Todos os títulos em árvore, um clique num deles mostra-o nos dois painéis: **Visualização › Mostrar estrutura** (⌃⌘S). Outros dois separadores contêm as [notas da pasta](#notas-numa-pasta) e uma pesquisa nelas.
+- **Barra lateral (opcional).** Todos os títulos em árvore, um clique num deles mostra-o nos dois painéis: **Visualização › Mostrar estrutura** (⌃⌘S). Outros dois separadores contêm as [notas da pasta](#notas-numa-pasta) e uma pesquisa nelas. O botão ao lado do título da janela mostra e oculta a barra, e as novas janelas abrem-na tal como a última janela a deixou.
 - **Barra de ferramentas.** Botões agrupados pelo que alteram: carateres, parágrafos e elementos inseridos, depois pré-visualização ligada/desligada, Partilhar e Novo documento. Personalize-a com **Visualização › Personalizar barra de ferramentas…**.
 
 Arraste o divisor para dar mais espaço a um dos lados. **Visualização › Ocultar pré-visualização** (⌥⌘P) deixa só o código-fonte; o Splat memoriza esta escolha por janela. Os dois painéis deslocam-se em conjunto, e a seleção num painel é realçada no outro.
 
-O canto da janela mostra as palavras e os carateres do texto e quanto tempo demora a ler, e os da seleção enquanto existir uma. Os endereços de hiperligações, as etiquetas HTML, os metadados, os comentários, as fórmulas e os diagramas não contam. **Visualização › Ocultar contagem de palavras** retira esta informação.
+O canto da janela mostra as palavras e os carateres do texto e quanto tempo demora a ler, e os da seleção enquanto existir uma. Os endereços de hiperligações, as etiquetas HTML, os metadados, os comentários, as fórmulas e os diagramas não contam. Esta informação fica oculta até que **Visualização › Mostrar contagem de palavras** a ative.
 
 ### Documentos, separadores e versões
 

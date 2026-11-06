@@ -164,12 +164,12 @@ Svaki dokument otvara se u vlastitom prozoru ili, ako više volite kartice, kao 
 
 - **Lijevo: izvorni kod.** Vaš Markdown u fontu SF Mono s bojanjem sintakse.
 - **Desno: pregled.** Prikazani dokument, spreman za uređivanje.
-- **Bočna traka (neobavezno).** Svi naslovi kao stablo, klik na naslov prikazuje ga u oba okna: **Prikaz › Prikaži strukturu** (⌃⌘S). Još dvije kartice sadrže [bilješke u mapi](#bilješke-u-mapi) i njihovu pretragu.
+- **Bočna traka (neobavezno).** Svi naslovi kao stablo, klik na naslov prikazuje ga u oba okna: **Prikaz › Prikaži strukturu** (⌃⌘S). Još dvije kartice sadrže [bilješke u mapi](#bilješke-u-mapi) i njihovu pretragu. Gumb pokraj naslova prozora prikazuje je i skriva, a novi prozori otvaraju je onako kako ju je ostavio posljednji prozor.
 - **Alatna traka.** Gumbi grupirani prema onome što mijenjaju: znakovi, odlomci i umetnuti elementi, zatim uključivanje i isključivanje pregleda, dijeljenje i novi dokument. Prilagodite je s **Prikaz › Podesi alatnu traku…**.
 
 Povucite razdjelnik da jednoj strani date više prostora. **Prikaz › Sakrij pregled** (⌥⌘P) ostavlja samo izvorni kod; Splat to pamti za svaki prozor. Oba okna pomiču se zajedno, a odabir u jednom oknu istaknut je u drugom.
 
-U kutu prozora prikazuju se riječi i znakovi teksta i vrijeme čitanja, a dok postoji odabir, i isti podaci za odabir. Adrese linkova, HTML oznake, metapodaci, komentari, formule i dijagrami ne broje se. **Prikaz › Sakrij broj riječi** to uklanja.
+U kutu prozora prikazuju se riječi i znakovi teksta i vrijeme čitanja, a dok postoji odabir, i isti podaci za odabir. Adrese linkova, HTML oznake, metapodaci, komentari, formule i dijagrami ne broje se. Isprva je skriveno; **Prikaz › Prikaži broj riječi** to uključuje.
 
 ### Dokumenti, kartice i verzije
 

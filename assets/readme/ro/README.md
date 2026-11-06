@@ -164,12 +164,12 @@ Fiecare document se deschide în propria fereastră sau, dacă preferați filele
 
 - **Stânga: sursa.** Markdownul dumneavoastră în SF Mono, cu culori de sintaxă.
 - **Dreapta: previzualizarea.** Documentul randat, gata de editat.
-- **Bară laterală (opțional).** Toate titlurile sub formă de arbore, un clic pe unul îl afișează în ambele panouri: **Vizualizare › Afișați structura** (⌃⌘S). Alte două file conțin [notele din dosar](#note-într-un-dosar) și o căutare în ele.
+- **Bară laterală (opțional).** Toate titlurile sub formă de arbore, un clic pe unul îl afișează în ambele panouri: **Vizualizare › Afișați structura** (⌃⌘S). Alte două file conțin [notele din dosar](#note-într-un-dosar) și o căutare în ele. Butonul de lângă titlul ferestrei o afișează și o ascunde, iar ferestrele noi o deschid așa cum a lăsat-o ultima fereastră.
 - **Bara de instrumente.** Butoane grupate după ce modifică: caractere, paragrafe și elemente inserate, apoi previzualizare pornită/oprită, Partajare și Document nou. Personalizați-o cu **Vizualizare › Personalizare bară de instrumente…**.
 
 Trageți separatorul pentru a da mai mult loc uneia dintre părți. **Vizualizare › Ascundeți previzualizarea** (⌥⌘P) lasă doar sursa; Splat reține această alegere pentru fiecare fereastră. Cele două panouri defilează împreună, iar o selecție dintr-un panou este evidențiată în celălalt.
 
-Colțul ferestrei arată cuvintele și caracterele textului și cât durează citirea lui, iar cât timp există o selecție, și pe cele ale selecției. Adresele linkurilor, etichetele HTML, metadatele, comentariile, formulele și diagramele nu se numără. **Vizualizare › Ascundeți numărul de cuvinte** înlătură această informație.
+Colțul ferestrei arată cuvintele și caracterele textului și cât durează citirea lui, iar cât timp există o selecție, și pe cele ale selecției. Adresele linkurilor, etichetele HTML, metadatele, comentariile, formulele și diagramele nu se numără. Această informație este ascunsă până când **Vizualizare › Afișați numărul de cuvinte** o activează.
 
 ### Documente, file și versiuni
 

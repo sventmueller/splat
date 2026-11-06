@@ -195,6 +195,14 @@ impl ForEditing<'_> {
         }
     }
 
+    /// Shows the sidebar on the tab it showed last, or hides it.
+    pub(in crate::editor) fn toggle_sidebar(&self) {
+        let panes = self.object().panes();
+        if panes.toggle_tab(panes.sidebar_tab().unwrap_or_default()) {
+            self.object().notes().rescan();
+        }
+    }
+
     pub(in crate::editor) fn search_notes(&self) {
         self.object().notes().show_search();
     }

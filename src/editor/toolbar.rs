@@ -21,6 +21,8 @@ const CHARACTER: &[&str] = &["bold", "italic", "underline", "strike", "highlight
 const PARAGRAPH: &[&str] = &["heading", "list", "quote", "codeblock", "alert"];
 const INSERT: &[&str] = &["link", "image", "table", "formula", "diagram", "more"];
 const TRAILING: &[&str] = &["preview", "share", "new"];
+/// Navigational items, which AppKit places before the window's title.
+const LEADING: &[&str] = &["sidebar"];
 /// Each group is one segmented control: macOS 26 gives every menu button of its own a separate glass background,
 /// which breaks a row of mixed buttons into many small islands.
 const GROUPS: &[(&str, &str, &[&str])] = &[
@@ -181,14 +183,15 @@ fn ids(names: &[&str]) -> Vec<Retained<NSString>> {
 }
 
 fn default_names<'a>(space: &'a str, flexible: &'a str) -> Vec<&'a str> {
-    let mut all = vec![GROUPS[0].0, space, GROUPS[1].0, space, GROUPS[2].0, flexible];
+    let mut all = LEADING.to_vec();
+    all.extend([GROUPS[0].0, space, GROUPS[1].0, space, GROUPS[2].0, flexible]);
     all.extend(TRAILING);
     all
 }
 
 fn allowed_names<'a>(space: &'a str, flexible: &'a str) -> Vec<&'a str> {
     let mut all: Vec<&str> = GROUPS.iter().map(|g| g.0).collect();
-    for names in [CHARACTER, PARAGRAPH, INSERT, TRAILING, EXTRA] {
+    for names in [LEADING, CHARACTER, PARAGRAPH, INSERT, TRAILING, EXTRA] {
         all.extend(names);
     }
     all.extend([space, flexible]);
@@ -314,6 +317,7 @@ fn entry(id: &str) -> Option<Entry> {
         "rule" => Entry::Command(Action::Rule),
         "clear" => Entry::Command(Action::RemoveFormatting),
         "preview" => Entry::Command(Action::TogglePreview),
+        "sidebar" => Entry::Command(Action::ToggleSidebar),
         "new" => Entry::Command(Action::NewTab),
         "heading" => Entry::Variants(Action::Heading),
         "codeblock" => Entry::Variants(Action::CodeBlock),
@@ -431,6 +435,7 @@ pub fn make(
     if gives_way_first(id) {
         item.setVisibilityPriority(NSToolbarItemVisibilityPriorityLow);
     }
+    item.setNavigational(LEADING.contains(&id));
     Some(item)
 }
 
@@ -482,10 +487,11 @@ mod tests {
     }
 
     #[test]
-    fn the_default_toolbar_is_the_three_groups_and_what_stands_behind_them() {
+    fn the_default_toolbar_is_the_sidebar_button_the_three_groups_and_what_stands_behind_them() {
         assert_eq!(
             default_names("space", "flexible"),
             [
+                "sidebar",
                 "group.character",
                 "space",
                 "group.paragraph",
@@ -543,6 +549,7 @@ mod tests {
             ("rule", sel!(mdInsertRule:)),
             ("clear", sel!(mdRemoveFormatting:)),
             ("preview", sel!(mdTogglePreview:)),
+            ("sidebar", sel!(mdToggleSidebar:)),
             ("new", sel!(mdNewTab:)),
         ] {
             let Some(Entry::Command(action)) = entry(id) else {
@@ -626,6 +633,7 @@ mod tests {
             "preview",
             "share",
             "new",
+            "sidebar",
         ] {
             assert!(!gives_way_first(id), "{id}");
         }

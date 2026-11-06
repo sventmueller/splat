@@ -164,12 +164,12 @@ Mỗi tài liệu mở trong một cửa sổ riêng, hoặc thành một tab n�
 
 - **Bên trái: mã nguồn.** Markdown của bạn bằng phông SF Mono với màu cú pháp.
 - **Bên phải: bản xem trước.** Tài liệu đã hiển thị, sẵn sàng để sửa.
-- **Thanh bên (tùy chọn).** Tất cả đề mục dưới dạng cây, bấm vào một đề mục sẽ hiển thị nó ở cả hai ngăn: **Xem › Hiển thị Dàn ý** (⌃⌘S). Hai tab nữa chứa [các ghi chú trong thư mục](#ghi-chú-trong-thư-mục) và phần tìm kiếm trong chúng.
+- **Thanh bên (tùy chọn).** Tất cả đề mục dưới dạng cây, bấm vào một đề mục sẽ hiển thị nó ở cả hai ngăn: **Xem › Hiển thị Dàn ý** (⌃⌘S). Hai tab nữa chứa [các ghi chú trong thư mục](#ghi-chú-trong-thư-mục) và phần tìm kiếm trong chúng. Nút bên cạnh tiêu đề cửa sổ hiển thị và ẩn thanh bên, và cửa sổ mới mở thanh bên giống như cửa sổ cuối cùng đã để lại.
 - **Thanh công cụ.** Các nút được nhóm theo thứ chúng thay đổi: ký tự, đoạn văn và thành phần được chèn, rồi bật tắt bản xem trước, Chia sẻ và Tài liệu mới. Tùy chỉnh bằng **Xem › Tùy chỉnh thanh công cụ…**.
 
 Kéo thanh phân cách để dành thêm chỗ cho bên nào cũng được. **Xem › Ẩn Bản xem trước** (⌥⌘P) chỉ để lại mã nguồn; Splat nhớ điều này theo từng cửa sổ. Cả hai ngăn cuộn cùng nhau, và phần chọn ở một ngăn được tô sáng ở ngăn kia.
 
-Góc cửa sổ hiển thị số từ và số ký tự của văn bản cùng thời gian đọc, và của phần chọn khi có phần chọn. Địa chỉ liên kết, thẻ HTML, siêu dữ liệu, chú thích, công thức và sơ đồ không được tính. **Xem › Ẩn Số từ** bỏ phần này đi.
+Góc cửa sổ hiển thị số từ và số ký tự của văn bản cùng thời gian đọc, và của phần chọn khi có phần chọn. Địa chỉ liên kết, thẻ HTML, siêu dữ liệu, chú thích, công thức và sơ đồ không được tính. Phần này ẩn lúc đầu; **Xem › Hiển thị Số từ** sẽ bật nó lên.
 
 ### Tài liệu, tab và phiên bản
 

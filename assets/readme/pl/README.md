@@ -164,12 +164,12 @@ Każdy dokument otwiera się we własnym oknie albo, jeśli wolisz karty, w karc
 
 - **Po lewej: tekst źródłowy.** Twój Markdown czcionką SF Mono, z kolorowaniem składni.
 - **Po prawej: podgląd.** Wyrenderowany dokument, gotowy do edycji.
-- **Panel boczny (opcjonalny).** Wszystkie nagłówki jako drzewo, kliknięcie jednego pokazuje go w obu panelach: **Widok › Pokaż konspekt** (⌃⌘S). Dwie kolejne karty zawierają [notatki w folderze](#notatki-w-folderze) i ich wyszukiwanie.
+- **Panel boczny (opcjonalny).** Wszystkie nagłówki jako drzewo, kliknięcie jednego pokazuje go w obu panelach: **Widok › Pokaż konspekt** (⌃⌘S). Dwie kolejne karty zawierają [notatki w folderze](#notatki-w-folderze) i ich wyszukiwanie. Przycisk obok tytułu okna pokazuje go i ukrywa, a nowe okna otwierają go tak, jak zostawiło go ostatnie okno.
 - **Pasek narzędzi.** Przyciski pogrupowane według tego, co zmieniają: znaki, akapity i wstawiane elementy, potem włączanie i wyłączanie podglądu, Udostępnij i Nowy dokument. Dostosujesz go poleceniem **Widok › Dostosuj pasek narzędzi…**.
 
 Przeciągnij separator, aby dać któremuś panelowi więcej miejsca. **Widok › Ukryj podgląd** (⌥⌘P) zostawia sam tekst źródłowy; Splat zapamiętuje to osobno dla każdego okna. Oba panele przewijają się razem, a zaznaczenie w jednym jest podświetlone w drugim.
 
-W rogu okna widać liczbę wyrazów i znaków tekstu oraz czas czytania, a dopóki istnieje zaznaczenie, również te dane dla zaznaczenia. Adresy łączy, znaczniki HTML, metadane, komentarze, wzory i diagramy się nie liczą. **Widok › Ukryj liczbę wyrazów** to wyłącza.
+W rogu okna widać liczbę wyrazów i znaków tekstu oraz czas czytania, a dopóki istnieje zaznaczenie, również te dane dla zaznaczenia. Adresy łączy, znaczniki HTML, metadane, komentarze, wzory i diagramy się nie liczą. Domyślnie ta informacja jest ukryta; **Widok › Pokaż liczbę wyrazów** ją włącza.
 
 ### Dokumenty, karty i wersje
 

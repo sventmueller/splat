@@ -4,11 +4,14 @@ use std::cell::Cell;
 
 use block2::RcBlock;
 use objc2::MainThreadMarker;
-use objc2_app_kit::NSApplication;
+use objc2_app_kit::{NSApplication, NSDocumentController};
 use objc2_foundation::{NSRange, NSTimer};
 
 use super::super::EditorController;
-use super::{after, check, editor, finish};
+use super::super::actions::Action;
+use super::super::sidebar::SidebarTab;
+use super::{after, check, editor, finish, perform};
+use crate::document::MdDocument;
 
 /// Drags the window's lower right corner through AppKit's own resize tracking, as a user does, and checks that the
 /// source text follows the width while the mouse is still down.
@@ -95,7 +98,7 @@ pub(super) fn resize_probe(mtm: MainThreadMarker) {
                         lag.get()
                     ),
                 );
-                panes_toggled_while_scrolled_away(mtm, PANE_TOGGLE_ROUNDS);
+                sidebar_keeps_the_ratio(mtm);
                 return;
             }
             _ => return,
@@ -111,6 +114,74 @@ pub(super) fn resize_probe(mtm: MainThreadMarker) {
     unsafe {
         objc2_foundation::NSRunLoop::currentRunLoop().addTimer_forMode(&timer, objc2_foundation::NSRunLoopCommonModes)
     };
+}
+
+/// The widths of the source and the preview pane.
+fn pane_widths(e: &EditorController) -> (f64, f64) {
+    let width = |view: &objc2_app_kit::NSTextView| {
+        view.enclosingScrollView()
+            .and_then(|scroll| unsafe { scroll.superview() })
+            .map_or(0.0, |pane| pane.frame().size.width)
+    };
+    (width(e.source()), width(e.preview()))
+}
+
+/// Whether a window opened now shows the sidebar, and on which tab.
+fn new_window_sidebar(mtm: MainThreadMarker) -> Option<(bool, Option<SidebarTab>)> {
+    let document = NSDocumentController::sharedDocumentController(mtm)
+        .openUntitledDocumentAndDisplay_error(false)
+        .ok()?;
+    document.makeWindowControllers();
+    let shown = document
+        .downcast_ref::<MdDocument>()
+        .and_then(|d| d.editor())
+        .map(|e| (e.panes().sidebar_visible(), e.panes().sidebar_tab()));
+    document.close();
+    shown
+}
+
+/// The divider was moved off the middle above: the sidebar coming and going leaves that share to the source, and a new
+/// window opens the sidebar as the last one left it.
+fn sidebar_keeps_the_ratio(mtm: MainThreadMarker) {
+    let Some(e) = editor(mtm) else { return };
+    let measure = |e: &EditorController| {
+        if let Some(window) = e.window() {
+            window.layoutIfNeeded();
+        }
+        let (source, preview) = pane_widths(e);
+        (source, preview, source / (source + preview).max(1.0))
+    };
+    let toggle = |e: &EditorController| perform(e, Action::ToggleSidebar.spec().selector, 0);
+    let before = measure(&e);
+    toggle(&e);
+    // Past the time `settlePanes` waits for an animation.
+    after(1.0, move || {
+        let Some(e) = editor(mtm) else { return };
+        let shown = measure(&e);
+        let opened_shown = new_window_sidebar(mtm);
+        toggle(&e);
+        after(1.0, move || {
+            let Some(e) = editor(mtm) else { return };
+            let hidden = measure(&e);
+            let near = |a: f64, b: f64| (a - b).abs() < 0.005;
+            check(
+                "the sidebar takes its room from source and preview alike",
+                shown.0 + shown.1 < before.0 + before.1 - 100.0 && near(shown.2, before.2) && near(hidden.2, before.2),
+                &format!(
+                    "source and preview {:.0} + {:.0}, with the sidebar {:.0} + {:.0}, without it again {:.0} + {:.0}",
+                    before.0, before.1, shown.0, shown.1, hidden.0, hidden.1
+                ),
+            );
+            let opened_hidden = new_window_sidebar(mtm);
+            check(
+                "a new window opens the sidebar as the last one left it",
+                opened_shown == Some((true, Some(SidebarTab::Outline)))
+                    && opened_hidden.is_some_and(|(shown, _)| !shown),
+                &format!("after showing {opened_shown:?}, after hiding {opened_hidden:?}"),
+            );
+            panes_toggled_while_scrolled_away(mtm, PANE_TOGGLE_ROUNDS);
+        });
+    });
 }
 
 const PANE_TOGGLE_ROUNDS: usize = 100;

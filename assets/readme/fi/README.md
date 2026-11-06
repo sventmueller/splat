@@ -164,12 +164,12 @@ Jokainen dokumentti avautuu omaan ikkunaansa tai välilehteen, jos pidät välil
 
 - **Vasemmalla: lähdeteksti.** Markdownisi SF Monolla ja syntaksiväreillä.
 - **Oikealla: esikatselu.** Renderöity dokumentti, valmiina muokattavaksi.
-- **Sivupalkki (valinnainen).** Kaikki otsikot puuna, otsikon napsautus näyttää sen molemmissa ruuduissa: **Näytä › Näytä jäsennys** (⌃⌘S). Kahdella muulla välilehdellä ovat [kansion muistiinpanot](#muistiinpanot-kansiossa) ja niiden haku.
+- **Sivupalkki (valinnainen).** Kaikki otsikot puuna, otsikon napsautus näyttää sen molemmissa ruuduissa: **Näytä › Näytä jäsennys** (⌃⌘S). Kahdella muulla välilehdellä ovat [kansion muistiinpanot](#muistiinpanot-kansiossa) ja niiden haku. Ikkunan otsikon vieressä oleva painike näyttää ja kätkee sen, ja uudet ikkunat avaavat sen sellaisena kuin viimeisin ikkuna sen jätti.
 - **Työkalupalkki.** Painikkeet ryhmiteltyinä sen mukaan, mitä ne muuttavat: merkit, kappaleet ja lisättävät elementit, sitten esikatselun näyttö päälle tai pois, Jaa ja Uusi dokumentti. Muokkaa sitä valinnalla **Näytä › Muokkaa työkalupalkkia…**.
 
 Vedä jakajaa antaaksesi jommallekummalle puolelle enemmän tilaa. **Näytä › Kätke esikatselu** (⌥⌘P) jättää vain lähdetekstin; Splat muistaa tämän ikkunakohtaisesti. Molemmat ruudut vierittyvät yhdessä, ja toisessa ruudussa tehty valinta korostuu toisessa.
 
-Ikkunan kulmassa näkyvät tekstin sanat ja merkit ja sen lukuaika sekä valinnan vastaavat tiedot, kun valinta on olemassa. Linkkien osoitteita, HTML-tageja, metatietoja, kommentteja, kaavoja ja kaavioita ei lasketa. **Näytä › Kätke sanamäärä** poistaa sen näkyvistä.
+Ikkunan kulmassa näkyvät tekstin sanat ja merkit ja sen lukuaika sekä valinnan vastaavat tiedot, kun valinta on olemassa. Linkkien osoitteita, HTML-tageja, metatietoja, kommentteja, kaavoja ja kaavioita ei lasketa. Se on aluksi piilossa; **Näytä › Näytä sanamäärä** tuo sen näkyviin.
 
 ### Dokumentit, välilehdet ja versiot
 

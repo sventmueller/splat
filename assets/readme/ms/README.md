@@ -164,12 +164,12 @@ Setiap dokumen dibuka dalam tetingkapnya sendiri, atau sebagai tab jika anda leb
 
 - **Kiri: sumber.** Markdown anda dalam SF Mono dengan warna sintaks.
 - **Kanan: pratonton.** Dokumen yang telah dipaparkan, sedia untuk diedit.
-- **Bar sisi (pilihan).** Semua tajuk sebagai pepohon, satu klik pada tajuk menunjukkannya dalam kedua-dua anak tetingkap: **Paparan › Tunjukkan Rangka** (⌃⌘S). Dua lagi tab memuatkan [nota dalam folder](#nota-dalam-folder) dan carian melaluinya.
+- **Bar sisi (pilihan).** Semua tajuk sebagai pepohon, satu klik pada tajuk menunjukkannya dalam kedua-dua anak tetingkap: **Paparan › Tunjukkan Rangka** (⌃⌘S). Dua lagi tab memuatkan [nota dalam folder](#nota-dalam-folder) dan carian melaluinya. Butang di sebelah tajuk tetingkap menunjukkan dan menyembunyikannya, dan tetingkap baharu membukanya seperti yang ditinggalkan oleh tetingkap terakhir.
 - **Bar alat.** Butang yang dikumpulkan mengikut apa yang diubahnya: aksara, perenggan dan elemen yang dimasukkan, kemudian pratonton hidup/mati, Kongsi dan Dokumen Baharu. Sesuaikannya dengan **Paparan › Sesuaikan Bar Alat…**.
 
 Seret pembahagi untuk memberi lebih ruang kepada mana-mana sebelah. **Paparan › Sembunyikan Pratonton** (⌥⌘P) meninggalkan sumber sahaja; Splat mengingatinya bagi setiap tetingkap. Kedua-dua anak tetingkap tergulung bersama, dan pilihan dalam satu anak tetingkap diserlahkan dalam yang satu lagi.
 
-Penjuru tetingkap menunjukkan bilangan perkataan dan aksara teks serta berapa lama masa untuk membacanya, dan selagi ada pilihan, yang sama bagi pilihan itu. Alamat pautan, teg HTML, metadata, ulasan, formula dan rajah tidak dikira. **Paparan › Sembunyikan Bilangan Perkataan** membuangnya.
+Penjuru tetingkap menunjukkan bilangan perkataan dan aksara teks serta berapa lama masa untuk membacanya, dan selagi ada pilihan, yang sama bagi pilihan itu. Alamat pautan, teg HTML, metadata, ulasan, formula dan rajah tidak dikira. Ia tersembunyi pada mulanya; **Paparan › Tunjukkan Bilangan Perkataan** menunjukkannya.
 
 ### Dokumen, tab dan versi
 

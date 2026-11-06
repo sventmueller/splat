@@ -18,7 +18,7 @@ use crate::i18n::{t, tf};
 use crate::markdown::counts::{self, Counts};
 use crate::util::{contained, ns, perform_later};
 
-/// User defaults key of the switch in the View menu; without an answer the count shows.
+/// User defaults key of the switch in the View menu; without an answer the count stays hidden.
 const HIDDEN_KEY: &str = "HidesWordCount";
 /// Long enough that typing and dragging a selection do not count for every step.
 const SETTLE_SECONDS: f64 = 0.15;
@@ -68,7 +68,15 @@ impl<'a> WordCounter<'a> {
 
 /// Whether windows show the count.
 pub(super) fn is_on() -> bool {
-    !NSUserDefaults::standardUserDefaults().boolForKey(&ns(HIDDEN_KEY))
+    let defaults = NSUserDefaults::standardUserDefaults();
+    let hides = defaults
+        .objectForKey(&ns(HIDDEN_KEY))
+        .map(|_| defaults.boolForKey(&ns(HIDDEN_KEY)));
+    shows(hides)
+}
+
+fn shows(hides: Option<bool>) -> bool {
+    hides == Some(false)
 }
 
 pub(super) fn set_on(on: bool) {
@@ -355,6 +363,13 @@ mod tests {
             characters,
             signs: 0,
         }
+    }
+
+    #[test]
+    fn the_count_shows_only_once_someone_asked_for_it() {
+        assert!(!shows(None));
+        assert!(!shows(Some(true)));
+        assert!(shows(Some(false)));
     }
 
     #[test]

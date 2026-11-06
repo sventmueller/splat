@@ -220,6 +220,7 @@ the search command shows the search
 the sheet proposes the name without its extension
 the sheet shows what is set
 the shown image survives
+the sidebar button stands between the window buttons and the title
 the sidebar takes its room beside the source
 the source draws each mark, from the top down
 the table dialog inserts a table of three by three
