@@ -11,7 +11,7 @@ This overview is an ordinary document: try things out in it, in the source on th
 | <ins>Underline</ins> | `<ins>Underline</ins>` | ⌘U |
 | ~~Strikethrough~~ | `~~Strikethrough~~` | ⇧⌘X |
 | <mark>Highlight</mark> | `<mark>Highlight</mark>` | |
-| `Code` | `` `Code` `` | |
+| `Code` | `` `Code` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

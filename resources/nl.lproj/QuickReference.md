@@ -11,7 +11,7 @@ Dit overzicht is een gewoon document: je kunt erin uitproberen wat je wilt, link
 | <ins>Onderstreept</ins> | `<ins>Onderstreept</ins>` | ⌘U |
 | ~~Doorgehaald~~ | `~~Doorgehaald~~` | ⇧⌘X |
 | <mark>Markering</mark> | `<mark>Markering</mark>` | |
-| `Code` | `` `Code` `` | |
+| `Code` | `` `Code` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

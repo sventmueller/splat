@@ -524,6 +524,7 @@ Le texte hébreu et arabe se lit de droite à gauche partout où il apparaît, q
 |---|---|
 | Gras, Italique, Souligné | ⌘B, ⌘I, ⌘U |
 | Barré | ⇧⌘X |
+| Code | ⌥⇧⌘C |
 | Lien… | ⌘K |
 | Corps de texte, Titre 1 à 6 | ⌥⌘0, ⌥⌘1 à ⌥⌘6 |
 | Aligner la colonne du tableau à gauche, au centre, à droite | ⌘{, ⌘\|, ⌘} |

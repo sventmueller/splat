@@ -11,7 +11,7 @@ Denne oversikten er et vanlig dokument: Du kan prøve ting i den, til venstre i 
 | <ins>Understreket</ins> | `<ins>Understreket</ins>` | ⌘U |
 | ~~Gjennomstreket~~ | `~~Gjennomstreket~~` | ⇧⌘X |
 | <mark>Uthevet</mark> | `<mark>Uthevet</mark>` | |
-| `Kode` | `` `Kode` `` | |
+| `Kode` | `` `Kode` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Lenke](https://example.com) | `[Lenke](https://example.com)` | ⌘K |

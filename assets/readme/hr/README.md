@@ -524,6 +524,7 @@ Hebrejski i arapski tekst čita se zdesna nalijevo gdje god se pojavi, bez obzir
 |---|---|
 | Podebljano, Kurziv, Podcrtano | ⌘B, ⌘I, ⌘U |
 | Precrtano | ⇧⌘X |
+| Kod | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Osnovni tekst, Naslov 1 do 6 | ⌥⌘0, ⌥⌘1 do ⌥⌘6 |
 | Poravnaj stupac tablice lijevo, centrirano, desno | ⌘{, ⌘\|, ⌘} |

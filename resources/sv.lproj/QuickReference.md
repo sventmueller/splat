@@ -11,7 +11,7 @@ Den här översikten är ett vanligt dokument: du kan prova saker i den, till v�
 | <ins>Understruken</ins> | `<ins>Understruken</ins>` | ⌘U |
 | ~~Genomstruken~~ | `~~Genomstruken~~` | ⇧⌘X |
 | <mark>Markerad</mark> | `<mark>Markerad</mark>` | |
-| `Kod` | `` `Kod` `` | |
+| `Kod` | `` `Kod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Länk](https://example.com) | `[Länk](https://example.com)` | ⌘K |

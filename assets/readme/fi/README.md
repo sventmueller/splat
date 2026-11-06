@@ -524,6 +524,7 @@ Heprean ja arabian teksti luetaan oikealta vasemmalle kaikkialla, missä se esii
 |---|---|
 | Lihavoi, Kursivoi, Alleviivaa | ⌘B, ⌘I, ⌘U |
 | Yliviivaa | ⇧⌘X |
+| Koodi | ⌥⇧⌘C |
 | Linkki… | ⌘K |
 | Leipäteksti, Otsikko 1–6 | ⌥⌘0, ⌥⌘1–⌥⌘6 |
 | Tasaa taulukon sarake vasemmalle, keskelle, oikealle | ⌘{, ⌘\|, ⌘} |

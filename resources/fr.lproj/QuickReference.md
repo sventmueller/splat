@@ -11,7 +11,7 @@ Cette vue d’ensemble est un document ordinaire : faites-y vos essais, à gauc
 | <ins>Souligné</ins> | `<ins>Souligné</ins>` | ⌘U |
 | ~~Barré~~ | `~~Barré~~` | ⇧⌘X |
 | <mark>Surbrillance</mark> | `<mark>Surbrillance</mark>` | |
-| `Code` | `` `Code` `` | |
+| `Code` | `` `Code` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Lien](https://example.com) | `[Lien](https://example.com)` | ⌘K |

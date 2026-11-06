@@ -169,7 +169,7 @@ impl Action {
             Underline => (sel!(mdUnderline:), n("Unterstrichen"), "", n("Markierten Text unterstreichen"), "cmd+u", "underline", OutsideCode),
             Strikethrough => (sel!(mdStrikethrough:), n("Durchgestrichen"), "", n("Markierten Text durchstreichen"), "shift+cmd+x", "strikethrough", OutsideCode),
             Highlight => (sel!(mdHighlight:), n("Textmarker"), "", n("Markierten Text farbig hervorheben"), "", "highlighter", OutsideCode),
-            InlineCode => (sel!(mdInlineCode:), n("Code"), "", n("Markierten Text als Code formatieren"), "", "chevron.left.forwardslash.chevron.right", OutsideCode),
+            InlineCode => (sel!(mdInlineCode:), n("Code"), "", n("Markierten Text als Code formatieren"), "alt+shift+cmd+c", "chevron.left.forwardslash.chevron.right", OutsideCode),
             Superscript => (sel!(mdSuperscript:), n("Hochgestellt"), "", n("Markierten Text hochstellen"), "", "textformat.superscript", InText),
             Subscript => (sel!(mdSubscript:), n("Tiefgestellt"), "", n("Markierten Text tiefstellen"), "", "textformat.subscript", InText),
             Heading => (sel!(mdHeading:), n("Überschrift"), "", n("Absatz als Überschrift oder Fließtext formatieren"), "", "h.square", InText),

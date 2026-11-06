@@ -11,7 +11,7 @@ Ten przegląd to zwykły dokument: możesz w nim wszystko wypróbować, po lewej
 | <ins>Podkreślenie</ins> | `<ins>Podkreślenie</ins>` | ⌘U |
 | ~~Przekreślenie~~ | `~~Przekreślenie~~` | ⇧⌘X |
 | <mark>Wyróżnienie</mark> | `<mark>Wyróżnienie</mark>` | |
-| `Kod` | `` `Kod` `` | |
+| `Kod` | `` `Kod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Łącze](https://example.com) | `[Łącze](https://example.com)` | ⌘K |

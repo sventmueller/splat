@@ -11,7 +11,7 @@ Questa panoramica è un normale documento: puoi fare delle prove, a sinistra nel
 | <ins>Sottolineato</ins> | `<ins>Sottolineato</ins>` | ⌘U |
 | ~~Barrato~~ | `~~Barrato~~` | ⇧⌘X |
 | <mark>Evidenziato</mark> | `<mark>Evidenziato</mark>` | |
-| `Codice` | `` `Codice` `` | |
+| `Codice` | `` `Codice` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

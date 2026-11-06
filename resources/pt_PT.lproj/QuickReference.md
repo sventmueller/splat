@@ -11,7 +11,7 @@ Esta vista geral é um documento normal: pode fazer experiências nele, no códi
 | <ins>Sublinhado</ins> | `<ins>Sublinhado</ins>` | ⌘U |
 | ~~Riscado~~ | `~~Riscado~~` | ⇧⌘X |
 | <mark>Destaque</mark> | `<mark>Destaque</mark>` | |
-| `Código` | `` `Código` `` | |
+| `Código` | `` `Código` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Hiperligação](https://example.com) | `[Hiperligação](https://example.com)` | ⌘K |

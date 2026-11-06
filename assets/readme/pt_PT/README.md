@@ -524,6 +524,7 @@ O texto em hebraico e em árabe lê-se da direita para a esquerda onde quer que 
 |---|---|
 | Negrito, Itálico, Sublinhado | ⌘B, ⌘I, ⌘U |
 | Riscado | ⇧⌘X |
+| Código | ⌥⇧⌘C |
 | Criar hiperligação… | ⌘K |
 | Corpo de texto, Título 1 a 6 | ⌥⌘0, ⌥⌘1 a ⌥⌘6 |
 | Alinhar a coluna da tabela à esquerda, ao centro, à direita | ⌘{, ⌘\|, ⌘} |

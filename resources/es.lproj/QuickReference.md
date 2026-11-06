@@ -11,7 +11,7 @@ Esta guía es un documento normal: puedes hacer pruebas en ella, en el código f
 | <ins>Subrayado</ins> | `<ins>Subrayado</ins>` | ⌘U |
 | ~~Tachado~~ | `~~Tachado~~` | ⇧⌘X |
 | <mark>Resaltado</mark> | `<mark>Resaltado</mark>` | |
-| `Código` | `` `Código` `` | |
+| `Código` | `` `Código` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Enlace](https://example.com) | `[Enlace](https://example.com)` | ⌘K |

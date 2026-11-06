@@ -11,7 +11,7 @@
 | <ins>底線</ins> | `<ins>底線</ins>` | ⌘U |
 | ~~刪除線~~ | `~~刪除線~~` | ⇧⌘X |
 | <mark>醒目標示</mark> | `<mark>醒目標示</mark>` | |
-| `程式碼` | `` `程式碼` `` | |
+| `程式碼` | `` `程式碼` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [連結](https://example.com) | `[連結](https://example.com)` | ⌘K |

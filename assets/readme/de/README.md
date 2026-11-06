@@ -524,6 +524,7 @@ Hebräischer und arabischer Text läuft überall, wo er erscheint, von rechts na
 |---|---|
 | Fett, Kursiv, Unterstrichen | ⌘B, ⌘I, ⌘U |
 | Durchgestrichen | ⇧⌘X |
+| Code | ⌥⇧⌘C |
 | Link … | ⌘K |
 | Fließtext, Überschrift 1 bis 6 | ⌥⌘0, ⌥⌘1 bis ⌥⌘6 |
 | Tabellenspalte links, zentriert, rechts ausrichten | ⌘{, ⌘\|, ⌘} |

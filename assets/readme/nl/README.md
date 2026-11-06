@@ -699,6 +699,7 @@ systeemtaal spiegelt macOS ook het venster, zodat de voorvertoning links staat.
 |---|---|
 | Vet, Cursief, Onderstreept | ⌘B, ⌘I, ⌘U |
 | Doorgehaald | ⇧⌘X |
+| Code | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Hoofdtekst, Koptekst 1 tot 6 | ⌥⌘0, ⌥⌘1 tot ⌥⌘6 |
 | Tabelkolom links, gecentreerd, rechts uitlijnen | ⌘{, ⌘\|, ⌘} |

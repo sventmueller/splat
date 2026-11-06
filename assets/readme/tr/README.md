@@ -524,6 +524,7 @@ Splat, **Sistem Ayarları › Genel › Dil ve Bölge** içindeki dil sırasın�
 |---|---|
 | Kalın, İtalik, Altı Çizgili | ⌘B, ⌘I, ⌘U |
 | Üstü çizgili | ⇧⌘X |
+| Kod | ⌥⇧⌘C |
 | Bağlantı… | ⌘K |
 | Gövde metni, Başlık 1–6 | ⌥⌘0, ⌥⌘1 ile ⌥⌘6 arası |
 | Tablo sütununu sola, ortaya, sağa hizala | ⌘{, ⌘\|, ⌘} |

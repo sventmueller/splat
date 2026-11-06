@@ -11,7 +11,7 @@ Tento prehľad je bežný dokument: môžete si v ňom všetko vyskúšať, vľa
 | <ins>Podčiarknuté</ins> | `<ins>Podčiarknuté</ins>` | ⌘U |
 | ~~Preškrtnuté~~ | `~~Preškrtnuté~~` | ⇧⌘X |
 | <mark>Zvýraznenie</mark> | `<mark>Zvýraznenie</mark>` | |
-| `Kód` | `` `Kód` `` | |
+| `Kód` | `` `Kód` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Odkaz](https://example.com) | `[Odkaz](https://example.com)` | ⌘K |

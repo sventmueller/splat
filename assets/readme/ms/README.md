@@ -523,6 +523,7 @@ Teks Ibrani dan Arab dibaca dari kanan ke kiri di mana-mana ia muncul, apa pun b
 |---|---|
 | Tebal, Italik, Garis Bawah | ⌘B, ⌘I, ⌘U |
 | Garis Potong | ⇧⌘X |
+| Kod | ⌥⇧⌘C |
 | Pautan… | ⌘K |
 | Teks badan, Tajuk 1 hingga 6 | ⌥⌘0, ⌥⌘1 hingga ⌥⌘6 |
 | Jajarkan lajur jadual ke kiri, tengah, kanan | ⌘{, ⌘\|, ⌘} |

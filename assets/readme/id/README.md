@@ -524,6 +524,7 @@ Teks Ibrani dan Arab dibaca dari kanan ke kiri di mana pun muncul, apa pun bahas
 |---|---|
 | Tebal, Cetak Miring, Garis Bawahi | ⌘B, ⌘I, ⌘U |
 | Coret | ⇧⌘X |
+| Kode | ⌥⇧⌘C |
 | Tautan… | ⌘K |
 | Teks isi, Heading 1 sampai 6 | ⌥⌘0, ⌥⌘1 sampai ⌥⌘6 |
 | Ratakan kolom tabel ke kiri, tengah, kanan | ⌘{, ⌘\|, ⌘} |

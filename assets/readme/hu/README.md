@@ -524,6 +524,7 @@ A héber és az arab szöveg mindenhol jobbról balra olvasódik, bármi is a fe
 |---|---|
 | Félkövér, Dőlt, Aláhúzás | ⌘B, ⌘I, ⌘U |
 | Áthúzás | ⇧⌘X |
+| Kód | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Szövegtörzs, 1–6. címsor | ⌥⌘0, ⌥⌘1–⌥⌘6 |
 | Táblázatoszlop balra, középre, jobbra igazítása | ⌘{, ⌘\|, ⌘} |

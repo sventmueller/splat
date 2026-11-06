@@ -11,7 +11,7 @@
 | <ins>تسطير</ins> | `<ins>تسطير</ins>` | ⌘U |
 | ~~يتوسطه خط~~ | `~~يتوسطه خط~~` | ⇧⌘X |
 | <mark>تمييز</mark> | `<mark>تمييز</mark>` | |
-| `رمز` | `` `رمز` `` | |
+| `رمز` | `` `رمز` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [رابط](https://example.com) | `[رابط](https://example.com)` | ⌘K |

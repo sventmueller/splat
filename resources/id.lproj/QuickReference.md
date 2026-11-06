@@ -11,7 +11,7 @@ Ikhtisar ini adalah dokumen biasa: Anda dapat mencoba langsung di dalamnya, di s
 | <ins>Garis bawah</ins> | `<ins>Garis bawah</ins>` | ⌘U |
 | ~~Coret~~ | `~~Coret~~` | ⇧⌘X |
 | <mark>Sorot</mark> | `<mark>Sorot</mark>` | |
-| `Kode` | `` `Kode` `` | |
+| `Kode` | `` `Kode` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Tautan](https://example.com) | `[Tautan](https://example.com)` | ⌘K |

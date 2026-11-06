@@ -524,6 +524,7 @@ Tekst hebrajski i arabski biegnie od prawej do lewej wszędzie, gdzie się pojaw
 |---|---|
 | Pogrubienie, Kursywa, Podkreślenie | ⌘B, ⌘I, ⌘U |
 | Przekreślenie | ⇧⌘X |
+| Kod | ⌥⇧⌘C |
 | Łącze… | ⌘K |
 | Tekst główny, Nagłówek od 1 do 6 | ⌥⌘0, ⌥⌘1 do ⌥⌘6 |
 | Wyrównanie kolumny tabeli do lewej, środka, prawej | ⌘{, ⌘\|, ⌘} |

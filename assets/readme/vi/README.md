@@ -523,6 +523,7 @@ Văn bản tiếng Do Thái và Ả Rập đọc từ phải sang trái ở bấ
 |---|---|
 | Đậm, Nghiêng, Gạch chân | ⌘B, ⌘I, ⌘U |
 | Gạch xuyên | ⇧⌘X |
+| Mã | ⌥⇧⌘C |
 | Liên kết… | ⌘K |
 | Văn bản thường, Đề mục 1 đến 6 | ⌥⌘0, ⌥⌘1 đến ⌥⌘6 |
 | Căn cột bảng sang trái, giữa, phải | ⌘{, ⌘\|, ⌘} |

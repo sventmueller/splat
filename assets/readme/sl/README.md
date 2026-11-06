@@ -524,6 +524,7 @@ Hebrejsko in arabsko besedilo se vedno bere od desne proti levi, ne glede na jez
 |---|---|
 | Krepko, ležeče, podčrtano | ⌘B, ⌘I, ⌘U |
 | Prečrtano | ⇧⌘X |
+| Koda | ⌥⇧⌘C |
 | Povezava … | ⌘K |
 | Navadno besedilo, naslov 1 do 6 | ⌥⌘0, ⌥⌘1 do ⌥⌘6 |
 | Poravnava stolpca tabele levo, na sredino, desno | ⌘{, ⌘\|, ⌘} |

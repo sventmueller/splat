@@ -11,7 +11,7 @@ Ez az áttekintés egy hagyományos dokumentum: kipróbálhat benne bármit, bal
 | <ins>Aláhúzás</ins> | `<ins>Aláhúzás</ins>` | ⌘U |
 | ~~Áthúzás~~ | `~~Áthúzás~~` | ⇧⌘X |
 | <mark>Kiemelés</mark> | `<mark>Kiemelés</mark>` | |
-| `Kód` | `` `Kód` `` | |
+| `Kód` | `` `Kód` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

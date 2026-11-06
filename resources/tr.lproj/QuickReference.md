@@ -11,7 +11,7 @@ Bu genel bakış sıradan bir belgedir: İçinde soldaki kaynakta veya sağdaki 
 | <ins>Altı çizili</ins> | `<ins>Altı çizili</ins>` | ⌘U |
 | ~~Üstü çizili~~ | `~~Üstü çizili~~` | ⇧⌘X |
 | <mark>Vurgu</mark> | `<mark>Vurgu</mark>` | |
-| `Kod` | `` `Kod` `` | |
+| `Kod` | `` `Kod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Bağlantı](https://example.com) | `[Bağlantı](https://example.com)` | ⌘K |

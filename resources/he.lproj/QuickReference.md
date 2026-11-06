@@ -11,7 +11,7 @@
 | <ins>קו תחתון</ins> | `<ins>קו תחתון</ins>` | ⌘U |
 | ~~קו חוצה~~ | `~~קו חוצה~~` | ⇧⌘X |
 | <mark>הדגשה</mark> | `<mark>הדגשה</mark>` | |
-| `קוד` | `` `קוד` `` | |
+| `קוד` | `` `קוד` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [קישור](https://example.com) | `[קישור](https://example.com)` | ⌘K |

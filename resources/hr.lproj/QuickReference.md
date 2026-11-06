@@ -11,7 +11,7 @@ Ovaj je vodič običan dokument: u njemu možete isprobavati, lijevo u izvornom 
 | <ins>Podcrtano</ins> | `<ins>Podcrtano</ins>` | ⌘U |
 | ~~Precrtano~~ | `~~Precrtano~~` | ⇧⌘X |
 | <mark>Istaknuto</mark> | `<mark>Istaknuto</mark>` | |
-| `Kod` | `` `Kod` `` | |
+| `Kod` | `` `Kod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

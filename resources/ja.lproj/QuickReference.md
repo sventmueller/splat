@@ -11,7 +11,7 @@
 | <ins>アンダーライン</ins> | `<ins>アンダーライン</ins>` | ⌘U |
 | ~~取り消し線~~ | `~~取り消し線~~` | ⇧⌘X |
 | <mark>ハイライト</mark> | `<mark>ハイライト</mark>` | |
-| `コード` | `` `コード` `` | |
+| `コード` | `` `コード` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [リンク](https://example.com) | `[リンク](https://example.com)` | ⌘K |

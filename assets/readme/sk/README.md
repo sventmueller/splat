@@ -524,6 +524,7 @@ Hebrejský a arabský text sa čítajú sprava doľava všade, kde sa objavia, b
 |---|---|
 | Tučné, Kurzíva, Podčiarknuté | ⌘B, ⌘I, ⌘U |
 | Preškrtnuté | ⇧⌘X |
+| Kód | ⌥⇧⌘C |
 | Odkaz… | ⌘K |
 | Základný text, Nadpis 1 až 6 | ⌥⌘0, ⌥⌘1 až ⌥⌘6 |
 | Zarovnať stĺpec tabuľky vľavo, na stred, vpravo | ⌘{, ⌘\|, ⌘} |

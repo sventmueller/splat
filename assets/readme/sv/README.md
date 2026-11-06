@@ -680,6 +680,7 @@ så förhandsvisningen hamnar till vänster.
 |---|---|
 | Fet, Kursiv, Understrykning | ⌘B, ⌘I, ⌘U |
 | Genomstrykning | ⇧⌘X |
+| Kod | ⌥⇧⌘C |
 | Länka… | ⌘K |
 | Brödtext, Rubrik 1 till 6 | ⌥⌘0, ⌥⌘1 till ⌥⌘6 |
 | Justera tabellkolumn vänster, centrerat, höger | ⌘{, ⌘\|, ⌘} |

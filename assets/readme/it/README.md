@@ -524,6 +524,7 @@ Il testo ebraico e arabo si legge da destra a sinistra ovunque compaia, qualunqu
 |---|---|
 | Grassetto, Corsivo, Sottolineato | ⌘B, ⌘I, ⌘U |
 | Barrato | ⇧⌘X |
+| Codice | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Corpo del testo, Intestazione da 1 a 6 | ⌥⌘0, ⌥⌘1 fino a ⌥⌘6 |
 | Allinea la colonna della tabella a sinistra, al centro, a destra | ⌘{, ⌘\|, ⌘} |

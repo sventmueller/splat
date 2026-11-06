@@ -17,7 +17,7 @@ use crate::i18n::{n, t};
 use crate::util::constant;
 use crate::util::{guarded, ns};
 
-const CHARACTER: &[&str] = &["bold", "italic", "underline", "strike", "highlight", "code", "script"];
+const CHARACTER: &[&str] = &["bold", "italic", "underline", "strike", "highlight", "script"];
 const PARAGRAPH: &[&str] = &["heading", "list", "quote", "codeblock", "alert"];
 const INSERT: &[&str] = &["link", "image", "table", "formula", "diagram", "more"];
 const TRAILING: &[&str] = &["preview", "share", "new"];
@@ -31,6 +31,7 @@ const GROUPS: &[(&str, &str, &[&str])] = &[
     ("group.insert", n("Einfügen"), INSERT),
 ];
 const EXTRA: &[&str] = &[
+    "code",
     "superscript",
     "subscript",
     "toc",
@@ -365,7 +366,12 @@ fn gives_way_first(id: &str) -> bool {
 fn variants(mtm: MainThreadMarker, action: Action) -> Vec<Retained<NSMenuItem>> {
     match action {
         Action::Heading => actions::heading_items(mtm, false),
-        Action::CodeBlock => actions::code_block_items(mtm),
+        // Inline code has no segment of its own, so that the default toolbar fits a window of the default width.
+        Action::CodeBlock => {
+            let mut items = vec![actions::item(mtm, Action::InlineCode), NSMenuItem::separatorItem(mtm)];
+            items.extend(actions::code_block_items(mtm));
+            items
+        }
         Action::Alert => actions::alert_items(mtm),
         Action::Diagram => actions::diagram_items(mtm),
         _ => Vec::new(),
@@ -613,8 +619,8 @@ mod tests {
     #[test]
     fn a_segment_stands_for_the_member_at_its_place() {
         assert_eq!(member_of("group.character", 0), Some("bold"));
-        assert_eq!(member_of("group.character", 6), Some("script"));
-        assert_eq!(member_of("group.character", 7), None);
+        assert_eq!(member_of("group.character", 5), Some("script"));
+        assert_eq!(member_of("group.character", 6), None);
         assert_eq!(member_of("group.paragraph", 0), Some("heading"));
         assert_eq!(member_of("group.insert", 5), Some("more"));
         assert_eq!(member_of("bold", 0), None);

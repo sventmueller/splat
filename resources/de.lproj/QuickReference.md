@@ -11,7 +11,7 @@ Diese Übersicht ist ein normales Dokument: Du kannst darin ausprobieren, links 
 | <ins>Unterstrichen</ins> | `<ins>Unterstrichen</ins>` | ⌘U |
 | ~~Durchgestrichen~~ | `~~Durchgestrichen~~` | ⇧⌘X |
 | <mark>Textmarker</mark> | `<mark>Textmarker</mark>` | |
-| `Code` | `` `Code` `` | |
+| `Code` | `` `Code` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

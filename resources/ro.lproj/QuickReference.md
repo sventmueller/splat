@@ -11,7 +11,7 @@ Această prezentare generală este un document obișnuit: puteți încerca lucru
 | <ins>Subliniat</ins> | `<ins>Subliniat</ins>` | ⌘U |
 | ~~Tăiat cu o linie~~ | `~~Tăiat cu o linie~~` | ⇧⌘X |
 | <mark>Evidențiere</mark> | `<mark>Evidențiere</mark>` | |
-| `Cod` | `` `Cod` `` | |
+| `Cod` | `` `Cod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Link](https://example.com) | `[Link](https://example.com)` | ⌘K |

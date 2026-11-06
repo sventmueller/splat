@@ -524,6 +524,7 @@ Textul în ebraică și în arabă se citește de la dreapta la stânga oriunde 
 |---|---|
 | Aldin, Cursiv, Subliniat | ⌘B, ⌘I, ⌘U |
 | Tăiat cu o linie | ⇧⌘X |
+| Cod | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Corp text, Titlu 1 până la 6 | ⌥⌘0, ⌥⌘1 până la ⌥⌘6 |
 | Aliniere coloană de tabel la stânga, centrat, la dreapta | ⌘{, ⌘\|, ⌘} |

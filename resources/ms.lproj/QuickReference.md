@@ -11,7 +11,7 @@ Gambaran keseluruhan ini ialah dokumen biasa: anda boleh mencuba di dalamnya, da
 | <ins>Garis bawah</ins> | `<ins>Garis bawah</ins>` | ⌘U |
 | ~~Garis potong~~ | `~~Garis potong~~` | ⇧⌘X |
 | <mark>Serlahan</mark> | `<mark>Serlahan</mark>` | |
-| `Kod` | `` `Kod` `` | |
+| `Kod` | `` `Kod` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Pautan](https://example.com) | `[Pautan](https://example.com)` | ⌘K |

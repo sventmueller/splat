@@ -11,7 +11,7 @@ Aquesta guia és un document normal: hi pots fer proves, al codi font a l’esqu
 | <ins>Subratllat</ins> | `<ins>Subratllat</ins>` | ⌘U |
 | ~~Ratllat~~ | `~~Ratllat~~` | ⇧⌘X |
 | <mark>Ressaltat</mark> | `<mark>Ressaltat</mark>` | |
-| `Codi` | `` `Codi` `` | |
+| `Codi` | `` `Codi` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Enllaç](https://example.com) | `[Enllaç](https://example.com)` | ⌘K |

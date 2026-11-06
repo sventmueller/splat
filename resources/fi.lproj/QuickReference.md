@@ -11,7 +11,7 @@ Tämä yleiskatsaus on tavallinen dokumentti: voit kokeilla asioita siinä, vase
 | <ins>Alleviivattu</ins> | `<ins>Alleviivattu</ins>` | ⌘U |
 | ~~Yliviivattu~~ | `~~Yliviivattu~~` | ⇧⌘X |
 | <mark>Korostettu</mark> | `<mark>Korostettu</mark>` | |
-| `Koodi` | `` `Koodi` `` | |
+| `Koodi` | `` `Koodi` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Linkki](https://example.com) | `[Linkki](https://example.com)` | ⌘K |

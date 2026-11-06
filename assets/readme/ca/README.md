@@ -523,6 +523,7 @@ El text en hebreu i en àrab es llegeix de dreta a esquerra allà on aparegui, s
 |---|---|
 | Negreta, cursiva, subratllat | ⌘B, ⌘I, ⌘U |
 | Ratllat | ⇧⌘X |
+| Codi | ⌥⇧⌘C |
 | Enllaça… | ⌘K |
 | Cos de text, capçalera de l’1 al 6 | ⌥⌘0, ⌥⌘1 a ⌥⌘6 |
 | Alinea la columna de la taula a l’esquerra, centrada, a la dreta | ⌘{, ⌘\|, ⌘} |

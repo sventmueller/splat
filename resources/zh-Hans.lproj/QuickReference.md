@@ -11,7 +11,7 @@
 | <ins>下划线</ins> | `<ins>下划线</ins>` | ⌘U |
 | ~~删除线~~ | `~~删除线~~` | ⇧⌘X |
 | <mark>高亮</mark> | `<mark>高亮</mark>` | |
-| `代码` | `` `代码` `` | |
+| `代码` | `` `代码` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [链接](https://example.com) | `[链接](https://example.com)` | ⌘K |

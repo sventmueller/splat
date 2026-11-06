@@ -11,7 +11,7 @@
 | <ins>밑줄체</ins> | `<ins>밑줄체</ins>` | ⌘U |
 | ~~취소선~~ | `~~취소선~~` | ⇧⌘X |
 | <mark>하이라이트</mark> | `<mark>하이라이트</mark>` | |
-| `코드` | `` `코드` `` | |
+| `코드` | `` `코드` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [링크](https://example.com) | `[링크](https://example.com)` | ⌘K |

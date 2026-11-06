@@ -11,7 +11,7 @@ Bản tổng quan này là một tài liệu bình thường: bạn có thể th
 | <ins>Gạch chân</ins> | `<ins>Gạch chân</ins>` | ⌘U |
 | ~~Gạch xuyên~~ | `~~Gạch xuyên~~` | ⇧⌘X |
 | <mark>Tô sáng</mark> | `<mark>Tô sáng</mark>` | |
-| `Mã` | `` `Mã` `` | |
+| `Mã` | `` `Mã` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Liên kết](https://example.com) | `[Liên kết](https://example.com)` | ⌘K |

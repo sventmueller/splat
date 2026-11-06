@@ -524,6 +524,7 @@ Hebraisk og arabisk tekst læses fra højre mod venstre, uanset hvor den står o
 |---|---|
 | Fed, Kursiv, Understreget | ⌘B, ⌘I, ⌘U |
 | Gennemstreget | ⇧⌘X |
+| Kode | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Brødtekst, Overskrift 1 til 6 | ⌥⌘0, ⌥⌘1 til ⌥⌘6 |
 | Juster tabelkolonne til venstre, centreret, til højre | ⌘{, ⌘\|, ⌘} |

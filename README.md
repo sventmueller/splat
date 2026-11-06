@@ -674,6 +674,7 @@ so the preview sits on the left.
 |---|---|
 | Bold, Italic, Underline | ⌘B, ⌘I, ⌘U |
 | Strikethrough | ⇧⌘X |
+| Code | ⌥⇧⌘C |
 | Link… | ⌘K |
 | Body text, Heading 1 to 6 | ⌥⌘0, ⌥⌘1 to ⌥⌘6 |
 | Align table column left, center, right | ⌘{, ⌘\|, ⌘} |

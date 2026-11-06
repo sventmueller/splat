@@ -11,7 +11,7 @@ Ta pregled je običajen dokument: v njem lahko vse preizkusite, levo v izvornem 
 | <ins>Podčrtano</ins> | `<ins>Podčrtano</ins>` | ⌘U |
 | ~~Prečrtano~~ | `~~Prečrtano~~` | ⇧⌘X |
 | <mark>Označeno</mark> | `<mark>Označeno</mark>` | |
-| `Koda` | `` `Koda` `` | |
+| `Koda` | `` `Koda` `` | ⌥⇧⌘C |
 | x<sup>2</sup> | `x<sup>2</sup>` | |
 | H<sub>2</sub>O | `H<sub>2</sub>O` | |
 | [Povezava](https://example.com) | `[Povezava](https://example.com)` | ⌘K |
