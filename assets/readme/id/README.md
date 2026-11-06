@@ -628,7 +628,7 @@ Cara membangun, menguji, struktur kode, dan aturan yang diikutinya dijelaskan di
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 dengan [satu baris diubah](../../../vendor/comrak/PATCH.md) | parser Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime Objective-C, Foundation, blok | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | binding AppKit, WebKit, dan Grand Central Dispatch | Zlib, Apache-2.0 atau MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | rumus dan gambar SVG sebagai PDF vektor | MIT atau Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | rumus dan gambar SVG sebagai PDF vektor | MIT atau Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | mendekode PNG, JPEG, GIF, WebP, dan BMP | MIT atau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | meratakan kolom tabel | MIT atau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | nama referensi karakter HTML | MIT |

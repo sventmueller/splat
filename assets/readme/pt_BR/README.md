@@ -628,7 +628,7 @@ A compilação, os testes, a estrutura do código e as regras que ele segue est�
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 com [uma linha alterada](../../../vendor/comrak/PATCH.md) | parser de Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime do Objective-C, Foundation, blocos | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | bindings de AppKit, WebKit e Grand Central Dispatch | Zlib, Apache-2.0 ou MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | fórmulas e imagens SVG como PDF vetorial | MIT ou Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | fórmulas e imagens SVG como PDF vetorial | MIT ou Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | decodificação de PNG, JPEG, GIF, WebP e BMP | MIT ou Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alinhamento das colunas de tabelas | MIT ou Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | os nomes das referências de caracteres HTML | MIT |

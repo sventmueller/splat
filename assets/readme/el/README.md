@@ -628,7 +628,7 @@ flowchart LR
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 με [μία αλλαγμένη γραμμή](../../../vendor/comrak/PATCH.md) | αναλυτής Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime Objective-C, Foundation, blocks | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | bindings για AppKit, WebKit και Grand Central Dispatch | Zlib, Apache-2.0 ή MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | τύποι και εικόνες SVG ως διανυσματικό PDF | MIT ή Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | τύποι και εικόνες SVG ως διανυσματικό PDF | MIT ή Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | αποκωδικοποίηση PNG, JPEG, GIF, WebP και BMP | MIT ή Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | στοίχιση στηλών πίνακα | MIT ή Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | τα ονόματα των αναφορών χαρακτήρων HTML | MIT |

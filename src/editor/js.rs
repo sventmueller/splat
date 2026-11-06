@@ -735,8 +735,7 @@ mod tests {
     fn mathjax_like_svg_converts() {
         let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 -750 1000 1000" color="#1D1D1F"><defs><path id="g" d="M10 10L500 10L500 -500Z"/></defs><g fill="currentColor"><use xlink:href="#g"/></g></svg>"##;
         let pdf =
-            super::super::safe_image::svg_to_pdf(svg, std::sync::Arc::new(svg2pdf::usvg::fontdb::Database::new()))
-                .expect("pdf");
+            super::super::safe_image::svg_to_pdf(svg, std::sync::Arc::new(usvg::fontdb::Database::new())).expect("pdf");
         assert!(pdf.starts_with(b"%PDF"));
     }
 }

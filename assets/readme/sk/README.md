@@ -628,7 +628,7 @@ Zostavenie, testovanie, štruktúra kódu a pravidlá, ktorými sa riadi, sú op
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 s [jedným zmeneným riadkom](../../../vendor/comrak/PATCH.md) | parser Markdownu | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | runtime Objective-C, Foundation, bloky | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | väzby na AppKit, WebKit a Grand Central Dispatch | Zlib, Apache-2.0 alebo MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | vzorce a obrázky SVG ako vektorové PDF | MIT alebo Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | vzorce a obrázky SVG ako vektorové PDF | MIT alebo Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | dekódovanie PNG, JPEG, GIF, WebP a BMP | MIT alebo Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | zarovnávanie stĺpcov tabuliek | MIT alebo Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | názvy odkazov na znaky HTML | MIT |

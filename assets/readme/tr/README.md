@@ -628,7 +628,7 @@ Derleme, test, kodun yapısı ve uyduğu kurallar [docs/development.md](../../..
 | [comrak](https://github.com/kivikakk/comrak) | 0.59, [bir satırı değiştirilmiş](../../../vendor/comrak/PATCH.md) | Markdown ayrıştırıcısı | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C çalışma zamanı, Foundation, bloklar | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit, WebKit ve Grand Central Dispatch bağlayıcıları | Zlib, Apache-2.0 veya MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | formüller ve SVG görüntüleri vektör PDF olarak | MIT veya Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | formüller ve SVG görüntüleri vektör PDF olarak | MIT veya Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP ve BMP çözme | MIT veya Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | tablo sütunlarını hizalama | MIT veya Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML karakter başvurularının adları | MIT |

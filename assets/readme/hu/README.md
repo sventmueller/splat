@@ -624,7 +624,7 @@ A fordítás, a tesztelés, a kód felépítése és az általa követett szabá
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 [egy módosított sorral](../../../vendor/comrak/PATCH.md) | Markdown-elemző | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | Objective-C futtatókörnyezet, Foundation, blokkok | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | AppKit-, WebKit- és Grand Central Dispatch-kötések | Zlib, Apache-2.0 vagy MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | képletek és SVG-képek vektoros PDF-ként | MIT vagy Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | képletek és SVG-képek vektoros PDF-ként | MIT vagy Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | PNG, JPEG, GIF, WebP és BMP dekódolása | MIT vagy Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | táblázatoszlopok igazítása | MIT vagy Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | a HTML-karakterhivatkozások nevei | MIT |

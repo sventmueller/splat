@@ -61,7 +61,9 @@ objc2-app-kit = { version = "0.3.2", features = ["objc2-uniform-type-identifiers
 objc2-foundation = "0.3.2"
 objc2-uniform-type-identifiers = "0.3.2"
 objc2-web-kit = "0.3.2"
-svg2pdf = "0.13"
+krilla = "0.8"
+krilla-svg = "0.8"
+usvg = "0.47"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [dev-dependencies]

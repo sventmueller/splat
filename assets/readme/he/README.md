@@ -629,7 +629,7 @@ Splat נשאר מגיב גם במסמכים של כמה מגה-בייטים:
 | [comrak](https://github.com/kivikakk/comrak) | 0.59 עם [שורה אחת ששונתה](../../../vendor/comrak/PATCH.md) | מנתח Markdown | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2), objc2-foundation, block2 | 0.6 / 0.3 | סביבת הריצה של Objective-C, Foundation, בלוקים | MIT |
 | objc2-app-kit, objc2-web-kit, dispatch2 | 0.3 | קשירות ל-AppKit, ל-WebKit ול-Grand Central Dispatch | Zlib, Apache-2.0 or MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | נוסחאות ותמונות SVG כ-PDF וקטורי | MIT or Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | נוסחאות ותמונות SVG כ-PDF וקטורי | MIT or Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | פענוח PNG, JPEG, GIF, WebP ו-BMP | MIT or Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | יישור עמודות בטבלה | MIT or Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | שמות הפניות התווים של HTML | MIT |

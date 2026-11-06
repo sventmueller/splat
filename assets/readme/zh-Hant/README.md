@@ -628,7 +628,7 @@ Splat 在數 MB 的文件中仍能保持流暢：
 | [comrak](https://github.com/kivikakk/comrak) | 0.59（[更動一行](../../../vendor/comrak/PATCH.md)） | Markdown 解析器 | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2)、objc2-foundation、block2 | 0.6 / 0.3 | Objective-C 執行環境、Foundation、區塊 | MIT |
 | objc2-app-kit、objc2-web-kit、dispatch2 | 0.3 | AppKit、WebKit 和 Grand Central Dispatch 的綁定 | Zlib、Apache-2.0 或 MIT |
-| [svg2pdf](https://github.com/typst/svg2pdf) | 0.13 | 將公式和 SVG 影像轉為向量 PDF | MIT 或 Apache-2.0 |
+| [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | 將公式和 SVG 影像轉為向量 PDF | MIT 或 Apache-2.0 |
 | [image](https://github.com/image-rs/image) | 0.25 | 解碼 PNG、JPEG、GIF、WebP 和 BMP | MIT 或 Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 對齊表格欄位 | MIT 或 Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字元參照的名稱 | MIT |
