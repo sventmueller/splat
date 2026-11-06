@@ -316,6 +316,13 @@ pub fn start(mtm: MainThreadMarker) {
     super::panes::forget_sidebar();
     // The checks look at the count in the corner, which windows hide until someone asks for it.
     super::counter::set_on(true);
+    // App Nap holds back the timers of an app behind other windows, and a check waiting on one then fails for nothing.
+    std::mem::forget(
+        objc2_foundation::NSProcessInfo::processInfo().beginActivityWithOptions_reason(
+            objc2_foundation::NSActivityOptions::UserInitiatedAllowingIdleSystemSleep,
+            &ns("self-test"),
+        ),
+    );
     if std::env::var_os("SPLAT_RENDER_PROBE").is_some() {
         probe::run(mtm);
         return;
