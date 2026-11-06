@@ -1,21 +1,21 @@
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject, Sel};
-use objc2::{MainThreadMarker, MainThreadOnly, sel};
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{NSApplication, NSBeep};
 use objc2_app_kit::{
-    NSFontWeightRegular, NSImage, NSImageSymbolConfiguration, NSMenu, NSMenuItem, NSMenuToolbarItem,
+    NSFontWeightRegular, NSImage, NSImageSymbolConfiguration, NSLayoutAttribute, NSMenu, NSMenuItem, NSMenuToolbarItem,
     NSSegmentSwitchTracking, NSSegmentedControl, NSSharingServicePickerToolbarItem,
-    NSSharingServicePickerToolbarItemDelegate, NSToolbarFlexibleSpaceItemIdentifier, NSToolbarItem,
-    NSToolbarItemIdentifier, NSToolbarItemVisibilityPriorityLow, NSToolbarSpaceItemIdentifier,
-    NSUserInterfaceItemIdentification,
+    NSSharingServicePickerToolbarItemDelegate, NSTitlebarAccessoryViewController, NSToolbar, NSToolbarDisplayMode,
+    NSToolbarFlexibleSpaceItemIdentifier, NSToolbarItem, NSToolbarItemIdentifier, NSToolbarItemVisibilityPriorityLow,
+    NSToolbarSpaceItemIdentifier, NSUserInterfaceItemIdentification, NSView,
 };
-use objc2_foundation::{NSArray, NSCopying, NSPoint, NSString};
+use objc2_foundation::{NSArray, NSCopying, NSObjectProtocol, NSPoint, NSSize, NSString};
 
 use super::EditorController;
 use super::actions::{self, Action};
 use crate::i18n::{n, t};
 use crate::util::constant;
-use crate::util::ns;
+use crate::util::{guarded, ns};
 
 const CHARACTER: &[&str] = &["bold", "italic", "underline", "strike", "highlight", "code", "script"];
 const PARAGRAPH: &[&str] = &["heading", "list", "quote", "codeblock", "alert"];
@@ -41,6 +41,54 @@ const EXTRA: &[&str] = &[
 
 const PLAIN_WIDTH: f64 = 32.0;
 const MENU_WIDTH: f64 = 44.0;
+
+/// Added to the 6 pt AppKit leaves beside a label, so that the last one stands as far from the window's edge as the
+/// close button; symbols share a capsule that AppKit already sets further in.
+const TEXT_MODE_MARGIN: f64 = 12.0;
+
+fn edge_margin(mode: NSToolbarDisplayMode) -> f64 {
+    if mode == NSToolbarDisplayMode::LabelOnly {
+        TEXT_MODE_MARGIN
+    } else {
+        0.0
+    }
+}
+
+define_class!(
+    #[unsafe(super(NSToolbar))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MDEditorToolbar"]
+    #[ivars = Retained<NSView>]
+    pub struct EditorToolbar;
+
+    unsafe impl NSObjectProtocol for EditorToolbar {}
+
+    impl EditorToolbar {
+        /// AppKit comes through here for the saved mode, the toolbar's menu and the other windows of the identifier.
+        #[unsafe(method(setDisplayMode:))]
+        fn set_display_mode(&self, mode: NSToolbarDisplayMode) {
+            // SAFETY: The superclass's implementation, with this method's signature.
+            let () = unsafe { msg_send![super(self), setDisplayMode: mode] };
+            guarded((), || self.ivars().setFrameSize(NSSize::new(edge_margin(mode), 1.0)));
+        }
+    }
+);
+
+impl EditorToolbar {
+    pub fn new(mtm: MainThreadMarker, identifier: &str) -> Retained<Self> {
+        let this = Self::alloc(mtm).set_ivars(NSView::new(mtm));
+        // SAFETY: NSToolbar's designated initializer, called once on the newly allocated object.
+        unsafe { msg_send![super(this), initWithIdentifier: &*ns(identifier)] }
+    }
+
+    /// A trailing accessory indents the toolbar's items by its width; its `hidden` has no effect at this position.
+    pub fn margin_accessory(&self) -> Retained<NSTitlebarAccessoryViewController> {
+        let accessory = NSTitlebarAccessoryViewController::new(self.mtm());
+        accessory.setView(self.ivars());
+        accessory.setLayoutAttribute(NSLayoutAttribute::Trailing);
+        accessory
+    }
+}
 
 /// The identifier of a segment of a group control.
 fn member_of(group: &str, segment: usize) -> Option<&'static str> {
@@ -580,6 +628,18 @@ mod tests {
             "new",
         ] {
             assert!(!gives_way_first(id), "{id}");
+        }
+    }
+
+    #[test]
+    fn only_the_text_mode_keeps_an_extra_margin() {
+        assert_eq!(edge_margin(NSToolbarDisplayMode::LabelOnly), TEXT_MODE_MARGIN);
+        for mode in [
+            NSToolbarDisplayMode::Default,
+            NSToolbarDisplayMode::IconAndLabel,
+            NSToolbarDisplayMode::IconOnly,
+        ] {
+            assert_eq!(edge_margin(mode), 0.0, "{mode:?}");
         }
     }
 

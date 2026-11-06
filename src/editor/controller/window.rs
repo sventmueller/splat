@@ -5,8 +5,8 @@ use objc2::runtime::ProtocolObject;
 use objc2::{MainThreadMarker, MainThreadOnly, msg_send, sel};
 use objc2_app_kit::{
     NSAccessibility, NSAutoresizingMaskOptions, NSBackingStoreType, NSDocumentController, NSScrollView,
-    NSSplitViewController, NSSplitViewDividerStyle, NSSplitViewItem, NSTextView, NSToolbar, NSToolbarDisplayMode,
-    NSView, NSViewBoundsDidChangeNotification, NSViewController, NSWindow, NSWindowOrderingMode, NSWindowStyleMask,
+    NSSplitViewController, NSSplitViewDividerStyle, NSSplitViewItem, NSTextView, NSToolbarDisplayMode, NSView,
+    NSViewBoundsDidChangeNotification, NSViewController, NSWindow, NSWindowOrderingMode, NSWindowStyleMask,
     NSWindowToolbarStyle,
 };
 use objc2_foundation::{
@@ -19,6 +19,7 @@ use crate::document::MdDocument;
 use crate::editor::OPEN_EDITORS;
 use crate::editor::model::Model;
 use crate::editor::panes::FRAME_KEY;
+use crate::editor::toolbar::EditorToolbar;
 use crate::editor::views::{PreviewTextView, SourceTextView};
 use crate::i18n::t;
 use crate::util::{constant, layout_manager, ns, storage};
@@ -139,13 +140,14 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     window.setContentSize(WINDOW_SIZE);
     window.center();
 
-    let toolbar = NSToolbar::initWithIdentifier(NSToolbar::alloc(mtm), &ns("MDEditorToolbar"));
+    let toolbar = EditorToolbar::new(mtm, "MDEditorToolbar");
     toolbar.setDelegate(Some(ProtocolObject::from_ref(controller)));
     toolbar.setAllowsUserCustomization(true);
     toolbar.setAutosavesConfiguration(true);
     toolbar.setDisplayMode(NSToolbarDisplayMode::IconOnly);
     window.setToolbar(Some(&toolbar));
     window.setToolbarStyle(NSWindowToolbarStyle::Unified);
+    window.addTitlebarAccessoryViewController(&toolbar.margin_accessory());
     place_window(window);
     window.setDelegate(Some(ProtocolObject::from_ref(controller)));
 

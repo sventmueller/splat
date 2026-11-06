@@ -225,7 +225,9 @@ the source draws each mark, from the top down
 the table dialog inserts a table of three by three
 the table dialog opens
 the text typed for the crash goes again
+the text-only toolbar stands as far from the edge as the close button
 the title page stands alone, with the metadata and without a header
+the toolbar with symbols keeps its place at the edge
 the typing is undone
 the unsaved text can be taken back
 the word count stands in the corner of its smaller pane
