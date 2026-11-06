@@ -1,11 +1,5 @@
-- **A folder of notes in the sidebar:** see all notes around a document, search them, find the links to a note, and rename it together with those links (**View › Show Files**, ⌃⌘E; **Search All Notes…**, ⇧⌘F).
-- **Changes since the last commit:** in a Git repository, bars beside the text mark what differs, in both panes.
-- **Paste as Markdown** (⌃⌘V): formatted text from a browser, Word or Confluence arrives as Markdown, cells from a spreadsheet as a table.
-- **Import Word documents** with their images, formulas and footnotes (**File › Import Word Document…**).
-- **Export Options:** page numbers, header, footer and a title page for PDF and print, a title page and your company's template for Word.
-- **Word count** in the corner of the window, also for the selection, with reading time.
-- **A form for metadata:** a click on the metadata line in the preview, or **Format › Edit Metadata…**.
-- **Help** has new items: **Report a Problem…** opens a form on GitHub with the versions of Splat and macOS and the kind of Mac filled in, **Suggest a Feature…** opens one for ideas, and **Splat on GitHub** opens the project page.
-- The update dialog now shows what a new version brings.
-- **PDF export** draws SVG images and formulas with krilla instead of the discontinued svg2pdf: color emoji, repeating gradients and `\style` colors now appear.
-- **Fixed:** after a jump far down a freshly opened document, the preview stopped short of the place the source showed.
+- **A sidebar button** beside the window's title shows and hides the sidebar on the tab it showed last. New windows and the next launch open it as it was left.
+- Showing or hiding the sidebar keeps source and preview at their share of the window.
+- **Code** has a shortcut, ⌥⇧⌘C, and moved into the code block menu of the toolbar, so the whole toolbar fits a new window.
+- The **word count** in the corner now starts hidden; **View › Show Word Count** turns it on.
+- **About Splat** shows the version once, with the copyright and the license.
