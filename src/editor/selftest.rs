@@ -1132,6 +1132,96 @@ fn check_app_menu(mtm: MainThreadMarker) {
     }
 }
 
+fn check_about_window(mtm: MainThreadMarker) {
+    #[derive(Default, Clone)]
+    struct Shown {
+        texts: Vec<String>,
+        links: Vec<(String, String)>,
+    }
+    fn links(view: &objc2_app_kit::NSTextView, out: &mut Vec<(String, String)>) {
+        let text = storage(view);
+        let mut at = 0;
+        while at < text.length() {
+            let mut range = NSRange::new(at, 0);
+            let value = unsafe {
+                text.attribute_atIndex_effectiveRange(objc2_app_kit::NSLinkAttributeName, at, &raw mut range)
+            };
+            if let Some(url) = value
+                .and_then(|v| v.downcast::<NSURL>().ok())
+                .and_then(|u| u.absoluteString())
+            {
+                out.push((text.string().substringWithRange(range).to_string(), url.to_string()));
+            }
+            at = (at + 1).max(range.location + range.length);
+        }
+    }
+    fn walk(view: &objc2_app_kit::NSView, out: &mut Shown) {
+        if let Some(field) = view.downcast_ref::<objc2_app_kit::NSTextField>() {
+            out.texts.push(field.stringValue().to_string());
+        }
+        if let Some(text) = view.downcast_ref::<objc2_app_kit::NSTextView>() {
+            out.texts.push(text.string().to_string());
+            links(text, &mut out.links);
+        }
+        for sub in view.subviews().iter() {
+            walk(&sub, out);
+        }
+    }
+    let app = NSApplication::sharedApplication(mtm);
+    // SAFETY: the app delegate's action takes any sender.
+    unsafe { app.sendAction_to_from(sel!(mdShowAbout:), None, None) };
+    let panel = app.windows().iter().find_map(|window| {
+        let mut shown = Shown::default();
+        walk(&*window.contentView()?, &mut shown);
+        shown
+            .texts
+            .iter()
+            .any(|t| t.contains("Sven Müller"))
+            .then_some((window, shown))
+    });
+    let bundle = objc2_foundation::NSBundle::mainBundle();
+    let version = bundle
+        .objectForInfoDictionaryKey(&ns("CFBundleShortVersionString"))
+        .and_then(|v| v.downcast::<NSString>().ok())
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    let acknowledgements = bundle
+        .pathForResource_ofType(Some(&ns("Acknowledgements")), Some(&ns("txt")))
+        .and_then(|p| std::fs::read_to_string(p.to_string()).ok())
+        .unwrap_or_default();
+    let shown = panel.as_ref().map(|(_, shown)| shown.clone()).unwrap_or_default();
+    let repository = crate::feedback::REPOSITORY;
+    let expected_links = [
+        ("github.com/sventmueller/splat".to_string(), repository.to_string()),
+        ("MIT".to_string(), format!("{repository}/blob/main/LICENSE-MIT")),
+        (
+            "Apache 2.0".to_string(),
+            format!("{repository}/blob/main/LICENSE-APACHE"),
+        ),
+    ];
+    check(
+        "the About window names the version once, the copyright and the license, and the bundle carries the license \
+         texts of all it contains",
+        !version.is_empty()
+            && shown.texts.iter().any(|t| t.ends_with(&format!(" {version}")))
+            && !shown.texts.iter().any(|t| t.contains(&format!("({version})")))
+            && shown.texts.iter().any(|t| t == "© 2026 Sven Müller")
+            && shown.links == expected_links
+            && ["## Splat\n", "\n## comrak ", "\n## mathjax ", "\n## Sparkle "]
+                .iter()
+                .all(|part| acknowledgements.contains(part)),
+        &format!(
+            "version {version}, texts {:?}, links {:?}, {} bytes of license texts",
+            shown.texts,
+            shown.links,
+            acknowledgements.len()
+        ),
+    );
+    if let Some((window, _)) = panel {
+        window.close();
+    }
+}
+
 fn check_default_probe(mtm: MainThreadMarker) {
     let modal = NSApplication::sharedApplication(mtm).modalWindow();
     check(

@@ -1,3 +1,4 @@
+mod about;
 mod app;
 mod diag;
 mod document;

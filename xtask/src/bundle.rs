@@ -133,7 +133,7 @@ pub(crate) fn info_plist(version: &str, languages: &[String], variant: Option<&s
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Markdown editor</string>
+	<string>© 2026 Sven Müller</string>
 {updates}	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -307,6 +307,7 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
         files::copy(&icns, resources.join("AppIcon.icns"))?;
     }
     files::write(contents.join("PkgInfo"), "APPL????")?;
+    let mut bundled_sparkle = None;
     if updates != Updates::Off {
         let frameworks = contents.join("Frameworks");
         files::create_dir_all(&frameworks)?;
@@ -319,7 +320,12 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
         // Only a sandboxed app needs Sparkle's XPC services.
         files::remove_dir_all(framework.join("Versions/B/XPCServices"))?;
         files::remove_file(framework.join("XPCServices"))?;
+        bundled_sparkle = Some(sparkle);
     }
+    files::write(
+        resources.join(ACKNOWLEDGEMENTS),
+        acknowledgements(bundled_sparkle.as_deref())?,
+    )?;
     Ok(app)
 }
 

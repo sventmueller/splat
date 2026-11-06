@@ -607,6 +607,7 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
             }
         }),
         applied(|c| check_context_menu(&c.e)),
+        applied(|c| check_about_window(c.e.mtm())),
         applied(|c| check_app_menu(c.e.mtm())),
         pause(
             0.5,

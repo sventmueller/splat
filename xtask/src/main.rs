@@ -4,6 +4,7 @@
 mod assets;
 mod bundle;
 mod coverage;
+mod licenses;
 mod release;
 mod selftest;
 
@@ -14,6 +15,7 @@ use std::process::{Command, ExitCode};
 pub(crate) use assets::*;
 pub(crate) use bundle::*;
 pub(crate) use coverage::*;
+pub(crate) use licenses::*;
 pub(crate) use release::*;
 pub(crate) use selftest::*;
 

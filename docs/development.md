@@ -52,10 +52,19 @@ build would be a new app to macOS. Debug and self-test builds carry bundle IDs o
 `local.splat.selftest`) and do not register for Markdown files, so the Finder never opens a document in an outdated
 build and they leave the settings of the normal app alone.
 
+`bundle` also writes `Acknowledgements.txt` into the resources, since the licenses of what Splat contains ask for their
+texts to go along with the app; the About window links only Splat's own. The file holds Splat's license and the
+license text of every crate that `cargo tree` finds in the program for either processor, of every
+`resources/js/LICENSE-<name>` and of Sparkle where the bundle carries it, each text once under the components it
+covers. Of alternatives a crate offers, MIT is taken where it can be; a crate that names MIT without shipping its text
+gets Splat's MIT terms with the authors from its manifest. A dependency whose license text xtask does not recognize
+stops the build with its name, and the test `every_component_of_the_program_comes_with_its_license_text` finds it in
+`make check` before that. A new script in `resources/js` needs its `LICENSE-<name>` next to it.
+
 The version lives in [VERSION](../VERSION) as `major.minor.build` and is the one the next build gets. Every release
 build that succeeds (`make build`, `cargo xtask bundle --release`, `make release`) raises the build number by one;
 debug and self-test builds leave it alone. Major and minor are raised by hand: set VERSION to, say, `1.1.0`, and the
-next build gets exactly that.
+next build gets exactly that. Since the version ends in the build number, the About window shows no second one.
 
 ## Distribution
 
@@ -299,7 +308,7 @@ Code uses the German text as key: `t("Fett")` looks it up at run time, `n("Fett"
 lookup. Each `resources/<language>.lproj/` holds:
 
 - `Localizable.strings`: every interface text, menu terms after Apple's own glossaries
-- `InfoPlist.strings`: the names macOS shows for the app and its document type
+- `InfoPlist.strings`: the name macOS shows for the document type
 - `QuickReference.md`: the Markdown quick reference
 
 `cargo xtask bundle` lists every `.lproj` folder as a localization, and `CFBundleDevelopmentRegion` is English, so
