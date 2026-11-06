@@ -73,3 +73,53 @@ fn with_caret(t: &str, edit: impl Fn(&Bridge) -> Option<Edit>) -> String {
     out.insert(edit.selection.start.get(), '|');
     out
 }
+
+/// A position behind the end of the preview, inside a character of it, or a pending caret from an older text, gives no
+/// edit or one that fits the source, and never a panic.
+#[test]
+fn a_stale_position_gives_no_edit_or_one_that_fits() {
+    use splat_markdown::commands::InlineStyle;
+    let t = "Füße 😀 **ä**\n\n- [ ] ü\n\n> b\n\n| ü | b |\n|---|---|\n| c | d |\n";
+    bridge_of!(t => d, l, index, b);
+    let fits = |edit: Option<Edit>, what: &str| {
+        if let Some(edit) = edit {
+            assert!(
+                edit.range.end <= t.end() && t.boundary(edit.range.start) && t.boundary(edit.range.end),
+                "{what}"
+            );
+        }
+    };
+    let inside_the_emoji = Shown::new("Füße ".chars().count() + 1);
+    for p in [inside_the_emoji, Shown::new(t.len() * 2), Shown::new(usize::MAX / 2)] {
+        let range = Shown::new(1)..p;
+        let _ = (
+            b.source_selection(range.clone()),
+            b.source_selection(p..p),
+            b.source_at(p),
+            b.escaped(p, "*", false),
+        );
+        fits(b.replace(range.clone(), "x"), "replace");
+        fits(b.replace(p..p, "x"), "replace");
+        fits(
+            b.replace_keeping_styles(range, "x").map(|(e, _)| e),
+            "replace_keeping_styles",
+        );
+        fits(b.newline(p), "newline");
+        fits(b.line_break(p), "line_break");
+        fits(b.tab(p, Direction::Forward), "tab");
+        fits(b.tab(p, Direction::Backward), "tab");
+        fits(b.delete_at_block_start(p), "delete_at_block_start");
+        fits(b.toggle_fold(p), "toggle_fold");
+        fits(b.toggle_task(p), "toggle_task");
+        for at in [2, 999] {
+            let pending = Pending {
+                at: Byte::new(at),
+                styles: vec![InlineStyle::Bold],
+            };
+            fits(
+                b.type_with_pending(&pending, p, "x").map(|(e, _)| e),
+                "type_with_pending",
+            );
+        }
+    }
+}

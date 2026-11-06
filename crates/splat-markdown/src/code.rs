@@ -870,12 +870,18 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
             }
         }
         let quoted = lang.quotes.contains(&c) && (!lang.markup || in_tag);
+        if quoted && c == '\'' && lang.names.contains(&"rust") {
+            match rust_char_len(rest) {
+                Some(len) => {
+                    out.push((i..i + len, CodeToken::String));
+                    i += len;
+                }
+                None => i += 1,
+            }
+            continue;
+        }
         if quoted {
             let end = string_end(code, i, c);
-            if c == '\'' && lang.names.contains(&"rust") && end - i > 6 {
-                i += 1;
-                continue;
-            }
             out.push((i..end, CodeToken::String));
             i = end;
             continue;
@@ -941,6 +947,32 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
         i += c.len_utf8();
     }
     out
+}
+
+/// How long the Rust character literal is that `rest` starts with, `'` included; `None` where the `'` starts a lifetime
+/// or a label, as `'a`, `'static` or `'outer:`, which hold no closing `'` behind one character or escape.
+fn rust_char_len(rest: &str) -> Option<usize> {
+    let body = rest.strip_prefix('\'')?;
+    let len = match body.chars().next()? {
+        '\\' => {
+            let escape = &body[1..];
+            1 + if let Some(hex) = escape.strip_prefix("u{") {
+                let digits = hex.find('}').filter(|&n| (1..=6).contains(&n))?;
+                hex[..digits]
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit())
+                    .then_some("u{}".len() + digits)?
+            } else if let Some(hex) = escape.strip_prefix('x') {
+                hex.get(..2).filter(|h| h.bytes().all(|b| b.is_ascii_hexdigit()))?;
+                3
+            } else {
+                matches!(escape.chars().next()?, 'n' | 'r' | 't' | '\\' | '0' | '\'' | '"').then_some(1)?
+            }
+        }
+        '\'' | '\n' | '\r' => return None,
+        c => c.len_utf8(),
+    };
+    body[len..].starts_with('\'').then_some(1 + len + 1)
 }
 
 /// End of a quoted string starting at `start`, honouring backslash escapes; unterminated strings end with the line.
@@ -1037,6 +1069,45 @@ mod tests {
         let t = tokens_of("rust", "fn f<'a>(s: &'a str) -> char { 'x' }\n");
         assert!(t.contains(&("'x'", CodeToken::String)));
         assert!(!t.iter().any(|(s, _)| s.starts_with("'a")));
+    }
+
+    #[test]
+    fn rust_tells_lifetimes_and_labels_from_character_literals() {
+        let strings = |code: &str| -> Vec<String> {
+            tokens_of("rust", code)
+                .into_iter()
+                .filter(|(_, t)| *t == CodeToken::String)
+                .map(|(s, _)| s.to_string())
+                .collect()
+        };
+        for code in [
+            "struct S<'a, 'b> { x: &'a str }",
+            "fn f(x: &'static str) {}",
+            "'outer: loop { break 'outer; }",
+            "impl<'a> T for &'a U {}",
+            r"'\u{1234567}'",
+            r"'\xZZ'",
+            r"'\q'",
+            "''",
+        ] {
+            assert_eq!(strings(code), Vec::<String>::new(), "{code}");
+        }
+        for (code, literal) in [
+            ("let c = 'a';", "'a'"),
+            ("let c = 'ä';", "'ä'"),
+            (r"let c = '\n';", r"'\n'"),
+            (r"let c = '\'';", r"'\''"),
+            (r"let c = '\\';", r"'\\'"),
+            (r"let c = '\x7F';", r"'\x7F'"),
+            (r"let c = '\u{1F600}';", r"'\u{1F600}'"),
+            ("let b = b'x';", "'x'"),
+            ("f::<'a>('y')", "'y'"),
+        ] {
+            assert_eq!(strings(code), [literal], "{code}");
+        }
+        assert_eq!(rust_char_len("'"), None);
+        assert_eq!(rust_char_len(r"'\u{}'"), None);
+        assert_eq!(rust_char_len(r"'\x7"), None);
     }
 
     #[test]

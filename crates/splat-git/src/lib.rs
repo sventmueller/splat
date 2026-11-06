@@ -30,6 +30,11 @@ pub use object::Oid;
 use object::{Kind, commit_tree, tag_target};
 use source::{read_small, volume_error};
 use store::Store;
+pub use tree::folded_name;
+
+/// The longest text, in bytes of UTF-8, that the app compares with its version in the last commit. `head_version` reads
+/// a blob that holds this much text even in UTF-16, which takes up to twice the bytes.
+pub const MAX_TEXT_BYTES: usize = 32 << 20;
 
 const MAX_PATH_COMPONENTS: usize = 256;
 /// Far more tags on tags than anyone has reason to make.
@@ -79,6 +84,11 @@ pub fn find(file: &Path) -> Option<Repository> {
 }
 
 impl Repository {
+    /// The folder the repository's files lie in, canonicalized.
+    pub fn work_tree(&self) -> &Path {
+        &self.work_tree
+    }
+
     /// What the file holds in the last commit; `None` if the file is not in it or there is no commit yet. These are the bytes
     /// of the commit: no line ending conversion or other filter of the repository is applied.
     pub fn head_version(&self, file: &Path) -> Result<Option<Vec<u8>>, ReadError> {

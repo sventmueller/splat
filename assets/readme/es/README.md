@@ -635,6 +635,7 @@ La compilación, las pruebas, la estructura del código y las reglas que sigue s
 | [entities](https://github.com/p-jackson/entities) | 1 | los nombres de las referencias de caracteres HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | descomprimir archivos de Word y objetos de Git | MIT, Zlib o Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | leer el XML de los archivos de Word | MIT o Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | lectura de texto RTF escrito en páginas de códigos antiguas | MIT o Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nombres y búsqueda con letras compuestas y descompuestas | MIT o Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | mantener literal el texto tipo `:shortcode:` en el texto importado | MIT o Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | renderizado de fórmulas | Apache-2.0 |

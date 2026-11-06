@@ -635,6 +635,7 @@ Splatは、数メガバイトの書類でも軽快に動作します。
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML文字参照の名前 | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | WordファイルとGitオブジェクトの展開 | MIT, Zlib or Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | WordファイルのXMLの読み取り | MIT or Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | 古いコードページで書かれたRTFテキストの読み込み | MIT or Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | 合成された文字と分解された文字にまたがる名前と検索 | MIT or Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | 読み込んだテキスト内の`:shortcode:`のようなテキストをそのまま保つ | MIT or Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | 数式のレンダリング | Apache-2.0 |

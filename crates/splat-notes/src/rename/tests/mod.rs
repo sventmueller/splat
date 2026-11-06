@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::*;
 use crate::search::tests::Folder;
-use crate::tree::{Node, scan};
+use crate::tree::scan;
 
 mod calls;
 mod links;
@@ -12,38 +12,8 @@ mod names;
 mod other_notes;
 mod random;
 
-/// A tree that exists only in memory.
 fn tree_of(notes: &[&str]) -> Tree {
-    let mut tree = Tree {
-        root: PathBuf::from("/v"),
-        ..Tree::default()
-    };
-    for note in notes {
-        let mut owner: Option<usize> = None;
-        let mut path = PathBuf::from("/v");
-        let parts: Vec<&str> = note.split('/').collect();
-        for (at, part) in parts.iter().enumerate() {
-            path.push(part);
-            let list = owner.map_or(&tree.top, |owner| &tree.nodes[owner].children);
-            let known = list.iter().copied().find(|&child| tree.nodes[child].name == *part);
-            let index = known.unwrap_or_else(|| {
-                let index = tree.nodes.len();
-                tree.nodes.push(Node {
-                    name: (*part).to_string(),
-                    path: path.clone(),
-                    folder: at + 1 < parts.len(),
-                    children: Vec::new(),
-                });
-                match owner {
-                    Some(owner) => tree.nodes[owner].children.push(index),
-                    None => tree.top.push(index),
-                }
-                index
-            });
-            owner = Some(index);
-        }
-    }
-    tree
+    Tree::of_notes(Path::new("/v"), notes)
 }
 
 fn renamed_in(tree: &Tree, file: &str, text: &str, from: &str, to: &str) -> String {

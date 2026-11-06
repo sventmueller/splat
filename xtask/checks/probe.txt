@@ -135,6 +135,7 @@ an autosave that the folder refuses leaves file, text and mark as they were
 an earlier version brought back by another program reloads
 an image is scaled like the text in Word
 an image is scaled like the text on paper
+another thread gets the answer of work it hands to the main thread
 bold is undone in one step
 bold writes exactly its text
 centred alignment is undone in one step

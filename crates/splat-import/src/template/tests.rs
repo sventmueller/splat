@@ -11,8 +11,8 @@ use super::serialize::{RELATIONSHIPS, WORD};
 use super::*;
 use crate::docx::import;
 use crate::package::{DOCUMENT_TYPE, resolve};
-use crate::zip::tests::{Part as Entry, archive, deflated, stored};
-use crate::zip::{Archive, MOST_ENTRY_BYTES};
+use splat_ooxml::zip::testing::{Part as Entry, archive, deflated, stored};
+use splat_ooxml::zip::{Archive, MOST_ENTRY_BYTES};
 
 mod errors;
 mod merge;

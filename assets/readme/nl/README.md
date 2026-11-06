@@ -869,6 +869,7 @@ Bouwen, testen, de opbouw van de code en de regels die hij volgt staan in [docs/
 | [entities](https://github.com/p-jackson/entities) | 1 | de namen van HTML-tekenverwijzingen | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | uitpakken van Word-bestanden en Git-objecten | MIT, Zlib of Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | lezen van de XML van Word-bestanden | MIT of Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | lezen van RTF-tekst in oudere codetabellen | MIT of Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | namen en zoeken over samengestelde en ontlede letters heen | MIT of Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | tekst als `:shortcode:` letterlijk houden in geïmporteerde tekst | MIT of Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | formules weergeven | Apache-2.0 |

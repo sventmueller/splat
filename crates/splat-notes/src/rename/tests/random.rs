@@ -31,7 +31,7 @@ fn leads_to(tree: &Tree, text: &str, file: &Path) -> Vec<(bool, Option<PathBuf>)
                 false,
                 resolver
                     .address(url, file)
-                    .filter(|path| tree.notes().any(|note| note.path == *path)),
+                    .filter(|path| tree.notes().any(|note| note.path() == *path)),
             ),
         })
         .collect()

@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use splat_markdown::commands::Edit;
 use splat_markdown::doc::Doc;
-use splat_markdown::reader::parse_part;
+use splat_markdown::reader::parse_as_part;
 use splat_markdown::text::{Byte, TextAt, line_end, line_start};
 
 use super::layout::{Atom, Layout, NoImages, ParaKind, Run, RunMap, layout};
@@ -32,7 +32,7 @@ struct Shows {
 }
 
 fn shows(markdown: &str, at_start: bool) -> Shows {
-    let doc = Doc::new(markdown.into(), parse_part(markdown, at_start));
+    let doc = parse_as_part(markdown, at_start);
     let laid_out = layout(&doc, &NoImages, None);
     let mut chars = Vec::new();
     let mut paragraphs = Vec::new();

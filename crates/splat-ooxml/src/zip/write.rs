@@ -1,6 +1,6 @@
-//! The container of a Word file: a ZIP archive with its entries stored as they are.
+//! The container of a Word file as Splat writes it: a ZIP archive with its entries stored as they are.
 
-use super::TooLarge;
+use super::crc32;
 
 /// A ZIP archive with uncompressed entries, which Office reads like any other.
 #[derive(Default)]
@@ -10,12 +10,16 @@ pub struct Zip {
     count: usize,
 }
 
-/// The highest values the format allows: the next ones announce its 64-bit extension.
-pub(crate) const MAX_ZIP_ENTRIES: usize = 0xFFFE;
-pub(crate) const MAX_ZIP_BYTES: usize = 0xFFFF_FFFE;
+/// More than a ZIP holds without its 64-bit extension.
+#[derive(Debug, PartialEq)]
+pub struct TooLarge;
 
-pub(crate) fn zip_holds(entries: usize, bytes: usize) -> bool {
-    entries <= MAX_ZIP_ENTRIES && bytes <= MAX_ZIP_BYTES
+/// The highest values the format allows: the next ones announce its 64-bit extension.
+const MOST_ENTRIES_WITHOUT_ZIP64: usize = 0xFFFE;
+const MOST_BYTES_WITHOUT_ZIP64: usize = 0xFFFF_FFFE;
+
+fn zip_holds(entries: usize, bytes: usize) -> bool {
+    entries <= MOST_ENTRIES_WITHOUT_ZIP64 && bytes <= MOST_BYTES_WITHOUT_ZIP64
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "`add` turns away what would not fit")]
@@ -80,44 +84,23 @@ impl Zip {
     }
 }
 
-/// The CRC-32 checksum ZIP stores for each entry.
-pub fn crc32(bytes: &[u8]) -> u32 {
-    static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
-    let table = TABLE.get_or_init(|| {
-        let mut t = [0u32; 256];
-        for (i, entry) in (0u32..).zip(t.iter_mut()) {
-            let mut c = i;
-            for _ in 0..8 {
-                c = if c & 1 != 0 { 0xEDB8_8320 ^ (c >> 1) } else { c >> 1 };
-            }
-            *entry = c;
-        }
-        t
-    });
-    !bytes
-        .iter()
-        .fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xFF) as usize] ^ (c >> 8))
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// Entry names and contents of a stored ZIP, read with nothing but the format description.
-#[cfg(any(test, feature = "selftest"))]
-pub fn stored_entries(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
-    let mut out = Vec::new();
-    let mut at = 0;
-    while zip.get(at..at + 4) == Some(&0x0403_4b50u32.to_le_bytes()) {
-        let field = |o: usize, n: usize| {
-            zip[at + o..at + o + n]
-                .iter()
-                .rev()
-                .fold(0usize, |v, b| v << 8 | *b as usize)
-        };
-        let (size, name_len, extra) = (field(18, 4), field(26, 2), field(28, 2));
-        let name = String::from_utf8_lossy(&zip[at + 30..at + 30 + name_len]).into_owned();
-        let start = at + 30 + name_len + extra;
-        let content = zip[start..start + size].to_vec();
-        assert_eq!(crc32(&content) as usize, field(14, 4), "{name}");
-        out.push((name, content));
-        at = start + size;
+    #[test]
+    fn a_zip_turns_away_what_needs_its_extension() {
+        assert!(zip_holds(MOST_ENTRIES_WITHOUT_ZIP64, MOST_BYTES_WITHOUT_ZIP64));
+        assert!(!zip_holds(MOST_ENTRIES_WITHOUT_ZIP64 + 1, 0));
+        assert!(!zip_holds(1, MOST_BYTES_WITHOUT_ZIP64 + 1));
+        let mut zip = Zip::default();
+        for _ in 0..MOST_ENTRIES_WITHOUT_ZIP64 {
+            zip.add("a", b"").expect("room for it");
+        }
+        assert_eq!(zip.add("a", b""), Err(TooLarge));
+        let bytes = zip.finish();
+        let end = &bytes[bytes.len() - 22..];
+        assert_eq!(end[..4], 0x0605_4b50u32.to_le_bytes());
+        assert_eq!(end[10..12], 0xFFFEu16.to_le_bytes());
     }
-    out
 }

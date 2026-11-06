@@ -144,6 +144,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
 
 pub(super) fn run(mtm: MainThreadMarker) {
     rendering_takes_what_it_is_given(mtm);
+    another_thread_gets_an_answer_from_the_main_thread();
     let name = "a document without formulas or diagrams starts no web view";
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
     let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
@@ -191,9 +192,37 @@ pub(super) fn run(mtm: MainThreadMarker) {
     );
 }
 
+/// `on_main` from a thread the main thread does not wait for, as the Word export calls it for pictures.
+fn another_thread_gets_an_answer_from_the_main_thread() {
+    let answer = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let given = answer.clone();
+    std::thread::spawn(move || {
+        let on_main = crate::util::on_main(|| MainThreadMarker::new().is_some());
+        *given.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(on_main);
+    });
+    let asked = answer.clone();
+    let lock = move || *asked.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let heard = lock.clone();
+    once(
+        0.0,
+        "the answer of the main thread to another thread",
+        move || heard().is_some(),
+        move || {
+            check(
+                "another thread gets the answer of work it hands to the main thread",
+                lock() == Some(Some(true)),
+                &format!("{:?}", lock()),
+            );
+        },
+    );
+}
+
 fn with_web_views_started(mtm: MainThreadMarker) {
     let keys = render_keys();
-    js::renderer(mtm).request(0, keys.iter().map(|(_, k)| k.clone()).collect());
+    js::renderer(mtm).request(
+        super::super::render_queue::Owner::unique(),
+        keys.iter().map(|(_, k)| k.clone()).collect(),
+    );
     let field = mathfield::field(mtm);
     let local = std::env::temp_dir().join(format!("splat-probe-{}.bmp", std::process::id()));
     let _ = std::fs::write(&local, two_pixel_bmp());
@@ -902,7 +931,7 @@ fn the_formula_survives_its_web_process(mtm: MainThreadMarker, editor: Option<Re
     let field = mathfield::field(mtm);
     field.attach(&editor, "x^2");
     let ended = web_process(&field.web);
-    crate::util::end_process(ended);
+    js::end_web_process(&field.web);
     let watched = field.clone();
     let back = move || watched.loaded.get() && ![0, ended].contains(&web_process(&watched.web));
     once(0.0, "the formula editor's page to load again", back, move || {
@@ -1062,7 +1091,7 @@ fn a_page_that_stops_answering(mtm: MainThreadMarker) {
     let renderer = js::renderer(mtm);
     webkit::run_script(&renderer.web(), "while (true) {}", &[]);
     let formula = || Key::math("a^2 + b^2 = c^2", false, false, &"".into());
-    renderer.request(1, vec![formula()]);
+    renderer.request(super::super::render_queue::Owner::unique(), vec![formula()]);
     let limit = js::RENDER_TIMEOUT.as_secs_f64();
     let started = std::time::Instant::now();
     let answered = move || js::outcome(&formula()).is_some();

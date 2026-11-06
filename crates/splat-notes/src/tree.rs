@@ -1,6 +1,6 @@
 //! The tree of notes below a folder.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::fs::{DirEntry, FileType};
 use std::io;
@@ -28,7 +28,8 @@ pub fn is_note(path: &Path) -> bool {
 }
 
 /// The folder to show for a document: the Git work tree it lies in (nearest `.git` file or folder), unless that also
-/// holds `home`, else the document's folder.
+/// holds `home`, else the document's folder. Any `.git` marks a project here, also one that `splat_git::find` passes over
+/// because Git could not read it.
 pub fn root_for(file: &Path, home: Option<&Path>) -> PathBuf {
     let folder = file.parent().unwrap_or(file);
     let work_tree = folder.ancestors().find(|at| at.join(".git").exists());
@@ -41,36 +42,108 @@ pub fn root_for(file: &Path, home: Option<&Path>) -> PathBuf {
 /// A note or a folder of notes.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Node {
-    /// The name to show; the path holds the real one, which need not be valid UTF-8.
-    pub name: String,
-    /// Where it lies, by its real name.
-    pub path: PathBuf,
-    /// Whether it is a folder, with `children`, and not a note.
-    pub folder: bool,
-    /// Indexes into `Tree::nodes`, folders first, then by name as the Finder sorts: case-insensitive with numbers by
-    /// value.
-    pub children: Vec<usize>,
+    name: String,
+    path: PathBuf,
+    folder: bool,
+    children: Vec<usize>,
 }
 
-/// The notes below a folder, and the folders that lead to them.
+impl Node {
+    /// The name to show; the path holds the real one, which need not be valid UTF-8.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Where it lies, by its real name.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Whether it is a folder, with children, and not a note.
+    pub fn is_folder(&self) -> bool {
+        self.folder
+    }
+
+    /// What a folder holds, as indexes into `Tree::nodes` of the tree it is from: folders first, then by name as the
+    /// Finder sorts, case-insensitive with numbers by value.
+    pub fn children(&self) -> &[usize] {
+        &self.children
+    }
+}
+
+/// The notes below a folder, and the folders that lead to them. Only `scan`, `scan_flat`, `of_notes` and `renamed`
+/// make one, so every index it holds names one of its nodes and every node but those at the top stands in exactly one
+/// folder.
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Tree {
-    /// The folder the tree shows, which is no node itself.
-    pub root: PathBuf,
-    /// In the order they show, each folder before what it holds.
-    pub nodes: Vec<Node>,
-    /// The top level.
-    pub top: Vec<usize>,
-    /// The walk stopped at the most entries a tree may hold.
-    pub cut: bool,
-    /// How many folders and entries in them the walk could not read, and so left out.
-    pub unreadable: usize,
+    root: PathBuf,
+    nodes: Vec<Node>,
+    top: Vec<usize>,
+    cut: bool,
+    unreadable: usize,
 }
 
 impl Tree {
+    /// The folder the tree shows, which is no node itself.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// The notes and folders, in the order they show, each folder before what it holds.
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    /// The top level, as indexes into `nodes`.
+    pub fn top(&self) -> &[usize] {
+        &self.top
+    }
+
+    /// Whether the walk stopped at the most entries a tree may hold.
+    pub fn is_cut(&self) -> bool {
+        self.cut
+    }
+
+    /// How many folders and entries in them the walk could not read, and so left out.
+    pub fn unreadable(&self) -> usize {
+        self.unreadable
+    }
+
     /// The notes, in the order they show.
     pub fn notes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.iter().filter(|node| !node.folder)
+    }
+
+    /// The tree `scan` would make of a folder `root` that holds the notes `notes`, given as paths relative to `root`
+    /// with `/` between the names, built without looking at the disk, for tests and fuzz targets.
+    pub fn of_notes(root: &Path, notes: &[&str]) -> Tree {
+        let mut found: Vec<Found> = Vec::new();
+        let mut known: HashMap<(Option<usize>, &str), usize> = HashMap::new();
+        for note in notes {
+            let names: Vec<&str> = note.split('/').filter(|name| !name.is_empty()).collect();
+            let mut parent = None;
+            let mut path = root.to_path_buf();
+            for (at, &name) in names.iter().enumerate() {
+                path.push(name);
+                let holds_more = at + 1 < names.len();
+                let index = *known.entry((parent, name)).or_insert_with(|| {
+                    found.push(Found {
+                        node: Node {
+                            name: name.to_string(),
+                            path: path.clone(),
+                            folder: holds_more,
+                            children: Vec::new(),
+                        },
+                        parent,
+                    });
+                    found.len() - 1
+                });
+                // A name given as a note and as a folder is the folder, as a volume has one or the other.
+                found[index].node.folder |= holds_more;
+                parent = Some(index);
+            }
+        }
+        assemble(root, found, false, 0)
     }
 
     /// The tree as it will be once the note `from` is called `to`, in the same folder.
@@ -94,7 +167,7 @@ impl Tree {
 
     fn sort_if_holding(&self, list: &mut [usize], at: usize) {
         if list.contains(&at) {
-            list.sort_by_cached_key(|&node| self.nodes.get(node).map(sort_key));
+            list.sort_by_cached_key(|&node| sort_key(&self.nodes[node]));
         }
     }
 }
@@ -105,7 +178,8 @@ fn shown_name(name: &OsStr) -> String {
 
 /// What a name sorts by: letters without their accents and case, as the Finder takes them, and a number as its count of
 /// digits and these, so that `2` comes before `10` at any length. `0` stands in front of a number to keep it among the
-/// digits.
+/// digits. It is not `splat_git::folded_name`, which says which names a volume takes for one file: an order puts
+/// `Äpfel` beside `apfel`, which are two files to a volume.
 fn name_order(name: &str) -> Vec<u32> {
     let mut key = Vec::with_capacity(name.len());
     let mut chars = name
@@ -335,14 +409,23 @@ mod tests {
         }
     }
 
+    /// The least a folder needs to be a git directory.
+    fn git_directory(at: &Path) {
+        std::fs::create_dir_all(at.join("objects")).unwrap();
+        std::fs::create_dir_all(at.join("refs")).unwrap();
+        std::fs::write(at.join("HEAD"), "ref: refs/heads/main\n").unwrap();
+    }
+
     #[test]
     fn the_root_of_a_document_is_its_work_tree_unless_that_holds_home() {
         let folder = Folder::new("root");
         let root = folder.path();
-        std::fs::create_dir_all(root.join("repo/.git")).unwrap();
+        git_directory(&root.join("repo/.git"));
         std::fs::create_dir_all(root.join("repo/a/b")).unwrap();
+        git_directory(&root.join("elsewhere.git"));
         std::fs::create_dir_all(root.join("worktree/c")).unwrap();
-        std::fs::write(root.join("worktree/.git"), "gitdir: x\n").unwrap();
+        let pointer = format!("gitdir: {}\n", root.join("elsewhere.git").display());
+        std::fs::write(root.join("worktree/.git"), pointer).unwrap();
         std::fs::create_dir_all(root.join("plain/d")).unwrap();
         let doc = root.join("repo/a/b/n.md");
         assert_eq!(root_for(&doc, None), root.join("repo"));
@@ -369,9 +452,58 @@ mod tests {
     fn a_nested_work_tree_is_the_nearest_one() {
         let folder = Folder::new("nested");
         let root = folder.path();
-        std::fs::create_dir_all(root.join("outer/.git")).unwrap();
-        std::fs::create_dir_all(root.join("outer/inner/.git")).unwrap();
+        git_directory(&root.join("outer/.git"));
+        git_directory(&root.join("outer/inner/.git"));
         assert_eq!(root_for(&root.join("outer/inner/n.md"), None), root.join("outer/inner"));
+    }
+
+    #[test]
+    fn any_dot_git_marks_a_work_tree() {
+        let folder = Folder::new("any-git");
+        let root = folder.path();
+        std::fs::create_dir_all(root.join("outer/empty/.git")).unwrap();
+        assert_eq!(
+            root_for(&root.join("outer/empty/n.md"), None),
+            root.join("outer/empty"),
+            "a .git folder without HEAD, objects and refs"
+        );
+        std::fs::create_dir_all(root.join("broken/d")).unwrap();
+        std::fs::write(root.join("broken/.git"), "gitdir: gone\n").unwrap();
+        assert_eq!(
+            root_for(&root.join("broken/d/n.md"), None),
+            root.join("broken"),
+            "a .git file that leads nowhere"
+        );
+    }
+
+    #[test]
+    fn the_root_keeps_the_spelling_of_the_document_path() {
+        let folder = Folder::new("spelling");
+        let root = folder.path();
+        git_directory(&root.join("repo/.git"));
+        std::fs::create_dir_all(root.join("repo/a")).unwrap();
+        std::os::unix::fs::symlink(root.join("repo"), root.join("link")).unwrap();
+        assert_eq!(root_for(&root.join("link/a/n.md"), None), root.join("link"));
+        assert_eq!(root_for(&root.join("repo/a/n.md"), None), root.join("repo"));
+    }
+
+    #[test]
+    fn a_tree_of_notes_is_one_the_scanner_would_make() {
+        let tree = Tree::of_notes(Path::new("/v"), &["b.md", "a/c.md", "a/d/e.md", "a.md"]);
+        assert_eq!(tree.root(), Path::new("/v"));
+        assert_eq!(names(&tree, tree.top()), ["a", "a.md", "b.md"]);
+        assert_eq!(names(&tree, at_path(&tree, &["a"]).children()), ["d", "c.md"]);
+        assert_eq!(at_path(&tree, &["a", "d", "e.md"]).path(), Path::new("/v/a/d/e.md"));
+        assert!(at_path(&tree, &["a", "d"]).is_folder() && !at_path(&tree, &["a.md"]).is_folder());
+        assert_eq!(at_path(&tree, &["a.md"]).name(), "a.md");
+        assert!(!tree.is_cut() && tree.unreadable() == 0);
+        assert_eq!(tree.nodes().len(), 6);
+        let odd = Tree::of_notes(Path::new("/v"), &["a", "a/b.md", "//c.md", ""]);
+        assert_eq!(names(&odd, odd.top()), ["a", "c.md"]);
+        assert!(
+            at_path(&odd, &["a"]).is_folder(),
+            "a name that holds another is a folder"
+        );
     }
 
     #[test]

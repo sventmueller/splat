@@ -10,6 +10,7 @@ mod apps;
 mod blocks;
 mod pictures;
 mod random;
+mod sheet;
 mod tables;
 mod text;
 

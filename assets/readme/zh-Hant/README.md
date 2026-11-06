@@ -635,6 +635,7 @@ Splat 在數 MB 的文件中仍能保持流暢：
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字元參照的名稱 | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | 解壓縮 Word 檔案和 Git 物件 | MIT、Zlib 或 Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | 讀取 Word 檔案的 XML | MIT 或 Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | 讀取以舊字碼頁編寫的 RTF 文字 | MIT 或 Apache-2.0、BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | 跨組合字母和分解字母的名稱與搜尋 | MIT 或 Apache-2.0、Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | 讓輸入文字中類似 `:shortcode:` 的文字保持字面形式 | MIT 或 Apache-2.0、Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | 呈現公式 | Apache-2.0 |

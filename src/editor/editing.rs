@@ -5,31 +5,28 @@ use std::cell::RefCell;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use objc2::rc::{Retained, Weak};
+use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, Sel};
-use objc2::{Message, sel};
+use objc2::{Message as _, sel};
 use objc2_app_kit::{NSBeep, NSMenu, NSMenuItem, NSPasteboard, NSPasteboardTypePNG, NSPasteboardTypeTIFF, NSTextView};
 use objc2_foundation::{NSArray, NSString, NSValue};
 
-use super::actions::{self, Action, Applies, code_language, diagram_template};
+use super::actions::{self, Action, Applies, Choice, diagram_template};
 use super::atom::atom_at_preview;
-use super::layers::ForEditing;
+use super::layers::{ForEditing, Message};
 use super::sidebar::SidebarTab;
-use super::state::PreviewMode;
-use super::sync::utf16_diff;
 use super::views::{offers_text, pasteboard_urls};
-use super::{Invalidate, State, tag_of};
+use super::{Invalidate, tag_of};
 use crate::i18n::{t, tf};
 use crate::markdown::commands::{self, Active, Edit, InlineStyle, ListStyle, Pending, Toggle};
-use crate::markdown::doc::{AlertKind, Align, Doc};
+use crate::markdown::doc::Doc;
 use crate::markdown::front_matter;
 use crate::markdown::table::{self, TableOp};
 use crate::markdown::text::{Byte, Direction, TextAt, U16, units, utf16_len};
-use crate::preview::bridge::Bridge;
-use crate::preview::layout::Layout;
-use crate::preview::map::Shown;
-use crate::util::{answer_from, constant, contained, ns, perform_later, shown_from_ns, to_nsrange};
-use splat_import::{Converted, ImageSource, Pasted, paste_as_markdown};
+use crate::util::{answer_from, constant, contained, ns, shown_from_ns, to_nsrange};
+use splat_editor_state::editing::{Announced, Dropped, compared_change, dropped_markdown, fitting_announcement};
+use splat_editor_state::files::write_new_file;
+use splat_import::{Converted, ImageSource, Pasted, Placement, paste_as_markdown};
 
 /// How long a paste waits for the picture to reach the document's folder, which may lie on a volume that hangs.
 const PASTE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -42,13 +39,6 @@ struct ActiveKey {
     preview: bool,
     state_version: u64,
     pending: Option<(Byte, Vec<InlineStyle>)>,
-}
-
-/// A change the preview announced before applying it, as range of its old text and replacement.
-enum Announced {
-    Edit(Range<Shown>, String),
-    /// Several changes or one without text: found by comparing the texts afterwards.
-    Unknown,
 }
 
 #[derive(Default)]
@@ -159,7 +149,7 @@ impl Editing<'_> {
     #[expect(clippy::too_many_lines, reason = "one case per command")]
     fn perform_it(&self, action: Action, sender: Option<&AnyObject>) {
         use Action::*;
-        let tag = tag_of(sender);
+        let choice = action.choice(tag_of(sender));
         match action {
             Bold => self.inline(InlineStyle::Bold, t("Fett")),
             Italic => self.inline(InlineStyle::Italic, t("Kursiv")),
@@ -170,7 +160,7 @@ impl Editing<'_> {
             Superscript => self.inline(InlineStyle::Superscript, t("Hochgestellt")),
             Subscript => self.inline(InlineStyle::Subscript, t("Tiefgestellt")),
             Heading => {
-                let level = u8::try_from(tag.clamp(0, 6)).unwrap_or(0);
+                let Choice::Heading(level) = choice else { return };
                 let name = if level == 0 {
                     t("Fließtext").to_string()
                 } else {
@@ -189,13 +179,13 @@ impl Editing<'_> {
             }),
             Quote => self.command(t("Zitat"), |d, sel| Some(commands::toggle_quote(d.text(), sel))),
             CodeBlock => {
-                let lang = code_language(tag);
+                let Choice::CodeLanguage(lang) = choice else { return };
                 self.command(t("Codeblock"), |d, sel| {
                     Some(commands::code_block_language(d, sel, lang))
                 });
             }
             Alert => {
-                let kind = AlertKind::ALL[crate::util::to_usize(tag).min(AlertKind::ALL.len() - 1)];
+                let Choice::Alert(kind) = choice else { return };
                 self.command(t("Hinweisbox"), |d, sel| Some(commands::insert_alert(d, sel, kind)));
             }
             RemoveFormatting => self.command(t("Formatierung entfernen"), |d, sel| {
@@ -207,7 +197,8 @@ impl Editing<'_> {
             Table => self.insert_table(),
             Formula => self.host.atom_editor().insert_formula(),
             Diagram => {
-                let template = diagram_template(tag.clamp(0, 2));
+                let Choice::Diagram(diagram) = choice else { return };
+                let template = diagram_template(diagram);
                 self.command(t("Diagramm"), |d, sel| {
                     Some(commands::insert_diagram(d.text(), sel, &template))
                 });
@@ -222,12 +213,7 @@ impl Editing<'_> {
             DeleteRow => self.table_op(TableOp::DeleteRow, t("Zeile löschen")),
             DeleteColumn => self.table_op(TableOp::DeleteColumn, t("Spalte löschen")),
             TableAlign => {
-                let align = match tag {
-                    1 => Align::Left,
-                    2 => Align::Center,
-                    3 => Align::Right,
-                    _ => Align::None,
-                };
+                let Choice::Align(align) = choice else { return };
                 self.table_op(TableOp::Align(align), t("Ausrichtung"));
             }
             TableFormat => self.table_op(TableOp::Format, t("Tabelle ausrichten")),
@@ -247,27 +233,33 @@ impl Editing<'_> {
                 self.host.updater().set_zoom((z / 1.1).max(0.5));
             }
             ZoomReset => self.host.updater().set_zoom(1.0),
-            NewTab => super::window::new_tab(self.host.object()),
+            NewTab => super::window::new_tab(self.host.mtm(), self.host.window().as_deref()),
             LoadRemoteImages => self.host.pictures().allow_remote_images(),
             ExportHtml => self.host.sharing().export(super::export::ExportKind::Html),
             ExportWord => self.host.sharing().export(super::export::ExportKind::Word),
             EditAtomAt => {
-                if let Some(range) = self
-                    .host
-                    .atom_editor()
-                    .starting_at(Byte::new(crate::util::to_usize(tag.max(0))))
-                {
+                if let Some(range) = actions::at_of(sender).and_then(|at| self.host.atom_editor().starting_at(at)) {
                     self.host.atom_editor().open(range, None);
                 }
             }
-            AtomSnippet => self.host.atom_editor().snippet(tag),
+            AtomSnippet => self.host.atom_editor().snippet(tag_of(sender)),
             AtomMode => {
                 let segment = sender
                     .and_then(|s| s.downcast_ref::<objc2_app_kit::NSSegmentedControl>())
                     .map_or(0, |c| c.selectedSegment());
                 self.host.atom_editor().mode_changed(segment);
             }
-            ToolbarSegment => super::toolbar::segment_clicked(self.host.object(), sender),
+            ToolbarSegment => {
+                let object = self.host.object();
+                let applies = |action| self.validate(Some(action), 0, None);
+                super::toolbar::click_segment(
+                    self.host.mtm(),
+                    sender,
+                    object.share_delegate(),
+                    object.target(),
+                    applies,
+                );
+            }
             PasteMarkdown => self.paste_as_markdown(&NSPasteboard::generalPasteboard()),
             EditMetadata => self.edit_metadata(),
             ExportOptions => self.host.sharing().ask_for_options(),
@@ -500,7 +492,7 @@ impl Editing<'_> {
             set_state(false);
             return false;
         }
-        if let Some(on) = action.checked(&active, tag) {
+        if let Some(on) = action.checked(&active, action.choice(tag)) {
             set_state(on);
         }
         true
@@ -526,7 +518,7 @@ impl Editing<'_> {
         };
         self.state.announce(announced);
         // A composition that is cancelled announces a change and never makes it.
-        perform_later(self.host.object(), sel!(previewEditSettled), 0.0, true);
+        self.host.object().perform_later(sel!(previewEditSettled), 0.0, true);
     }
 
     /// The turn of the run loop that announced an edit is over, and with it the edit, unless a composition goes on.
@@ -545,7 +537,7 @@ impl Editing<'_> {
         }
         let caught_up = self
             .host
-            .with_text(|snap, st| st.is_current(snap) && bridge(st).is_some());
+            .with_text(|snap, st| st.is_current(snap) && st.bridge().is_some());
         if !caught_up {
             self.host.invalidate(Invalidate::Preview);
             return;
@@ -557,7 +549,7 @@ impl Editing<'_> {
         let (edit, dirty, next) = self.host.model().read(move |st| {
             let (old_range, inserted) = known.unwrap_or_else(|new_text| compared_change(st.layout(), &new_text, caret));
             let delta = crate::util::to_isize(utf16_len(&inserted)) - crate::util::to_isize(units(&old_range));
-            let bridge = bridge(st);
+            let bridge = st.bridge();
             // Without an edit the preview falls back to what the source says, which it shows next.
             let (edit, next) = contained(|| {
                 let bridge = bridge.as_ref()?;
@@ -591,7 +583,7 @@ impl Editing<'_> {
             if !st.is_current(snap) {
                 return None;
             }
-            let sel = contained(|| bridge(st).map(|b| b.source_selection(shown))).flatten()?;
+            let sel = contained(|| st.bridge().map(|b| b.source_selection(shown))).flatten()?;
             let range = to_nsrange(snap.u16_range(&sel));
             Some((sel, range))
         });
@@ -618,7 +610,7 @@ impl Editing<'_> {
         let sel = shown_from_ns(self.host.panes().preview().selected_range());
         let p = sel.start;
         let answer = self.host.model().read(move |st| {
-            let Some(bridge) = bridge(st) else {
+            let Some(bridge) = st.bridge() else {
                 return PreviewCommand::NotCaughtUp;
             };
             let edit = |e: Option<Option<Edit>>, name: &'static str| match e.flatten() {
@@ -637,7 +629,7 @@ impl Editing<'_> {
                 }
                 c if c == sel!(insertTab:) => match contained(|| bridge.tab(p, Direction::Forward)).flatten() {
                     Some(e) => PreviewCommand::Edit(e, t("Einrücken")),
-                    None => PreviewCommand::Handled(!preview_in_code(st, p)),
+                    None => PreviewCommand::Handled(!st.preview_in_code(p)),
                 },
                 c if c == sel!(insertBacktab:) => match contained(|| bridge.tab(p, Direction::Backward)).flatten() {
                     Some(e) => PreviewCommand::Edit(e, t("Ausrücken")),
@@ -750,13 +742,7 @@ impl Editing<'_> {
             } else {
                 t("Formel bearbeiten …")
             };
-            insert(actions::tagged(
-                mtm,
-                Action::EditAtomAt,
-                title,
-                "",
-                crate::util::to_isize(range.start.get()),
-            ));
+            insert(actions::item_at(mtm, Action::EditAtomAt, title, range.start));
         }
         if self.active().table {
             insert(NSMenuItem::separatorItem(mtm));
@@ -775,22 +761,28 @@ impl Editing<'_> {
     fn insert_link(&self) {
         let Some(window) = self.host.window() else { return };
         let (_, selected) = self.selected_source();
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         // The selection is read again when the sheet closes: a reload from disk can change the text meanwhile.
-        super::dialogs::link(&window, &selected, move |url, label| this.link_chosen(&url, &label));
+        super::dialogs::link(&window, &selected, move |url, label| {
+            messenger.send(mtm, Message::LinkChosen { url, label });
+        });
     }
 
     pub(super) fn link_chosen(&self, url: &str, label: &str) {
         self.host.updater().update_now();
         let (sel, _) = self.selected_source();
-        let edit = commands::insert_link(sel, url, label);
+        let edit = self
+            .host
+            .on_source_text(move |text| commands::insert_link(text, sel, url, label));
         self.apply_edit(edit, Some(t("Link einfügen")), false);
     }
 
     fn insert_table(&self) {
         let Some(window) = self.host.window() else { return };
-        let this = self.host.object().retain();
-        super::dialogs::table(&window, move |rows, cols| this.table_chosen(rows, cols));
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
+        super::dialogs::table(&window, move |rows, columns| {
+            messenger.send(mtm, Message::TableChosen { rows, columns });
+        });
     }
 
     pub(super) fn table_chosen(&self, rows: usize, cols: usize) {
@@ -804,10 +796,10 @@ impl Editing<'_> {
 
     fn insert_image(&self) {
         let Some(window) = self.host.window() else { return };
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         super::dialogs::image(&window, move |url| {
             if let Some(path) = url.path() {
-                this.image_chosen(Path::new(&path.to_string()));
+                messenger.send(mtm, Message::ImageChosen(PathBuf::from(path.to_string())));
             }
         });
     }
@@ -820,7 +812,9 @@ impl Editing<'_> {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
         let rel = super::links::relative_path(self.host.doc_dir().as_deref(), path);
-        let edit = commands::insert_image(sel, &alt, &rel);
+        let edit = self
+            .host
+            .on_source_text(move |text| commands::insert_image(text, sel, &alt, &rel));
         self.apply_edit(edit, Some(t("Bild einfügen")), false);
     }
 
@@ -852,31 +846,17 @@ impl Editing<'_> {
             return true;
         };
         let stem = format!("{} {}", t("Bild"), crate::util::now("yyyy-MM-dd HH.mm.ss"));
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
+        let messenger = self.host.object().messenger();
         crate::util::BACKGROUND.run(move || {
             let png = png.or_else(|| super::decoder::png_of_pasted_tiff(&tiff?));
             let folder = dir.clone();
             let written = png.and_then(|png| {
                 answer_from(&dir, PASTE_WAIT, move || {
-                    let mut path = folder.join(format!("{stem}.png"));
-                    for n in 2.. {
-                        if !path.exists() {
-                            break;
-                        }
-                        path = folder.join(format!("{stem} {n}.png"));
-                    }
-                    std::fs::write(&path, &png).ok().map(|()| path)
+                    write_new_file(&folder, &stem, "png", &png).ok()
                 })
                 .flatten()
             });
-            crate::util::main_soon(move || {
-                let Some(mtm) = objc2::MainThreadMarker::new() else {
-                    return;
-                };
-                if let Some(c) = me.get(mtm).load() {
-                    c.picture_pasted(written, &dir);
-                }
-            });
+            messenger.send_soon(Message::PicturePasted { written, folder: dir });
         });
         true
     }
@@ -892,7 +872,10 @@ impl Editing<'_> {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let edit = commands::insert_image(sel, &alt, &super::links::relative_path(Some(dir), &path));
+        let rel = super::links::relative_path(Some(dir), &path);
+        let edit = self
+            .host
+            .on_source_text(move |text| commands::insert_image(text, sel, &alt, &rel));
         self.apply_edit(edit, Some(t("Bild einfügen")), false);
     }
 
@@ -932,9 +915,9 @@ impl Editing<'_> {
             self.ask_to_save_before_pasting();
             return;
         }
-        let Converted { markdown, blocks } = converted;
+        let Converted { markdown, placement } = converted;
         self.command(t("Als Markdown einsetzen"), move |d, sel| {
-            Some(if blocks {
+            Some(if placement == Placement::OwnLines {
                 commands::insert_block(d.text(), sel, &markdown, markdown.len())
             } else {
                 let end = sel.start + markdown.len();
@@ -957,9 +940,9 @@ impl Editing<'_> {
                 .map(|found| found.fields.into_iter().map(|field| (field.key, field.value)).collect())
                 .unwrap_or_default()
         });
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         super::metadata::show(&window, &fields, move |wanted| {
-            this.metadata_chosen(wanted);
+            messenger.send(mtm, Message::MetadataChosen(wanted));
         });
     }
 
@@ -976,7 +959,7 @@ impl Editing<'_> {
             if text != before {
                 return None;
             }
-            super::notes::single_edit(text, replacements)
+            splat_editor_state::notes::single_edit(text, replacements)
         });
         match edit {
             Some(edit) => {
@@ -1074,137 +1057,16 @@ fn write_pasted_picture(dir: &Path, mime: &str, bytes: &[u8]) -> Option<String> 
     let bytes = bytes.to_vec();
     let folder = dir.to_path_buf();
     let written = answer_from(dir, PASTE_WAIT, move || {
-        let mut path = folder.join(format!("{stem}.{extension}"));
-        for n in 2.. {
-            if !path.exists() {
-                break;
-            }
-            path = folder.join(format!("{stem} {n}.{extension}"));
-        }
-        std::fs::write(&path, &bytes).ok().map(|()| path)
+        write_new_file(&folder, &stem, extension, &bytes).ok()
     })
     .flatten()?;
     Some(super::links::relative_path(Some(dir), &written))
 }
 
-/// `None` while the preview has not caught up with the document, or shows a notice instead of it.
-pub(super) fn bridge(st: &State) -> Option<Bridge<'_>> {
-    if st.preview_mode() != PreviewMode::Shows {
-        return None;
-    }
-    Bridge::new(st.doc(), st.layout(), st.index())
-}
-
-fn preview_in_code(st: &State, p: Shown) -> bool {
-    st.index().para_at(p).is_some_and(|i| {
-        matches!(
-            st.index().para(st.layout(), i).style.kind,
-            crate::preview::layout::ParaKind::Code { .. }
-        )
-    })
-}
-
-/// The change the preview view announced, as the range of its old text and what replaced it, if that fits the lengths.
-fn fitting_announcement(
-    announced: Option<Announced>,
-    shown_len: usize,
-    new_len: usize,
-) -> Option<(Range<Shown>, String)> {
-    match announced {
-        Some(Announced::Edit(range, text))
-            if range.end.get() <= shown_len && new_len + units(&range) == shown_len + utf16_len(&text) =>
-        {
-            Some((range, text))
-        }
-        _ => None,
-    }
-}
-
-/// The change the user made in the preview found by comparing its old and new text around the caret.
-fn compared_change(layout: &Layout, new_text: &str, caret: usize) -> (Range<Shown>, String) {
-    let new: Vec<u16> = new_text.encode_utf16().collect();
-    let old: Vec<u16> = preview_string(layout).encode_utf16().collect();
-    let (old_range, new_range) = utf16_diff(&old, &new, caret);
-    (
-        Shown::new(old_range.start)..Shown::new(old_range.end),
-        String::from_utf16_lossy(&new[new_range]),
-    )
-}
-
-enum Dropped {
-    File(PathBuf),
-    Address(String),
-}
-
-/// Markdown for files and addresses dropped on the source, one per line: pictures as images, everything else as
-/// links, files relative to `dir`.
-fn dropped_markdown(dropped: &[Dropped], dir: Option<&Path>) -> String {
-    const PICTURES: [&str; 10] = ["png", "jpg", "jpeg", "gif", "svg", "webp", "heic", "tif", "tiff", "bmp"];
-    let lines: Vec<String> = dropped
-        .iter()
-        .map(|item| match item {
-            Dropped::File(path) => {
-                let name = path
-                    .file_stem()
-                    .map(|s| s.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-                let dest = commands::link_destination(&super::links::relative_path(dir, path));
-                let ext = path
-                    .extension()
-                    .map(|e| e.to_string_lossy().to_lowercase())
-                    .unwrap_or_default();
-                if PICTURES.contains(&ext.as_str()) {
-                    format!("![{name}]({dest})")
-                } else {
-                    format!("[{name}]({dest})")
-                }
-            }
-            Dropped::Address(s) => format!("[{s}]({})", commands::link_destination(s)),
-        })
-        .collect();
-    lines.join("\n")
-}
-
-/// The text the preview shows for `layout`.
-fn preview_string(layout: &Layout) -> String {
-    let mut s = String::new();
-    for para in layout.blocks.iter().flat_map(|b| &b.paras) {
-        for run in &para.runs {
-            s.push_str(&run.text);
-        }
-        s.push('\n');
-    }
-    s
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markdown::reader::parse;
-    use crate::preview::layout::{NoImages, layout};
-
-    #[test]
-    fn an_announced_preview_change_counts_only_when_it_fits_the_lengths() {
-        let text = "Ein Wort\n";
-        let l = layout(&parse(text), &NoImages, None);
-        let shown = utf16_len(&preview_string(&l));
-        let fits = Some(Announced::Edit(Shown::new(3)..Shown::new(3), "x".into()));
-        assert_eq!(
-            fitting_announcement(fits, shown, shown + 1),
-            Some((Shown::new(3)..Shown::new(3), "x".into()))
-        );
-        let misfit = Some(Announced::Edit(Shown::new(0)..Shown::new(0), "yy".into()));
-        assert_eq!(fitting_announcement(misfit, shown, shown + 1), None);
-        assert_eq!(fitting_announcement(Some(Announced::Unknown), shown, shown - 4), None);
-        assert_eq!(
-            compared_change(&l, "Einx Wort\n", 4),
-            (Shown::new(3)..Shown::new(3), "x".into())
-        );
-        assert_eq!(
-            compared_change(&l, "Ein \n", 4),
-            (Shown::new(4)..Shown::new(8), String::new())
-        );
-    }
+    use crate::preview::map::Shown;
 
     fn key(version: u64) -> ActiveKey {
         ActiveKey {
@@ -1261,22 +1123,5 @@ mod tests {
         assert!(matches!(*state.preview_edit.borrow(), Some(Announced::Edit(..))));
         state.announce(Announced::Edit(Shown::new(2)..Shown::new(2), "b".into()));
         assert!(matches!(*state.preview_edit.borrow(), Some(Announced::Unknown)));
-    }
-
-    #[test]
-    fn dropped_files_become_images_or_links_relative_to_the_document() {
-        let dropped = [
-            Dropped::File("/Users/a/Notizen/Bilder/Foto 1.PNG".into()),
-            Dropped::File("/Users/a/Bericht.pdf".into()),
-            Dropped::Address("https://example.com/(x)".into()),
-        ];
-        assert_eq!(
-            dropped_markdown(&dropped, Some(Path::new("/Users/a/Notizen"))),
-            "![Foto 1](<Bilder/Foto 1.PNG>)\n[Bericht](../Bericht.pdf)\n[https://example.com/(x)](<https://example.com/(x)>)"
-        );
-        assert_eq!(
-            dropped_markdown(&dropped[1..2], None),
-            "[Bericht](/Users/a/Bericht.pdf)"
-        );
     }
 }

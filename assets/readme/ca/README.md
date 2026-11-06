@@ -634,6 +634,7 @@ La compilació, les proves, l’estructura del codi i les regles que segueix es 
 | [entities](https://github.com/p-jackson/entities) | 1 | els noms de les referències de caràcters HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | descomprimir fitxers del Word i objectes de Git | MIT, Zlib o Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | llegir l’XML dels fitxers del Word | MIT o Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | lectura de text RTF escrit en pàgines de codis antigues | MIT o Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | noms i cerca entre lletres compostes i descompostes | MIT o Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | mantenir literal el text semblant a `:shortcode:` en text importat | MIT o Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | renderització de fórmules | Apache-2.0 |

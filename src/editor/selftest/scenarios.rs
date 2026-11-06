@@ -2,7 +2,6 @@
 //! formatting and table command, the dialogs, link clicks, pasting and dropping, exports, a large change, the
 //! toolbar groups, the recovery after a crash and the quick reference.
 
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 
 use objc2::rc::Retained;
@@ -11,7 +10,7 @@ use objc2_app_kit::{NSDocumentController, NSModalResponse, NSWindow};
 use objc2_foundation::NSData;
 
 use super::super::actions::Action;
-use super::{Ctx, EditorController, Step, applied, check, perform, select_in_source, settle, source, when};
+use super::{Ctx, EditorController, Plan, Step, applied, check, perform, select_in_source, settle, source, when};
 use crate::document::MdDocument;
 
 mod app;
@@ -41,28 +40,23 @@ use view::{marks_on_screen_steps, outline_without_preview_steps, toolbar_steps, 
 
 pub(super) const SECTION: &str = "\n\n## Prüfstand\n\nWort **fett** eins zwei drei.\n\n\
     Links: [Netz](https://example.com/pruefstand) #pruefstand [Andere](andere.md) [Fehlt](fehlt.md) \
-    [Einstellungen](x-apple.systempreferences:com.apple.Settings) mit Fußnote[^pruef].\n\n\
+    [Einstellungen](x-apple.systempreferences:com.apple.Settings) [[andere]] mit Fußnote[^pruef].\n\n\
     ![png](bild.png) ![jpg](foto.jpg) ![svg](zeichnung.svg) ![pdf](seite.pdf) ![tif](scan.tiff)\n\n\
     | A | B |\n|---|---|\n| 1 | 2 |\n\n[^pruef]: Die Prüffußnote.\n";
 
 const SVG: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"20\" height=\"10\"><rect width=\"20\" \
                    height=\"10\" fill=\"#3a7\"/></svg>";
 
-thread_local! {
-    /// The source before the step under test, for the step that checks or undoes it.
-    static BEFORE: RefCell<String> = const { RefCell::new(String::new()) };
-}
-
 fn remember(c: &Ctx) {
-    BEFORE.with(|b| *b.borrow_mut() = source(&c.e));
+    *c.before.borrow_mut() = source(&c.e);
 }
 
-fn before() -> String {
-    BEFORE.with(|b| b.borrow().clone())
+fn before(c: &Ctx) -> String {
+    c.before.borrow().clone()
 }
 
 fn sizes(c: &Ctx) -> String {
-    format!("{} bytes, before {}", source(&c.e).len(), before().len())
+    format!("{} bytes, before {}", source(&c.e).len(), before(c).len())
 }
 
 fn undo(c: &Ctx) {
@@ -75,7 +69,7 @@ fn undo(c: &Ctx) {
 fn undone(name: String) -> Step {
     applied(move |c| {
         undo(c);
-        check(&name, source(&c.e) == before(), &sizes(c));
+        check(&name, source(&c.e) == before(c), &sizes(c));
     })
 }
 
@@ -450,7 +444,7 @@ fn command(command: &'static Command) -> [Step; 2] {
         applied(move |c| {
             remember(c);
             command.run(&c.e);
-            command.check_text(&c.e, &before());
+            command.check_text(&c.e, &before(c));
         }),
         undone(format!("{} is undone in one step", command.name)),
     ]
@@ -667,26 +661,27 @@ pub(super) fn document_holding(group: &'static str, text: impl Fn(&Ctx) -> Strin
                 if let Some(window) = next.window() {
                     window.makeKeyAndOrderFront(None);
                 }
-                super::work_on(next);
+                super::work_on(c, next);
             },
         ),
         settle(|_| {}),
     ]
 }
 
-pub(super) fn steps() -> Vec<Step> {
+pub(super) fn add_steps(plan: &mut Plan) {
     let only = std::env::var("SPLAT_SELFTEST_ONLY").ok();
-    let mut steps = Vec::new();
     let mut found = false;
     for (name, group) in groups() {
         if only.as_deref().is_none_or(|only| only == name) {
             found = true;
-            steps.extend(own_document(name));
-            steps.extend(group);
+            plan.add(name, own_document(name));
+            plan.add(name, group);
         }
     }
     if !found {
-        steps.push(applied(|_| check("the group named by --only exists", false, "")));
+        plan.add(
+            "scenarios",
+            vec![applied(|_| check("the group named by --only exists", false, ""))],
+        );
     }
-    steps
 }

@@ -16,7 +16,7 @@ use crate::markdown::doc::{BlockKind, Doc, block_path, figure_at};
 use crate::markdown::text::{Byte, Direction, TextAt, U16, units};
 use crate::preview::layout::{Atom, ParaKind, RunMap};
 use crate::preview::map::Shown;
-use crate::util::{contained, ns, perform_later, storage, to_nsrange};
+use crate::util::{contained, ns, storage, to_nsrange};
 
 /// What closing a formula or diagram editor does to the document.
 #[derive(Debug, PartialEq, Eq)]
@@ -83,7 +83,7 @@ impl AtomEditor<'_> {
             return;
         };
         if self.state.opens_at(range.start) {
-            perform_later(self.host.object(), sel!(openAtomUnderCaret), 0.0, false);
+            self.host.object().perform_later(sel!(openAtomUnderCaret), 0.0, false);
         }
     }
 
@@ -225,7 +225,9 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            mathfield::field(self.host.mtm()).detach(self.host.object());
+            self.host
+                .object()
+                .detach_formula_field(&mathfield::field(self.host.mtm()));
         }
         edit.popover.close();
     }
@@ -245,7 +247,9 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            mathfield::field(self.host.mtm()).detach(self.host.object());
+            self.host
+                .object()
+                .detach_formula_field(&mathfield::field(self.host.mtm()));
         }
         self.state.closed.set(Some(edit.range_start));
         let current = edit.start..edit.start + edit.len.get();

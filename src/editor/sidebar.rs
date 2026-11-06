@@ -3,7 +3,6 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
-use std::ops::Range;
 use std::path::PathBuf;
 
 use objc2::rc::{Retained, Weak};
@@ -16,13 +15,15 @@ use objc2_app_kit::{
     NSSegmentedControl, NSStackView, NSTableColumn, NSTableViewStyle, NSTextField, NSUserInterfaceLayoutOrientation,
     NSView, NSViewController,
 };
-use objc2_foundation::{NSArray, NSNotification, NSNumber, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize};
+use objc2_foundation::{NSArray, NSNotification, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize};
 
 use super::EditorController;
 use super::attributes::{Attribute, Attributes, add_attribute, attributed_mut};
-use super::outline::Outline;
+use super::outline::{Outline, RowItems};
 use crate::i18n::t;
 use crate::util::{guarded, ns};
+use splat_editor_state::notes::chain_to;
+pub(super) use splat_editor_state::notes::{Row, RowKind};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub(in crate::editor) enum SidebarTab {
@@ -80,43 +81,15 @@ pub(in crate::editor) enum NoteEvent {
     LinksTo(PathBuf),
 }
 
-/// What a row stands for.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) enum RowKind {
-    Folder,
-    Note(PathBuf),
-    /// The line and the place in it.
-    Hit(PathBuf, usize, usize),
-    /// A line that only tells something, such as that more hits stood there.
-    Remark,
-}
-
-/// A row of a list in the sidebar.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(super) struct Row {
-    pub(super) title: String,
-    /// The part of the title that matched, in bytes.
-    pub(super) matched: Option<Range<usize>>,
-    pub(super) tip: String,
-    pub(super) symbol: &'static str,
-    pub(super) kind: RowKind,
-    /// Stays the same across a reload, so that a folder stays open.
-    pub(super) key: String,
-    pub(super) children: Vec<usize>,
-}
-
 #[derive(Default)]
 pub struct ListIvars {
     rows: RefCell<Vec<Row>>,
+    items: RowItems,
     roots: RefCell<Vec<usize>>,
     open: RefCell<HashSet<String>>,
     controller: RefCell<Option<Weak<EditorController>>>,
     /// Raised while the list is replaced, which moves the selection without the user choosing anything.
     reloading: Cell<bool>,
-}
-
-fn index_of(item: &AnyObject) -> Option<usize> {
-    item.downcast_ref::<NSNumber>().map(|n| n.as_usize())
 }
 
 define_class!(
@@ -136,13 +109,8 @@ define_class!(
 
         #[unsafe(method_id(outlineView:child:ofItem:))]
         fn child(&self, _view: &NSOutlineView, index: isize, item: Option<&AnyObject>) -> Retained<AnyObject> {
-            let i = guarded(0, || {
-                self.children_of(item)
-                    .get(crate::util::to_usize(index))
-                    .copied()
-                    .unwrap_or(0)
-            });
-            crate::util::obj(NSNumber::new_usize(i))
+            let row = guarded(None, || self.children_of(item).get(crate::util::to_usize(index)).copied());
+            self.ivars().items.item_or_none(self.mtm(), row)
         }
 
         #[unsafe(method(outlineView:isItemExpandable:))]
@@ -163,7 +131,7 @@ define_class!(
         ) -> Option<Retained<NSView>> {
             guarded(None, || {
                 let rows = self.ivars().rows.borrow();
-                Some(row_view(self.mtm(), rows.get(index_of(item)?)?))
+                Some(row_view(self.mtm(), rows.get(self.ivars().items.row_of(item)?)?))
             })
         }
 
@@ -207,15 +175,14 @@ define_class!(
 
 impl NotesList {
     fn children_of(&self, item: Option<&AnyObject>) -> Vec<usize> {
-        match item.and_then(index_of) {
-            Some(i) => self
-                .ivars()
-                .rows
-                .borrow()
-                .get(i)
-                .map(|r| r.children.clone())
+        let ivars = self.ivars();
+        match item {
+            Some(item) => ivars
+                .items
+                .row_of(item)
+                .and_then(|row| ivars.rows.borrow().get(row).map(|r| r.children.clone()))
                 .unwrap_or_default(),
-            None => self.ivars().roots.borrow().clone(),
+            None => ivars.roots.borrow().clone(),
         }
     }
 
@@ -227,7 +194,8 @@ impl NotesList {
         let Some(item) = info.objectForKey(&ns("NSObject")) else {
             return;
         };
-        let Some(key) = index_of(&item).and_then(|i| self.ivars().rows.borrow().get(i).map(|r| r.key.clone())) else {
+        let row = self.ivars().items.row_of(&item);
+        let Some(key) = row.and_then(|i| self.ivars().rows.borrow().get(i).map(|r| r.key.clone())) else {
             return;
         };
         let mut remembered = self.ivars().open.borrow_mut();
@@ -243,7 +211,7 @@ impl NotesList {
     }
 
     fn row_at(&self, view: &NSOutlineView, row: isize) -> Option<Row> {
-        let i = index_of(&*view.itemAtRow(row)?)?;
+        let i = self.ivars().items.row_of(&*view.itemAtRow(row)?)?;
         self.ivars().rows.borrow().get(i).cloned()
     }
 
@@ -270,15 +238,16 @@ impl NotesList {
         }
     }
 
-    /// A menu item's tag holds the row it was opened on.
+    /// A menu item's represented object is the item of the row it was opened on.
     fn menu_chose(&self, sender: Option<&AnyObject>, event: fn(PathBuf) -> NoteEvent) {
         let Some(item) = sender.and_then(|s| s.downcast_ref::<objc2_app_kit::NSMenuItem>()) else {
             return;
         };
+        let Some(row) = item.representedObject().and_then(|row| self.ivars().items.row_of(&row)) else {
+            return;
+        };
         let rows = self.ivars().rows.borrow();
-        let Some(RowKind::Note(path) | RowKind::Hit(path, ..)) =
-            rows.get(crate::util::to_usize(item.tag())).map(|r| &r.kind)
-        else {
+        let Some(RowKind::Note(path) | RowKind::Hit(path, ..)) = rows.get(row).map(|r| &r.kind) else {
             return;
         };
         let path = path.clone();
@@ -289,7 +258,8 @@ impl NotesList {
     }
 
     fn menu_for(&self, view: &NSOutlineView, row: isize) -> Option<Retained<NSMenu>> {
-        let i = index_of(&*view.itemAtRow(row)?)?;
+        let row_item = view.itemAtRow(row)?;
+        let i = self.ivars().items.row_of(&row_item)?;
         let has_note = matches!(
             self.ivars().rows.borrow().get(i).map(|r| &r.kind),
             Some(RowKind::Note(_) | RowKind::Hit(..))
@@ -304,9 +274,13 @@ impl NotesList {
             (t("Im Finder zeigen"), sel!(noteReveal:)),
             (t("Verweise auf diese Notiz suchen"), sel!(noteLinks:)),
         ] {
-            let item = crate::util::tagged(mtm, title, action, "", crate::util::to_isize(i));
-            // SAFETY: The target is this list, which the sidebar keeps as long as the menu's view exists.
-            unsafe { item.setTarget(Some(self)) };
+            let item = crate::util::item(mtm, title, Some(action), "");
+            // SAFETY: The target is this list, which the sidebar keeps as long as the menu's view exists; the represented
+            // object is the row's item, which the menu item retains.
+            unsafe {
+                item.setTarget(Some(self));
+                item.setRepresentedObject(Some(&row_item));
+            }
             menu.addItem(&item);
         }
         Some(menu)
@@ -472,19 +446,21 @@ impl List {
             let keys = rows.iter().filter(|r| !r.children.is_empty()).map(|r| r.key.clone());
             ivars.open.borrow_mut().extend(keys);
         }
+        let count = rows.len();
         *ivars.rows.borrow_mut() = rows;
         *ivars.roots.borrow_mut() = roots;
-        crate::util::with_raised(&ivars.reloading, || {
-            self.view.reloadData();
-            let open: Vec<usize> = {
-                let (rows, remembered) = (ivars.rows.borrow(), ivars.open.borrow());
-                (0..rows.len()).filter(|&i| remembered.contains(&rows[i].key)).collect()
-            };
-            for i in open {
-                let item = crate::util::obj(NSNumber::new_usize(i));
-                // SAFETY: A row's number is an item of this list, as `child` hands it out.
-                unsafe { self.view.expandItem(Some(&item)) };
-            }
+        ivars.items.replace(self.view.mtm(), count, || {
+            crate::util::with_raised(&ivars.reloading, || {
+                self.view.reloadData();
+                let open: Vec<usize> = {
+                    let (rows, remembered) = (ivars.rows.borrow(), ivars.open.borrow());
+                    (0..rows.len()).filter(|&i| remembered.contains(&rows[i].key)).collect()
+                };
+                for item in open.into_iter().filter_map(|i| ivars.items.item(i)) {
+                    // SAFETY: The item is a row's own, as `child` hands it out, and the list keeps it.
+                    unsafe { self.view.expandItem(Some(&item)) };
+                }
+            });
         });
     }
 
@@ -501,9 +477,8 @@ impl List {
         };
         crate::util::with_raised(&ivars.reloading, || {
             let mut row = -1;
-            for i in chain {
-                let item = crate::util::obj(NSNumber::new_usize(i));
-                // SAFETY: A row's number is an item of this list, as `child` hands it out.
+            for item in chain.into_iter().filter_map(|i| ivars.items.item(i)) {
+                // SAFETY: The item is a row's own, as `child` hands it out, and the list keeps it.
                 row = unsafe {
                     self.view.expandItem(Some(&item));
                     self.view.rowForItem(Some(&item))
@@ -516,21 +491,6 @@ impl List {
             }
         });
     }
-}
-
-/// The rows from the top of the list down to the note at `path`.
-fn chain_to(rows: &[Row], roots: &[usize], path: &std::path::Path) -> Option<Vec<usize>> {
-    for &root in roots {
-        let row = rows.get(root)?;
-        if matches!(&row.kind, RowKind::Note(p) if p == path) {
-            return Some(vec![root]);
-        }
-        if let Some(mut below) = chain_to(rows, &row.children, path) {
-            below.insert(0, root);
-            return Some(below);
-        }
-    }
-    None
 }
 
 pub struct ActionIvars {
@@ -805,41 +765,6 @@ impl List {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn row(kind: RowKind, children: Vec<usize>) -> Row {
-        Row {
-            title: String::new(),
-            matched: None,
-            tip: String::new(),
-            symbol: "",
-            kind,
-            key: String::new(),
-            children,
-        }
-    }
-
-    #[test]
-    fn the_way_to_a_note_leads_through_its_folders() {
-        let note = |path: &str| RowKind::Note(PathBuf::from(path));
-        let rows = vec![
-            row(RowKind::Folder, vec![1, 2]),
-            row(RowKind::Folder, vec![3]),
-            row(note("/a/b.md"), vec![]),
-            row(note("/a/x/c.md"), vec![]),
-            row(note("/d.md"), vec![]),
-        ];
-        let roots = [0, 4];
-        assert_eq!(chain_to(&rows, &roots, std::path::Path::new("/d.md")), Some(vec![4]));
-        assert_eq!(
-            chain_to(&rows, &roots, std::path::Path::new("/a/b.md")),
-            Some(vec![0, 2])
-        );
-        assert_eq!(
-            chain_to(&rows, &roots, std::path::Path::new("/a/x/c.md")),
-            Some(vec![0, 1, 3])
-        );
-        assert_eq!(chain_to(&rows, &roots, std::path::Path::new("/nicht.md")), None);
-    }
 
     #[test]
     fn a_tab_is_found_again_by_its_segment() {

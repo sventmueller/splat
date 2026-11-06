@@ -3,36 +3,62 @@
 //! ISO/IEC 29500 the file is written in.
 
 use std::collections::HashMap;
+use std::fmt;
 
-use crate::xml::{self, XmlError};
-use crate::zip::{Archive, ZipError};
+use splat_ooxml::zip::{Archive, TooLarge, ZipError};
 
-/// Why a file cannot be read as a Word package.
+use crate::xml::{self, XmlBudget, XmlError};
+
+/// Why a Word file cannot be read, whether for an import or as one of the two files of a template merge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum PackageError {
+pub enum WordError {
+    /// Another kind of file, an old `.doc` among them. A template merge also refuses a Word file with macros, which it
+    /// would carry into a document that cannot have them.
     NotAWordFile,
+    /// A file protected by a password.
     Encrypted,
+    /// More than an import or a merge reads into memory, or more than the merged file can hold.
     TooLarge,
+    /// A Word file whose structure is broken.
     Damaged,
 }
 
-impl From<ZipError> for PackageError {
-    fn from(error: ZipError) -> PackageError {
+impl fmt::Display for WordError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            WordError::NotAWordFile => "not a Word file of a kind that can be used here",
+            WordError::Encrypted => "the Word file is protected by a password",
+            WordError::TooLarge => "the Word file is larger than can be read",
+            WordError::Damaged => "the Word file is damaged",
+        })
+    }
+}
+
+impl std::error::Error for WordError {}
+
+impl From<ZipError> for WordError {
+    fn from(error: ZipError) -> WordError {
         match error {
-            ZipError::NotAnArchive => PackageError::NotAWordFile,
-            ZipError::Encrypted => PackageError::Encrypted,
-            ZipError::Zip64 | ZipError::TooLarge => PackageError::TooLarge,
-            ZipError::Damaged => PackageError::Damaged,
+            ZipError::NotAnArchive => WordError::NotAWordFile,
+            ZipError::Encrypted => WordError::Encrypted,
+            ZipError::Zip64 | ZipError::TooLarge | ZipError::EntryTooLarge => WordError::TooLarge,
+            ZipError::Damaged => WordError::Damaged,
         }
     }
 }
 
-impl From<XmlError> for PackageError {
-    fn from(error: XmlError) -> PackageError {
+impl From<XmlError> for WordError {
+    fn from(error: XmlError) -> WordError {
         match error {
-            XmlError::TooLarge => PackageError::TooLarge,
-            XmlError::Damaged => PackageError::Damaged,
+            XmlError::TooLarge => WordError::TooLarge,
+            XmlError::Damaged => WordError::Damaged,
         }
+    }
+}
+
+impl From<TooLarge> for WordError {
+    fn from(_: TooLarge) -> WordError {
+        WordError::TooLarge
     }
 }
 
@@ -44,18 +70,15 @@ pub(crate) const TEMPLATE_TYPE: &str =
 pub(crate) const MACRO_DOCUMENT_TYPE: &str = "application/vnd.ms-word.document.macroEnabled.main+xml";
 pub(crate) const MACRO_TEMPLATE_TYPE: &str = "application/vnd.ms-word.template.macroEnabledTemplate.main+xml";
 
-/// More than any part of a Word file that is not made to hurt; a part read as XML stays in memory whole.
-pub(crate) const MOST_XML_BYTES: u64 = 128 << 20;
-
 pub(crate) const OLE_MAGIC: &[u8] = b"\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
 
 /// An old `.doc` or an Office file with a password: both are OLE files, and only the second names this stream.
-fn ole_error(bytes: &[u8]) -> PackageError {
+fn ole_error(bytes: &[u8]) -> WordError {
     let name: Vec<u8> = "EncryptedPackage".encode_utf16().flat_map(u16::to_le_bytes).collect();
     if bytes.windows(name.len()).any(|window| window == name) {
-        PackageError::Encrypted
+        WordError::Encrypted
     } else {
-        PackageError::NotAWordFile
+        WordError::NotAWordFile
     }
 }
 
@@ -223,8 +246,8 @@ pub(crate) fn in_the_usual_form(name: &str, bytes: Vec<u8>) -> Vec<u8> {
 }
 
 /// The text of a part, without the byte order mark it may start with.
-fn into_text(bytes: Vec<u8>) -> Result<String, PackageError> {
-    let mut text = String::from_utf8(bytes).map_err(|_| PackageError::Damaged)?;
+fn into_text(bytes: Vec<u8>) -> Result<String, WordError> {
+    let mut text = String::from_utf8(bytes).map_err(|_| WordError::Damaged)?;
     if text.starts_with('\u{feff}') {
         text.drain(..'\u{feff}'.len_utf8());
     }
@@ -292,8 +315,8 @@ pub(crate) struct Relationships {
 
 impl Relationships {
     /// The relationships in the `.rels` text of a part in `folder`.
-    pub(crate) fn read(text: &str, folder: &str) -> Result<Relationships, PackageError> {
-        let document = xml::parse(text)?;
+    pub(crate) fn read(text: &str, folder: &str, budget: &XmlBudget) -> Result<Relationships, WordError> {
+        let document = xml::parse(text, budget)?;
         let mut rels = Relationships::default();
         for node in document.root_element().children() {
             if node.tag_name().name() != "Relationship" {
@@ -340,6 +363,8 @@ impl Relationships {
 /// A Word file opened: its archive and what `[Content_Types].xml` says.
 pub(crate) struct Package<'a> {
     pub(crate) archive: Archive<'a>,
+    /// What the XML of this file, and of any other read along with it, may still take.
+    pub(crate) budget: &'a XmlBudget,
     /// `[Content_Types].xml` as it stands.
     pub(crate) types: String,
     pub(crate) main: String,
@@ -350,15 +375,16 @@ pub(crate) struct Package<'a> {
 }
 
 impl<'a> Package<'a> {
-    /// The package in `bytes`, whose main part is the first with one of `main_types`.
-    pub(crate) fn open(bytes: &'a [u8], main_types: &[&str]) -> Result<Package<'a>, PackageError> {
+    /// The package in `bytes`, whose main part is the first with one of `main_types`; its XML comes out of `budget`.
+    pub(crate) fn open(bytes: &'a [u8], main_types: &[&str], budget: &'a XmlBudget) -> Result<Package<'a>, WordError> {
         if bytes.starts_with(OLE_MAGIC) {
             return Err(ole_error(bytes));
         }
         let archive = Archive::read(bytes)?;
-        let types = archive.get(TYPES_PART)?.ok_or(PackageError::NotAWordFile)?;
+        budget.take_bytes(archive.size_of(TYPES_PART).ok_or(WordError::NotAWordFile)?)?;
+        let types = archive.get(TYPES_PART)?.ok_or(WordError::NotAWordFile)?;
         let types = into_text(in_the_usual_form(TYPES_PART, types))?;
-        let document = xml::parse(&types)?;
+        let document = xml::parse(&types, budget)?;
         let mut main = None;
         let mut defaults = HashMap::new();
         let mut overrides = HashMap::new();
@@ -380,12 +406,13 @@ impl<'a> Package<'a> {
             }
         }
         drop(document);
-        let main = main.ok_or(PackageError::NotAWordFile)?;
+        let main = main.ok_or(WordError::NotAWordFile)?;
         if !archive.contains(&main) {
-            return Err(PackageError::Damaged);
+            return Err(WordError::Damaged);
         }
         Ok(Package {
             archive,
+            budget,
             types,
             main,
             defaults,
@@ -394,22 +421,22 @@ impl<'a> Package<'a> {
     }
 
     /// The content of the part `name` in the transitional form, if the package has such a part.
-    pub(crate) fn part(&self, name: &str) -> Result<Option<Vec<u8>>, PackageError> {
+    pub(crate) fn part(&self, name: &str) -> Result<Option<Vec<u8>>, WordError> {
         Ok(self.archive.get(name)?.map(|bytes| in_the_usual_form(name, bytes)))
     }
 
-    /// The part `name` as XML text, which has to fit into what can be read whole.
-    pub(crate) fn text(&self, name: &str) -> Result<Option<String>, PackageError> {
-        if self.archive.size_of(name).is_some_and(|size| size > MOST_XML_BYTES) {
-            return Err(PackageError::TooLarge);
+    /// The part `name` as XML text, whose size the budget has to have room for before it is inflated.
+    pub(crate) fn text(&self, name: &str) -> Result<Option<String>, WordError> {
+        if let Some(size) = self.archive.size_of(name) {
+            self.budget.take_bytes(size)?;
         }
         self.part(name)?.map(into_text).transpose()
     }
 
     /// The relationships of the part `name`; a part without them has none.
-    pub(crate) fn relationships(&self, name: &str) -> Result<Relationships, PackageError> {
+    pub(crate) fn relationships(&self, name: &str) -> Result<Relationships, WordError> {
         match self.text(&rels_name(name))? {
-            Some(text) => Relationships::read(&text, folder_of(name)),
+            Some(text) => Relationships::read(&text, folder_of(name), self.budget),
             None => Ok(Relationships::default()),
         }
     }

@@ -113,7 +113,7 @@ pub fn outputs(data: &[u8]) {
     let shown = layout(&doc, &NoImages, None);
     let _ = Index::new(&shown);
     let page = to_html(
-        text,
+        &doc,
         &Export {
             title: "",
             figure: &|_| None,

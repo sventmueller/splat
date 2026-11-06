@@ -1,6 +1,8 @@
 //! RTF as the pasteboard offers it, from TextEdit, Word and other Cocoa or Windows apps: read in one pass without
-//! recursion, whatever the nesting. Text is taken as Windows-1252, which is what `\'hh` means in nearly all of it.
+//! recursion, whatever the nesting. The bytes of the text, `\'hh` or as they stand, are read in the code page of their
+//! font or of the document.
 
+mod code_page;
 mod document;
 mod fields;
 mod math;
@@ -11,6 +13,7 @@ mod tests;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use code_page::{DOS_LATIN_1, DOS_US, MAC_ROMAN, TextBytes, WESTERN, of_charset};
 use document::{Collected, ListPlace, Paragraph, assemble};
 use fields::hyperlink;
 
@@ -176,6 +179,10 @@ struct Reader<'a> {
     instruction: String,
     default_font: i32,
     monospace_fonts: HashSet<i32>,
+    /// What `\ansicpg` and its kin say, for fonts that name no code page of their own.
+    document_code_page: u16,
+    font_code_pages: HashMap<i32, u16>,
+    bytes: TextBytes,
     font_entry: i32,
     font_name: String,
     characters_by_size: HashMap<i32, usize>,
@@ -223,6 +230,9 @@ impl<'a> Reader<'a> {
             instruction: String::new(),
             default_font: 0,
             monospace_fonts: HashSet::new(),
+            document_code_page: WESTERN,
+            font_code_pages: HashMap::new(),
+            bytes: TextBytes::default(),
             font_entry: 0,
             font_name: String::new(),
             characters_by_size: HashMap::new(),
@@ -254,6 +264,7 @@ impl<'a> Reader<'a> {
     }
 
     fn open_group(&mut self) {
+        self.end_bytes();
         self.starred = false;
         self.fallback_left = 0;
         if self.stack.len() < MOST_DEPTH {
@@ -270,6 +281,7 @@ impl<'a> Reader<'a> {
 
     /// Whether this ended the document.
     fn close_group(&mut self) -> bool {
+        self.end_bytes();
         self.starred = false;
         self.fallback_left = 0;
         if self.too_deep > 0 {
@@ -310,8 +322,45 @@ impl<'a> Reader<'a> {
         if self.fallback_left > 0 {
             self.fallback_left -= 1;
         } else {
-            self.push_char(cp1252(byte));
+            self.push_byte(byte);
         }
+    }
+
+    /// The code page the text has where it stands: in the font table the one of the font being defined.
+    fn code_page(&self) -> u16 {
+        let font = if self.state.destination == Destination::FontTable {
+            self.font_entry
+        } else {
+            self.state.font
+        };
+        self.font_code_pages
+            .get(&font)
+            .copied()
+            .unwrap_or(self.document_code_page)
+    }
+
+    fn push_byte(&mut self, byte: u8) {
+        if byte.is_ascii() && self.bytes.ascii_stands_for_itself() {
+            return self.push_char(char::from(byte));
+        }
+        let code_page = self.code_page();
+        let mut bytes = std::mem::take(&mut self.bytes);
+        for c in bytes.decode(code_page, byte).chars() {
+            self.push_char(c);
+        }
+        self.bytes = bytes;
+    }
+
+    /// Ends a character whose first bytes wait for the rest, before what comes cannot be the rest.
+    fn end_bytes(&mut self) {
+        if self.bytes.ascii_stands_for_itself() {
+            return;
+        }
+        let mut bytes = std::mem::take(&mut self.bytes);
+        for c in bytes.end().chars() {
+            self.push_char(c);
+        }
+        self.bytes = bytes;
     }
 
     fn control(&mut self) {
@@ -328,6 +377,7 @@ impl<'a> Reader<'a> {
         }
         let word = std::str::from_utf8(&data[start..self.at]).unwrap_or_default();
         let param = self.read_param();
+        self.end_bytes();
         self.word(word, param);
     }
 
@@ -353,13 +403,17 @@ impl<'a> Reader<'a> {
     fn symbol(&mut self, byte: u8) {
         self.starred = false;
         if byte == b'\'' {
-            let c = self.hex_byte().map(cp1252);
+            let byte = self.hex_byte();
             if self.fallback_left > 0 {
                 self.fallback_left -= 1;
-            } else if let Some(c) = c {
-                self.push_char(c);
+            } else if let Some(byte) = byte {
+                self.push_byte(byte);
             }
             return;
+        }
+        // A trail byte of a double-byte code page may be one of these three.
+        if !matches!(byte, b'{' | b'}' | b'\\') {
+            self.end_bytes();
         }
         if self.fallback_left > 0 {
             self.fallback_left -= 1;
@@ -374,7 +428,7 @@ impl<'a> Reader<'a> {
             }
             b'~' => self.push_char('\u{a0}'),
             b'_' => self.push_char('\u{2011}'),
-            b'{' | b'}' | b'\\' => self.push_char(char::from(byte)),
+            b'{' | b'}' | b'\\' => self.push_byte(byte),
             _ => {}
         }
     }
@@ -430,6 +484,10 @@ impl<'a> Reader<'a> {
         match self.state.destination {
             Destination::Text => self.text_word(word, param),
             Destination::FontTable if word == "f" => self.font_entry = param.unwrap_or(0),
+            Destination::FontTable if word == "fcharset" => self.set_font_code_page(of_charset(param.unwrap_or(0))),
+            Destination::FontTable if word == "cpg" => {
+                self.set_font_code_page(param.and_then(|page| u16::try_from(page).ok()));
+            }
             Destination::FieldInstruction if word == "l" => self.instruction.push_str("\\l "),
             Destination::Picture => {
                 if let Some(picture) = &mut self.picture {
@@ -449,7 +507,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    /// Takes in a control word that decides where the text of its group goes; whether it was one.
+    /// Takes in a control word if it decides where the text of its group goes, and returns whether it did.
     fn starts_destination(&mut self, word: &str) -> bool {
         let in_properties = matches!(
             self.state.destination,
@@ -648,6 +706,13 @@ impl<'a> Reader<'a> {
         }
     }
 
+    fn set_font_code_page(&mut self, code_page: Option<u16>) {
+        match code_page {
+            Some(code_page) => self.font_code_pages.insert(self.font_entry, code_page),
+            None => self.font_code_pages.remove(&self.font_entry),
+        };
+    }
+
     fn end_font_entry(&mut self) {
         if is_monospace_font(&self.font_name) {
             self.monospace_fonts.insert(self.font_entry);
@@ -712,11 +777,16 @@ impl<'a> Reader<'a> {
                 self.default_font = param.unwrap_or(0);
                 self.state.font = self.default_font;
             }
+            "ansi" => self.document_code_page = WESTERN,
+            "mac" => self.document_code_page = MAC_ROMAN,
+            "pc" => self.document_code_page = DOS_US,
+            "pca" => self.document_code_page = DOS_LATIN_1,
+            "ansicpg" => self.document_code_page = param.and_then(|page| u16::try_from(page).ok()).unwrap_or(WESTERN),
             _ => {}
         }
     }
 
-    /// Takes in a control word that sets a mark; whether it was one.
+    /// Takes in a control word if it sets a mark, and returns whether it did.
     fn set_mark(&mut self, word: &str, param: Option<i32>) -> bool {
         let on = param != Some(0);
         let marks = self.state.marks;
@@ -839,6 +909,7 @@ impl<'a> Reader<'a> {
     }
 
     fn finish(mut self) -> Rich {
+        self.end_bytes();
         self.lone_surrogate();
         self.end_formula();
         self.end_note();
@@ -941,17 +1012,4 @@ fn is_skipped_destination(word: &str) -> bool {
             | "panose"
             | "pgdsctbl"
     )
-}
-
-/// What a byte means in Windows-1252; it differs from Latin-1 only here.
-const CP1252_80_TO_9F: [char; 32] = [
-    '€', '\u{FFFD}', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '\u{FFFD}', 'Ž', '\u{FFFD}', '\u{FFFD}',
-    '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '\u{FFFD}', 'ž', 'Ÿ',
-];
-
-fn cp1252(byte: u8) -> char {
-    match byte {
-        0x80..=0x9F => CP1252_80_TO_9F[usize::from(byte - 0x80)],
-        byte => char::from(byte),
-    }
 }

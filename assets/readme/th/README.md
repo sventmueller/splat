@@ -806,6 +806,7 @@ PlantUML ใต้โค้ด
 | [entities](https://github.com/p-jackson/entities) | 1 | ชื่อของการอ้างอิงอักขระ HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | แตกไฟล์ Word และออบเจกต์ของ Git | MIT, Zlib หรือ Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | อ่าน XML ของไฟล์ Word | MIT หรือ Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | การอ่านข้อความ RTF ที่เขียนด้วยโค้ดเพจรุ่นเก่า | MIT หรือ Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | ชื่อและการค้นหาข้ามอักษรแบบรวมและแบบแยก | MIT หรือ Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | คงข้อความที่คล้าย `:shortcode:` ในข้อความที่นำเข้าให้เป็นตามตัวอักษร | MIT หรือ Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | แสดงผลสูตร | Apache-2.0 |

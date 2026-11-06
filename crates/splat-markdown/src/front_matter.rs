@@ -837,12 +837,6 @@ fn write_new(key: &str, value: &Value, indent: &str, eol: &str, out: &mut String
     out.push_str(eol);
 }
 
-fn inside(text: &str, selection: &Range<Byte>) -> Range<Byte> {
-    let edge = |at: Byte| Byte::new(text.floor_char_boundary(at.get()));
-    let (start, end) = (edge(selection.start), edge(selection.end));
-    start.min(end)..end
-}
-
 /// A new block at the very start, behind a byte order mark: the first closing delimiter with a Windows line end wins
 /// wherever it stands, so a document that holds one needs that line end on this one as well.
 fn new_block(text: &str, wanted: &[(String, Value)], selection: &Range<Byte>) -> Option<Edit> {
@@ -868,7 +862,7 @@ fn new_block(text: &str, wanted: &[(String, Value)], selection: &Range<Byte>) ->
         Edit {
             range: at..at,
             replacement: block,
-            selection: inside(text, selection),
+            selection: selection.clone(),
         }
         .keeping_selection_after(at, 0, inserted),
     )
@@ -887,7 +881,7 @@ fn removal(text: &str, block: &Located, selection: &Range<Byte>) -> Edit {
     Edit {
         range: at..Byte::new(end),
         replacement,
-        selection: inside(text, selection),
+        selection: selection.clone(),
     }
     .keeping_selection_after(at, end - block.start, inserted)
 }
@@ -897,6 +891,7 @@ fn removal(text: &str, block: &Located, selection: &Range<Byte>) -> Edit {
 /// fields apart, and these go behind the last field. A value left alone never changes, whatever `wanted` says, nor does
 /// a field become one; both can only go away.
 pub fn edit(doc: &Doc, wanted: &[(String, Value)], selection: &Range<Byte>) -> Option<Edit> {
+    let selection = &doc.fit(selection.clone());
     let text = doc.text();
     let Some(block) = located(doc) else {
         return if doc.is_too_large() || wanted.is_empty() {
@@ -933,7 +928,7 @@ pub fn edit(doc: &Doc, wanted: &[(String, Value)], selection: &Range<Byte>) -> O
         Edit {
             range,
             replacement,
-            selection: inside(text, selection),
+            selection: selection.clone(),
         }
         .keeping_selection_after(start, removed, inserted),
     )

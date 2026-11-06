@@ -2,7 +2,7 @@
 //! diagram action adds.
 
 use crate::text::Direction;
-use crate::text::{Byte, line_start};
+use crate::text::{Byte, TextAt, line_start};
 use std::ops::Range;
 
 use splat_i18n::{n, t};
@@ -393,7 +393,7 @@ pub fn diagram_snippet(code: &str, caret: usize, action: DiagramAction, today: &
             text,
         };
     }
-    let caret = caret.min(code.len());
+    let caret = code.fit_at(Byte::new(caret)).get();
     let line_end = code[caret..].find('\n').map_or(code.len(), |i| caret + i);
     let line_begin = line_start(code, Byte::new(line_end)).get();
     let caret_indent = code[line_begin..line_end].len() - code[line_begin..line_end].trim_start().len();

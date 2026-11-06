@@ -291,13 +291,13 @@ pub fn renames(
         if stop.load(Ordering::Relaxed) {
             return Vec::new();
         }
-        let Some(text) = read(&note.path) else {
+        let Some(text) = read(note.path()) else {
             continue;
         };
-        let replacements = plan.changes_in(&text, &note.path);
+        let replacements = plan.changes_in(&text, note.path());
         if !replacements.is_empty() {
             rewrites.push(Rewrite {
-                path: note.path.clone(),
+                path: note.path().to_path_buf(),
                 replacements,
             });
         }

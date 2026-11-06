@@ -185,7 +185,10 @@ impl Active {
 
 /// The innermost block at `offset` that holds running text.
 pub fn leaf_at(doc: &Doc, offset: Byte) -> Option<&Block> {
-    block_path(&doc.blocks, offset).into_iter().rev().find(|b| b.is_leaf())
+    block_path(&doc.blocks, doc.fit_at(offset))
+        .into_iter()
+        .rev()
+        .find(|b| b.is_leaf())
 }
 
 /// Inline nodes (containers and code spans) whose source range contains `offset`, outermost first.
@@ -206,6 +209,7 @@ fn inlines_around(doc: &Doc, offset: Byte) -> Vec<&Inline> {
 
 /// The formatting at `offset`, from the inlines and blocks around it.
 pub fn active_at(doc: &Doc, offset: Byte) -> Active {
+    let offset = doc.fit_at(offset);
     let mut a = Active::default();
     for i in inlines_around(doc, offset) {
         match i.kind {
@@ -289,6 +293,7 @@ fn inside_word(text: &str, at: Byte) -> bool {
 /// Toggles `style` like a word processor: a selection or the word around the caret is reformatted, while at the
 /// edge of a word or between words the style is kept for the text typed next.
 pub fn toggle(doc: &Doc, sel: Range<Byte>, style: InlineStyle, pending: Option<&Pending>) -> Toggle {
+    let sel = doc.fit(sel);
     if !sel.is_empty() || inside_word(doc.text(), sel.start) {
         return Toggle::Edit(toggle_inline(doc, sel, style));
     }
@@ -350,12 +355,17 @@ fn active_styles(nodes: &[FormatNode], at: Byte) -> Vec<InlineStyle> {
 
 /// The styles in effect at a position of the text.
 pub fn styles_at(doc: &Doc, at: Byte) -> Vec<InlineStyle> {
+    let at = doc.fit_at(at);
     active_styles(&format_nodes(doc, at), at)
 }
 
 /// Decides where text typed at a pending caret goes so it gets exactly the chosen styles: it leaves spans it must not
 /// continue, joins an adjacent span of the one style it adds, and otherwise is wrapped in new markers.
 pub fn typing_plan(doc: &Doc, pending: &Pending) -> Option<Typing> {
+    // A caret that does not lie in this text was left pending in another one.
+    if doc.fit_at(pending.at) != pending.at {
+        return None;
+    }
     let nodes = format_nodes(doc, pending.at);
     let styles = &pending.styles;
     let mut at = pending.at;
@@ -451,19 +461,23 @@ pub fn place(plan: &Typing, typed: &str) -> Placed {
 /// Moves `len` bytes the user already typed at `typed_at` to their placement; `placed.at` refers to the text
 /// before the typing.
 pub fn move_typed(text: &str, typed_at: Byte, len: usize, placed: &Placed) -> Edit {
+    let typed = text.fit(typed_at..typed_at + len);
+    let (typed_at, len) = (typed.start, units(&typed));
     if placed.at >= typed_at {
-        let between = text.at(typed_at + len..placed.at + len);
+        let placed_end = text.fit_at(placed.at + len);
+        let between = text.at(typed.end..placed_end);
         let caret = typed_at + between.len() + placed.caret;
         Edit {
-            range: typed_at..placed.at + len,
+            range: typed_at..placed_end,
             replacement: format!("{between}{}", placed.text),
             selection: caret..caret,
         }
     } else {
-        let between = text.at(placed.at..typed_at);
-        let caret = placed.at + placed.caret;
+        let placed_at = text.fit_at(placed.at);
+        let between = text.at(placed_at..typed_at);
+        let caret = placed_at + placed.caret;
         Edit {
-            range: placed.at..typed_at + len,
+            range: placed_at..typed.end,
             replacement: format!("{}{between}", placed.text),
             selection: caret..caret,
         }
@@ -479,6 +493,7 @@ pub fn typed_at_pending(base: &Doc, text: &str, pending: &Pending) -> Option<(Ed
     let at = pending.at;
     let len = text.len().saturating_sub(base.len());
     if len == 0
+        || doc.fit_at(at) != at
         || !text.boundary(at)
         || !text.boundary(at + len)
         || text.upto(at) != base.upto(at)
@@ -495,6 +510,7 @@ pub fn typed_at_pending(base: &Doc, text: &str, pending: &Pending) -> Option<(Ed
 /// Takes `style` off the span of it that holds the selection, or else puts it on the selection, or on the word around
 /// an empty one; over several lines, line by line.
 pub fn toggle_inline(doc: &Doc, sel: Range<Byte>, style: InlineStyle) -> Edit {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let around_start = inlines_around(doc, sel.start);
     let around_end = inlines_around(doc, sel.end);
@@ -596,7 +612,7 @@ impl<'a> StyleSpans<'a> {
         StyleSpans(found)
     }
 
-    fn inside(&self, part: &Range<Byte>) -> impl Iterator<Item = &'a Inline> {
+    fn contained_in(&self, part: &Range<Byte>) -> impl Iterator<Item = &'a Inline> {
         let first = self.0.partition_point(|i| i.range.start < part.start);
         self.0[first..]
             .iter()
@@ -608,7 +624,7 @@ impl<'a> StyleSpans<'a> {
     /// Whether one span holds all of `body`, apart from the marks of other styles around it.
     fn hold_all_of(&self, text: &str, body: &Range<Byte>) -> bool {
         let only_marks = |part: &str| part.chars().all(|c| matches!(c, '*' | '_' | '~' | '='));
-        self.inside(body).any(|span| {
+        self.contained_in(body).any(|span| {
             only_marks(text.at(body.start..span.range.start)) && only_marks(text.at(span.range.end..body.end))
         })
     }
@@ -616,7 +632,7 @@ impl<'a> StyleSpans<'a> {
     /// The text of `part` without the marks of these spans.
     fn removed_from(&self, text: &str, part: &Range<Byte>) -> String {
         let mut marks: Vec<Range<Byte>> = self
-            .inside(part)
+            .contained_in(part)
             .flat_map(|span| {
                 let (open, close) = delimiter_ranges(text, span);
                 [open, close]
@@ -686,6 +702,7 @@ fn wrap_lines(doc: &Doc, sel: Range<Byte>, style: InlineStyle) -> Edit {
 /// Takes the formatting off what the selection touches: inline styles and code spans, and the marks of headings on its
 /// lines; links and pictures stay.
 pub fn remove_formatting(doc: &Doc, sel: Range<Byte>) -> Edit {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let span = line_span(text, &sel);
     let mut removals: Vec<Range<Byte>> = Vec::new();

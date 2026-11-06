@@ -1,19 +1,18 @@
 //! What the target `import` in `fuzz/` asks of its input: every importer takes any bytes without a panic and what it writes
 //! reads as Markdown with no link Splat would not follow. It lives here for the same reason as `fuzz_checks`.
 
-use splat_import::docx::{ImportError, import};
+use splat_import::docx::import;
 use splat_import::html::from_html;
 use splat_import::rich::Rich;
 use splat_import::rtf::from_rtf;
 use splat_import::tabular::from_text;
 use splat_import::template::apply_template;
-use splat_import::zip::Archive;
-use splat_import::{ImageSource, Pasted, paste_as_markdown};
+use splat_import::{ImageSource, Pasted, WordError, paste_as_markdown};
 use splat_markdown::doc::{InlineKind, walk_blocks, walk_inlines};
-use splat_markdown::docx::zip::Zip;
 use splat_markdown::docx::{WordExport, to_docx};
 use splat_markdown::reader::parse;
 use splat_markdown::url::is_harmless;
+use splat_ooxml::zip::{Archive, Zip};
 
 use crate::fuzz_checks::xml_problem;
 
@@ -99,7 +98,7 @@ fn check_written(markdown: &str) {
     let doc = parse(markdown);
     walk_blocks(doc.blocks(), &mut |block| {
         walk_inlines(block.inlines(), &mut |inline| {
-            if let InlineKind::Link { url, .. } | InlineKind::Image { url, .. } = &inline.kind {
+            if let InlineKind::Link { url, .. } | InlineKind::Image { url, .. } = inline.kind() {
                 assert!(is_harmless(url), "{url:?} in {markdown:?}");
             }
         });
@@ -207,6 +206,6 @@ fn check_merged(merged: &[u8]) {
             assert_eq!(xml_problem(&part), None, "{name}");
         }
     }
-    assert_ne!(import(merged, "p").err(), Some(ImportError::NotAWordFile));
+    assert_ne!(import(merged, "p").err(), Some(WordError::NotAWordFile));
     check_word_file(merged);
 }

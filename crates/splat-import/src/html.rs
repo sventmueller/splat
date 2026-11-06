@@ -24,7 +24,7 @@ pub fn from_html(html: &str) -> Rich {
     builder.finish()
 }
 
-/// Takes in what stands at `at`, a char boundary; where reading goes on.
+/// Takes in what stands at `at`, a char boundary, and returns the offset to read on from.
 fn step(html: &str, at: usize, builder: &mut Builder) -> usize {
     let rest = &html[at..];
     if let Some(comment) = rest.strip_prefix("<!--") {

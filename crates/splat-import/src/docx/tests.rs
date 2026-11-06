@@ -6,7 +6,7 @@ use splat_testkit::{Rng, rounds};
 
 use super::package::{A, M, MC, R, V, W, WP};
 use super::*;
-use crate::zip::tests::{Part, archive, deflated, stored};
+use splat_ooxml::zip::testing::{Part, archive, deflated, stored};
 
 mod fields;
 mod files;

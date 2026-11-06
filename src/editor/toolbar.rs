@@ -11,6 +11,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSArray, NSCopying, NSObjectProtocol, NSPoint, NSSize, NSString};
 
+#[cfg(feature = "selftest")]
 use super::EditorController;
 use super::actions::{self, Action};
 use crate::i18n::{n, t};
@@ -223,8 +224,15 @@ fn symbol(name: &str, description: &str) -> Option<Retained<NSImage>> {
 /// The toolbar button of a command, with the label, symbol and tooltip of the registry.
 fn action_button(mtm: MainThreadMarker, id: &str, action: Action) -> Retained<NSToolbarItem> {
     let spec = action.spec();
-    let label = if spec.label.is_empty() { spec.title } else { spec.label };
-    button(mtm, id, t(label), spec.symbol, spec.selector, t(spec.tip))
+    let label = spec.label.or(spec.title).map_or("", t);
+    button(
+        mtm,
+        id,
+        label,
+        spec.symbol.unwrap_or_default(),
+        spec.selector,
+        spec.tip.map_or("", t),
+    )
 }
 
 fn button(
@@ -392,9 +400,9 @@ pub fn make(
             menu_button(
                 mtm,
                 id,
-                t(spec.title),
-                spec.symbol,
-                t(spec.tip),
+                spec.title.map_or("", t),
+                spec.symbol.unwrap_or_default(),
+                spec.tip.map_or("", t),
                 menu(mtm, variants(mtm, action)),
             )
         }
@@ -445,22 +453,24 @@ pub fn make(
     Some(item)
 }
 
-/// A segment of a toolbar group was clicked: it opens its menu or runs its command.
-pub(super) fn segment_clicked(controller: &EditorController, sender: Option<&AnyObject>) {
+/// A segment of a toolbar group was clicked: it opens its menu or runs its command, unless `applies` refuses it. `share`
+/// and `target` are what `make` takes.
+pub(super) fn click_segment(
+    mtm: MainThreadMarker,
+    sender: Option<&AnyObject>,
+    share: &ProtocolObject<dyn NSSharingServicePickerToolbarItemDelegate>,
+    target: &AnyObject,
+    applies: impl FnOnce(Sel) -> bool,
+) {
     let Some(control) = sender.and_then(|s| s.downcast_ref::<NSSegmentedControl>()) else {
         return;
     };
     let segment = control.selectedSegment();
     let group = NSUserInterfaceItemIdentification::identifier(control);
-    let Some(item) = group.filter(|_| segment >= 0).and_then(|g| {
-        segment_item(
-            controller.mtm(),
-            &g.to_string(),
-            crate::util::to_usize(segment),
-            ProtocolObject::from_ref(controller),
-            controller,
-        )
-    }) else {
+    let Some(item) = group
+        .filter(|_| segment >= 0)
+        .and_then(|g| segment_item(mtm, &g.to_string(), crate::util::to_usize(segment), share, target))
+    else {
         return;
     };
     if let Some(menu_item) = item.downcast_ref::<NSMenuToolbarItem>() {
@@ -470,15 +480,25 @@ pub(super) fn segment_clicked(controller: &EditorController, sender: Option<&Any
             .popUpMenuPositioningItem_atLocation_inView(None, at, Some(control));
     } else if let Some(action) = item.action() {
         // Segments are not validated like toolbar buttons, so a command that does not apply here is refused.
-        if !controller.command_applies(action) {
+        if !applies(action) {
             NSBeep();
             return;
         }
         // SAFETY: The action comes from a toolbar item and takes the sender as its only argument.
-        let _ = unsafe {
-            NSApplication::sharedApplication(controller.mtm()).sendAction_to_from(action, None, Some(control))
-        };
+        let _ = unsafe { NSApplication::sharedApplication(mtm).sendAction_to_from(action, None, Some(control)) };
     }
+}
+
+/// `click_segment` for the toolbar of `controller`, as a click on the segment `sender` runs it.
+#[cfg(feature = "selftest")]
+pub(super) fn segment_clicked(controller: &EditorController, sender: Option<&AnyObject>) {
+    click_segment(
+        controller.mtm(),
+        sender,
+        ProtocolObject::from_ref(controller),
+        controller,
+        |action| controller.command_applies(action),
+    );
 }
 
 #[cfg(test)]
@@ -581,9 +601,9 @@ mod tests {
                 _ => continue,
             };
             let spec = action.spec();
-            assert!(!spec.symbol.is_empty(), "{id} would show an empty button");
-            assert!(!spec.title.is_empty(), "{id} would have no label");
-            assert!(!spec.tip.is_empty(), "{id} would have no tooltip");
+            assert!(spec.symbol.is_some(), "{id} would show an empty button");
+            assert!(spec.title.is_some(), "{id} would have no label");
+            assert!(spec.tip.is_some(), "{id} would have no tooltip");
         }
     }
 

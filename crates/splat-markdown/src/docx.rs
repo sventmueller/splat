@@ -4,22 +4,22 @@
 mod html;
 mod package;
 mod xml;
-pub mod zip;
 
 use std::collections::HashMap;
 use std::ops::Range;
 
 use super::doc::output::{BlockOutput, Callout, Code, Note, write_block};
 use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, Piece, code_figure};
+use super::markup::{AddressFor, Destination, destination};
 use super::text::{Byte, TextAt, count32, right_to_left};
-use super::typography::{Open, Quotes, Running, Segment, TextMark, Within, citation_shown};
-use super::url::is_web_or_mail;
+use super::typography::{Open, Quotes, Running, Segment, Shorthand, Typesetting, Within, citation_shown};
 use package::{CONTENT_TYPES, FONT_TABLE, NAMESPACES, PACKAGE_RELS, SETTINGS, STYLES, numbering};
 use splat_i18n::t;
-use xml::{Line, ParaProps, ParaStyle, Props, Runs, escape_xml};
-use zip::Zip;
-#[cfg(any(test, feature = "selftest"))]
-pub use zip::stored_entries;
+use splat_ooxml::xml::escape_text;
+/// More than a ZIP holds without its 64-bit extension, which is how large a Word file can be.
+pub use splat_ooxml::zip::TooLarge;
+use splat_ooxml::zip::Zip;
+use xml::{Line, ParaProps, ParaStyle, Props, Runs};
 
 /// An image for the document, as PNG or JPEG data, with its size in points.
 pub struct Picture {
@@ -55,10 +55,6 @@ const EMU_PER_POINT: f64 = 12_700.0;
 /// Space after a paragraph, in twentieths of a point, as the default paragraph style sets it.
 const GAP: u32 = 160;
 
-/// More than a ZIP holds without its 64-bit extension.
-#[derive(Debug, PartialEq)]
-pub struct TooLarge;
-
 /// What a title page in front of the text shows; empty parts are left out.
 #[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub struct TitlePage {
@@ -80,7 +76,7 @@ impl TitlePage {
             }
             format!(
                 "<w:p><w:pPr><w:pStyle w:val=\"{style}\"/></w:pPr><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>",
-                escape_xml(text)
+                escape_text(text)
             )
         };
         format!(
@@ -393,7 +389,7 @@ impl<'a> Writer<'a> {
                 Piece::Code(code) => out.push(code, props.code()),
                 Piece::Html(raw) => out.push(raw, props),
                 Piece::Emoji(emoji) => out.push(emoji, props),
-                Piece::Styled => self.inlines(&inline.children, props.inside(&inline.kind), out),
+                Piece::Styled => self.inlines(&inline.children, props.nested_in(&inline.kind), out),
                 Piece::Hidden => {}
                 Piece::WikiPage(_) => self.inlines(&inline.children, props, out),
                 Piece::Picture(picture) => match (self.export.image)(picture.url) {
@@ -404,7 +400,7 @@ impl<'a> Writer<'a> {
                     None => out.push(&picture.alt, props),
                 },
                 Piece::Link { url, .. } => {
-                    if is_web_or_mail(url) {
+                    if word_follows(url) {
                         let mut inner = Runs::default();
                         self.inlines(&inline.children, props.linked(), &mut inner);
                         out.hyperlink(self.link_id(url), inner);
@@ -432,39 +428,36 @@ impl<'a> Writer<'a> {
         if literal.is_empty() {
             return;
         }
-        // Word opens no link inside a link, and a mark in one would be one.
+        // Word opens no link inside a link, and a shorthand in one would be one.
         let within = Within {
             code: props.text.code,
             link: props.link,
             html: false,
         };
-        let running = Running::of(
-            self.source,
-            literal,
-            at,
-            within,
-            self.export.quotes,
-            &mut self.open,
-            true,
-        );
-        let segments = running.segments(|piece, mark| {
+        let setting = Typesetting {
+            source: self.source,
+            quotes: self.export.quotes,
+            references: true,
+        };
+        let running = Running::of(&setting, literal, at, within, &mut self.open);
+        let segments = running.segments(|piece, shorthand| {
             let mut marked = Runs::default();
-            match mark {
-                TextMark::Tag(_) => marked.push(piece, Props { tag: true, ..props }),
-                TextMark::Reference(r) => {
+            match shorthand {
+                Shorthand::Tag(_) => marked.push(piece, Props { tag: true, ..props }),
+                Shorthand::Reference(r) => {
                     let url = (self.export.reference)(r)?;
                     let mut linked = Runs::default();
                     linked.push(piece, props.linked());
                     marked.hyperlink(self.link_id(&url), linked);
                 }
-                TextMark::Citation(keys) => marked.push(&citation_shown(keys, self.export.citation)?, props),
+                Shorthand::Citation(keys) => marked.push(&citation_shown(keys, self.export.citation)?, props),
             }
             Some(marked)
         });
         for segment in segments {
             match segment {
                 Segment::Text(text) => out.push(text, props),
-                Segment::Mark(marked) => out.append(marked),
+                Segment::Shorthand(marked) => out.append(marked),
             }
         }
     }
@@ -534,7 +527,7 @@ impl<'a> Writer<'a> {
              <pic:blipFill><a:blip r:embed=\"rIdI{n}\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>\
              <pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>\
              </pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>",
-            alt = escape_xml(alt)
+            alt = escape_text(alt)
         )
     }
 
@@ -563,7 +556,7 @@ impl<'a> Writer<'a> {
             rels.push_str(&format!(
                 "<Relationship Id=\"rIdL{}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"{}\" TargetMode=\"External\"/>",
                 n + 1,
-                escape_xml(url)
+                escape_text(url)
             ));
         }
         rels.push_str("</Relationships>");
@@ -583,6 +576,15 @@ impl<'a> Writer<'a> {
             )?;
         }
         Ok(zip.finish())
+    }
+}
+
+/// Whether a link in the Word file leads to `url`.
+fn word_follows(url: &str) -> bool {
+    match destination(url, AddressFor::Link) {
+        Destination::Web | Destination::Mail => true,
+        // A Word file travels without the folder of the document, in which a relative path would be looked for.
+        Destination::Relative | Destination::PictureData | Destination::Refused => false,
     }
 }
 
@@ -702,28 +704,34 @@ fn cell_paragraph(justify: Option<Align>) -> ParaProps {
     }
 }
 
+/// Entry names and contents of a stored ZIP, read with nothing but the format description.
+#[cfg(any(test, feature = "selftest"))]
+pub fn stored_entries(zip: &[u8]) -> Vec<(String, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while zip.get(at..at + 4) == Some(&0x0403_4b50u32.to_le_bytes()) {
+        let field = |o: usize, n: usize| {
+            zip[at + o..at + o + n]
+                .iter()
+                .rev()
+                .fold(0usize, |v, b| v << 8 | *b as usize)
+        };
+        let (size, name_len, extra) = (field(18, 4), field(26, 2), field(28, 2));
+        let name = String::from_utf8_lossy(&zip[at + 30..at + 30 + name_len]).into_owned();
+        let start = at + 30 + name_len + extra;
+        let content = zip[start..start + size].to_vec();
+        assert_eq!(splat_ooxml::zip::crc32(&content) as usize, field(14, 4), "{name}");
+        out.push((name, content));
+        at = start + size;
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
-    use super::zip::{MAX_ZIP_BYTES, MAX_ZIP_ENTRIES, crc32, zip_holds};
     use super::*;
     use crate::doc::AlertKind;
     use crate::reader::parse;
-
-    #[test]
-    fn a_zip_turns_away_what_needs_its_extension() {
-        assert!(zip_holds(MAX_ZIP_ENTRIES, MAX_ZIP_BYTES));
-        assert!(!zip_holds(MAX_ZIP_ENTRIES + 1, 0));
-        assert!(!zip_holds(1, MAX_ZIP_BYTES + 1));
-        let mut zip = Zip::default();
-        for _ in 0..MAX_ZIP_ENTRIES {
-            zip.add("a", b"").expect("room for it");
-        }
-        assert_eq!(zip.add("a", b""), Err(TooLarge));
-        let bytes = zip.finish();
-        let end = &bytes[bytes.len() - 22..];
-        assert_eq!(end[..4], 0x0605_4b50u32.to_le_bytes());
-        assert_eq!(end[10..12], 0xFFFEu16.to_le_bytes());
-    }
 
     fn export(text: &str) -> Vec<u8> {
         to_docx(
@@ -807,11 +815,6 @@ mod tests {
         let document =
             String::from_utf8(files.iter().find(|(n, _)| n == "word/document.xml").unwrap().1.clone()).unwrap();
         assert!(document.contains("晴れ“です") && document.contains("„x“"), "{document}");
-    }
-
-    #[test]
-    fn crc_matches_the_reference_value() {
-        assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
     }
 
     #[test]
@@ -1262,6 +1265,34 @@ mod tests {
         assert!(!script.contains("<w:hyperlink") && script.contains(">l<"), "{script}");
         assert!(document("<pre>a\n b</pre>\n").contains("<w:pStyle w:val=\"Code\"/>"));
         assert!(document("<ol><li>a</li></ol>\n").contains("<w:numId w:val=\"2\"/>"));
+    }
+
+    #[test]
+    fn word_links_only_what_it_can_follow_and_shows_pictures_only_from_files_and_the_web() {
+        let links = |html: &str| document(html).matches("<w:hyperlink").count();
+        assert_eq!(links("<p><a href=\"mailto:a@b.de\">m</a></p>\n"), 1);
+        assert_eq!(links("<p><a href=\"andere.md\">r</a></p>\n"), 0, "a relative path");
+        assert_eq!(links("[r](andere.md) [w](https://x.de)\n"), 1, "the same for Markdown");
+        let pictures = |html: &str| document(html).matches("<w:drawing>").count();
+        assert_eq!(pictures("<p><img src=\"bild.png\" alt=\"A\"></p>\n"), 1);
+        for src in ["mailto:a@b.de", "data:image/png;base64,AA", "javascript:x"] {
+            let word = document(&format!("<p><img src=\"{src}\" alt=\"Ersatz\"></p>\n"));
+            assert!(
+                !word.contains("<w:drawing>") && word.contains("Ersatz"),
+                "{src}: {word}"
+            );
+        }
+        assert_eq!(
+            pictures("<picture><source srcset=\"a.webp\"><img src=\"a.png\"></picture>\n"),
+            1
+        );
+        let word = document("<p>a<input value=\"x\">b<wbr>c<blink>d</blink></p>\n");
+        let text: String = word
+            .split("<w:t xml:space=\"preserve\">")
+            .skip(1)
+            .filter_map(|run| run.split_once("</w:t>").map(|(text, _)| text))
+            .collect();
+        assert_eq!(text, "abcd", "{word}");
     }
 
     #[test]

@@ -443,6 +443,8 @@ mod tests {
         assert!(section("objc2-app-kit ").contains("Copyright (c) the authors of https://github.com/madsmtm/objc2"));
         assert!(section("emojis ").contains("UNICODE LICENSE V3"));
         assert!(section("ryu ").contains("Boost Software License"));
+        let encodings = section("encoding_rs ");
+        assert!(encodings.contains("Copyright Mozilla Foundation") && encodings.contains("Copyright © WHATWG"));
         assert!(section("mathjax ").contains("Apache License"));
         assert!(section("graphviz").contains("Eclipse Public License"));
         let names: Vec<&str> = text

@@ -5,7 +5,7 @@ use std::ops::Range;
 use super::code::{self, CodeToken};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, walk_blocks};
 use super::text::{
-    Byte, ContainerMark, LineStarts, TextAt, behind_quote_marks, changed, container_mark, indent_len, right_to_left,
+    Byte, ContainerMark, LineStarts, TextAt, behind_quote_marks, changed, indent_len, line_marks, right_to_left,
     shifted,
 };
 
@@ -241,34 +241,21 @@ fn table_spans(text: &str, lines: &LineStarts, b: &Block, spans: &mut Vec<(Range
 /// letter, as `[x]` or `[!NOTE]`, starts it and would make it read left to right.
 pub fn right_to_left_behind_markers(line: &str) -> bool {
     let mut rest = line;
-    let (mut quote, mut item) = (false, false);
+    let mut quoted = false;
     loop {
-        let before = rest;
-        let marks = behind_quote_marks(rest);
-        quote |= marks > 0;
-        rest = &rest[marks..];
+        let end = line_marks(rest)
+            .inspect(|mark| quoted |= mark.kind == ContainerMark::Quote)
+            .last()
+            .map_or(0, |mark| mark.range.end);
+        rest = &rest[end..];
         rest = &rest[indent_len(rest)..];
-        if let Some((ContainerMark::Bullet, len)) = container_mark(rest)
-            && rest[len..].starts_with([' ', '\t'])
-        {
-            rest = &rest[len..];
-            (rest, item) = (&rest[indent_len(rest)..], true);
-        }
-        if let Some((ContainerMark::Number, len)) = container_mark(rest) {
-            rest = &rest[len..];
-            (rest, item) = (&rest[indent_len(rest)..], true);
-        }
-        if item && let Some(r) = ["[ ]", "[x]", "[X]"].iter().find_map(|task| rest.strip_prefix(task)) {
-            (rest, item) = (r, false);
-        }
-        if quote
-            && rest.starts_with("[!")
-            && let Some(end) = rest.find(']')
-        {
-            rest = rest[end + 1..].trim_start_matches(['-', '+']);
-        }
-        if rest == before {
-            break;
+        let behind_alert = rest
+            .strip_prefix("[!")
+            .filter(|_| quoted)
+            .and_then(|r| Some(&r[r.find(']')? + 1..]));
+        match behind_alert {
+            Some(behind) => rest = behind.trim_start_matches(['-', '+']),
+            None => break,
         }
     }
     right_to_left(rest) == Some(true) && right_to_left(line) != Some(true)
@@ -616,6 +603,10 @@ mod tests {
         assert!(
             !right_to_left_behind_markers(". [x] משימה"),
             "a dot without a number is no list"
+        );
+        assert!(
+            !right_to_left_behind_markers("1.[x] משימה"),
+            "nor a number without a space behind it"
         );
         assert!(right_to_left_behind_markers("> [!NOTE]- - [x] הערה"));
     }

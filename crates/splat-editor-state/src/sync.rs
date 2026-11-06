@@ -11,17 +11,26 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::markdown::text::{Byte, TextAt, U16, byte_at_u16, byte_at_u16_exact, offsets, units, utf16_len};
 use crate::preview::map::Shown;
 
+/// A length as a text storage counts a change of it; no text comes near the difference.
+fn signed(n: usize) -> isize {
+    isize::try_from(n).unwrap_or(isize::MAX)
+}
+
 /// The source text as the source view holds it.
 #[derive(Clone)]
 pub struct Snapshot {
+    /// The text.
     pub text: String,
+    /// The version of the source the text is, counted in edits.
     pub version: u64,
+    /// The length of the text in UTF-16 units.
     pub len_u16: usize,
     /// A position and where it lies in the text; typing goes on near the last edit.
     mark: (U16, Byte),
 }
 
 impl Snapshot {
+    /// A copy of `text`, which is `len_u16` units long, at `version`.
     pub fn new(text: String, len_u16: usize, version: u64) -> Self {
         Snapshot {
             text,
@@ -35,7 +44,7 @@ impl Snapshot {
     /// by `delta`. `None` when the edit does not fit this copy, e.g. because it splits a surrogate pair.
     pub fn patched(mut self, range: Range<U16>, delta: isize, inserted: &str, version: u64) -> Option<Snapshot> {
         let new_len = units(&range);
-        let old_len = usize::try_from(crate::util::to_isize(new_len) - delta).ok()?;
+        let old_len = usize::try_from(signed(new_len) - delta).ok()?;
         let (mark_u16, mark_byte) = if self.mark.0 <= range.start {
             self.mark
         } else {
@@ -101,6 +110,7 @@ pub struct SourceCopy {
 }
 
 impl SourceCopy {
+    /// How many edits the source has had.
     pub fn version(&self) -> u64 {
         self.version.get()
     }
@@ -139,6 +149,7 @@ impl SourceCopy {
         generation
     }
 
+    /// Whether `generation` is the update that started last.
     pub fn is_latest(&self, generation: u64) -> bool {
         self.generation.get() == generation
     }
@@ -154,10 +165,12 @@ impl SourceCopy {
     }
 
     #[cfg(any(test, feature = "selftest"))]
+    /// Whether an update is scheduled and has not run yet.
     pub fn update_is_scheduled(&self) -> bool {
         self.update_scheduled.get()
     }
 
+    /// The scheduled update ran; the next edit schedules one again.
     pub fn update_ran(&self) {
         self.update_scheduled.set(false);
     }
@@ -167,8 +180,11 @@ impl SourceCopy {
 /// as plain text, waiting to be rendered.
 #[derive(Default)]
 pub struct Blocks {
+    /// The layout key of each block.
     pub keys: Vec<u64>,
+    /// The UTF-16 length of each block in the preview text.
     pub lens: Vec<usize>,
+    /// Whether each block still shows as plain text.
     pub placeholders: Vec<bool>,
 }
 
@@ -177,6 +193,7 @@ pub struct Blocks {
 pub struct BlockDiff {
     /// Number of unchanged blocks at the start and at the end.
     pub prefix: usize,
+    /// The unchanged blocks at the end.
     pub suffix: usize,
     /// The part of the preview text that the changed blocks replace.
     pub replace: Range<Shown>,
@@ -235,7 +252,7 @@ impl Blocks {
         }
         let start: usize = self.lens[..prefix].iter().sum();
         let end: usize = self.lens[..old_count - suffix].iter().sum();
-        let end = crate::util::to_usize(crate::util::to_isize(end) + delta).max(start);
+        let end = usize::try_from(signed(end) + delta).unwrap_or(0).max(start);
         let start = start.min(shown_len);
         BlockDiff {
             prefix,
@@ -272,6 +289,7 @@ impl Blocks {
         }
     }
 
+    /// Whether any block waits to be rendered.
     pub fn pending(&self) -> bool {
         self.placeholders.iter().any(|p| *p)
     }
@@ -325,7 +343,7 @@ mod tests {
                 let inserted = random_text(&mut rng, 4);
                 let new: Vec<u16> = inserted.encode_utf16().collect();
                 reference.splice(a..b, new.iter().copied());
-                let delta = crate::util::to_isize(new.len()) - crate::util::to_isize(b - a);
+                let delta = signed(new.len()) - signed(b - a);
                 snap = snap
                     .patched(U16::new(a)..U16::new(a + new.len()), delta, &inserted, version)
                     .expect("edit fits");
@@ -453,7 +471,7 @@ mod tests {
                 let (a, b) = (cuts[rng.below(cuts.len())], cuts[rng.below(cuts.len())]);
                 let (a, b) = (a.min(b), a.max(b));
                 let typed: Vec<u16> = random_text(&mut rng, 2).encode_utf16().collect();
-                edited = Some((a..b, crate::util::to_isize(typed.len()) - crate::util::to_isize(b - a)));
+                edited = Some((a..b, signed(typed.len()) - signed(b - a)));
                 text.splice(a..b, typed);
             }
             let diff = state.diff(

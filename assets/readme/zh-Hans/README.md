@@ -635,6 +635,7 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字符引用的名称 | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | 解压 Word 文件和 Git 对象 | MIT、Zlib 或 Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | 读取 Word 文件的 XML | MIT 或 Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | 读取以旧代码页编写的 RTF 文本 | MIT 或 Apache-2.0、BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | 跨合成字母和分解字母的名称与搜索 | MIT 或 Apache-2.0、Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | 让导入文本中类似 `:shortcode:` 的文本保持字面形式 | MIT 或 Apache-2.0、Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | 渲染公式 | Apache-2.0 |

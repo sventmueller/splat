@@ -50,13 +50,14 @@ pub fn memory_estimate(text: &str) -> u64 {
 }
 
 /// Whether `text` would take too much memory to parse and lay out; shorter texts need no look at their bytes.
-pub fn stays_plain(text: &str) -> bool {
+pub(crate) fn stays_plain(text: &str) -> bool {
     text.len() as u64 * HEAVIEST_BYTE >= MOST_MEMORY && memory_estimate(text) >= MOST_MEMORY
 }
 
-/// How often a text holds the marks that make the rest of it matter for a part of it, and what it takes in memory.
+/// How often a text holds the two-character sequences whose meaning depends on text far away from them, which decides
+/// whether a part of the text can be parsed on its own, and how much memory the text is estimated to take.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MarkCounts {
+pub struct SyntaxCounts {
     /// `^[`
     pub inline_notes: usize,
     /// `\(`, `\[` and `` $` ``
@@ -69,37 +70,43 @@ pub struct MarkCounts {
     pub memory: u64,
 }
 
-impl MarkCounts {
+impl SyntaxCounts {
     /// The counts for all of `text`.
-    pub(crate) fn of(text: &[u8]) -> MarkCounts {
-        let mut marks = MarkCounts {
+    pub(crate) fn of(text: &[u8]) -> SyntaxCounts {
+        let mut counts = SyntaxCounts {
             memory: text.last().map_or(0, |&b| u64::from(MEMORY_OF[usize::from(b)])),
-            ..MarkCounts::default()
+            ..SyntaxCounts::default()
         };
         for pair in text.windows(2) {
-            marks.memory += u64::from(MEMORY_OF[usize::from(pair[0])]);
+            counts.memory += u64::from(MEMORY_OF[usize::from(pair[0])]);
             match (pair[0], pair[1]) {
-                (b'^', b'[') => marks.inline_notes += 1,
-                (b'\\', b'(' | b'[') | (b'$', b'`') => marks.formulas += 1,
-                (b'%', b'%') => marks.comments += 1,
-                (b']', b':') => marks.definitions += 1,
+                (b'^', b'[') => counts.inline_notes += 1,
+                (b'\\', b'(' | b'[') | (b'$', b'`') => counts.formulas += 1,
+                (b'%', b'%') => counts.comments += 1,
+                (b']', b':') => counts.definitions += 1,
                 _ => {}
             }
         }
-        marks
+        counts
     }
 
-    /// The marks of `new` when they were these in `old` and only the given ranges differ. A mark can reach one byte over
-    /// the edge of a change, and those on the edge count in both.
+    /// The counts of `new` when they were these in `old` and only the given ranges differ. A sequence can reach one
+    /// byte over the edge of a change, and those on the edge count in both.
     #[must_use]
-    pub fn after_change(self, old: &str, new: &str, old_change: &Range<Byte>, new_change: &Range<Byte>) -> MarkCounts {
+    pub fn after_change(
+        self,
+        old: &str,
+        new: &str,
+        old_change: &Range<Byte>,
+        new_change: &Range<Byte>,
+    ) -> SyntaxCounts {
         let around = |text: &str, change: &Range<Byte>| {
             let from = change.start.get().saturating_sub(1);
             let to = (change.end.get() + 1).min(text.len());
-            MarkCounts::of(&text.as_bytes()[from..to])
+            SyntaxCounts::of(&text.as_bytes()[from..to])
         };
         let (gone, come) = (around(old, old_change), around(new, new_change));
-        MarkCounts {
+        SyntaxCounts {
             inline_notes: self.inline_notes + come.inline_notes - gone.inline_notes,
             formulas: self.formulas + come.formulas - gone.formulas,
             comments: self.comments + come.comments - gone.comments,
@@ -216,8 +223,8 @@ pub(crate) fn unclosed_after_change(
 /// What a document knows about all of its text.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextFacts {
-    /// How often the marks stand in the text, and what it takes in memory.
-    pub marks: MarkCounts,
+    /// How often the text holds what makes text far away matter, and what it takes in memory.
+    pub counts: SyntaxCounts,
     /// What `unclosed_formulas` says.
     pub unclosed_formulas: Unclosed,
     /// A line starts with a `%%` that nothing closes yet, which the next one anywhere would.
@@ -234,15 +241,15 @@ impl TextFacts {
     /// What `doc` knows about its text, read from the text and its blocks.
     pub fn of(doc: &Doc) -> TextFacts {
         let text = doc.text();
-        let marks = MarkCounts::of(text.as_bytes());
+        let counts = SyntaxCounts::of(text.as_bytes());
         let by_position = BlocksByPosition::new(&doc.blocks);
         let reference_expansions = reference_expansions(&doc.blocks, TextPart::whole(text));
         TextFacts {
-            marks,
+            counts,
             unclosed_formulas: unclosed_formulas(text),
-            loose_comment: marks.comments > 0 && holds_loose_comment(&by_position, text),
+            loose_comment: counts.comments > 0 && holds_loose_comment(&by_position, text),
             may_define_links: may_define_links(text),
-            link_definitions: if marks.definitions > 0 {
+            link_definitions: if counts.definitions > 0 {
                 link_definitions_of(&by_position, text)
                     .filter(|definitions| expansions_fit(reference_expansions, definitions, text.len()))
             } else {
@@ -366,7 +373,7 @@ pub(crate) fn reference_expansions(blocks: &[Block], part: TextPart) -> usize {
     walk_blocks(blocks, &mut |b| {
         walk_inlines(b.inlines(), &mut |i| {
             if let InlineKind::Link { url, title } | InlineKind::Image { url, title } = &i.kind
-                && let Some(end) = part.inside(i.range.end).filter(|end| end.get() > 0)
+                && let Some(end) = part.in_part(i.range.end).filter(|end| end.get() > 0)
                 && part.text.as_bytes().get(end.get() - 1) == Some(&b']')
             {
                 taken += url.len() + title.len();
@@ -514,11 +521,11 @@ mod tests {
     }
 
     #[test]
-    fn marks_are_counted_and_follow_a_change() {
+    fn sequences_are_counted_and_follow_a_change() {
         let old = "^[a] \\(b\\) $`c`$ %%d%% [e]: f\n";
         assert_eq!(
-            MarkCounts::of(old.as_bytes()),
-            MarkCounts {
+            SyntaxCounts::of(old.as_bytes()),
+            SyntaxCounts {
                 inline_notes: 1,
                 formulas: 2,
                 comments: 2,
@@ -539,8 +546,8 @@ mod tests {
             let new = old.replacen(from, to, 1);
             let (old_change, new_change) = changed(old, &new);
             assert_eq!(
-                MarkCounts::of(old.as_bytes()).after_change(old, &new, &old_change, &new_change),
-                MarkCounts::of(new.as_bytes()),
+                SyntaxCounts::of(old.as_bytes()).after_change(old, &new, &old_change, &new_change),
+                SyntaxCounts::of(new.as_bytes()),
                 "{from:?} to {to:?}"
             );
         }
@@ -574,8 +581,8 @@ mod tests {
         for (old, new) in [("", "%%"), ("%%", ""), ("%", "%%"), ("a", "]:a"), ("a", "a]:")] {
             let (old_change, new_change) = changed(old, new);
             assert_eq!(
-                MarkCounts::of(old.as_bytes()).after_change(old, new, &old_change, &new_change),
-                MarkCounts::of(new.as_bytes()),
+                SyntaxCounts::of(old.as_bytes()).after_change(old, new, &old_change, &new_change),
+                SyntaxCounts::of(new.as_bytes()),
                 "{old:?} to {new:?}"
             );
         }

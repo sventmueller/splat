@@ -6,10 +6,10 @@ use std::sync::OnceLock;
 
 use unicode_normalization::char::is_combining_mark;
 
+use crate::aligner::{Aligner, Gaps, Spelling};
 use crate::doc::{Block, BlockKind, Doc, Inline, InlineKind, code_figure};
-use crate::markup::{self, Node};
-use crate::style::styled_element;
-use crate::text::{Byte, decode_entity};
+use crate::markup::{self, Node, Role};
+use crate::text::Byte;
 
 /// What a document holds for its reader. A word is a run of letters, digits and marks, which `'`, `’` and `-` inside it
 /// hold together, and every Han or kana character is a word of its own, as Microsoft Word counts them; so `3.14` and
@@ -49,13 +49,11 @@ pub fn of_doc(doc: &Doc) -> Counts {
 /// `of_doc` as far as it lies inside the source `range`. A text run is cut at the range, so a word across its edge
 /// counts on both sides, and each character on one of them.
 pub fn of_range(doc: &Doc, range: Range<Byte>) -> Counts {
-    let text = doc.text();
-    let edge = |at: Byte| text.floor_char_boundary(at.get());
-    let (from, to) = (edge(range.start), edge(range.end));
-    if from < to {
-        of_part(doc, from, to)
-    } else {
+    let range = doc.fit(range);
+    if range.is_empty() {
         Counts::default()
+    } else {
+        of_part(doc, range.start.get(), range.end.get())
     }
 }
 
@@ -69,7 +67,7 @@ fn of_part(doc: &Doc, from: usize, to: usize) -> Counts {
         tally: Tally::default(),
     };
     if doc.is_too_large() {
-        counter.run(text, &(Byte::default()..Byte::new(text.len())));
+        counter.run(text, &(Byte::default()..Byte::new(text.len())), Spelling::Verbatim);
     }
     let whole = from == 0 && counter.reaches_end;
     for block in &doc.blocks {
@@ -316,53 +314,28 @@ impl Tally {
 
 /// Finds in a run's source what stands where, so that a run can be cut at a range however its literal is spelled: every
 /// character of the literal has one place, which is why two ranges side by side take each of them once.
-struct Aligner<'t> {
-    source: &'t str,
-    at: usize,
-}
+struct Cutter<'t>(Aligner<'t>);
 
-impl Aligner<'_> {
-    /// The place of what `literal` starts with, and how long that is in the literal: past what only the source has, as
-    /// the markers of a quote or the tags around a text.
+impl<'t> Cutter<'t> {
+    /// Cuts a literal of the kind `spelling` out of `source`, past whatever only the source holds, as the marks of a
+    /// quote or the tags around a text.
+    fn new(source: &'t str, spelling: Spelling) -> Self {
+        Cutter(Aligner::new(source, spelling, Gaps::Anything, false))
+    }
+
+    /// The place of what `literal` starts with, and how long that is in the literal.
     fn next_place(&mut self, literal: &str) -> (usize, usize) {
         let Some(c) = literal.chars().next() else {
-            return (self.at, 0);
+            return (self.0.position(), 0);
         };
-        while let Some(found) = self.source[self.at..].chars().next() {
-            let rest = &self.source[self.at..];
-            let spelled = if found == '&' {
-                decode_entity(rest)
-                    .filter(|(decoded, len)| !literal.starts_with(&rest[..*len]) && literal.starts_with(&**decoded))
-                    .map(|(decoded, len)| (len, decoded.len()))
-            } else {
-                None
-            };
-            let taken = spelled.or_else(|| {
-                let two = found == '\\' && c.is_ascii_punctuation() && rest[1..].starts_with(c);
-                let breaks = c == ' ' && matches!(found, '\n' | '\r');
-                let lost = c == '\u{FFFD}' && found == '\0';
-                if found == c {
-                    Some((c.len_utf8(), c.len_utf8()))
-                } else if two {
-                    Some((2, 1))
-                } else if breaks {
-                    Some((if rest.starts_with("\r\n") { 2 } else { 1 }, 1))
-                } else if lost {
-                    Some((1, c.len_utf8()))
-                } else {
-                    None
-                }
-            });
-            if let Some((in_source, in_literal)) = taken {
-                let place = self.at;
-                self.at += in_source;
-                return (place, in_literal);
+        match self.0.next(literal) {
+            Some(step) => (step.at, step.in_literal),
+            None => {
+                // Text the source does not spell stays inside the run.
+                let source = self.0.source();
+                (source.floor_char_boundary(source.len().saturating_sub(1)), c.len_utf8())
             }
-            self.at += found.len_utf8();
         }
-        // Text the source does not spell stays inside the run.
-        let last = self.source.floor_char_boundary(self.source.len().saturating_sub(1));
-        (last, c.len_utf8())
     }
 
     /// The part of `literal` whose places lie in `from..to`.
@@ -398,7 +371,7 @@ impl<'d> Counter<'d> {
     }
 
     /// `literal`, which `source` in the text spells.
-    fn run(&mut self, literal: &str, source: &Range<Byte>) {
+    fn run(&mut self, literal: &str, source: &Range<Byte>, spelling: Spelling) {
         let (start, end) = (source.start.get(), source.end.get());
         if start >= end {
             if self.holds(start) {
@@ -412,7 +385,7 @@ impl<'d> Counter<'d> {
             let cut = if spelled == literal {
                 from..to.min(literal.len())
             } else {
-                Aligner { source: spelled, at: 0 }.cut(literal, from, to)
+                Cutter::new(spelled, spelling).cut(literal, from, to)
             };
             self.tally.add(&literal[cut]);
         }
@@ -425,7 +398,7 @@ impl<'d> Counter<'d> {
                 info, literal, content, ..
             } => {
                 if code_figure(info, literal).is_none() {
-                    self.run(literal, content);
+                    self.run(literal, content, Spelling::Verbatim);
                 }
             }
             BlockKind::HtmlBlock { literal } => self.html(literal, &block.range),
@@ -433,7 +406,7 @@ impl<'d> Counter<'d> {
                 title: Some(title),
                 marker,
                 ..
-            } => self.run(title, marker),
+            } => self.run(title, marker, Spelling::Text),
             _ => {}
         }
         self.inlines(block.inlines());
@@ -446,7 +419,8 @@ impl<'d> Counter<'d> {
     fn inlines(&mut self, inlines: &'d [Inline]) {
         for inline in inlines {
             match &inline.kind {
-                InlineKind::Text(text) | InlineKind::Code(text) => self.run(text, &inline.range),
+                InlineKind::Text(text) => self.run(text, &inline.range, Spelling::Text),
+                InlineKind::Code(text) => self.run(text, &inline.range, Spelling::CodeSpan),
                 InlineKind::Emoji(emoji) => {
                     if self.holds(inline.range.start.get()) {
                         self.tally.add(emoji);
@@ -487,11 +461,11 @@ impl<'d> Counter<'d> {
         } else {
             let source = self.text.get(start..end).unwrap_or("");
             let wanted = self.from.saturating_sub(start)..self.to - start;
-            self.html_nodes(&nodes, Some((&mut Aligner { source, at: 0 }, &wanted)));
+            self.html_nodes(&nodes, Some((&mut Cutter::new(source, Spelling::Text), &wanted)));
         }
     }
 
-    fn html_nodes(&mut self, nodes: &[Node], mut cut: Option<(&mut Aligner, &Range<usize>)>) {
+    fn html_nodes(&mut self, nodes: &[Node], mut cut: Option<(&mut Cutter, &Range<usize>)>) {
         for node in nodes {
             match node {
                 Node::Text { text, .. } => match &mut cut {
@@ -502,7 +476,35 @@ impl<'d> Counter<'d> {
                     None => self.tally.add(text),
                 },
                 Node::Element(element) => {
-                    let inline = element.name == "a" || styled_element(&element.name).is_some();
+                    let inline = match element.role {
+                        Role::Look(_) | Role::Presentational | Role::Link => true,
+                        Role::LineBreak
+                        | Role::Picture
+                        | Role::PictureSources
+                        | Role::Heading(_)
+                        | Role::Paragraph
+                        | Role::Division
+                        | Role::Center
+                        | Role::Section
+                        | Role::Quote
+                        | Role::Preformatted
+                        | Role::Rule
+                        | Role::List { .. }
+                        | Role::ListItem
+                        | Role::DefinitionList
+                        | Role::Term
+                        | Role::Definition
+                        | Role::Table
+                        | Role::TableSection { .. }
+                        | Role::TableRow
+                        | Role::TableCell { .. }
+                        | Role::Details
+                        | Role::Summary
+                        | Role::Empty
+                        | Role::Input
+                        | Role::Dropped
+                        | Role::Unknown => false,
+                    };
                     if !inline {
                         self.tally.gap();
                     }
@@ -812,17 +814,14 @@ mod tests {
 
     #[test]
     fn a_literal_the_source_does_not_spell_stays_inside_its_run() {
-        let mut aligner = Aligner { source: "abc", at: 0 };
-        assert_eq!(aligner.cut("xyz", 2, 9), 0..3);
-        let mut aligner = Aligner { source: "abc", at: 0 };
-        assert_eq!(aligner.cut("xyz", 0, 2), 0..0);
-        let mut aligner = Aligner {
-            source: "a\u{0}b",
-            at: 0,
-        };
-        assert_eq!(aligner.cut("a\u{FFFD}b", 1, 2), 1..4);
-        let mut aligner = Aligner { source: "ab", at: 0 };
-        assert_eq!(aligner.next_place(""), (0, 0));
+        assert_eq!(Cutter::new("abc", Spelling::Text).cut("xyz", 2, 9), 0..3);
+        assert_eq!(Cutter::new("abc", Spelling::Text).cut("xyz", 0, 2), 0..0);
+        assert_eq!(
+            Cutter::new("`a\nb`", Spelling::CodeSpan).cut("a b", 2, 3),
+            1..2,
+            "the space a line ending reads as"
+        );
+        assert_eq!(Cutter::new("ab", Spelling::Text).next_place(""), (0, 0));
     }
 
     #[test]
@@ -835,7 +834,7 @@ mod tests {
                 reaches_end: to == 2,
                 tally: Tally::default(),
             };
-            counter.run("x", &bytes(at..at));
+            counter.run("x", &bytes(at..at), Spelling::Text);
             counter.tally.counts.words
         };
         assert_eq!(words_of(0, 1, 0), 1);

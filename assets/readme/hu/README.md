@@ -631,6 +631,7 @@ A fordítás, a tesztelés, a kód felépítése és az általa követett szabá
 | [entities](https://github.com/p-jackson/entities) | 1 | a HTML-karakterhivatkozások nevei | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Word-fájlok és Git-objektumok kicsomagolása | MIT, Zlib vagy Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | a Word-fájlok XML-jének olvasása | MIT vagy Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | régebbi kódlapokkal írt RTF-szöveg olvasása | MIT vagy Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nevek és keresés összetett és felbontott betűkön át | MIT vagy Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | a `:shortcode:`-szerű szöveg szó szerinti megtartása az importált szövegben | MIT vagy Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | képletek megjelenítése | Apache-2.0 |

@@ -73,7 +73,11 @@ pub(super) fn unsaved_copy_steps() -> Vec<Step> {
                     copies_of(c).is_empty(),
                     &format!("{:?}", copies_of(c)),
                 );
-                check("undoing leaves the text of before", source(&c.e) == before(), &sizes(c));
+                check(
+                    "undoing leaves the text of before",
+                    source(&c.e) == before(c),
+                    &sizes(c),
+                );
                 if let Some(d) = c.e.document() {
                     d.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeDone);
                 }
@@ -123,7 +127,7 @@ pub(super) fn reload_under_an_open_editor_steps() -> Vec<Step> {
                     source(&c.e) == "# Von außen geändert\n\nGanz anderer Text.\n",
                     &source(&c.e),
                 );
-                c.e.updater().replace_all_text(&before());
+                c.e.updater().replace_all_text(&before(c));
             },
         ),
         settle(|_| {}),
@@ -183,14 +187,14 @@ pub(super) fn saving_and_unsaved_text_steps() -> Vec<Step> {
         }),
         applied(move |c| {
             if let Some(p) = path(c) {
-                let _ = std::fs::write(p, before());
+                let _ = std::fs::write(p, before(c));
             }
         }),
         after_a_look(|c| {
             undo(c);
             check(
                 "the unsaved text can be taken back",
-                source(&c.e) == before(),
+                source(&c.e) == before(c),
                 &sizes(c),
             );
         }),
@@ -269,7 +273,7 @@ pub(super) fn another_version_on_disk_steps() -> Vec<Step> {
             move |c| {
                 check(
                     "a save over the file of another program asks first and leaves file and text alone",
-                    on_file(c) == OUTSIDE && source(&c.e) == before(),
+                    on_file(c) == OUTSIDE && source(&c.e) == before(c),
                     &on_file(c),
                 );
                 check(
@@ -283,7 +287,7 @@ pub(super) fn another_version_on_disk_steps() -> Vec<Step> {
         when("the text to be saved over the other version", saved, move |c| {
             check(
                 "saving anyway writes the text over the other version",
-                on_file(c) == before() && source(&c.e) == before(),
+                on_file(c) == before(c) && source(&c.e) == before(c),
                 &sizes(c),
             );
             check(
@@ -358,7 +362,7 @@ pub(super) fn typing_through_a_save_steps() -> Vec<Step> {
         after_a_look(move |c| {
             check(
                 "keys right after a save outlive the look at the file",
-                source(&c.e) == format!("{}ABCD", before()),
+                source(&c.e) == format!("{}ABCD", before(c)),
                 &super::super::tail(&source(&c.e), 20),
             );
             check(
@@ -374,15 +378,15 @@ pub(super) fn typing_through_a_save_steps() -> Vec<Step> {
                 "",
             );
             let undo_manager = c.e.document().and_then(|d| d.undoManager());
-            while source(&c.e) != before() && undo_manager.as_ref().is_some_and(|u| u.canUndo()) {
+            while source(&c.e) != before(c) && undo_manager.as_ref().is_some_and(|u| u.canUndo()) {
                 undo(c);
             }
             check(
                 "undoing reaches back across the save",
-                source(&c.e) == before(),
+                source(&c.e) == before(c),
                 &sizes(c),
             );
-            let back = before();
+            let back = before(c);
             if source(&c.e) != back {
                 c.e.updater().replace_all_text(&back);
             }

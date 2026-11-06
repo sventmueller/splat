@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
 use roxmltree::Node;
+use splat_ooxml::xml::{escape_attribute, escape_text};
 
 pub(super) const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 pub(super) const RELATIONSHIPS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -190,21 +191,6 @@ fn write_start(node: Node, names: &mut Names, rewrite: &Rewrite, out: &mut Strin
         }
     }
     out.push_str(if node.has_children() { ">" } else { "/>" });
-}
-
-fn escape_text(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('\r', "&#13;")
-}
-
-/// `text` for a double-quoted attribute value, where XML would turn a line break or tab into a space.
-pub(super) fn escape_attribute(text: &str) -> String {
-    escape_text(text)
-        .replace('"', "&quot;")
-        .replace('\t', "&#9;")
-        .replace('\n', "&#10;")
 }
 
 /// `root` written as a part of its own.
@@ -397,7 +383,7 @@ mod tests {
     fn deep_nesting_is_written_without_a_stack() {
         let depth = 100_000;
         let text = format!("{}x{}", "<a>".repeat(depth), "</a>".repeat(depth));
-        let doc = crate::xml::parse(&text).unwrap();
+        let doc = crate::xml::parse(&text, &crate::xml::XmlBudget::default()).unwrap();
         let mut out = String::new();
         write_tree(doc.root_element(), &mut Names::none(), &Rewrite::default(), &mut out);
         assert_eq!(out, text);

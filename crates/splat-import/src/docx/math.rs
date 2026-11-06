@@ -11,7 +11,7 @@ const MOST_DEPTH: usize = 64;
 /// or `m:oMathPara` with the prefix `m` and no declaration of it.
 pub(crate) fn from_omml(fragment: &str) -> Option<(String, bool)> {
     let xml = format!("<m:math xmlns:m=\"{M}\">{fragment}</m:math>");
-    let document = crate::xml::parse(&xml).ok()?;
+    let document = crate::xml::parse(&xml, &crate::xml::XmlBudget::default()).ok()?;
     let root = document.root_element();
     let formula = root.children().find(|child| child.is_element())?;
     let display = named(formula, M, "oMathPara");

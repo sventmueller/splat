@@ -2,75 +2,111 @@
 //! and menu validation reads here when a command applies and whether it shows a checkmark.
 
 use objc2::rc::Retained;
-use objc2::runtime::Sel;
+use objc2::runtime::{AnyObject, Sel};
 use objc2::{MainThreadMarker, sel};
 use objc2_app_kit::{NSImage, NSMenuItem};
+use objc2_foundation::NSNumber;
 
 use crate::i18n::{n, t, tf};
 use crate::markdown::code;
 use crate::markdown::commands::{Active, ListStyle};
-use crate::markdown::doc::AlertKind;
+use crate::markdown::doc::{AlertKind, Align};
+use crate::markdown::text::Byte;
 use crate::util::ns;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Action {
-    Bold,
-    Italic,
-    Underline,
-    Strikethrough,
-    Highlight,
-    InlineCode,
-    Superscript,
-    Subscript,
-    Heading,
-    BulletList,
-    NumberedList,
-    TaskList,
-    Quote,
-    CodeBlock,
-    Alert,
-    RemoveFormatting,
-    EditAtom,
-    Link,
-    Image,
-    Table,
-    Formula,
-    Diagram,
-    Toc,
-    Footnote,
-    Rule,
-    RowAbove,
-    RowBelow,
-    ColumnLeft,
-    ColumnRight,
-    DeleteRow,
-    DeleteColumn,
-    TableAlign,
-    TableFormat,
-    TogglePreview,
-    ToggleSidebar,
-    ToggleOutline,
-    Typography,
-    ZoomIn,
-    ZoomOut,
-    ZoomReset,
-    NewTab,
-    LoadRemoteImages,
-    ExportHtml,
-    ExportWord,
-    PasteMarkdown,
-    EditMetadata,
-    ExportOptions,
-    ToggleFiles,
-    SearchFolder,
-    ToggleWordCount,
-    ToggleChanges,
-    /// Targets of controls in the editor window rather than menu items of their own.
-    EditAtomAt,
-    AtomSnippet,
-    AtomMode,
-    ToolbarSegment,
+/// Every command once, as `Variant = selector, when it applies { what menus and toolbar show }`, handed to the macro
+/// `then` after `pass`. Here the rows become `Action` and its specs; `controller.rs` gives each the method by which
+/// AppKit finds the command's target.
+macro_rules! commands {
+    ($then:ident $(, $pass:tt)?) => {
+        $then! {
+            $($pass)?
+            Bold = mdBold, OutsideCode { title: n("Fett"), tip: n("Markierten Text fett formatieren"), key: "cmd+b", symbol: "bold" };
+            Italic = mdItalic, OutsideCode { title: n("Kursiv"), tip: n("Markierten Text kursiv formatieren"), key: "cmd+i", symbol: "italic" };
+            Underline = mdUnderline, OutsideCode { title: n("Unterstrichen"), tip: n("Markierten Text unterstreichen"), key: "cmd+u", symbol: "underline" };
+            Strikethrough = mdStrikethrough, OutsideCode { title: n("Durchgestrichen"), tip: n("Markierten Text durchstreichen"), key: "shift+cmd+x", symbol: "strikethrough" };
+            Highlight = mdHighlight, OutsideCode { title: n("Textmarker"), tip: n("Markierten Text farbig hervorheben"), symbol: "highlighter" };
+            InlineCode = mdInlineCode, OutsideCode { title: n("Code"), tip: n("Markierten Text als Code formatieren"), key: "alt+shift+cmd+c", symbol: "chevron.left.forwardslash.chevron.right" };
+            Superscript = mdSuperscript, InText { title: n("Hochgestellt"), tip: n("Markierten Text hochstellen"), symbol: "textformat.superscript" };
+            Subscript = mdSubscript, InText { title: n("Tiefgestellt"), tip: n("Markierten Text tiefstellen"), symbol: "textformat.subscript" };
+            Heading = mdHeading, InText { title: n("Überschrift"), tip: n("Absatz als Überschrift oder Fließtext formatieren"), symbol: "h.square" };
+            BulletList = mdBulletList, InText { title: n("Aufzählung"), symbol: "list.bullet" };
+            NumberedList = mdNumberedList, InText { title: n("Nummerierung"), symbol: "list.number" };
+            TaskList = mdTaskList, InText { title: n("Aufgabenliste"), symbol: "checklist" };
+            Quote = mdQuote, InText { title: n("Zitat"), tip: n("Absätze als Zitat formatieren"), symbol: "text.quote" };
+            CodeBlock = mdCodeBlock, InText { title: n("Codeblock"), tip: n("Codeblock in einer Programmiersprache einfügen"), symbol: "curlybraces" };
+            Alert = mdInsertAlert, InText { title: n("Hinweisbox"), tip: n("Absatz als Hinweis-, Tipp- oder Warnbox formatieren"), symbol: "info.bubble" };
+            RemoveFormatting = mdRemoveFormatting, InText { title: n("Formatierung entfernen"), tip: n("Formatierung der Auswahl entfernen"), symbol: "eraser" };
+            EditAtom = mdEditAtom, OnFormulaOrDiagram { title: n("Formel oder Diagramm bearbeiten …") };
+            Link = mdInsertLink, InText { title: n("Link …"), label: n("Link"), tip: n("Link einfügen"), key: "cmd+k", symbol: "link" };
+            Image = mdInsertImage, InText { title: n("Bild …"), label: n("Bild"), tip: n("Bild aus einer Datei einfügen"), symbol: "photo" };
+            Table = mdInsertTable, InText { title: n("Tabelle …"), label: n("Tabelle"), tip: n("Tabelle einfügen"), symbol: "tablecells" };
+            Formula = mdInsertFormula, InText { title: n("Formel"), tip: n("LaTeX-Formel einfügen"), symbol: "function" };
+            Diagram = mdInsertDiagram, InText { title: n("Diagramm"), tip: n("Mermaid-Diagramm einfügen"), symbol: "flowchart" };
+            Toc = mdInsertToc, InText { title: n("Inhaltsverzeichnis"), tip: n("Inhaltsverzeichnis einfügen oder aktualisieren"), symbol: "list.bullet.rectangle.portrait" };
+            Footnote = mdInsertFootnote, InText { title: n("Fußnote"), tip: n("Fußnote einfügen"), symbol: "text.append" };
+            Rule = mdInsertRule, InText { title: n("Trennlinie"), tip: n("Trennlinie einfügen"), symbol: "minus" };
+            RowAbove = mdTableRowAbove, InTable { title: n("Zeile darüber einfügen") };
+            RowBelow = mdTableRowBelow, InTable { title: n("Zeile darunter einfügen") };
+            ColumnLeft = mdTableColumnLeft, InTable { title: n("Spalte links einfügen") };
+            ColumnRight = mdTableColumnRight, InTable { title: n("Spalte rechts einfügen") };
+            DeleteRow = mdTableDeleteRow, InTable { title: n("Zeile löschen") };
+            DeleteColumn = mdTableDeleteColumn, InTable { title: n("Spalte löschen") };
+            TableAlign = mdTableAlign, InTable { title: n("Ausrichtung") };
+            TableFormat = mdTableFormat, InTable { title: n("Tabelle bündig ausrichten") };
+            TogglePreview = mdTogglePreview, Always { title: n("Vorschau ausblenden"), label: n("Vorschau"), tip: n("Vorschau ein- oder ausblenden"), key: "alt+cmd+p", symbol: "rectangle.split.2x1" };
+            ToggleSidebar = mdToggleSidebar, Always { title: n("Seitenleiste einblenden"), label: n("Seitenleiste"), tip: n("Seitenleiste ein- oder ausblenden"), symbol: "sidebar.left" };
+            ToggleOutline = mdToggleOutline, Always { title: n("Gliederung einblenden"), key: "ctrl+cmd+s", symbol: "sidebar.left" };
+            Typography = mdTypography, Always { title: n("Typografische Satzzeichen") };
+            ZoomIn = mdZoomIn, Always { title: n("Vergrößern"), key: "cmd++" };
+            ZoomOut = mdZoomOut, Always { title: n("Verkleinern"), key: "cmd+-" };
+            ZoomReset = mdZoomReset, Always { title: n("Originalgröße"), key: "cmd+0" };
+            NewTab = mdNewTab, Always { title: n("Neuer Tab"), label: n("Neues Dokument"), tip: n("Neues Dokument in einem Tab öffnen"), symbol: "plus" };
+            LoadRemoteImages = mdLoadRemoteImages, Always { title: n("Bilder laden") };
+            ExportHtml = mdExportHTML, Always { title: n("Als HTML exportieren …") };
+            ExportWord = mdExportWord, Always { title: n("Als Word-Dokument exportieren …") };
+            PasteMarkdown = mdPasteMarkdown, InText { title: n("Als Markdown einsetzen"), tip: n("Formatierten Text als Markdown einsetzen"), key: "ctrl+cmd+v", symbol: "doc.on.clipboard" };
+            EditMetadata = mdEditMetadata, Always { title: n("Metadaten bearbeiten …"), label: n("Metadaten"), tip: n("Metadaten des Dokuments in einem Formular bearbeiten"), symbol: "tag" };
+            ExportOptions = mdExportOptions, Always { title: n("Exportoptionen …") };
+            ToggleFiles = mdToggleFiles, Always { title: n("Dateien einblenden"), key: "ctrl+cmd+e", symbol: "folder" };
+            SearchFolder = mdSearchFolder, Always { title: n("In allen Notizen suchen …"), key: "shift+cmd+f", symbol: "magnifyingglass" };
+            ToggleWordCount = mdToggleWordCount, Always { title: n("Wortanzahl ausblenden") };
+            ToggleChanges = mdToggleChanges, Always { title: n("Änderungen seit dem letzten Commit") };
+            EditAtomAt = mdEditAtomAt, Always {};
+            AtomSnippet = mdAtomSnippet, Always {};
+            AtomMode = mdAtomMode, Always {};
+            ToolbarSegment = mdToolbarSegment, Always {};
+        }
+    };
 }
+pub(super) use commands;
+
+macro_rules! actions_of {
+    ($($action:ident = $selector:ident, $applies:ident { $($field:ident: $value:expr),* };)*) => {
+        /// An editor command.
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub enum Action {
+            $($action,)*
+        }
+
+        impl Action {
+            /// Every command, in the order of the table.
+            pub const ALL: &[Action] = &[$(Action::$action,)*];
+
+            /// What the menus, the toolbar and validation know of the command.
+            pub fn spec(self) -> Spec {
+                match self {
+                    $(Action::$action => Spec {
+                        $($field: Some($value),)*
+                        ..Spec::blank(sel!($selector:), Applies::$applies)
+                    },)*
+                }
+            }
+        }
+    };
+}
+
+commands!(actions_of);
 
 /// When a command can be chosen.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -84,152 +120,107 @@ pub enum Applies {
     OnFormulaOrDiagram,
 }
 
+/// What the menus, the toolbar and validation know of a command; what it lacks is `None`.
 pub struct Spec {
     pub selector: Sel,
-    /// Menu title, untranslated.
-    pub title: &'static str,
-    /// Shorter toolbar label, untranslated; empty when it is the title.
-    pub label: &'static str,
-    pub tip: &'static str,
-    pub key: &'static str,
+    /// Menu title, untranslated; the targets of controls have none, as no menu shows them.
+    pub title: Option<&'static str>,
+    /// Shorter toolbar label, untranslated, where the title is too long.
+    pub label: Option<&'static str>,
+    /// Tooltip, untranslated: it starts with a verb and has at most 75 characters.
+    pub tip: Option<&'static str>,
+    /// Key equivalent, as `crate::util::item` reads it.
+    pub key: Option<&'static str>,
     /// SF Symbol for the toolbar and for menu items that show one.
-    pub symbol: &'static str,
+    pub symbol: Option<&'static str>,
     pub applies: Applies,
 }
 
+impl Spec {
+    fn blank(selector: Sel, applies: Applies) -> Spec {
+        Spec {
+            selector,
+            title: None,
+            label: None,
+            tip: None,
+            key: None,
+            symbol: None,
+            applies,
+        }
+    }
+}
+
+/// The starter diagrams of the menus.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Diagram {
+    Flowchart,
+    Sequence,
+    Gantt,
+}
+
+/// Which variant of a command an item of its submenu stands for. The item's tag is the variant's place in
+/// `Action::choices`, which builds the items and reads the tag back.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Choice {
+    /// The command has no variants.
+    Plain,
+    /// Body text for 0, else a heading of this level.
+    Heading(u8),
+    /// The info string of a code block, empty for none.
+    CodeLanguage(&'static str),
+    /// The kind of a new alert box.
+    Alert(AlertKind),
+    /// The starter of a new diagram.
+    Diagram(Diagram),
+    /// The alignment of a table column.
+    Align(Align),
+}
+
 impl Action {
-    pub const ALL: [Action; 55] = {
-        use Action::*;
-        [
-            Bold,
-            Italic,
-            Underline,
-            Strikethrough,
-            Highlight,
-            InlineCode,
-            Superscript,
-            Subscript,
-            Heading,
-            BulletList,
-            NumberedList,
-            TaskList,
-            Quote,
-            CodeBlock,
-            Alert,
-            RemoveFormatting,
-            EditAtom,
-            Link,
-            Image,
-            Table,
-            Formula,
-            Diagram,
-            Toc,
-            Footnote,
-            Rule,
-            RowAbove,
-            RowBelow,
-            ColumnLeft,
-            ColumnRight,
-            DeleteRow,
-            DeleteColumn,
-            TableAlign,
-            TableFormat,
-            TogglePreview,
-            ToggleSidebar,
-            ToggleOutline,
-            Typography,
-            ZoomIn,
-            ZoomOut,
-            ZoomReset,
-            NewTab,
-            LoadRemoteImages,
-            ExportHtml,
-            ExportWord,
-            PasteMarkdown,
-            EditMetadata,
-            ExportOptions,
-            ToggleFiles,
-            SearchFolder,
-            ToggleWordCount,
-            ToggleChanges,
-            EditAtomAt,
-            AtomSnippet,
-            AtomMode,
-            ToolbarSegment,
-        ]
-    };
-
-    #[rustfmt::skip]
-    pub fn spec(self) -> Spec {
-        use Action::*;
-        use Applies::*;
-        let (selector, title, label, tip, key, symbol, applies) = match self {
-            Bold => (sel!(mdBold:), n("Fett"), "", n("Markierten Text fett formatieren"), "cmd+b", "bold", OutsideCode),
-            Italic => (sel!(mdItalic:), n("Kursiv"), "", n("Markierten Text kursiv formatieren"), "cmd+i", "italic", OutsideCode),
-            Underline => (sel!(mdUnderline:), n("Unterstrichen"), "", n("Markierten Text unterstreichen"), "cmd+u", "underline", OutsideCode),
-            Strikethrough => (sel!(mdStrikethrough:), n("Durchgestrichen"), "", n("Markierten Text durchstreichen"), "shift+cmd+x", "strikethrough", OutsideCode),
-            Highlight => (sel!(mdHighlight:), n("Textmarker"), "", n("Markierten Text farbig hervorheben"), "", "highlighter", OutsideCode),
-            InlineCode => (sel!(mdInlineCode:), n("Code"), "", n("Markierten Text als Code formatieren"), "alt+shift+cmd+c", "chevron.left.forwardslash.chevron.right", OutsideCode),
-            Superscript => (sel!(mdSuperscript:), n("Hochgestellt"), "", n("Markierten Text hochstellen"), "", "textformat.superscript", InText),
-            Subscript => (sel!(mdSubscript:), n("Tiefgestellt"), "", n("Markierten Text tiefstellen"), "", "textformat.subscript", InText),
-            Heading => (sel!(mdHeading:), n("Überschrift"), "", n("Absatz als Überschrift oder Fließtext formatieren"), "", "h.square", InText),
-            BulletList => (sel!(mdBulletList:), n("Aufzählung"), "", "", "", "list.bullet", InText),
-            NumberedList => (sel!(mdNumberedList:), n("Nummerierung"), "", "", "", "list.number", InText),
-            TaskList => (sel!(mdTaskList:), n("Aufgabenliste"), "", "", "", "checklist", InText),
-            Quote => (sel!(mdQuote:), n("Zitat"), "", n("Absätze als Zitat formatieren"), "", "text.quote", InText),
-            CodeBlock => (sel!(mdCodeBlock:), n("Codeblock"), "", n("Codeblock in einer Programmiersprache einfügen"), "", "curlybraces", InText),
-            Alert => (sel!(mdInsertAlert:), n("Hinweisbox"), "", n("Absatz als Hinweis-, Tipp- oder Warnbox formatieren"), "", "info.bubble", InText),
-            RemoveFormatting => (sel!(mdRemoveFormatting:), n("Formatierung entfernen"), "", n("Formatierung der Auswahl entfernen"), "", "eraser", InText),
-            EditAtom => (sel!(mdEditAtom:), n("Formel oder Diagramm bearbeiten …"), "", "", "", "", OnFormulaOrDiagram),
-            Link => (sel!(mdInsertLink:), n("Link …"), n("Link"), n("Link einfügen"), "cmd+k", "link", InText),
-            Image => (sel!(mdInsertImage:), n("Bild …"), n("Bild"), n("Bild aus einer Datei einfügen"), "", "photo", InText),
-            Table => (sel!(mdInsertTable:), n("Tabelle …"), n("Tabelle"), n("Tabelle einfügen"), "", "tablecells", InText),
-            Formula => (sel!(mdInsertFormula:), n("Formel"), "", n("LaTeX-Formel einfügen"), "", "function", InText),
-            Diagram => (sel!(mdInsertDiagram:), n("Diagramm"), "", n("Mermaid-Diagramm einfügen"), "", "flowchart", InText),
-            Toc => (sel!(mdInsertToc:), n("Inhaltsverzeichnis"), "", n("Inhaltsverzeichnis einfügen oder aktualisieren"), "", "list.bullet.rectangle.portrait", InText),
-            Footnote => (sel!(mdInsertFootnote:), n("Fußnote"), "", n("Fußnote einfügen"), "", "text.append", InText),
-            Rule => (sel!(mdInsertRule:), n("Trennlinie"), "", n("Trennlinie einfügen"), "", "minus", InText),
-            RowAbove => (sel!(mdTableRowAbove:), n("Zeile darüber einfügen"), "", "", "", "", InTable),
-            RowBelow => (sel!(mdTableRowBelow:), n("Zeile darunter einfügen"), "", "", "", "", InTable),
-            ColumnLeft => (sel!(mdTableColumnLeft:), n("Spalte links einfügen"), "", "", "", "", InTable),
-            ColumnRight => (sel!(mdTableColumnRight:), n("Spalte rechts einfügen"), "", "", "", "", InTable),
-            DeleteRow => (sel!(mdTableDeleteRow:), n("Zeile löschen"), "", "", "", "", InTable),
-            DeleteColumn => (sel!(mdTableDeleteColumn:), n("Spalte löschen"), "", "", "", "", InTable),
-            TableAlign => (sel!(mdTableAlign:), n("Ausrichtung"), "", "", "", "", InTable),
-            TableFormat => (sel!(mdTableFormat:), n("Tabelle bündig ausrichten"), "", "", "", "", InTable),
-            TogglePreview => (sel!(mdTogglePreview:), n("Vorschau ausblenden"), n("Vorschau"), n("Vorschau ein- oder ausblenden"), "alt+cmd+p", "rectangle.split.2x1", Always),
-            ToggleSidebar => (sel!(mdToggleSidebar:), n("Seitenleiste einblenden"), n("Seitenleiste"), n("Seitenleiste ein- oder ausblenden"), "", "sidebar.left", Always),
-            ToggleOutline => (sel!(mdToggleOutline:), n("Gliederung einblenden"), "", "", "ctrl+cmd+s", "sidebar.left", Always),
-            Typography => (sel!(mdTypography:), n("Typografische Satzzeichen"), "", "", "", "", Always),
-            ZoomIn => (sel!(mdZoomIn:), n("Vergrößern"), "", "", "cmd++", "", Always),
-            ZoomOut => (sel!(mdZoomOut:), n("Verkleinern"), "", "", "cmd+-", "", Always),
-            ZoomReset => (sel!(mdZoomReset:), n("Originalgröße"), "", "", "cmd+0", "", Always),
-            NewTab => (sel!(mdNewTab:), n("Neuer Tab"), n("Neues Dokument"), n("Neues Dokument in einem Tab öffnen"), "", "plus", Always),
-            LoadRemoteImages => (sel!(mdLoadRemoteImages:), n("Bilder laden"), "", "", "", "", Always),
-            ExportHtml => (sel!(mdExportHTML:), n("Als HTML exportieren …"), "", "", "", "", Always),
-            ExportWord => (sel!(mdExportWord:), n("Als Word-Dokument exportieren …"), "", "", "", "", Always),
-            PasteMarkdown => (sel!(mdPasteMarkdown:), n("Als Markdown einsetzen"), "", n("Formatierten Text als Markdown einsetzen"), "ctrl+cmd+v", "doc.on.clipboard", InText),
-            EditMetadata => (sel!(mdEditMetadata:), n("Metadaten bearbeiten …"), n("Metadaten"), n("Metadaten des Dokuments in einem Formular bearbeiten"), "", "tag", Always),
-            ExportOptions => (sel!(mdExportOptions:), n("Exportoptionen …"), "", "", "", "", Always),
-            ToggleFiles => (sel!(mdToggleFiles:), n("Dateien einblenden"), "", "", "ctrl+cmd+e", "folder", Always),
-            SearchFolder => (sel!(mdSearchFolder:), n("In allen Notizen suchen …"), "", "", "shift+cmd+f", "magnifyingglass", Always),
-            ToggleWordCount => (sel!(mdToggleWordCount:), n("Wortanzahl ausblenden"), "", "", "", "", Always),
-            ToggleChanges => (sel!(mdToggleChanges:), n("Änderungen seit dem letzten Commit"), "", "", "", "", Always),
-            EditAtomAt => (sel!(mdEditAtomAt:), "", "", "", "", "", Always),
-            AtomSnippet => (sel!(mdAtomSnippet:), "", "", "", "", "", Always),
-            AtomMode => (sel!(mdAtomMode:), "", "", "", "", "", Always),
-            ToolbarSegment => (sel!(mdToolbarSegment:), "", "", "", "", "", Always),
-        };
-        Spec { selector, title, label, tip, key, symbol, applies }
-    }
-
+    /// The command AppKit sends `selector` for.
     pub fn from_selector(selector: Sel) -> Option<Action> {
-        Action::ALL.into_iter().find(|a| a.spec().selector == selector)
+        Action::ALL.iter().copied().find(|a| a.spec().selector == selector)
     }
 
-    /// Whether the menu item for this command and `tag` shows a checkmark at the formatting in `active`; `None`
+    /// The variants of the command in the order of their tags; none for a command without variants.
+    pub fn choices(self) -> Vec<Choice> {
+        match self {
+            Action::Heading => (0..=6).map(Choice::Heading).collect(),
+            Action::CodeBlock => std::iter::once("")
+                .chain(code::MENU.iter().map(|(lang, _)| *lang))
+                .map(Choice::CodeLanguage)
+                .collect(),
+            Action::Alert => AlertKind::ALL.map(Choice::Alert).to_vec(),
+            Action::Diagram => [Diagram::Flowchart, Diagram::Sequence, Diagram::Gantt]
+                .map(Choice::Diagram)
+                .to_vec(),
+            Action::TableAlign => [Align::None, Align::Left, Align::Center, Align::Right]
+                .map(Choice::Align)
+                .to_vec(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// The variant an item's `tag` stands for; a tag no item has stands for the first.
+    pub fn choice(self, tag: isize) -> Choice {
+        let choices = self.choices();
+        usize::try_from(tag)
+            .ok()
+            .and_then(|at| choices.get(at))
+            .or(choices.first())
+            .copied()
+            .unwrap_or(Choice::Plain)
+    }
+
+    /// The tag of the item for `choice`.
+    fn tag_of(self, choice: Choice) -> isize {
+        let at = self.choices().iter().position(|c| *c == choice).unwrap_or(0);
+        crate::util::to_isize(at)
+    }
+
+    /// Whether the menu item for this command and `choice` shows a checkmark at the formatting in `active`; `None`
     /// for commands without one.
-    pub fn checked(self, active: &Active, tag: isize) -> Option<bool> {
+    pub fn checked(self, active: &Active, choice: Choice) -> Option<bool> {
         use Action::*;
         Some(match self {
             Bold => active.bold,
@@ -240,34 +231,27 @@ impl Action {
             InlineCode => active.code,
             Superscript => active.superscript,
             Subscript => active.subscript,
-            Heading => active.heading as isize == tag,
+            Heading => choice == Choice::Heading(active.heading),
             BulletList => active.list == Some(ListStyle::Bullet),
             NumberedList => active.list == Some(ListStyle::Numbered),
             TaskList => active.list == Some(ListStyle::Task),
             Quote => active.quote,
-            CodeBlock => active.code_lang.as_deref() == Some(code_language(tag)),
-            Alert => active.alert.is_some() && active.alert == alert_kind(tag),
+            CodeBlock => matches!(choice, Choice::CodeLanguage(lang) if active.code_lang.as_deref() == Some(lang)),
+            Alert => matches!(choice, Choice::Alert(kind) if active.alert == Some(kind)),
             _ => return None,
         })
     }
 }
 
-/// Info string for the tag of a code block menu item, see `code_block_items`.
-pub fn code_language(tag: isize) -> &'static str {
-    usize::try_from(tag - 1)
-        .ok()
-        .and_then(|i| code::MENU.get(i))
-        .map_or("", |(lang, _)| lang)
-}
-
-pub fn alert_kind(tag: isize) -> Option<AlertKind> {
-    usize::try_from(tag).ok().and_then(|i| AlertKind::ALL.get(i)).copied()
-}
-
 /// The menu item of a command, with its shortcut.
 pub fn item(mtm: MainThreadMarker, action: Action) -> Retained<NSMenuItem> {
     let spec = action.spec();
-    crate::util::item(mtm, t(spec.title), Some(spec.selector), spec.key)
+    crate::util::item(
+        mtm,
+        spec.title.map_or("", t),
+        Some(spec.selector),
+        spec.key.unwrap_or_default(),
+    )
 }
 
 /// The menu item of a command with its symbol in front.
@@ -278,82 +262,123 @@ pub fn item_with_symbol(mtm: MainThreadMarker, action: Action) -> Retained<NSMen
 /// The menu item of a command for a context menu, without shortcut.
 pub fn context_item(mtm: MainThreadMarker, action: Action) -> Retained<NSMenuItem> {
     let spec = action.spec();
-    crate::util::item(mtm, t(spec.title), Some(spec.selector), "")
+    crate::util::item(mtm, spec.title.map_or("", t), Some(spec.selector), "")
 }
 
-/// A menu item running a command with a parameter in its tag.
-pub fn tagged(mtm: MainThreadMarker, action: Action, title: &str, key: &str, tag: isize) -> Retained<NSMenuItem> {
-    crate::util::tagged(mtm, title, action.spec().selector, key, tag)
+/// A menu item running a variant of a command.
+fn choice_item(mtm: MainThreadMarker, action: Action, title: &str, key: &str, choice: Choice) -> Retained<NSMenuItem> {
+    crate::util::tagged(mtm, title, action.spec().selector, key, action.tag_of(choice))
 }
 
-pub fn with_symbol(item: Retained<NSMenuItem>, symbol: &str) -> Retained<NSMenuItem> {
-    if let Some(image) = NSImage::imageWithSystemSymbolName_accessibilityDescription(&ns(symbol), None) {
+/// A menu item running a command on what starts at `at` in the source.
+pub fn item_at(mtm: MainThreadMarker, action: Action, title: &str, at: Byte) -> Retained<NSMenuItem> {
+    let item = crate::util::item(mtm, title, Some(action.spec().selector), "");
+    let at = NSNumber::new_usize(at.get());
+    // SAFETY: Any object can be represented; the item retains it.
+    unsafe { item.setRepresentedObject(Some(&at)) };
+    item
+}
+
+/// Where in the source the menu item of `item_at` that sent a command points.
+pub fn at_of(sender: Option<&AnyObject>) -> Option<Byte> {
+    let item = sender?.downcast_ref::<NSMenuItem>()?;
+    let at = item.representedObject()?.downcast::<NSNumber>().ok()?;
+    Some(Byte::new(at.as_usize()))
+}
+
+/// `item` with `symbol` in front, if there is one and the system knows it.
+pub fn with_symbol(item: Retained<NSMenuItem>, symbol: Option<&str>) -> Retained<NSMenuItem> {
+    if let Some(image) =
+        symbol.and_then(|symbol| NSImage::imageWithSystemSymbolName_accessibilityDescription(&ns(symbol), None))
+    {
         item.setImage(Some(&image));
     }
     item
 }
 
-/// Body text and the six heading levels; the tag is the level, 0 for body text.
+/// Body text and the six heading levels.
 pub fn heading_items(mtm: MainThreadMarker, shortcuts: bool) -> Vec<Retained<NSMenuItem>> {
-    let key = |level: isize| {
+    let key = |level: u8| {
         if shortcuts {
             format!("alt+cmd+{level}")
         } else {
             String::new()
         }
     };
-    let mut items = vec![tagged(mtm, Action::Heading, t("Fließtext"), &key(0), 0)];
+    let mut items = vec![choice_item(
+        mtm,
+        Action::Heading,
+        t("Fließtext"),
+        &key(0),
+        Choice::Heading(0),
+    )];
     for level in 1..=6 {
         let title = tf("Überschrift {}", &[&level.to_string()]);
-        items.push(tagged(mtm, Action::Heading, &title, &key(level), level));
+        items.push(choice_item(
+            mtm,
+            Action::Heading,
+            &title,
+            &key(level),
+            Choice::Heading(level),
+        ));
     }
     items
 }
 
-/// Code block entries; the tag is 0 for no language, else the position in `code::MENU` plus one.
+/// Code block entries, the first for no language.
 pub fn code_block_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
     let mut items = vec![
-        tagged(mtm, Action::CodeBlock, t("Ohne Sprache"), "", 0),
+        choice_item(mtm, Action::CodeBlock, t("Ohne Sprache"), "", Choice::CodeLanguage("")),
         NSMenuItem::separatorItem(mtm),
     ];
-    for (n, (_, title)) in code::MENU.iter().enumerate() {
-        items.push(tagged(mtm, Action::CodeBlock, title, "", crate::util::to_isize(n) + 1));
+    for (lang, title) in code::MENU {
+        items.push(choice_item(
+            mtm,
+            Action::CodeBlock,
+            title,
+            "",
+            Choice::CodeLanguage(lang),
+        ));
     }
     items
 }
 
-/// Alert entries; the tag is the position in `AlertKind::ALL`.
+/// The kinds of alert box.
 pub fn alert_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
     AlertKind::ALL
         .iter()
-        .enumerate()
-        .map(|(n, kind)| tagged(mtm, Action::Alert, t(kind.label()), "", crate::util::to_isize(n)))
+        .map(|kind| choice_item(mtm, Action::Alert, t(kind.label()), "", Choice::Alert(*kind)))
         .collect()
 }
 
-/// Starter diagrams; the tag picks the template, see `diagram_template`.
+/// The starter diagrams.
 pub fn diagram_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
-    [n("Flussdiagramm"), n("Sequenzdiagramm"), n("Gantt-Diagramm")]
-        .iter()
-        .enumerate()
-        .map(|(tag, title)| tagged(mtm, Action::Diagram, t(title), "", crate::util::to_isize(tag)))
-        .collect()
+    [
+        (n("Flussdiagramm"), Diagram::Flowchart),
+        (n("Sequenzdiagramm"), Diagram::Sequence),
+        (n("Gantt-Diagramm"), Diagram::Gantt),
+    ]
+    .iter()
+    .map(|(title, diagram)| choice_item(mtm, Action::Diagram, t(title), "", Choice::Diagram(*diagram)))
+    .collect()
 }
 
-/// Column alignments; the tag is 1 left, 2 centered, 3 right and 0 for none.
+/// Column alignments.
 pub fn align_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
+    let align =
+        |title: &str, key: &str, align: Align| choice_item(mtm, Action::TableAlign, title, key, Choice::Align(align));
     vec![
-        tagged(mtm, Action::TableAlign, t("Links"), "cmd+{", 1),
-        tagged(mtm, Action::TableAlign, t("Zentriert"), "cmd+|", 2),
-        tagged(mtm, Action::TableAlign, t("Rechts"), "cmd+}", 3),
-        tagged(mtm, Action::TableAlign, t("Standard"), "", 0),
+        align(t("Links"), "cmd+{", Align::Left),
+        align(t("Zentriert"), "cmd+|", Align::Center),
+        align(t("Rechts"), "cmd+}", Align::Right),
+        align(t("Standard"), "", Align::None),
     ]
 }
 
-/// Starter diagrams of the menus: flowchart, sequence and Gantt.
-pub fn diagram_template(tag: isize) -> String {
-    match tag {
-        0 => format!(
+/// The text of a starter diagram.
+pub fn diagram_template(diagram: Diagram) -> String {
+    match diagram {
+        Diagram::Flowchart => format!(
             "flowchart TD\n    A[{}] --> B{{{}}}\n    B -->|{}| C[{}]\n    B -->|{}| D[{}]",
             t("Start"),
             t("Entscheidung"),
@@ -362,12 +387,12 @@ pub fn diagram_template(tag: isize) -> String {
             t("Nein"),
             t("Ende")
         ),
-        1 => format!(
+        Diagram::Sequence => format!(
             "sequenceDiagram\n    Alice->>Bob: {}\n    Bob-->>Alice: {}",
             t("Anfrage"),
             t("Antwort")
         ),
-        _ => format!(
+        Diagram::Gantt => format!(
             "gantt\n    title {}\n    dateFormat YYYY-MM-DD\n    section {}\n    {} A :a1, 2026-01-05, 10d\n    {} B :after a1, 5d",
             t("Projektplan"),
             tf("Phase {}", &["1"]),
@@ -382,12 +407,12 @@ mod tests {
     use super::*;
     use objc2::ClassType;
 
-    /// A selector exists twice: in the registry and as a method of the editor. A typo in either compiles, so the
-    /// two are compared here.
+    /// The controller's methods come from the same table as the registry; this holds that AppKit finds one for every
+    /// command and no command method outside it.
     #[test]
     fn every_command_has_a_method_and_every_method_a_command() {
         let class = super::super::EditorController::class();
-        for action in Action::ALL {
+        for &action in Action::ALL {
             let selector = action.spec().selector;
             assert!(
                 class.instance_method(selector).is_some(),
@@ -417,52 +442,82 @@ mod tests {
             bold: true,
             heading: 2,
             list: Some(ListStyle::Task),
-            code_lang: Some(code_language(1).to_string()),
-            alert: alert_kind(1),
+            code_lang: Some(code::MENU[0].0.to_string()),
+            alert: Some(AlertKind::ALL[1]),
             ..Active::default()
         };
-        assert_eq!(Action::Bold.checked(&active, 0), Some(true));
-        assert_eq!(Action::Italic.checked(&active, 0), Some(false));
-        assert_eq!(Action::Heading.checked(&active, 2), Some(true));
-        assert_eq!(Action::Heading.checked(&active, 1), Some(false));
-        assert_eq!(Action::TaskList.checked(&active, 0), Some(true));
-        assert_eq!(Action::BulletList.checked(&active, 0), Some(false));
-        assert_eq!(Action::CodeBlock.checked(&active, 1), Some(true));
-        assert_eq!(Action::Alert.checked(&active, 1), Some(true));
-        assert_eq!(Action::Alert.checked(&active, 0), Some(false));
-        assert_eq!(Action::Rule.checked(&active, 0), None);
-        assert_eq!(alert_kind(-1), None);
-        assert_eq!(alert_kind(crate::util::to_isize(AlertKind::ALL.len())), None);
+        let plain = Choice::Plain;
+        assert_eq!(Action::Bold.checked(&active, plain), Some(true));
+        assert_eq!(Action::Italic.checked(&active, plain), Some(false));
+        assert_eq!(Action::Heading.checked(&active, Action::Heading.choice(2)), Some(true));
+        assert_eq!(Action::Heading.checked(&active, Action::Heading.choice(1)), Some(false));
+        assert_eq!(Action::TaskList.checked(&active, plain), Some(true));
+        assert_eq!(Action::BulletList.checked(&active, plain), Some(false));
+        assert_eq!(
+            Action::CodeBlock.checked(&active, Action::CodeBlock.choice(1)),
+            Some(true)
+        );
+        assert_eq!(Action::Alert.checked(&active, Action::Alert.choice(1)), Some(true));
+        assert_eq!(Action::Alert.checked(&active, Action::Alert.choice(0)), Some(false));
+        assert_eq!(Action::Rule.checked(&active, plain), None);
+    }
+
+    #[test]
+    fn a_tag_reads_back_as_the_variant_its_item_was_made_for() {
+        for &action in Action::ALL {
+            for choice in action.choices() {
+                assert_eq!(action.choice(action.tag_of(choice)), choice, "{action:?}");
+            }
+        }
+        assert_eq!(Action::Heading.choice(4), Choice::Heading(4));
+        assert_eq!(Action::CodeBlock.choice(0), Choice::CodeLanguage(""));
+        assert_eq!(Action::CodeBlock.choice(1), Choice::CodeLanguage(code::MENU[0].0));
+        assert_eq!(Action::TableAlign.choice(2), Choice::Align(Align::Center));
+        assert_eq!(
+            Action::Diagram.choice(9),
+            Choice::Diagram(Diagram::Flowchart),
+            "a tag no item has"
+        );
+        assert_eq!(Action::Alert.choice(-1), Choice::Alert(AlertKind::ALL[0]));
+        assert_eq!(Action::Bold.choice(3), Choice::Plain);
     }
 
     #[test]
     fn diagram_templates_are_the_three_mermaid_starters() {
-        for (tag, kind) in [(0, "flowchart"), (1, "sequenceDiagram"), (2, "gantt"), (9, "gantt")] {
-            assert!(diagram_template(tag).starts_with(kind), "{tag}");
+        for (diagram, kind) in [
+            (Diagram::Flowchart, "flowchart"),
+            (Diagram::Sequence, "sequenceDiagram"),
+            (Diagram::Gantt, "gantt"),
+        ] {
+            assert!(diagram_template(diagram).starts_with(kind), "{diagram:?}");
         }
     }
 
     #[test]
-    fn every_shortcut_names_a_key() {
-        for action in Action::ALL {
-            let key = action.spec().key;
-            assert_eq!(
-                crate::util::split_shortcut(key).1.is_empty(),
-                key.is_empty(),
-                "{action:?}"
-            );
+    fn every_shortcut_names_a_key_and_nothing_given_is_empty() {
+        for &action in Action::ALL {
+            let spec = action.spec();
+            if let Some(key) = spec.key {
+                assert!(!crate::util::split_shortcut(key).1.is_empty(), "{action:?}");
+            }
+            for given in [spec.title, spec.label, spec.tip, spec.key, spec.symbol]
+                .into_iter()
+                .flatten()
+            {
+                assert!(!given.is_empty(), "{action:?} gives an empty text instead of none");
+            }
         }
     }
 
     #[test]
     fn menu_commands_have_titles() {
-        for action in Action::ALL {
+        for &action in Action::ALL {
             let spec = action.spec();
             let internal = matches!(
                 action,
                 Action::EditAtomAt | Action::AtomSnippet | Action::AtomMode | Action::ToolbarSegment
             );
-            assert_eq!(spec.title.is_empty(), internal, "{action:?}");
+            assert_eq!(spec.title.is_none(), internal, "{action:?}");
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Typographic punctuation and the marks inside running text that Obsidian, Pandoc and code hosts give a meaning:
+//! Typographic punctuation and the shorthands inside running text that Obsidian, Pandoc and code hosts give a meaning:
 //! `#tags`, `@mentions`, `#123` issues, `!123` merge requests and `[@key]` citations.
 
 use std::ops::Range;
@@ -31,7 +31,7 @@ pub struct Open {
 /// `text` with straight quotes turned into `quotes`, `--` and `---` into dashes and `...` into an ellipsis.
 /// `before` is the character in front of the text, which decides whether a quote opens or closes; `open` comes from
 /// the earlier runs of the same paragraph.
-pub fn smarten(text: &str, before: Option<char>, quotes: Quotes, open: &mut Open) -> String {
+pub(crate) fn smarten(text: &str, before: Option<char>, quotes: Quotes, open: &mut Open) -> String {
     let mut out = String::with_capacity(text.len());
     let mut prev = before;
     let mut rest = text;
@@ -134,7 +134,7 @@ pub fn before_text(text: &str, at: Byte) -> Option<char> {
 }
 
 /// How many source bytes at the start of `source` the typographic character `shown` stands for.
-pub fn typographic_source(shown: char, source: &str) -> Option<usize> {
+pub(crate) fn typographic_source(shown: char, source: &str) -> Option<usize> {
     let ascii = match shown {
         '—' => "---",
         '–' => "--",
@@ -153,9 +153,9 @@ pub fn typographic_source(shown: char, source: &str) -> Option<usize> {
     }
 }
 
-/// A mark in running text with a meaning beyond its characters.
+/// A short form in running text that points somewhere else: a tag, a reference into a code host or a citation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TextMark {
+pub enum Shorthand {
     /// `#tag`, as Obsidian files notes.
     Tag(String),
     /// `@name`, `#123` or `!123`, pointing into the code host of the document's repository.
@@ -164,9 +164,9 @@ pub enum TextMark {
     Citation(Vec<String>),
 }
 
-/// The marks in `text`, as byte ranges. `references` turns on mentions, issues and merge requests, which only mean
+/// The shorthands in `text`, as byte ranges. `references` turns on mentions, issues and merge requests, which only mean
 /// something in a repository.
-pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<usize>, TextMark)> {
+pub fn shorthands(text: &str, before: Option<char>, references: bool) -> Vec<(Range<usize>, Shorthand)> {
     let mut out = Vec::new();
     let mut prev = before;
     let mut i = 0;
@@ -188,7 +188,7 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
                 .filter(|k| !k.is_empty() && k.chars().all(|c| c.is_alphanumeric() || "_:.-/".contains(c)))
                 .collect();
             if !keys.is_empty() && keys.len() == inside.split(';').count() {
-                out.push((i..i + len + 1, TextMark::Citation(keys)));
+                out.push((i..i + len + 1, Shorthand::Citation(keys)));
                 prev = Some(']');
                 i += len + 1;
                 continue;
@@ -203,13 +203,13 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
             let name = text[i + 1..i + 1 + name_len].trim_end_matches(['-', '/']);
             let digits = !name.is_empty() && name.chars().all(|n| n.is_ascii_digit());
             let mark = match c {
-                '#' if !name.is_empty() && !digits => Some(TextMark::Tag(name.to_string())),
-                '#' | '!' if digits && references => Some(TextMark::Reference(format!("{c}{name}"))),
+                '#' if !name.is_empty() && !digits => Some(Shorthand::Tag(name.to_string())),
+                '#' | '!' if digits && references => Some(Shorthand::Reference(format!("{c}{name}"))),
                 '@' if !name.is_empty()
                     && references
                     && name.chars().next().is_some_and(|n| n.is_ascii_alphanumeric()) =>
                 {
-                    Some(TextMark::Reference(format!("@{name}")))
+                    Some(Shorthand::Reference(format!("@{name}")))
                 }
                 _ => None,
             };
@@ -232,74 +232,80 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
 pub struct Within {
     /// Code, inline or a block, which shows every character as typed.
     pub code: bool,
-    /// The text of a link, which can hold no other link and so no mark.
+    /// The text of a link, which can hold no other link and so no shorthand.
     pub link: bool,
     /// Text inside raw HTML, which the page shows as written.
     pub html: bool,
 }
 
-/// Running text as the preview and the exports show it: typographic punctuation applied, and where its marks stand.
+/// What holds for all the running text of one document: the source it stands in and how its punctuation and
+/// shorthands are to show.
+#[derive(Debug, Clone, Copy)]
+pub struct Typesetting<'a> {
+    /// The whole source text.
+    pub source: &'a str,
+    /// The quotation marks straight quotes turn into; `None` keeps them straight.
+    pub quotes: Option<Quotes>,
+    /// Whether the document lies in a repository, whose code host `@name`, `#123` and `!123` point into.
+    pub references: bool,
+}
+
+/// Running text as the preview and the exports show it: typographic punctuation applied, and where its shorthands
+/// stand.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Running {
     /// The text to show.
     pub shown: String,
-    /// The marks in `shown`, in text order.
-    pub marks: Vec<(Range<usize>, TextMark)>,
+    /// The shorthands in `shown`, in text order.
+    pub shorthands: Vec<(Range<usize>, Shorthand)>,
 }
 
-/// A stretch of [`Running`] text: plain text, or what a writer made of a mark.
+/// A stretch of [`Running`] text: plain text, or what a writer made of a shorthand.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Segment<'a, T> {
-    /// Text between the marks, and every mark the writer declined.
+    /// Text between the shorthands, and every shorthand the writer declined.
     Text(&'a str),
-    /// A mark the writer took.
-    Mark(T),
+    /// A shorthand the writer took.
+    Shorthand(T),
 }
 
 impl Running {
-    /// `literal`, which stands at `at` in `source`. Code and raw HTML keep their quotes, and code, raw HTML and link
-    /// text hold no marks; `open` carries the open quotes from the earlier text of the same paragraph.
-    pub fn of(
-        source: &str,
-        literal: &str,
-        at: Byte,
-        within: Within,
-        quotes: Option<Quotes>,
-        open: &mut Open,
-        references: bool,
-    ) -> Running {
+    /// `literal`, which stands at `at` in the source of `setting`. Code and raw HTML keep their quotes, and code, raw
+    /// HTML and link text hold no shorthands; `open` carries the open quotes from the earlier text of the same
+    /// paragraph.
+    pub fn of(setting: &Typesetting, literal: &str, at: Byte, within: Within, open: &mut Open) -> Running {
         if within.code {
             return Running {
                 shown: literal.to_string(),
-                marks: Vec::new(),
+                shorthands: Vec::new(),
             };
         }
-        let before = before_text(source, at);
-        let shown = match quotes {
+        let before = before_text(setting.source, at);
+        let shown = match setting.quotes {
             Some(quotes) if !within.html => smarten(literal, before, quotes, open),
             _ => literal.to_string(),
         };
-        let marks = if within.link || within.html {
+        let shorthands = if within.link || within.html {
             Vec::new()
         } else {
-            marks(&shown, before, references)
+            self::shorthands(&shown, before, setting.references)
         };
-        Running { shown, marks }
+        Running { shown, shorthands }
     }
 
-    /// The text in order, with each mark `take` makes something of in its place; a mark it declines stays text, joined
-    /// to the text around it.
-    pub fn segments<T>(&self, mut take: impl FnMut(&str, &TextMark) -> Option<T>) -> Vec<Segment<'_, T>> {
+    /// The text in order, with each shorthand `take` makes something of in its place; one it declines stays text,
+    /// joined to the text around it.
+    pub fn segments<T>(&self, mut take: impl FnMut(&str, &Shorthand) -> Option<T>) -> Vec<Segment<'_, T>> {
         let mut out = Vec::new();
         let mut done = 0;
-        for (range, mark) in &self.marks {
-            let Some(made) = take(&self.shown[range.clone()], mark) else {
+        for (range, shorthand) in &self.shorthands {
+            let Some(made) = take(&self.shown[range.clone()], shorthand) else {
                 continue;
             };
             if range.start > done {
                 out.push(Segment::Text(&self.shown[done..range.start]));
             }
-            out.push(Segment::Mark(made));
+            out.push(Segment::Shorthand(made));
             done = range.end;
         }
         if done < self.shown.len() {
@@ -309,7 +315,7 @@ impl Running {
     }
 }
 
-/// What citation marks with these keys show: the names the bibliography knows for them, or `None` if it misses one, which
+/// What a citation with these keys shows: the names the bibliography knows for them, or `None` if it misses one, which
 /// leaves the text as written.
 pub fn citation_shown(keys: &[String], name_of: impl Fn(&str) -> Option<String>) -> Option<String> {
     let names: Option<Vec<String>> = keys.iter().map(|key| name_of(key)).collect();
@@ -353,10 +359,10 @@ mod tests {
     }
 
     #[test]
-    fn citations_without_a_closing_bracket_are_no_marks() {
-        assert!(marks("[@doe und [@roe", None, false).is_empty());
-        assert_eq!(marks("[@doe und [@roe]", None, false).len(), 1);
-        assert_eq!(marks("[@a [@b [@c; @d] e", None, false).len(), 1);
+    fn citations_without_a_closing_bracket_are_no_shorthands() {
+        assert!(shorthands("[@doe und [@roe", None, false).is_empty());
+        assert_eq!(shorthands("[@doe und [@roe]", None, false).len(), 1);
+        assert_eq!(shorthands("[@a [@b [@c; @d] e", None, false).len(), 1);
     }
 
     #[test]
@@ -419,34 +425,34 @@ mod tests {
     #[test]
     fn tags_references_and_citations_are_found_where_they_start_a_word() {
         let text = "Siehe #idee, #123 und !7 von @anna, mail@x.de, [@doe2020; @roe] und C#sharp #1a";
-        let found: Vec<(&str, TextMark)> = marks(text, None, true)
+        let found: Vec<(&str, Shorthand)> = shorthands(text, None, true)
             .into_iter()
             .map(|(r, m)| (&text[r], m))
             .collect();
         assert_eq!(
             found,
             [
-                ("#idee", TextMark::Tag("idee".into())),
-                ("#123", TextMark::Reference("#123".into())),
-                ("!7", TextMark::Reference("!7".into())),
-                ("@anna", TextMark::Reference("@anna".into())),
+                ("#idee", Shorthand::Tag("idee".into())),
+                ("#123", Shorthand::Reference("#123".into())),
+                ("!7", Shorthand::Reference("!7".into())),
+                ("@anna", Shorthand::Reference("@anna".into())),
                 (
                     "[@doe2020; @roe]",
-                    TextMark::Citation(vec!["doe2020".into(), "roe".into()])
+                    Shorthand::Citation(vec!["doe2020".into(), "roe".into()])
                 ),
-                ("#1a", TextMark::Tag("1a".into())),
+                ("#1a", Shorthand::Tag("1a".into())),
             ]
         );
-        let outside = marks(text, None, false);
-        assert!(outside.iter().all(|(_, m)| !matches!(m, TextMark::Reference(_))));
+        let outside = shorthands(text, None, false);
+        assert!(outside.iter().all(|(_, m)| !matches!(m, Shorthand::Reference(_))));
         let scripts = "#แท็ก #हिन्दी فكرة،#وسوم";
-        let found: Vec<&str> = marks(scripts, None, false)
+        let found: Vec<&str> = shorthands(scripts, None, false)
             .into_iter()
             .map(|(r, _)| &scripts[r])
             .collect();
         assert_eq!(found, ["#แท็ก", "#हिन्दी", "#وسوم"]);
         let chinese = "想法，#灵感、#12（@anna）和C#语言";
-        let found: Vec<&str> = marks(chinese, None, true)
+        let found: Vec<&str> = shorthands(chinese, None, true)
             .into_iter()
             .map(|(r, _)| &chinese[r])
             .collect();
@@ -462,74 +468,71 @@ mod tests {
     #[test]
     fn a_citation_holds_nothing_but_valid_keys() {
         for text in ["[@]", "[@a!]", "[@a; b]", "[@a; @b!]"] {
-            assert!(marks(text, None, false).is_empty(), "{text}");
+            assert!(shorthands(text, None, false).is_empty(), "{text}");
         }
-        assert_eq!(marks("[@a; @b]", None, false).len(), 1);
+        assert_eq!(shorthands("[@a; @b]", None, false).len(), 1);
     }
 
     #[test]
     fn running_text_follows_what_it_stands_in() {
-        let of = |within: Within| {
-            Running::of(
-                "\"a\" #tag",
-                "\"a\" #tag",
-                Byte::new(0),
-                within,
-                Some(GERMAN),
-                &mut Open::default(),
-                true,
-            )
+        let setting = Typesetting {
+            source: "\"a\" #tag",
+            quotes: Some(GERMAN),
+            references: true,
         };
+        let of = |within: Within| Running::of(&setting, "\"a\" #tag", Byte::new(0), within, &mut Open::default());
         let plain = of(Within::default());
         assert_eq!(plain.shown, "„a“ #tag");
-        assert_eq!(plain.marks, [(8..12, TextMark::Tag("tag".into()))]);
+        assert_eq!(plain.shorthands, [(8..12, Shorthand::Tag("tag".into()))]);
         let code = of(Within {
             code: true,
             ..Within::default()
         });
-        assert_eq!((code.shown.as_str(), code.marks.len()), ("\"a\" #tag", 0));
+        assert_eq!((code.shown.as_str(), code.shorthands.len()), ("\"a\" #tag", 0));
         let link = of(Within {
             link: true,
             ..Within::default()
         });
         assert_eq!(
-            (link.shown.as_str(), link.marks.len()),
+            (link.shown.as_str(), link.shorthands.len()),
             ("„a“ #tag", 0),
-            "a link smartens but holds no mark"
+            "a link smartens but holds no shorthand"
         );
         let html = of(Within {
             html: true,
             ..Within::default()
         });
-        assert_eq!((html.shown.as_str(), html.marks.len()), ("\"a\" #tag", 0));
+        assert_eq!((html.shown.as_str(), html.shorthands.len()), ("\"a\" #tag", 0));
     }
 
     #[test]
-    fn a_declined_mark_stays_part_of_the_text_around_it() {
+    fn a_declined_shorthand_stays_part_of_the_text_around_it() {
+        let plain = |source: &'static str| Typesetting {
+            source,
+            quotes: None,
+            references: true,
+        };
+        let text = "a #x b #y c";
         let running = Running::of(
-            "a #x b #y c",
-            "a #x b #y c",
+            &plain(text),
+            text,
             Byte::new(0),
             Within::default(),
-            None,
             &mut Open::default(),
-            true,
         );
         let segments = running.segments(|piece, _| (piece == "#y").then_some(piece.len()));
         assert_eq!(
             segments,
-            [Segment::Text("a #x b "), Segment::Mark(2), Segment::Text(" c")]
+            [Segment::Text("a #x b "), Segment::Shorthand(2), Segment::Text(" c")]
         );
         assert_eq!(running.segments(|_, _| None::<()>), [Segment::Text("a #x b #y c")]);
         let at_the_ends = Running::of(
-            "#x",
+            &plain("#x"),
             "#x",
             Byte::new(0),
             Within::default(),
-            None,
             &mut Open::default(),
-            true,
         );
-        assert_eq!(at_the_ends.segments(|_, _| Some(())), [Segment::Mark(())]);
+        assert_eq!(at_the_ends.segments(|_, _| Some(())), [Segment::Shorthand(())]);
     }
 }

@@ -9,6 +9,10 @@ use std::time::{Duration, Instant, SystemTime};
 
 use objc2_foundation::{NSBundle, NSLocale, NSUserDefaults};
 
+use splat_editor_state::bibtex::parse_bibtex;
+use splat_editor_state::repository::find_repository;
+pub use splat_editor_state::repository::{Repository, repository_root};
+
 use crate::markdown::typography::Quotes;
 use crate::util::{contained, ns, read_regular_file};
 
@@ -232,92 +236,6 @@ pub fn quotes() -> Quotes {
     }
 }
 
-/// A repository on GitHub or GitLab, which `@name`, `#123` and `!123` point into.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Repository {
-    host: String,
-    /// `owner/name`, or deeper with GitLab's groups.
-    path: String,
-    gitlab: bool,
-}
-
-impl Repository {
-    /// The web page a reference such as `@anna`, `#12` or `!7` stands for.
-    pub fn url(&self, reference: &str) -> Option<String> {
-        let (kind, name) = reference.split_at_checked(1)?;
-        let base = format!("https://{}", self.host);
-        match (kind, self.gitlab) {
-            ("@", _) => Some(format!("{base}/{name}")),
-            ("#", false) => Some(format!("{base}/{}/issues/{name}", self.path)),
-            ("#", true) => Some(format!("{base}/{}/-/issues/{name}", self.path)),
-            ("!", true) => Some(format!("{base}/{}/-/merge_requests/{name}", self.path)),
-            _ => None,
-        }
-    }
-}
-
-/// The folder of the repository `dir` lies in.
-pub(super) fn repository_root(dir: &Path) -> Option<&Path> {
-    dir.ancestors().find(|d| d.join(".git").exists())
-}
-
-/// The repository the folder lies in, from the `origin` remote of its Git configuration.
-fn find_repository(dir: &Path) -> Option<Repository> {
-    let git = dir.ancestors().map(|d| d.join(".git")).find(|g| g.exists())?;
-    let git_dir = if git.is_file() {
-        // A worktree or submodule names its real Git folder in a file.
-        let text = std::fs::read_to_string(&git).ok()?;
-        let target = PathBuf::from(text.trim().strip_prefix("gitdir:")?.trim());
-        let target = if target.is_absolute() {
-            target
-        } else {
-            git.parent()?.join(target)
-        };
-        let common = target.join("commondir");
-        match std::fs::read_to_string(&common) {
-            Ok(rel) => target.join(rel.trim()),
-            Err(_) => target,
-        }
-    } else {
-        git
-    };
-    let config = std::fs::read_to_string(git_dir.join("config")).ok()?;
-    remote_repository(&config)
-}
-
-/// The repository the `origin` remote of a Git configuration points to.
-pub fn remote_repository(config: &str) -> Option<Repository> {
-    let mut in_origin = false;
-    let mut url = None;
-    for line in config.lines().map(str::trim) {
-        if line.starts_with('[') {
-            in_origin = line.replace(' ', "") == "[remote\"origin\"]";
-        } else if in_origin
-            && let Some((key, value)) = line.split_once('=')
-            && key.trim() == "url"
-        {
-            url = Some(value.trim().to_string());
-        }
-    }
-    let url = url?;
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .or_else(|| url.strip_prefix("ssh://"))
-        .unwrap_or(&url);
-    let rest = rest.rsplit_once('@').map_or(rest, |(_, r)| r);
-    let (host, path) = rest.split_once([':', '/'])?;
-    // `ssh://host:2222/group/repo`: the port is no part of the web address.
-    let path = match path.split_once('/') {
-        Some((port, tail)) if port.chars().all(|c| c.is_ascii_digit()) => tail,
-        _ => path,
-    };
-    let path = path.trim_end_matches('/').trim_end_matches(".git").to_string();
-    let host = host.to_ascii_lowercase();
-    let gitlab = host.contains("gitlab");
-    (host == "github.com" || gitlab).then_some(Repository { host, path, gitlab })
-}
-
 /// Bibliographies and embedded notes kept read, the oldest going first: reading one again costs far less than keeping
 /// everything an app that stays open for weeks ever showed.
 const KEPT_FILES: usize = 64;
@@ -384,96 +302,6 @@ fn find_citations(dir: &Path, named: Option<PathBuf>) -> Option<Citations> {
         let bytes = read_regular_file(&path, MAX_BIBLIOGRAPHY_BYTES)?;
         Some(Arc::new(parse_bibtex(&String::from_utf8(bytes).ok()?)))
     })
-}
-
-/// Whether text ending in `before` is inside a braced or quoted value, where a field name is only a word.
-fn inside_value(before: &str) -> bool {
-    let (mut depth, mut quoted) = (0, false);
-    for c in before.chars() {
-        match c {
-            '{' if !quoted => depth += 1,
-            '}' if !quoted && depth > 0 => depth -= 1,
-            '"' if depth == 0 => quoted = !quoted,
-            _ => {}
-        }
-    }
-    depth > 0 || quoted
-}
-
-/// BibTeX entries as `key → "Author Year"`, from their author or editor and year or date fields.
-pub fn parse_bibtex(text: &str) -> HashMap<String, String> {
-    let mut out = HashMap::new();
-    for entry in text.split('@').skip(1) {
-        let Some(open) = entry.find(['{', '(']) else { continue };
-        let body = &entry[open + 1..];
-        let Some((key, fields)) = body.split_once(',') else {
-            continue;
-        };
-        let field = |name: &str| -> Option<String> {
-            let lower = fields.to_ascii_lowercase();
-            let mut from = 0;
-            while let Some(at) = lower[from..].find(name) {
-                let start = from + at;
-                from = start + name.len();
-                let before_ok = start == 0 || !lower.as_bytes()[start - 1].is_ascii_alphanumeric();
-                let after = lower[start + name.len()..].trim_start();
-                if !before_ok || !after.starts_with('=') || inside_value(&fields[..start]) {
-                    continue;
-                }
-                let value = fields[fields.len() - after.len() + 1..].trim_start();
-                let (close, rest) = match value.chars().next()? {
-                    '{' => ('}', &value[1..]),
-                    '"' => ('"', &value[1..]),
-                    _ => (',', value),
-                };
-                let mut depth = 0;
-                let mut end = rest.len();
-                for (i, c) in rest.char_indices() {
-                    match c {
-                        '{' => depth += 1,
-                        '}' if depth > 0 => depth -= 1,
-                        c if c == close && depth == 0 => {
-                            end = i;
-                            break;
-                        }
-                        '\n' if close == ',' => {
-                            end = i;
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-                return Some(rest[..end].replace(['{', '}'], "").trim().to_string());
-            }
-            None
-        };
-        let people = field("author").or_else(|| field("editor")).unwrap_or_default();
-        let names: Vec<String> = people
-            .split(" and ")
-            .map(str::trim)
-            .filter(|p| !p.is_empty())
-            .map(|p| match p.split_once(',') {
-                Some((last, _)) => last.trim().to_string(),
-                None => p.rsplit(' ').next().unwrap_or(p).to_string(),
-            })
-            .collect();
-        let year = field("year").or_else(|| field("date").map(|d| d.chars().take(4).collect()));
-        let who = match names.as_slice() {
-            [] => String::new(),
-            [one] => one.clone(),
-            [a, b] => format!("{a} & {b}"),
-            [a, ..] => format!("{a} et al."),
-        };
-        let shown = [who, year.unwrap_or_default()]
-            .into_iter()
-            .filter(|s| !s.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
-        if !shown.is_empty() {
-            out.insert(key.trim().to_string(), shown);
-        }
-    }
-    out
 }
 
 type Found = (PathBuf, String, Instant, Option<PathBuf>);
@@ -559,50 +387,10 @@ mod tests {
     }
 
     #[test]
-    fn remotes_lead_to_their_code_host() {
-        let config = |url: &str| format!("[core]\n\tbare = false\n[remote \"origin\"]\n\turl = {url}\n");
-        let github = remote_repository(&config("git@github.com:anna/splat.git")).unwrap();
-        assert_eq!(
-            github.url("#12").as_deref(),
-            Some("https://github.com/anna/splat/issues/12")
-        );
-        assert_eq!(github.url("@bob").as_deref(), Some("https://github.com/bob"));
-        assert_eq!(github.url("!3"), None);
-        let gitlab = remote_repository(&config("https://gitlab.example.com/team/sub/app.git")).unwrap();
-        assert_eq!(
-            gitlab.url("!7").as_deref(),
-            Some("https://gitlab.example.com/team/sub/app/-/merge_requests/7")
-        );
-        let port = remote_repository(&config("ssh://git@gitlab.example.com:2222/team/app.git")).unwrap();
-        assert_eq!(
-            port.url("#1").as_deref(),
-            Some("https://gitlab.example.com/team/app/-/issues/1")
-        );
-        assert_eq!(remote_repository(&config("https://example.com/x/y.git")), None);
-    }
-
-    #[test]
-    fn worktrees_and_bibliographies_are_found_beside_the_document() {
+    fn bibliographies_and_notes_are_found_beside_the_document() {
         let root = std::env::temp_dir().join(format!("splat-env-{}", std::process::id()));
-        let main_git = root.join("main/.git");
-        let worktree = root.join("worktree");
-        std::fs::create_dir_all(main_git.join("worktrees/wt")).unwrap();
-        std::fs::create_dir_all(worktree.join("docs")).unwrap();
-        std::fs::write(
-            main_git.join("config"),
-            "[remote \"origin\"]\n\turl = git@github.com:anna/splat.git\n",
-        )
-        .unwrap();
-        std::fs::write(main_git.join("worktrees/wt/commondir"), "../..\n").unwrap();
-        std::fs::write(worktree.join(".git"), "gitdir: ../main/.git/worktrees/wt\n").unwrap();
-        let found = find_repository(&worktree.join("docs")).unwrap();
-        assert_eq!(
-            found.url("#1").as_deref(),
-            Some("https://github.com/anna/splat/issues/1")
-        );
-        assert_eq!(find_repository(&worktree.join("docs")), Some(found));
-
-        let docs = worktree.join("docs");
+        let docs = root.join("docs");
+        std::fs::create_dir_all(&docs).unwrap();
         std::fs::write(docs.join("quellen.bib"), "@book{k, author = {Kant, I.}, year = 1781}").unwrap();
         std::fs::write(docs.join("references.bib"), "@book{r, author = {Roe, R.}, year = 2000}").unwrap();
         let named = citations(&docs, "---\nbibliography: \"quellen.bib\"\n---\n# Text").unwrap();
@@ -624,6 +412,8 @@ mod tests {
         assert_eq!(embedded_note(&docs, "Notiz").unwrap().0, "# Notiz");
         assert!(embedded_note(&docs, "Groß").is_none());
         assert!(embedded_note(&docs, "Fehlt").is_none());
+        std::fs::write(docs.join(".env"), "TOKEN=1").unwrap();
+        assert!(embedded_note(&docs, ".env").is_none(), "only notes show");
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -665,24 +455,5 @@ mod tests {
         set_typography(!before);
         assert_eq!(typography_on(), !before);
         set_typography(before);
-    }
-
-    #[test]
-    fn bibtex_entries_read_as_author_and_year() {
-        let entries = parse_bibtex(
-            "@article{doe2020,\n  author = {Doe, Jane and Roe, Rick},\n  year = 2020,\n  title = {A {B} c}\n}\n\
-             @book{solo, author = \"Max Mustermann\", date = {2019-04-01}}\n\
-             @misc{many, author = {A, a and B, b and C, c}, year = {2021}}",
-        );
-        assert_eq!(entries["doe2020"], "Doe & Roe 2020");
-        assert_eq!(entries["solo"], "Mustermann 2019");
-        assert_eq!(entries["many"], "A et al. 2021");
-        let odd = parse_bibtex(
-            "@comment no braces\n@misc{nofields}\n@misc{bare, author = Plain,\n year = 1999\n}\n\
-             @misc{nested, title = {author = no}, editor = {Ed, E.}, year = {2001}}",
-        );
-        assert_eq!(odd["bare"], "Plain 1999");
-        assert_eq!(odd["nested"], "Ed 2001");
-        assert!(!odd.contains_key("nofields"));
     }
 }

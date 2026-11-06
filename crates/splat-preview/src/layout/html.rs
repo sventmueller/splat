@@ -6,13 +6,13 @@ use std::ops::Range;
 use super::blocks::marker_text;
 use super::inlines::{align, atom, atom_styled};
 use super::{
-    ATTACHMENT, Align, Atom, Builder, CharMap, Ctx, ImageAtom, LINE_SEPARATOR, Link, Marker, ParaKind, Run, RunMap,
+    ATTACHMENT, Align, Atom, Builder, CharMap, Ctx, ImageAtom, ItemMarker, LINE_SEPARATOR, Link, ParaKind, Run, RunMap,
     RunStyle,
 };
-use splat_markdown::markup::{self, Element, Node, find, raw_text};
-use splat_markdown::style::{TextStyle, styled_element};
+use splat_markdown::aligner::Spelling;
+use splat_markdown::markup::{self, AddressFor, Destination, Element, Node, Role, destination, find, raw_text};
+use splat_markdown::style::TextStyle;
 use splat_markdown::text::{Byte, count32};
-use splat_markdown::url::is_harmless;
 
 /// Offsets in the HTML literal, which inside a quote lacks the `>` prefixes, as source offsets.
 struct Map<'t> {
@@ -60,7 +60,7 @@ struct HtmlWriter<'b, 'a, 't> {
     block: Range<Byte>,
     runs: Vec<Run>,
     /// The list or footnote marker the next paragraph starts with.
-    marker: Option<(Marker, Range<Byte>)>,
+    marker: Option<(ItemMarker, Range<Byte>)>,
     in_cell: bool,
     /// Where the current line of a cell starts in `runs`.
     line_start: usize,
@@ -75,9 +75,9 @@ impl Builder<'_> {
         literal: &str,
         range: Range<Byte>,
         ctx: &Ctx,
-        marker: Option<(Marker, Range<Byte>)>,
+        marker: Option<(ItemMarker, Range<Byte>)>,
     ) {
-        let chars = align(literal, self.text, range.clone());
+        let chars = align(literal, self.text, range.clone(), Spelling::Verbatim);
         let nodes = markup::parse(literal);
         let mut w = HtmlWriter {
             b: self,
@@ -185,14 +185,13 @@ impl HtmlWriter<'_, '_, '_> {
 
     fn element(&mut self, e: &Element, cx: &Surroundings) {
         let src = self.map.source(&e.tag);
-        if let Some(kind) = styled_element(&e.name) {
-            let mut c = cx.clone();
-            c.style.text = c.style.text.inside(&kind);
-            self.nodes(&e.children, &c);
-            return;
-        }
-        match e.name.as_str() {
-            "br" => {
+        match e.role {
+            Role::Look(look) => {
+                let mut c = cx.clone();
+                c.style.text = c.style.text.nested_in(&look.inline_kind());
+                self.nodes(&e.children, &c);
+            }
+            Role::LineBreak => {
                 if let Some(last) = self.runs.last_mut()
                     && matches!(last.map, RunMap::Atom { atom: Atom::Text, .. })
                 {
@@ -202,55 +201,32 @@ impl HtmlWriter<'_, '_, '_> {
                 self.runs
                     .push(atom_styled(Atom::Text, &LINE_SEPARATOR.to_string(), src, &cx.style));
             }
-            "img" => self.image(e, src, &cx.style),
-            "picture" => {
-                if let Some(img) = find(&e.children, "img") {
+            Role::Picture => self.image(e, src, &cx.style),
+            // The preview shows the `<img>` a browser falls back to, as it reads none of the other sources.
+            Role::PictureSources => {
+                if let Some(img) = find(&e.children, Role::Picture) {
                     let src = self.map.source(&img.tag);
                     self.image(img, src, &cx.style);
                 }
             }
-            "a" => {
+            Role::Link => {
                 let mut c = cx.clone();
-                if let Some(href) = e.attr("href").filter(|h| is_harmless(h)) {
+                let href = e.attr("href").filter(|href| match destination(href, AddressFor::Link) {
+                    Destination::Web | Destination::Mail | Destination::Relative => true,
+                    Destination::PictureData | Destination::Refused => false,
+                });
+                if let Some(href) = href {
                     c.style.link = Some(Link::Address(href.into()));
                 }
                 self.nodes(&e.children, &c);
             }
-            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
-                let level = e.name[1..].parse().unwrap_or(1);
-                self.block(e, cx, ParaKind::Heading(level));
+            Role::Heading(level) => self.block(e, cx, ParaKind::Heading(level)),
+            Role::Paragraph | Role::Division | Role::Center | Role::Section | Role::Summary => {
+                self.block(e, cx, ParaKind::Body);
             }
-            name if markup::makes_paragraphs(name) => self.block(e, cx, ParaKind::Body),
-            "hr" if self.in_cell => self.flush(cx),
-            "hr" => {
-                self.flush(cx);
-                let run = atom(Atom::Rule, "\u{00A0}", src);
-                self.runs.push(run);
-                let rule = Surroundings {
-                    kind: ParaKind::Rule,
-                    ..cx.clone()
-                };
-                self.flush(&rule);
-            }
-            "pre" => {
-                self.flush(cx);
-                let mut code = String::new();
-                raw_text(&e.children, &mut code);
-                let mut code = code.trim_matches('\n').to_string();
-                if self.in_cell {
-                    code = code.replace('\n', &LINE_SEPARATOR.to_string());
-                }
-                if !code.is_empty() {
-                    let mut c = cx.clone();
-                    c.kind = ParaKind::Code { info: "".into() };
-                    c.ctx.group = self.b.next_group();
-                    c.style.text.code = true;
-                    self.runs
-                        .push(atom_styled(Atom::Text, &code, self.map.source(&e.range), &c.style));
-                    self.flush(&c);
-                }
-            }
-            "blockquote" => {
+            Role::Rule => self.rule(src, cx),
+            Role::Preformatted => self.preformatted(e, cx),
+            Role::Quote => {
                 self.flush(cx);
                 let mut c = cx.clone();
                 c.ctx.quote_depth += 1;
@@ -258,23 +234,21 @@ impl HtmlWriter<'_, '_, '_> {
                 self.nodes(&e.children, &c);
                 self.flush(&c);
             }
-            "ul" | "ol" => self.list(e, cx),
-            "dl" => {
-                self.flush(cx);
-                for item in e.children.iter().filter_map(Node::element) {
-                    let mut c = cx.clone();
-                    if item.name == "dd" {
-                        c.ctx.list_depth += 1;
-                    } else {
-                        c.style.text.bold = true;
-                    }
-                    self.nodes(&item.children, &c);
-                    self.flush(&c);
-                }
-            }
-            "table" => self.table(e, cx),
-            "details" => self.details(e, cx),
-            _ => self.nodes(&e.children, cx),
+            Role::List { ordered } => self.list(e, ordered, cx),
+            Role::DefinitionList => self.definitions(e, cx),
+            Role::Table => self.table(e, cx),
+            // Folded as a browser folds it, where Word shows it open.
+            Role::Details => self.details(e, cx),
+            // What changes nothing here, and parts of a list or table outside one, give way to what they hold.
+            Role::Presentational
+            | Role::ListItem
+            | Role::Term
+            | Role::Definition
+            | Role::TableSection { .. }
+            | Role::TableRow
+            | Role::TableCell { .. }
+            | Role::Unknown => self.nodes(&e.children, cx),
+            Role::Empty | Role::Input | Role::Dropped => {}
         }
     }
 
@@ -283,16 +257,69 @@ impl HtmlWriter<'_, '_, '_> {
         self.flush(cx);
         let mut c = cx.clone();
         c.kind = kind;
-        if let Some(a) = e.align().or((e.name == "center").then_some(Align::Center)) {
+        if let Some(a) = e.align().or((e.role == Role::Center).then_some(Align::Center)) {
             c.ctx.align = a;
         }
         self.nodes(&e.children, &c);
         self.flush(&c);
     }
 
+    fn rule(&mut self, src: Range<Byte>, cx: &Surroundings) {
+        self.flush(cx);
+        if self.in_cell {
+            return;
+        }
+        let run = atom(Atom::Rule, "\u{00A0}", src);
+        self.runs.push(run);
+        let rule = Surroundings {
+            kind: ParaKind::Rule,
+            ..cx.clone()
+        };
+        self.flush(&rule);
+    }
+
+    fn preformatted(&mut self, e: &Element, cx: &Surroundings) {
+        self.flush(cx);
+        let mut code = String::new();
+        raw_text(&e.children, &mut code);
+        let mut code = code.trim_matches('\n').to_string();
+        if self.in_cell {
+            code = code.replace('\n', &LINE_SEPARATOR.to_string());
+        }
+        if !code.is_empty() {
+            let mut c = cx.clone();
+            c.kind = ParaKind::Code { info: "".into() };
+            c.ctx.group = self.b.next_group();
+            c.style.text.code = true;
+            self.runs
+                .push(atom_styled(Atom::Text, &code, self.map.source(&e.range), &c.style));
+            self.flush(&c);
+        }
+    }
+
+    /// Terms in bold, and what explains them indented as a list item is.
+    fn definitions(&mut self, e: &Element, cx: &Surroundings) {
+        self.flush(cx);
+        for item in e.children.iter().filter_map(Node::element) {
+            let mut c = cx.clone();
+            if item.role == Role::Definition {
+                c.ctx.list_depth += 1;
+            } else {
+                c.style.text.bold = true;
+            }
+            self.nodes(&item.children, &c);
+            self.flush(&c);
+        }
+    }
+
     fn image(&mut self, e: &Element, src: Range<Byte>, style: &RunStyle) {
         let alt = e.attr("alt").unwrap_or("");
-        match e.attr("src").filter(|u| is_harmless(u)) {
+        let url = e.attr("src").filter(|url| match destination(url, AddressFor::Picture) {
+            Destination::Web | Destination::Relative => true,
+            // The preview loads pictures from files and the web.
+            Destination::PictureData | Destination::Mail | Destination::Refused => false,
+        });
+        match url {
             Some(url) => self.runs.push(atom_styled(
                 Atom::Image(Box::new(ImageAtom {
                     url: url.into(),
@@ -309,7 +336,7 @@ impl HtmlWriter<'_, '_, '_> {
         }
     }
 
-    fn list(&mut self, e: &Element, cx: &Surroundings) {
+    fn list(&mut self, e: &Element, ordered: bool, cx: &Surroundings) {
         self.flush(cx);
         let start: usize = e.attr("start").and_then(|s| s.parse().ok()).unwrap_or(1);
         let depth = cx.ctx.list_depth;
@@ -317,16 +344,16 @@ impl HtmlWriter<'_, '_, '_> {
             .children
             .iter()
             .filter_map(Node::element)
-            .filter(|i| i.name == "li")
+            .filter(|i| i.role == Role::ListItem)
             .enumerate()
         {
             let mut c = cx.clone();
             c.ctx.list_depth = depth + 1;
             c.kind = ParaKind::Body;
-            let marker = if e.name == "ol" {
-                Marker::Number(start.saturating_add(n))
+            let marker = if ordered {
+                ItemMarker::Number(start.saturating_add(n))
             } else {
-                Marker::Bullet(depth)
+                ItemMarker::Bullet(depth)
             };
             self.marker = Some((marker, self.map.source(&item.tag)));
             self.nodes(&item.children, &c);
@@ -369,7 +396,7 @@ impl HtmlWriter<'_, '_, '_> {
         for (row, (r, in_head)) in rows.iter().enumerate() {
             let mut col = 0;
             for cell in r.cells() {
-                let header = *in_head || cell.name == "th";
+                let header = *in_head || cell.role == (Role::TableCell { header: true });
                 let width = cell.span().min(columns - col);
                 let c = Surroundings {
                     ctx: inner.clone(),
@@ -462,7 +489,7 @@ impl HtmlWriter<'_, '_, '_> {
             },
             ..cx.clone()
         };
-        match find(&e.children, "summary") {
+        match find(&e.children, Role::Summary) {
             Some(s) => self.nodes(&s.children, &summary),
             None => {
                 let label = splat_i18n::t("Details");
@@ -475,7 +502,7 @@ impl HtmlWriter<'_, '_, '_> {
             let body: Vec<Node> = e
                 .children
                 .iter()
-                .filter(|n| !matches!(n, Node::Element(s) if s.name == "summary"))
+                .filter(|n| !matches!(n, Node::Element(s) if s.role == Role::Summary))
                 .cloned()
                 .collect();
             self.nodes(&body, cx);
@@ -614,9 +641,9 @@ mod tests {
         assert!(paras.iter().any(|p| p.style.kind == ParaKind::Rule));
         assert!(matches!(find("let x = 1;").style.kind, ParaKind::Code { .. }));
         assert_eq!(find("Zitat").style.quote_depth, 1);
-        assert_eq!(find("drei").style.marker, Some(Marker::Number(3)));
-        assert_eq!(find("vier").style.marker, Some(Marker::Number(4)));
-        assert_eq!(find("Punkt").style.marker, Some(Marker::Bullet(0)));
+        assert_eq!(find("drei").style.marker, Some(ItemMarker::Number(3)));
+        assert_eq!(find("vier").style.marker, Some(ItemMarker::Number(4)));
+        assert_eq!(find("Punkt").style.marker, Some(ItemMarker::Bullet(0)));
         assert!(find("Begriff").runs.iter().all(|r| r.style.text.bold));
         assert_eq!(find("Erklärung").style.list_depth, 1);
         assert!(find("Ersatz").runs.iter().any(|r| r.text == "Ersatz"));
@@ -672,6 +699,36 @@ mod tests {
     }
 
     #[test]
+    fn links_and_pictures_follow_the_one_judgement_of_addresses() {
+        let l = laid(
+            "<p><a href=\"mailto:a@b.de\">m</a> <a href=\"rel.md\">r</a> <a href=\"javascript:x\">j</a> \
+             <img src=\"mailto:a@b.de\" alt=\"M\"> <img src=\"data:image/png;base64,AA\" alt=\"D\"></p>\n",
+        );
+        let link = |text: &str| {
+            paras(&l)[0]
+                .runs
+                .iter()
+                .find(|r| r.text == text)
+                .map(|r| r.style.link.clone())
+        };
+        assert_eq!(link("m"), Some(Some(Link::Address("mailto:a@b.de".into()))));
+        assert_eq!(link("r"), Some(Some(Link::Address("rel.md".into()))));
+        assert_eq!(link("j"), Some(None));
+        assert_eq!(link("M"), Some(None), "a mail address is no picture");
+        assert_eq!(link("D"), Some(None), "the preview loads no picture from its address");
+    }
+
+    #[test]
+    fn what_shows_nothing_leaves_nothing_and_an_unknown_element_its_content() {
+        assert_eq!(
+            texts(&laid("<p>a<input value=\"x\">b<wbr>c<blink>d</blink></p>\n")),
+            ["abcd"]
+        );
+        let l = laid("<p><font><b>a</b></font> <dt>b</dt></p>\n");
+        assert!(paras(&l)[0].runs.iter().any(|r| r.text == "a" && r.style.text.bold));
+    }
+
+    #[test]
     fn only_a_center_element_centers_itself() {
         assert_eq!(para_with(&laid("<center>a</center>\n"), "a").style.align, Align::Center);
         assert_eq!(para_with(&laid("<p>a</p>\n"), "a").style.align, Align::None);
@@ -683,7 +740,7 @@ mod tests {
         assert_eq!(para_with(&l, "a").style.list_depth, 1);
         let b = para_with(&l, "b");
         assert_eq!(b.style.list_depth, 2);
-        assert_eq!(b.style.marker, Some(Marker::Bullet(1)));
+        assert_eq!(b.style.marker, Some(ItemMarker::Bullet(1)));
     }
 
     #[test]

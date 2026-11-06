@@ -4,8 +4,8 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use objc2::rc::{Retained, Weak};
-use objc2::{AnyThread, MainThreadMarker, MainThreadOnly, Message};
+use objc2::AnyThread;
+use objc2::rc::Retained;
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSBitmapImageFileType, NSBitmapImageRep,
     NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSPrintInfo, NSPrintOperation, NSPrintingPaginationMode,
@@ -19,12 +19,12 @@ use objc2_uniform_type_identifiers::UTType;
 use super::attributes::{Attribute, Attributes, attributed};
 use super::export_options::{ExportOptions, TitleFacts};
 use super::images::{native_only, resolve_path};
-use super::layers::ForSharing;
+use super::layers::{ForSharing, Message};
 use super::picture::Sizing;
 use super::render::{Live, RenderCtx};
 use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
-use super::{decoder, js, links, remote, views};
+use super::{decoder, js, remote, views};
 use crate::i18n::t;
 use crate::markdown::doc::Figure;
 use crate::markdown::docx::{Picture, TitlePage, TooLarge, WordExport, to_docx};
@@ -169,7 +169,7 @@ impl Sharing<'_> {
         let stem = doc.displayName().to_string();
         let stem = stem.rsplit_once('.').map_or(stem.as_str(), |(s, _)| s).to_string();
         panel.setNameFieldStringValue(&ns(&format!("{stem}.{}", format.extension())));
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         let chosen = panel.clone();
         let handler = block2::RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
             crate::util::guarded((), || {
@@ -179,25 +179,23 @@ impl Sharing<'_> {
                 let Some(path) = chosen.URL().and_then(|u| u.path()) else {
                     return;
                 };
-                let path = std::path::PathBuf::from(path.to_string());
                 chosen.orderOut(None);
-                let (source, title) = (this.export_source(), stem.clone());
-                let me = dispatch2::MainThreadBound::new(Weak::from(&*this), this.mtm());
-                // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
-                std::thread::spawn(move || {
-                    let Err(failure) = source.write(format, &title, &path) else {
-                        return;
-                    };
-                    crate::util::main_soon(move || {
-                        let Some(mtm) = MainThreadMarker::new() else { return };
-                        if let Some(c) = me.get(mtm).load() {
-                            c.report_export_failure(&failure);
-                        }
-                    });
-                });
+                let (path, title) = (PathBuf::from(path.to_string()), stem.clone());
+                messenger.send(mtm, Message::ExportTo { format, path, title });
             });
         });
         panel.beginSheetModalForWindow_completionHandler(&window, &handler);
+    }
+
+    /// Writes `source` as an export to `path`; a failure comes back as a message.
+    pub(super) fn export_to(&self, source: ExportSource, format: ExportKind, path: PathBuf, title: String) {
+        let messenger = self.host.object().messenger();
+        // Each export has a thread of its own: it reads from one volume and writes to another, and either may hang.
+        std::thread::spawn(move || {
+            if let Err(failure) = source.write(format, &title, &path) {
+                messenger.send_soon(Message::ExportFailed(failure));
+            }
+        });
     }
 
     pub(super) fn export_source(&self) -> ExportSource {
@@ -256,15 +254,11 @@ impl Sharing<'_> {
             }),
         )];
         for action in [super::Action::ExportHtml, super::Action::ExportWord] {
-            let me = Weak::from(self.host.object());
+            let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
             services.push(service(
-                t(action.spec().title),
+                action.spec().title.map_or("", t),
                 block2::RcBlock::new(move || {
-                    crate::util::guarded((), || {
-                        if let Some(c) = me.load() {
-                            c.perform(action);
-                        }
-                    });
+                    crate::util::guarded((), || messenger.send(mtm, Message::Perform(action)));
                 }),
             ));
         }
@@ -422,7 +416,7 @@ impl ExportSource {
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         to_html(
-            &self.text,
+            &parse(&self.text),
             &Export {
                 title,
                 figure: &figure,
@@ -444,7 +438,7 @@ impl ExportSource {
         let template =
             crate::util::read_regular_file(template, MAX_TEMPLATE_BYTES).ok_or(ExportFailure::TemplateNotRead)?;
         splat_import::template::apply_template(&generated, &template).map_err(|error| match error {
-            splat_import::template::TemplateError::TooLarge => ExportFailure::TooLargeForWord,
+            splat_import::WordError::TooLarge => ExportFailure::TooLargeForWord,
             _ => ExportFailure::TemplateNotUsable,
         })
     }
@@ -603,7 +597,7 @@ fn png_of_pixels(width: u32, height: u32, pixels: Vec<u8>) -> Option<Vec<u8>> {
 
 /// A local image for Word: PNG and JPEG as they are, other formats converted to PNG.
 fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
-    let path = &super::images::locate(path, doc_dir);
+    let path = &super::links::locate(path, doc_dir);
     if !super::images::may_carry_along(path, doc_dir) {
         return None;
     }
@@ -641,7 +635,7 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
     if url.contains("://") && crate::markdown::url::behind_file_scheme(url).is_none() {
         return None;
     }
-    let path = super::images::locate(&resolve_path(url, doc_dir)?, doc_dir);
+    let path = super::links::locate(&resolve_path(url, doc_dir)?, doc_dir);
     if !super::images::may_carry_along(&path, doc_dir) {
         return None;
     }
@@ -672,7 +666,7 @@ fn rebased(link: &str, doc_dir: Option<&Path>, export_dir: Option<&Path>) -> Str
     }
     let split = link.find(['#', '?']).unwrap_or(link.len());
     let (path, suffix) = link.split_at(split);
-    let target = doc_dir.join(links::percent_decode(path));
+    let target = doc_dir.join(crate::markdown::url::percent_decode(path));
     let relative = super::links::relative_path(Some(export_dir), &target);
     // Without a folder in common the only way there is an absolute path, which would show the user's folders to the reader.
     if Path::new(&relative).is_absolute() {

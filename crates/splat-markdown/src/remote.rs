@@ -8,7 +8,7 @@ pub fn has_remote_images(doc: &Doc) -> bool {
     fn in_html(nodes: &[markup::Node]) -> bool {
         nodes.iter().any(|n| match n {
             markup::Node::Element(e) => {
-                (e.name == "img" && e.attr("src").is_some_and(url::is_https)) || in_html(&e.children)
+                (e.role == markup::Role::Picture && e.attr("src").is_some_and(url::is_https)) || in_html(&e.children)
             }
             markup::Node::Text { .. } => false,
         })

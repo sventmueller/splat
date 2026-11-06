@@ -159,9 +159,17 @@ pub fn storage(view: &NSTextView) -> Retained<NSTextStorage> {
     unsafe { view.textStorage() }.expect("text view without storage")
 }
 
-pub fn layout_manager(view: &NSTextView) -> Option<Retained<NSLayoutManager>> {
+/// A text view built for TextKit 1, whose layout manager can be asked for without changing it. Asking a TextKit 2 view
+/// for one switches it to TextKit 1 for good, so the source view is no such view; `editor::geometry` serves both.
+pub trait TextKitOne {
+    /// The view as AppKit knows it.
+    fn text_view(&self) -> &NSTextView;
+}
+
+/// The layout manager of a view built for TextKit 1.
+pub fn layout_manager(view: &impl TextKitOne) -> Option<Retained<NSLayoutManager>> {
     // SAFETY: A text view keeps its text system alive, those made in `views.rs` through their `owner`.
-    unsafe { view.layoutManager() }
+    unsafe { view.text_view().layoutManager() }
 }
 
 pub fn text_container(view: &NSTextView) -> Option<Retained<NSTextContainer>> {

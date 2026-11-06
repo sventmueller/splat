@@ -12,8 +12,8 @@ pub mod rtf;
 pub mod tabular;
 pub mod template;
 mod xml;
-pub mod zip;
 
+pub use package::WordError;
 use rich::{Block, Rich};
 
 /// What the pasteboard offers, in the order of preference html, rtf, plain.
@@ -41,13 +41,22 @@ pub enum ImageSource<'a> {
     },
 }
 
+/// Where pasted Markdown goes in the text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Placement {
+    /// Into the line at the cursor, as one paragraph's text.
+    WithinLine,
+    /// On lines of its own between the paragraphs around it: more than one block, or a block that is no paragraph.
+    OwnLines,
+}
+
 /// Pasted content as Markdown.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Converted {
     /// The text, without a line break at its end.
     pub markdown: String,
-    /// More than one block, or a block that is no paragraph: it needs lines of its own.
-    pub blocks: bool,
+    /// Where it goes.
+    pub placement: Placement,
 }
 
 /// `place` says where an image goes in Markdown: its destination, or None to leave it out (its alt text stays).
@@ -62,9 +71,14 @@ pub fn paste_as_markdown(pasted: &Pasted, place: &mut dyn FnMut(&ImageSource) ->
     if let Some(table) = tabular::from_text(plain).and_then(|table| convert(table, place)) {
         return Some(table);
     }
+    let own_lines = plain.trim().lines().any(|line| line.trim().is_empty());
     Some(Converted {
         markdown: plain.to_string(),
-        blocks: plain.trim().lines().any(|line| line.trim().is_empty()),
+        placement: if own_lines {
+            Placement::OwnLines
+        } else {
+            Placement::WithinLine
+        },
     })
 }
 
@@ -73,14 +87,14 @@ fn convert(mut rich: Rich, place: &mut dyn FnMut(&ImageSource) -> Option<String>
     rich.place_images(place);
     rich.settle_images();
     let rich = rich.tidied();
-    let blocks = match rich.blocks.as_slice() {
+    let placement = match rich.blocks.as_slice() {
         [] => return None,
-        [Block::Paragraph(_)] => false,
-        _ => true,
+        [Block::Paragraph(_)] => Placement::WithinLine,
+        _ => Placement::OwnLines,
     };
     let mut markdown = rich.tidy_markdown();
     markdown.truncate(markdown.trim_end_matches('\n').len());
-    Some(Converted { markdown, blocks })
+    Some(Converted { markdown, placement })
 }
 
 #[cfg(test)]
@@ -97,7 +111,7 @@ mod tests {
 
     fn markdown(converted: Option<Converted>) -> (String, bool) {
         let converted = converted.expect("something on offer");
-        (converted.markdown, converted.blocks)
+        (converted.markdown, converted.placement == Placement::OwnLines)
     }
 
     #[test]
@@ -142,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn blocks_tell_what_needs_lines_of_its_own() {
+    fn the_placement_tells_what_needs_lines_of_its_own() {
         assert!(!markdown(pasted(Some("a <i>b</i>"), None, None)).1);
         assert!(markdown(pasted(Some("<p>a</p><p>b</p>"), None, None)).1);
         assert!(markdown(pasted(Some("<h1>a</h1>"), None, None)).1);

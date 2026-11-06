@@ -2,9 +2,10 @@ use std::ops::Range;
 
 use super::inlines::{atom, atom_styled};
 use super::{
-    ATTACHMENT, Atom, Builder, CharMap, Ctx, LeadingMarker, Link, MAX_EMBEDS, Marker, Para, ParaKind, ParaStyle, Run,
-    RunMap, RunStyle, WithoutEmbeds, layout,
+    ATTACHMENT, Atom, Builder, CharMap, Ctx, ItemMarker, LeadingMarker, Link, MAX_EMBEDS, Para, ParaKind, ParaStyle,
+    Run, RunMap, RunStyle, WithoutEmbeds, layout,
 };
+use splat_markdown::aligner::Spelling;
 use splat_markdown::doc::output::{BlockOutput, Callout, Code, Note, write_block};
 use splat_markdown::doc::{
     AlertKind, Align, Block, BlockKind, Fold, Inline, InlineKind, ListKind, diagram_kind, is_image_name, is_math_fence,
@@ -328,12 +329,12 @@ impl Builder<'_> {
                 continue;
             };
             let item_marker = match (task, kind) {
-                (Some(t), _) => Marker::Task {
+                (Some(t), _) => ItemMarker::Task {
                     checked: t.checked,
                     symbol: Some(t.symbol),
                 },
-                (None, ListKind::Bullet(_)) => Marker::Bullet(depth),
-                (None, ListKind::Ordered { start, .. }) => Marker::Number(start + index),
+                (None, ListKind::Bullet(_)) => ItemMarker::Bullet(depth),
+                (None, ListKind::Ordered { start, .. }) => ItemMarker::Number(start + index),
             };
             let marker_end = task
                 .as_ref()
@@ -423,6 +424,7 @@ impl Builder<'_> {
             vec![ending_at_last_char(self.aligned(
                 body,
                 content.clone(),
+                Spelling::Verbatim,
                 RunStyle::default().code(),
             ))]
         };
@@ -548,7 +550,7 @@ impl Builder<'_> {
             ..ctx.clone()
         };
         let shown = number.map_or_else(|| name.into(), |n| n.to_string().into());
-        let mut first = Some((Marker::Footnote(name.into(), shown), label.clone()));
+        let mut first = Some((ItemMarker::Footnote(name.into(), shown), label.clone()));
         if block.children().is_empty() {
             self.push_para(
                 ParaKind::FootnoteDef,
@@ -592,7 +594,7 @@ impl Builder<'_> {
                 0 => frame,
                 g => *groups.entry(g).or_insert_with(|| self.next_group()),
             };
-            if let Some(Marker::Task { symbol, .. }) = &mut p.style.marker {
+            if let Some(ItemMarker::Task { symbol, .. }) = &mut p.style.marker {
                 *symbol = None;
             }
             for run in &mut p.runs {
@@ -644,7 +646,7 @@ fn ending_at_last_char(mut run: Run) -> Run {
 fn only_embed(inlines: &[Inline]) -> Option<&str> {
     let mut found = None;
     for i in inlines {
-        match &i.kind {
+        match i.kind() {
             InlineKind::WikiLink { target, embed: true } if found.is_none() && !is_image_name(target) => {
                 found = Some(&**target)
             }
@@ -656,12 +658,12 @@ fn only_embed(inlines: &[Inline]) -> Option<&str> {
     found
 }
 
-pub(super) fn marker_text(m: &Marker) -> String {
+pub(super) fn marker_text(m: &ItemMarker) -> String {
     match m {
-        Marker::Bullet(depth) => format!("{}\t", ["•", "◦", "▪"][*depth as usize % 3]),
-        Marker::Number(n) => format!("{n}.\t"),
-        Marker::Task { checked, .. } => format!("{}\t", if *checked { "☑" } else { "☐" }),
-        Marker::Footnote(_, shown) => format!("{shown}.\t"),
+        ItemMarker::Bullet(depth) => format!("{}\t", ["•", "◦", "▪"][*depth as usize % 3]),
+        ItemMarker::Number(n) => format!("{n}.\t"),
+        ItemMarker::Task { checked, .. } => format!("{}\t", if *checked { "☑" } else { "☐" }),
+        ItemMarker::Footnote(_, shown) => format!("{shown}.\t"),
     }
 }
 
@@ -747,7 +749,10 @@ mod tests {
         let l = layout(&d, &NoImages, None);
         assert_eq!(texts(&l), vec!["Titel", "Text fett", "•\ta", "☑\tb", "h", "i", "1", ""]);
         let item = &l.blocks[2].paras[1];
-        assert!(matches!(item.style.marker, Some(Marker::Task { checked: true, .. })));
+        assert!(matches!(
+            item.style.marker,
+            Some(ItemMarker::Task { checked: true, .. })
+        ));
         let empty_cell = &l.blocks[3].paras[3];
         assert_eq!(t.at(empty_cell.insert_at..empty_cell.insert_at + 1), " ");
     }
@@ -853,15 +858,15 @@ mod tests {
     #[test]
     fn list_items_know_their_number_depth_and_marker() {
         let l = laid("3. a\n4. b\n");
-        assert_eq!(para_with(&l, "a").style.marker, Some(Marker::Number(3)));
-        assert_eq!(para_with(&l, "b").style.marker, Some(Marker::Number(4)));
+        assert_eq!(para_with(&l, "a").style.marker, Some(ItemMarker::Number(3)));
+        assert_eq!(para_with(&l, "b").style.marker, Some(ItemMarker::Number(4)));
         let t = "- [x] a\n  - b\n";
         let l = laid(t);
         let a = para_with(&l, "a");
         assert_eq!(marker_of(t, a), "- [x]");
         assert_eq!(a.style.list_depth, 1);
         let b = para_with(&l, "b");
-        assert_eq!(b.style.marker, Some(Marker::Bullet(1)));
+        assert_eq!(b.style.marker, Some(ItemMarker::Bullet(1)));
         assert_eq!(b.style.list_depth, 2);
         assert!(a.style.tight, "no blank line between the items");
         let l = laid("- a\n\n- b\n");
@@ -945,26 +950,16 @@ mod tests {
 
     #[test]
     fn only_a_note_alone_in_its_paragraph_is_embedded() {
-        let inline = |kind: InlineKind| Inline {
-            kind,
-            range: bytes(0..0),
-            children: Box::default(),
+        let embedded = |text: &str, part: Range<usize>| {
+            let doc = parse(text);
+            only_embed(&doc.blocks()[0].inlines()[part]).map(str::to_string)
         };
-        let note = |target: &str| {
-            inline(InlineKind::WikiLink {
-                target: target.into(),
-                embed: true,
-            })
-        };
-        assert_eq!(only_embed(&[note("a")]), Some("a"));
-        assert_eq!(only_embed(&[note("a"), inline(InlineKind::SoftBreak)]), Some("a"));
-        assert_eq!(
-            only_embed(&[inline(InlineKind::Text(" ".into())), note("a")]),
-            Some("a")
-        );
-        assert_eq!(only_embed(&[note("a"), note("b")]), None);
-        assert_eq!(only_embed(&[note("a"), inline(InlineKind::Text("x".into()))]), None);
-        assert_eq!(only_embed(&[note("a.png")]), None);
+        assert_eq!(embedded("![[a]]\n", 0..1).as_deref(), Some("a"));
+        assert_eq!(embedded("![[a]]\n![[b]]\n", 0..2).as_deref(), Some("a"), "a line break");
+        assert_eq!(embedded("![[a]] ![[b]]\n", 1..3).as_deref(), Some("b"), "a space");
+        assert_eq!(embedded("![[a]] ![[b]]\n", 0..3), None);
+        assert_eq!(embedded("![[a]]x\n", 0..2), None);
+        assert_eq!(embedded("![[a.png]]\n", 0..1), None);
     }
 
     #[test]

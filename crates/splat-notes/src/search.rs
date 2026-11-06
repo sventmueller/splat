@@ -9,7 +9,7 @@ use caseless::Caseless;
 use splat_markdown::doc::{Doc, Inline, InlineKind, walk_blocks};
 use splat_markdown::reader::parse;
 use splat_markdown::text::{label_key, offsets};
-use splat_markdown::typography::{TextMark, before_text, marks};
+use splat_markdown::typography::{Shorthand, before_text, shorthands};
 use unicode_normalization::char::{canonical_combining_class, decompose_canonical};
 
 use crate::links::{LinkTarget, links_of};
@@ -360,13 +360,13 @@ fn tag_matches(name: &str, wanted: &str) -> bool {
 /// neither in code nor in a link.
 fn tags_in(text: &str, inlines: &[Inline], wanted: &str, out: &mut Vec<Range<usize>>) {
     for inline in inlines {
-        match &inline.kind {
+        match inline.kind() {
             InlineKind::Text(literal) => {
-                let source = offsets(&inline.range);
+                let source = offsets(&inline.range());
                 let spelled = text.get(source.clone()).unwrap_or("");
                 let mut from = 0;
-                for (shown, mark) in marks(literal, before_text(text, inline.range.start), false) {
-                    let TextMark::Tag(name) = mark else {
+                for (shown, mark) in shorthands(literal, before_text(text, inline.range().start), false) {
+                    let Shorthand::Tag(name) = mark else {
                         continue;
                     };
                     let tag = &literal[shown];
@@ -382,7 +382,7 @@ fn tags_in(text: &str, inlines: &[Inline], wanted: &str, out: &mut Vec<Range<usi
                 }
             }
             InlineKind::Link { .. } | InlineKind::Image { .. } | InlineKind::WikiLink { .. } | InlineKind::Kbd => {}
-            kind if kind.holds_inlines() => tags_in(text, &inline.children, wanted, out),
+            kind if kind.holds_inlines() => tags_in(text, inline.children(), wanted, out),
             _ => {}
         }
     }
@@ -487,7 +487,7 @@ pub fn search(tree: &Tree, query: &Query, stop: &AtomicBool, found: &mut dyn FnM
         if stop.load(Ordering::Relaxed) {
             break;
         }
-        let text = match read_note(&note.path) {
+        let text = match read_note(note.path()) {
             Ok(Some(text)) => text,
             Ok(None) => continue,
             Err(_) => {
@@ -495,10 +495,10 @@ pub fn search(tree: &Tree, query: &Query, stop: &AtomicBool, found: &mut dyn FnM
                 continue;
             }
         };
-        let (hits, more) = prepared.places_in(&text, &note.path);
+        let (hits, more) = prepared.places_in(&text, note.path());
         if !hits.is_empty() {
             found(FileHits {
-                path: note.path.clone(),
+                path: note.path().to_path_buf(),
                 hits,
                 more,
             });

@@ -4,6 +4,7 @@ mod lanes;
 mod process;
 mod volumes;
 
+pub use appkit::TextKitOne;
 pub(crate) use appkit::constant;
 #[cfg(test)]
 pub use appkit::split_shortcut;
@@ -18,6 +19,6 @@ pub use lanes::{
     BACKGROUND, DISK, Lane, contained, free_in_background, guarded, main_after, main_soon, on_main, panic_is_contained,
     with_raised,
 };
-pub use process::{end_process, process_exists};
+pub use process::{Process, end_child, process_exists};
 pub use splat_file_state::Stamp;
 pub use volumes::{BusyVolumes, answer_from, lane_of, lane_of_volume, volume_of};

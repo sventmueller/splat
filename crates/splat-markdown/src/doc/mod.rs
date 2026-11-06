@@ -15,11 +15,12 @@ mod figures;
 pub mod output;
 mod shift;
 
+pub(crate) use figures::code_figure;
 pub use figures::{
-    DiagramKind, Figure, code_figure, diagram_kind, figure_at, figures, is_image_name, is_math_fence, macros_of,
-    math_delimiters,
+    DiagramKind, Figure, diagram_kind, figure_at, figures, is_image_name, is_math_fence, macros_of, math_delimiters,
 };
-pub use shift::{Splice, shift_block};
+pub use shift::Splice;
+pub(crate) use shift::shift_block;
 
 /// How the items of a list are marked.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -320,12 +321,10 @@ pub enum InlineKind {
 /// A piece of running text in the tree, with where it stands and the inlines it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inline {
-    /// The construct it is and what the source says about it.
-    pub kind: InlineKind,
-    /// Where it stands in the source, its delimiters included.
-    pub range: Range<Byte>,
-    /// The inlines inside it, for a kind that holds some; empty for any other.
-    pub children: Box<[Inline]>,
+    // Not public, so that nothing outside this crate can move an inline out of the text it was read from.
+    pub(crate) kind: InlineKind,
+    pub(crate) range: Range<Byte>,
+    pub(crate) children: Box<[Inline]>,
 }
 
 impl BlockKind {
@@ -357,6 +356,21 @@ impl BlockKind {
 }
 
 impl Inline {
+    /// The construct it is and what the source says about it.
+    pub fn kind(&self) -> &InlineKind {
+        &self.kind
+    }
+
+    /// Where it stands in the source, its delimiters included.
+    pub fn range(&self) -> Range<Byte> {
+        self.range.clone()
+    }
+
+    /// The inlines inside it, for a kind that holds some; empty for any other.
+    pub fn children(&self) -> &[Inline] {
+        &self.children
+    }
+
     /// Whether it is written as an HTML tag in `text`, its source: `<em>a</em>` is the same `Emph` as `*a*`.
     pub fn written_as_html(&self, text: &str) -> bool {
         text.as_bytes().get(self.range.start.get()) == Some(&b'<')
@@ -385,8 +399,8 @@ impl InlineKind {
     }
 }
 
-/// An inline as its writers see it: kinds that differ only in their look are one case here, and what `TextStyle::inside`
-/// and `style::html_element` say about them is all that a new look needs.
+/// An inline as its writers see it: kinds that differ only in their look are one case here, and what
+/// `TextStyle::nested_in` and `style::html_element` say about them is all that a new look needs.
 #[derive(Debug)]
 pub enum Piece<'a> {
     /// Running text as it reads.
@@ -447,14 +461,16 @@ pub struct Picture<'a> {
     pub height: Option<u32>,
 }
 
-/// Strings and lists are boxed slices without spare capacity, since a large document has hundreds of thousands of
-/// blocks.
+/// A block of the document, such as a paragraph, a heading, a list or a quote, with where it stands in the source and
+/// the running text or the blocks it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     /// The construct it is and what the source says about it.
     pub kind: BlockKind,
     /// Where it stands in the source, from its first character to its last, the final line ending left out.
     pub range: Range<Byte>,
+    // Strings and lists in blocks are boxed slices without spare capacity, as a large document has hundreds of
+    // thousands of blocks.
     content: Content,
 }
 
@@ -483,7 +499,7 @@ fn next_version() -> u64 {
 
 impl Doc {
     /// The tree `blocks` read from `text`, with a version no other parse has.
-    pub fn new(text: Arc<str>, blocks: Vec<Block>) -> Doc {
+    pub(crate) fn new(text: Arc<str>, blocks: Vec<Block>) -> Doc {
         Doc {
             blocks,
             text,
@@ -509,6 +525,17 @@ impl Doc {
     /// The source text the blocks were read from.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// A selection from outside, which may belong to another version of the text, brought into this text and onto
+    /// the boundaries of its characters, as every command and query takes it.
+    pub fn fit(&self, selection: Range<Byte>) -> Range<Byte> {
+        self.text.fit(selection)
+    }
+
+    /// An offset from outside brought into the text as [`Doc::fit`] brings a selection.
+    pub fn fit_at(&self, at: Byte) -> Byte {
+        self.text.fit_at(at)
     }
 
     /// The top-level blocks, in the order of the text.

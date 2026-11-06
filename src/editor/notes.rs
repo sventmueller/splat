@@ -4,26 +4,27 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use block2::RcBlock;
-use objc2::rc::{Retained, Weak};
-use objc2::{MainThreadMarker, MainThreadOnly, Message};
+use objc2::MainThreadOnly;
+use objc2::rc::Retained;
 use objc2_app_kit::{
     NSAlert, NSAlertFirstButtonReturn, NSBeep, NSDocument, NSDocumentController, NSOpenPanel, NSWorkspace,
 };
 use objc2_foundation::{NSArray, NSError, NSURL};
-use splat_notes::{FileHits, MOST_HITS_PER_FILE, Query, Replacement, Rewrite, Tree};
+use splat_notes::{FileHits, Query, Rewrite, Tree};
 
-use super::layers::ForNotes;
-use super::sidebar::{NoteEvent, Row, RowKind, SidebarTab};
+use splat_editor_state::notes::{query_of, renamed_path, rows_of_hits, rows_of_tree, search_status, write_rewrites};
+
+use super::layers::{ForNotes, Message, Messenger};
+use super::sidebar::{NoteEvent, SidebarTab};
 use crate::document::MdDocument;
 use crate::i18n::{t, tf};
-use crate::util::{guarded, lane_of, main_soon, ns};
+use crate::util::{guarded, lane_of, ns};
 
 /// More hits than anyone reads, and a query of one letter in a large folder would otherwise fill the memory.
 const MOST_HITS: usize = 5_000;
@@ -79,23 +80,6 @@ impl Wanted {
     }
 }
 
-/// `#tag` searches for that tag, anything else for the text as typed.
-fn query_of(text: &str) -> Option<Query> {
-    let text = text.trim();
-    if text.is_empty() {
-        return None;
-    }
-    let is_tag = text.len() > 1 && text.starts_with('#') && !text.contains(char::is_whitespace);
-    Some(if is_tag {
-        Query::Tag(text.to_string())
-    } else {
-        Query::Text {
-            needle: text.to_string(),
-            case_sensitive: false,
-        }
-    })
-}
-
 #[derive(Default)]
 pub(super) struct NotesState {
     /// The folder the user chose for this window, instead of the one around its document.
@@ -123,185 +107,23 @@ impl<'a> Notes<'a> {
 }
 
 /// Starts `work` on a thread of its own and sends what it returns to the window, unless too many threads wait already.
-fn on_own_thread(
-    controller: &super::EditorController,
-    work: impl FnOnce() -> Option<NoteAnswer> + Send + 'static,
-) -> bool {
+fn on_own_thread(messenger: Messenger, work: impl FnOnce() -> Option<NoteAnswer> + Send + 'static) -> bool {
     if THREADS.fetch_add(1, Ordering::SeqCst) >= MOST_THREADS {
         THREADS.fetch_sub(1, Ordering::SeqCst);
         return false;
     }
-    let me = dispatch2::MainThreadBound::new(Weak::from(controller), controller.mtm());
     std::thread::spawn(move || {
         let answer = crate::util::contained(work).flatten();
         THREADS.fetch_sub(1, Ordering::SeqCst);
-        main_soon(move || {
-            let Some(mtm) = MainThreadMarker::new() else { return };
-            if let (Some(answer), Some(c)) = (answer, me.get(mtm).load()) {
-                c.note_answer(answer);
-            }
-        });
+        if let Some(answer) = answer {
+            messenger.send_soon(Message::Notes(answer));
+        }
     });
     true
 }
 
 fn home() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from)
-}
-
-/// The rows of a folder's tree.
-fn rows_of_tree(tree: &Tree) -> (Vec<Row>, Vec<usize>) {
-    let rows = tree
-        .nodes
-        .iter()
-        .map(|node| Row {
-            title: node.name.clone(),
-            matched: None,
-            tip: node.path.display().to_string(),
-            symbol: if node.folder { "folder" } else { "doc.text" },
-            kind: if node.folder {
-                RowKind::Folder
-            } else {
-                RowKind::Note(node.path.clone())
-            },
-            key: node.path.display().to_string(),
-            children: node.children.clone(),
-        })
-        .collect();
-    (rows, tree.top.clone())
-}
-
-/// The rows of search results: a row per file, relative to the folder, with its hits below.
-fn rows_of_hits(hits: &[FileHits], root: Option<&Path>) -> (Vec<Row>, Vec<usize>) {
-    let mut rows = Vec::new();
-    let mut roots = Vec::new();
-    for file in hits {
-        let shown = root
-            .and_then(|root| file.path.strip_prefix(root).ok())
-            .unwrap_or(&file.path)
-            .display()
-            .to_string();
-        let top = rows.len();
-        roots.push(top);
-        rows.push(Row {
-            title: shown,
-            matched: None,
-            tip: file.path.display().to_string(),
-            symbol: "doc.text",
-            kind: RowKind::Note(file.path.clone()),
-            key: file.path.display().to_string(),
-            children: Vec::new(),
-        });
-        for hit in &file.hits {
-            let child = rows.len();
-            rows[top].children.push(child);
-            let (title, matched) = near_the_match(&hit.context, hit.in_context.clone());
-            rows.push(Row {
-                title,
-                matched: Some(matched),
-                tip: format!("{}\n{}", tf("Zeile {}", &[&(hit.line + 1).to_string()]), hit.context),
-                symbol: "",
-                kind: RowKind::Hit(file.path.clone(), hit.line, hit.column),
-                key: format!("{}#{}", file.path.display(), hit.range.start),
-                children: Vec::new(),
-            });
-        }
-        if file.more {
-            let child = rows.len();
-            rows[top].children.push(child);
-            rows.push(Row {
-                title: tf("Mehr als {} Treffer", &[&MOST_HITS_PER_FILE.to_string()]),
-                matched: None,
-                tip: String::new(),
-                symbol: "",
-                kind: RowKind::Remark,
-                key: format!("{}#more", file.path.display()),
-                children: Vec::new(),
-            });
-        }
-    }
-    (rows, roots)
-}
-
-/// A line of a hit as a narrow sidebar has room for it: it starts shortly before the match, which would otherwise lie
-/// beyond the edge of the row.
-fn near_the_match(context: &str, matched: Range<usize>) -> (String, Range<usize>) {
-    const LEAD_CHARS: usize = 12;
-    let lead = context.get(..matched.start).unwrap_or("");
-    let Some((cut, _)) = lead.char_indices().rev().nth(LEAD_CHARS) else {
-        return (context.to_string(), matched);
-    };
-    let dots = "…";
-    let moved = cut.min(matched.start);
-    let start = matched.start - moved + dots.len();
-    (format!("{dots}{}", &context[moved..]), start..start + matched.len())
-}
-
-/// What the status line says about a search.
-fn search_status(hits: &[FileHits], searching: bool) -> String {
-    let count: usize = hits.iter().map(|f| f.hits.len()).sum();
-    match (count, searching) {
-        (0, true) => t("Suche läuft …").to_string(),
-        (0, false) => t("Keine Treffer").to_string(),
-        _ => tf(
-            "Treffer: {} · Dateien: {}",
-            &[&count.to_string(), &hits.len().to_string()],
-        ),
-    }
-}
-
-/// A new name for a note: its stem as typed, with the note's extension unless one is typed. `None` if it cannot be a name.
-fn renamed_path(path: &Path, typed: &str) -> Option<PathBuf> {
-    let typed = typed.trim();
-    if typed.is_empty() || typed.contains('/') || typed.contains(':') || typed.starts_with('.') {
-        return None;
-    }
-    let name = if splat_notes::is_note(Path::new(typed)) {
-        typed.to_string()
-    } else {
-        let extension = path.extension()?.to_string_lossy();
-        format!("{typed}.{extension}")
-    };
-    let to = path.with_file_name(name);
-    (to != path).then_some(to)
-}
-
-/// Writes every text first and moves them all into place after, so that a full disk changes none of them.
-fn write_rewrites(writes: &[(PathBuf, String, String)]) -> Vec<PathBuf> {
-    let mut failed = Vec::new();
-    let mut ready = Vec::new();
-    for (path, before, after) in writes {
-        let Some(name) = path.file_name() else { continue };
-        // What another program changed in the meantime stays as it is.
-        let current = std::fs::read(path).ok();
-        if current.as_deref() != Some(before.as_bytes()) {
-            failed.push(path.clone());
-            continue;
-        }
-        let spare = path.with_file_name(format!(".{}.splat-rename", name.to_string_lossy()));
-        let kept = std::fs::metadata(path).ok().map(|m| m.permissions());
-        let written = std::fs::write(&spare, after).is_ok()
-            && kept.is_none_or(|permissions| std::fs::set_permissions(&spare, permissions).is_ok());
-        if written {
-            ready.push((spare, path.clone()));
-        } else {
-            let _ = std::fs::remove_file(&spare);
-            failed.push(path.clone());
-        }
-    }
-    if !failed.is_empty() {
-        for (spare, _) in &ready {
-            let _ = std::fs::remove_file(spare);
-        }
-        return writes.iter().map(|(path, ..)| path.clone()).collect();
-    }
-    for (spare, path) in ready {
-        if std::fs::rename(&spare, &path).is_err() {
-            let _ = std::fs::remove_file(&spare);
-            failed.push(path);
-        }
-    }
-    failed
 }
 
 impl Notes<'_> {
@@ -375,7 +197,7 @@ impl Notes<'_> {
         if let Some(previous) = previous {
             previous.store(true, Ordering::Relaxed);
         }
-        let started = on_own_thread(self.host.object(), move || {
+        let started = on_own_thread(self.host.object().messenger(), move || {
             let root = match (chosen, file) {
                 (Some(chosen), _) => chosen,
                 (None, Some(file)) => splat_notes::root_for(&file, home().as_deref()),
@@ -409,16 +231,20 @@ impl Notes<'_> {
     }
 
     fn scanned(&self, tree: Tree) {
-        if tree.unreadable > 0 {
-            crate::diag::report("folders or notes the sidebar could not read", tree.unreadable);
+        if tree.unreadable() > 0 {
+            crate::diag::report("folders or notes the sidebar could not read", tree.unreadable());
         }
         let (rows, roots) = rows_of_tree(&tree);
-        let name = tree
-            .root
-            .file_name()
-            .map_or_else(|| tree.root.display().to_string(), |n| n.to_string_lossy().into_owned());
-        let shown = if tree.cut { tf("{} (gekürzt)", &[&name]) } else { name };
-        let tip = tree.root.display().to_string();
+        let name = tree.root().file_name().map_or_else(
+            || tree.root().display().to_string(),
+            |n| n.to_string_lossy().into_owned(),
+        );
+        let shown = if tree.is_cut() {
+            tf("{} (gekürzt)", &[&name])
+        } else {
+            name
+        };
+        let tip = tree.root().display().to_string();
         let document = self.document_path();
         self.host.panes().with_sidebar(|sidebar| {
             sidebar.show_folder(&shown, &tip);
@@ -443,7 +269,7 @@ impl Notes<'_> {
         panel.setCanChooseDirectories(true);
         panel.setAllowsMultipleSelection(false);
         panel.setPrompt(Some(&ns(t("Wählen"))));
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
+        let messenger = self.host.object().messenger();
         let chosen = panel.clone();
         let handler = RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
             guarded((), || {
@@ -454,8 +280,8 @@ impl Notes<'_> {
                     .URL()
                     .and_then(|u| u.path())
                     .map(|p| PathBuf::from(p.to_string()));
-                if let (Some(path), Some(c)) = (path, me.get(chosen.mtm()).load()) {
-                    c.use_notes_folder(path);
+                if let Some(path) = path {
+                    messenger.send(chosen.mtm(), Message::NotesFolder(path));
                 }
             });
         });
@@ -521,10 +347,9 @@ impl Notes<'_> {
         };
         let stop = Arc::new(AtomicBool::new(false));
         *self.state.stop_search.borrow_mut() = Some(stop.clone());
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
-        let me = Arc::new(me);
-        let reports = me.clone();
-        let started = on_own_thread(self.host.object(), move || {
+        let messenger = self.host.object().messenger();
+        let reports = messenger.clone();
+        let started = on_own_thread(messenger, move || {
             let mut batch = Vec::new();
             let mut last_shown = Instant::now();
             let mut total = 0;
@@ -536,18 +361,11 @@ impl Notes<'_> {
                 }
                 if last_shown.elapsed() >= SHOW_EVERY {
                     last_shown = Instant::now();
-                    let hits = std::mem::take(&mut batch);
-                    let reports = reports.clone();
-                    main_soon(move || {
-                        let Some(mtm) = MainThreadMarker::new() else { return };
-                        if let Some(c) = reports.get(mtm).load() {
-                            c.note_answer(NoteAnswer::Found {
-                                generation,
-                                hits,
-                                done: false,
-                            });
-                        }
-                    });
+                    reports.send_soon(Message::Notes(NoteAnswer::Found {
+                        generation,
+                        hits: std::mem::take(&mut batch),
+                        done: false,
+                    }));
                 }
             });
             if searched.unreadable > 0 {
@@ -563,7 +381,6 @@ impl Notes<'_> {
             self.state.searching.set(false);
             NSBeep();
         }
-        drop(me);
     }
 
     fn found(&self, hits: Vec<FileHits>, done: bool) {
@@ -571,10 +388,12 @@ impl Notes<'_> {
         if done {
             self.state.searching.set(false);
         }
-        let all = self.state.hits.borrow();
-        let root = self.state.tree.borrow().as_ref().map(|tree| tree.root.clone());
-        let (rows, roots) = rows_of_hits(&all, root.as_deref());
-        let status = search_status(&all, !done);
+        let root = self.state.tree.borrow().as_ref().map(|tree| tree.root().to_path_buf());
+        // AppKit runs callbacks while the list reloads, and whatever they set off must find the hits free to change.
+        let ((rows, roots), status) = {
+            let all = self.state.hits.borrow();
+            (rows_of_hits(&all, root.as_deref()), search_status(&all, !done))
+        };
         self.host.panes().with_sidebar(|sidebar| {
             sidebar.hits.show(rows, roots, true);
             sidebar.show_status(&status);
@@ -584,15 +403,15 @@ impl Notes<'_> {
     /// Opens a note as a tab of this window, or brings it forward if it is open, and shows a line and place in it.
     fn open(&self, path: PathBuf, at: Option<(usize, usize)>) {
         if self.document_path().as_deref() == Some(&*path) {
-            if let Some(at) = at {
-                reveal_place(self.host.object(), at);
+            if let Some((line, column)) = at {
+                self.host.object().send(Message::RevealPlace { line, column });
             }
             return;
         }
         let Some(address) = path.to_str().map(|p| NSURL::fileURLWithPath(&ns(p))) else {
             return;
         };
-        let this = self.host.object().retain();
+        let (mtm, window) = (self.host.mtm(), self.host.window());
         let tab = self.host.panes().sidebar_tab().unwrap_or(SidebarTab::Files);
         let handed = (
             self.state.chosen.borrow().clone(),
@@ -609,14 +428,14 @@ impl Notes<'_> {
                         // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
                         if let Some(error) = unsafe { Retained::retain(error) } {
                             crate::diag::report("opening a note failed", error.code());
-                            objc2_app_kit::NSApplication::sharedApplication(this.mtm()).presentError(&error);
+                            objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
                         }
                         return;
                     };
                     if !already.as_bool() {
                         document.makeWindowControllers();
                         let tab_window = document.windowControllers().firstObject().and_then(|c| c.window());
-                        if let (Some(window), Some(tab_window)) = (this.window(), tab_window) {
+                        if let (Some(window), Some(tab_window)) = (&window, tab_window) {
                             window.addTabbedWindow_ordered(&tab_window, objc2_app_kit::NSWindowOrderingMode::Above);
                         }
                     }
@@ -634,8 +453,8 @@ impl Notes<'_> {
                             keep_shown: already.as_bool(),
                         });
                     }
-                    if let Some(at) = at {
-                        reveal_place(&editor, at);
+                    if let Some((line, column)) = at {
+                        editor.handle(Message::RevealPlace { line, column });
                     }
                 });
             },
@@ -677,13 +496,13 @@ impl Notes<'_> {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         super::dialogs::rename(&window, &stem, move |typed| {
             let Some(to) = renamed_path(&path, &typed) else {
                 NSBeep();
                 return;
             };
-            this.note_rename_chosen(path.clone(), to);
+            messenger.send(mtm, Message::RenameChosen { from: path.clone(), to });
         });
     }
 
@@ -709,7 +528,7 @@ impl Notes<'_> {
             }
             return;
         }
-        let started = on_own_thread(self.host.object(), move || {
+        let started = on_own_thread(self.host.object().messenger(), move || {
             let stop = AtomicBool::new(false);
             let mut texts = HashMap::new();
             let rewrites = splat_notes::renames(&tree, &from, &to, &stop, &mut |path: &Path| {
@@ -748,14 +567,14 @@ impl Notes<'_> {
         alert
             .addButtonWithTitle(&ns(t("Abbrechen")))
             .setKeyEquivalent(&ns("\u{1b}"));
-        let this = self.host.object().retain();
+        let (messenger, mtm) = (self.host.object().messenger(), self.host.mtm());
         let waiting = RefCell::new(Some((request, rewrites)));
         let handler = RcBlock::new(move |response: objc2_app_kit::NSModalResponse| {
             guarded((), || {
                 if response == NSAlertFirstButtonReturn
                     && let Some((request, rewrites)) = waiting.borrow_mut().take()
                 {
-                    this.note_rename_confirmed(request, rewrites);
+                    messenger.send(mtm, Message::RenameConfirmed(request, rewrites));
                 }
             });
         });
@@ -796,15 +615,8 @@ impl Notes<'_> {
             }
         }
         let lane = lane_of(&from);
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
-        let report = move |failed: Vec<PathBuf>| {
-            main_soon(move || {
-                let Some(mtm) = MainThreadMarker::new() else { return };
-                if let Some(c) = me.get(mtm).load() {
-                    c.note_answer(NoteAnswer::Renamed { failed });
-                }
-            });
-        };
+        let messenger = self.host.object().messenger();
+        let report = move |failed: Vec<PathBuf>| messenger.send_soon(Message::Notes(NoteAnswer::Renamed { failed }));
         if let Some(document) = moved_document {
             let Some(address) = to.to_str().map(|p| NSURL::fileURLWithPath(&ns(p))) else {
                 return;
@@ -871,36 +683,6 @@ impl Notes<'_> {
     }
 }
 
-fn reveal_place(editor: &super::EditorController, (line, column): (usize, usize)) {
-    let at = editor.on_source_text(move |text| place_in_text(text, line, column));
-    editor.reveal_source(crate::markdown::text::Byte::new(at));
-}
-
-/// A line and a place in it as a position of `text`, as near as the text comes: it may have changed since the search.
-fn place_in_text(text: &str, line: usize, column: usize) -> usize {
-    let bytes = text.as_bytes();
-    let mut start = 0;
-    let mut seen = 0;
-    while seen < line {
-        let Some(found) = bytes[start..].iter().position(|&b| b == b'\n' || b == b'\r') else {
-            return text.len();
-        };
-        let at = start + found;
-        start = at
-            + if bytes[at] == b'\r' && bytes.get(at + 1) == Some(&b'\n') {
-                2
-            } else {
-                1
-            };
-        seen += 1;
-    }
-    let line_end = bytes[start..]
-        .iter()
-        .position(|&b| b == b'\n' || b == b'\r')
-        .map_or(text.len(), |found| start + found);
-    text.floor_char_boundary((start + column).min(line_end))
-}
-
 /// A folder the size of a home folder asks for every permission macOS has, so of that one only its own notes show.
 fn scan_root(root: &Path, stop: &AtomicBool) -> Tree {
     if home().as_deref() == Some(root) {
@@ -930,29 +712,6 @@ pub(in crate::editor) struct Inherited {
     keep_shown: bool,
 }
 
-/// Changes to a text as one edit: from the first replacement to the last, what lies between stays as it was.
-pub(super) fn single_edit(text: &str, replacements: &[Replacement]) -> Option<crate::markdown::edit::Edit> {
-    use crate::markdown::text::Byte;
-    let start = replacements.iter().map(|r| r.range.start).min()?;
-    let end = replacements.iter().map(|r| r.range.end).max()?;
-    let mut sorted: Vec<&Replacement> = replacements.iter().collect();
-    sorted.sort_by_key(|r| r.range.start);
-    let mut replacement = String::new();
-    let mut at = start;
-    for r in sorted {
-        replacement.push_str(text.get(at..r.range.start)?);
-        replacement.push_str(&r.text);
-        at = r.range.end;
-    }
-    replacement.push_str(text.get(at..end)?);
-    let selection = Byte::new(start + replacement.len());
-    Some(crate::markdown::edit::Edit {
-        range: Byte::new(start)..Byte::new(end),
-        replacement,
-        selection: selection..selection,
-    })
-}
-
 #[cfg(feature = "selftest")]
 impl Notes<'_> {
     pub(super) fn hit_paths(&self) -> Vec<PathBuf> {
@@ -962,7 +721,7 @@ impl Notes<'_> {
     pub(super) fn tree_paths(&self) -> Vec<PathBuf> {
         let tree = self.state.tree.borrow();
         tree.iter()
-            .flat_map(|t| t.nodes.iter().filter(|n| !n.folder).map(|n| n.path.clone()))
+            .flat_map(|t| t.notes().map(|n| n.path().to_path_buf()))
             .collect()
     }
 
@@ -974,186 +733,6 @@ impl Notes<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use splat_notes::{Hit, Node};
-
-    #[test]
-    fn a_hash_sign_in_front_of_one_word_looks_for_a_tag() {
-        assert_eq!(query_of("#idee"), Some(Query::Tag("#idee".to_string())));
-        assert_eq!(
-            query_of("#idee und mehr"),
-            Some(Query::Text {
-                needle: "#idee und mehr".to_string(),
-                case_sensitive: false
-            })
-        );
-        assert_eq!(
-            query_of("#"),
-            Some(Query::Text {
-                needle: "#".to_string(),
-                case_sensitive: false
-            })
-        );
-        assert_eq!(query_of("  "), None);
-    }
-
-    #[test]
-    fn a_new_name_keeps_the_extension_and_stays_in_the_folder() {
-        let path = Path::new("/a/Alt.md");
-        assert_eq!(renamed_path(path, "Neu"), Some(PathBuf::from("/a/Neu.md")));
-        assert_eq!(renamed_path(path, " Neu "), Some(PathBuf::from("/a/Neu.md")));
-        assert_eq!(
-            renamed_path(path, "Neu.markdown"),
-            Some(PathBuf::from("/a/Neu.markdown"))
-        );
-        assert_eq!(renamed_path(path, "x/Neu"), None);
-        assert_eq!(renamed_path(path, "a:b"), None);
-        assert_eq!(renamed_path(path, ".versteckt"), None);
-        assert_eq!(renamed_path(path, ""), None);
-        assert_eq!(renamed_path(path, "Alt"), None, "nothing to do");
-    }
-
-    #[test]
-    fn a_tree_becomes_rows_with_the_same_shape() {
-        let tree = Tree {
-            root: PathBuf::from("/r"),
-            nodes: vec![
-                Node {
-                    name: "d".to_string(),
-                    path: PathBuf::from("/r/d"),
-                    folder: true,
-                    children: vec![1],
-                },
-                Node {
-                    name: "n.md".to_string(),
-                    path: PathBuf::from("/r/d/n.md"),
-                    folder: false,
-                    children: vec![],
-                },
-            ],
-            top: vec![0],
-            cut: false,
-            unreadable: 0,
-        };
-        let (rows, roots) = rows_of_tree(&tree);
-        assert_eq!(roots, [0]);
-        assert_eq!(rows[0].kind, RowKind::Folder);
-        assert_eq!(rows[0].children, [1]);
-        assert_eq!(rows[1].kind, RowKind::Note(PathBuf::from("/r/d/n.md")));
-    }
-
-    #[test]
-    fn hits_stand_below_their_file_by_the_path_inside_the_folder() {
-        let hits = [FileHits {
-            path: PathBuf::from("/r/d/n.md"),
-            hits: vec![Hit {
-                line: 2,
-                column: 4,
-                range: 40..43,
-                context: "ein Wort".to_string(),
-                in_context: 4..8,
-            }],
-            more: true,
-        }];
-        let (rows, roots) = rows_of_hits(&hits, Some(Path::new("/r")));
-        assert_eq!(roots, [0]);
-        assert_eq!(rows[0].title, "d/n.md");
-        assert_eq!(rows[0].children, [1, 2]);
-        assert_eq!(rows[1].kind, RowKind::Hit(PathBuf::from("/r/d/n.md"), 2, 4));
-        assert_eq!(rows[1].matched, Some(4..8));
-        assert_eq!(rows[2].kind, RowKind::Remark);
-    }
-
-    #[test]
-    fn a_long_line_starts_shortly_before_its_match() {
-        assert_eq!(near_the_match("kurz Wort", 5..9), ("kurz Wort".to_string(), 5..9));
-        let line = "Ein ganz langer Satz vor dem äpfel und mehr";
-        let at = line.find("äpfel").unwrap();
-        let (shown, matched) = near_the_match(line, at..at + "äpfel".len());
-        assert_eq!(&shown[matched], "äpfel");
-        assert!(shown.starts_with('…'), "{shown}");
-        assert!(shown.len() < line.len());
-        assert_eq!(near_the_match("äöü", 0..2), ("äöü".to_string(), 0..2));
-    }
-
-    #[test]
-    fn the_status_says_what_a_search_came_to() {
-        let none: [FileHits; 0] = [];
-        assert_ne!(search_status(&none, true), search_status(&none, false));
-        let some = [FileHits {
-            path: PathBuf::from("/a.md"),
-            hits: vec![Hit {
-                line: 0,
-                column: 0,
-                range: 0..1,
-                context: "a".to_string(),
-                in_context: 0..1,
-            }],
-            more: false,
-        }];
-        let status = search_status(&some, true);
-        assert!(status.contains('1'), "{status}");
-    }
-
-    #[test]
-    fn several_replacements_make_one_edit_and_leave_what_lies_between() {
-        let text = "ein [[Alt]] und [[Alt|x]] Ende";
-        let at = |needle: usize| needle..needle + 3;
-        let edit = single_edit(
-            text,
-            &[
-                Replacement {
-                    range: at(18),
-                    text: "Neu".to_string(),
-                },
-                Replacement {
-                    range: at(6),
-                    text: "Neu".to_string(),
-                },
-            ],
-        )
-        .unwrap();
-        assert_eq!(edit.applied_to(text), "ein [[Neu]] und [[Neu|x]] Ende");
-        assert_eq!(edit.range.start.get(), 6);
-        assert_eq!(edit.range.end.get(), 21);
-        assert_eq!(single_edit(text, &[]), None);
-    }
-
-    #[test]
-    fn a_hit_is_found_again_by_its_line_whatever_ends_the_lines() {
-        assert_eq!(place_in_text("ab\ncd\nef", 1, 1), 4);
-        assert_eq!(place_in_text("ab\r\ncd\r\nef", 2, 1), 9);
-        assert_eq!(place_in_text("ab\rcd", 1, 0), 3);
-        assert_eq!(place_in_text("ab\ncd", 0, 99), 2, "not beyond its line");
-        assert_eq!(place_in_text("ab", 5, 0), 2, "the text has lost lines since");
-        assert_eq!(place_in_text("äb", 0, 1), 0, "on a letter");
-    }
-
-    #[test]
-    fn links_change_in_all_files_or_in_none() {
-        let dir = std::env::temp_dir().join(format!("splat-rewrites-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let (a, b) = (dir.join("a.md"), dir.join("b.md"));
-        std::fs::write(&a, "alt a").unwrap();
-        std::fs::write(&b, "alt b").unwrap();
-        let writes = vec![
-            (a.clone(), "alt a".to_string(), "neu a".to_string()),
-            (b.clone(), "alt b".to_string(), "neu b".to_string()),
-        ];
-        assert_eq!(write_rewrites(&writes), Vec::<PathBuf>::new());
-        assert_eq!(std::fs::read_to_string(&a).unwrap(), "neu a");
-        assert_eq!(std::fs::read_to_string(&b).unwrap(), "neu b");
-
-        std::fs::write(&b, "anders").unwrap();
-        let writes = vec![
-            (a.clone(), "neu a".to_string(), "x".to_string()),
-            (b.clone(), "neu b".to_string(), "y".to_string()),
-        ];
-        assert_eq!(write_rewrites(&writes).len(), 2, "another program changed one of them");
-        assert_eq!(std::fs::read_to_string(&a).unwrap(), "neu a", "so the other stays too");
-        assert_eq!(std::fs::read_to_string(&b).unwrap(), "anders");
-        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2, "nothing lies around");
-        std::fs::remove_dir_all(&dir).unwrap();
-    }
 
     #[test]
     fn a_folder_counts_as_the_same_file_only_with_itself() {

@@ -24,11 +24,11 @@ pub(super) fn dialog_steps() -> Vec<Step> {
         ),
         when(
             "the new table to reach the text",
-            |c| table_rows(&source(&c.e)) > table_rows(&before()),
+            |c| table_rows(&source(&c.e)) > table_rows(&before(c)),
             |c| {
                 check(
                     "the table dialog inserts a table of three by three",
-                    table_rows(&source(&c.e)) == table_rows(&before()) + 4,
+                    table_rows(&source(&c.e)) == table_rows(&before(c)) + 4,
                     &sizes(c),
                 );
             },
@@ -85,7 +85,7 @@ pub(super) fn dialog_steps() -> Vec<Step> {
             |c| {
                 check(
                     "a cancelled image dialog leaves the text",
-                    source(&c.e) == before(),
+                    source(&c.e) == before(c),
                     &sizes(c),
                 );
             },

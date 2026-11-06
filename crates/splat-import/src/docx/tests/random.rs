@@ -103,7 +103,7 @@ fn holds_formula_or_bookmark_link(markdown: &str) -> bool {
     walk_blocks(read_markdown(markdown).blocks(), &mut |block| {
         found |= matches!(block.kind, BlockKind::MathBlock { .. });
         walk_inlines(block.inlines(), &mut |inline| {
-            found |= match &inline.kind {
+            found |= match inline.kind() {
                 InlineKind::Math { .. } => true,
                 InlineKind::Link { url, .. } => url.starts_with('#'),
                 _ => false,

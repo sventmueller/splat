@@ -20,9 +20,15 @@ use splat_preview::bridge::Bridge;
 use splat_preview::layout::{Resolver, layout, relayout, reusable};
 use splat_preview::map::{Index, Shown, preview_offset};
 
-use super::common::{LIMIT, MEASURING, NOTICEABLE, STACK, Stages, applies, grows_too_fast, numbered, scales};
+use splat_testkit::timing::{LIMIT, NOTICEABLE, STACK, Scaled, Stages, alone, grows_too_fast, holds_to_time, scales};
+
+use super::common::{applies, numbered};
 
 const MAX_PAIRED: usize = 16;
+
+/// An edit in the preview reads the text it would make for as far as `MAX_CHECKED` goes, and from there on not at all, so
+/// its time grows faster up to that size and then stops; only other programs on the Mac can take it above this.
+const NOTICEABLE_IN_THE_PREVIEW: Duration = Duration::from_millis(2000);
 
 /// Says that formulas and diagrams are rendered, so that the preview takes the path of pictures with them, or not.
 struct Everything(bool);
@@ -62,7 +68,7 @@ fn exports(text: &str, rendered: bool) -> usize {
         height: 10.0,
     };
     let page = to_html(
-        text,
+        &parse(text),
         &Export {
             title: "Probe",
             figure: &|_| rendered.then(|| "<img>".to_string()),
@@ -147,7 +153,7 @@ fn consume(text: &str) -> Stages {
     let bridge = Bridge::new(&doc, &laid_out, &index).unwrap();
     let shown: usize = laid_out.blocks.iter().map(|b| b.len_u16).sum();
     let at = preview_offset(&laid_out, &index, Byte::new(middle));
-    stages.time("editing in the preview", || {
+    stages.time_noticeable_from("editing in the preview", NOTICEABLE_IN_THE_PREVIEW, || {
         for edit in [
             bridge.replace(at..at, "x"),
             bridge.replace(Shown::new(0)..Shown::new(shown), "x"),
@@ -374,8 +380,10 @@ fn pasting_text_full_of_marks_takes_linear_time() {
     ] {
         let shortest_of = |paste: &str| (0..3).map(|_| pasting(paste.to_string())).min().unwrap();
         let (small, large) = (mark.repeat(count / 4), mark.repeat(count));
+        let alone = alone();
         let (small_took, large_took) = (shortest_of(&small), shortest_of(&large));
-        if cfg!(target_arch = "aarch64") && !cfg!(debug_assertions) && !cfg!(coverage) {
+        drop(alone);
+        if holds_to_time() {
             assert!(
                 !grows_too_fast(NOTICEABLE, small_took, large_took, small.len(), large.len()),
                 "{name}: {small_took:?}, then {large_took:?}"
@@ -411,32 +419,17 @@ fn the_memory_estimate_keeps_up_with_what_a_parse_builds() {
 }
 
 #[test]
-fn hostile_documents_neither_overflow_the_stack_nor_take_quadratic_time() {
-    let _alone = MEASURING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    let cases = std::sync::Mutex::new(cases(1).into_iter().zip(cases(4)).collect::<Vec<_>>());
-    let suspects = std::sync::Mutex::new(Vec::new());
-    let workers = std::thread::available_parallelism().map_or(2, |n| n.get().min(4));
-    std::thread::scope(|scope| {
-        for _ in 0..workers {
-            scope.spawn(|| {
-                loop {
-                    let Some(((name, small), (_, large))) = cases.lock().unwrap().pop() else {
-                        return;
-                    };
-                    if scales(name, small.clone(), large.clone(), consume).is_err() {
-                        suspects.lock().unwrap().push((name, small, large));
-                    }
-                }
-            });
-        }
-    });
-    // Four at a time they share the caches and the memory bus, and a large document that meets a busy moment looks like more
-    // than linear work; alone there is nothing else to blame.
-    let failures: Vec<String> = suspects
-        .into_inner()
-        .unwrap()
+fn hostile_documents_neither_overflow_the_stack_nor_take_quadratic_time_or_memory() {
+    let cases = cases(1)
         .into_iter()
-        .filter_map(|(name, small, large)| scales(name, small, large, consume).err())
+        .zip(cases(4))
+        .map(|((name, small), (_, large))| Scaled {
+            name,
+            small: small.into(),
+            large: large.into(),
+            work: consume,
+        })
         .collect();
+    let failures = scales::<str>(cases);
     assert!(failures.is_empty(), "{failures:#?}");
 }

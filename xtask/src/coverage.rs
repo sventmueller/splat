@@ -41,12 +41,14 @@ pub(crate) const NO_FLOOR: [(&str, &str); 1] = [(
 )];
 
 /// The modules that need no window, which `cargo test` measures alone; CI holds them to the floors.
-pub(crate) const LIBRARY: [&str; 7] = [
+pub(crate) const LIBRARY: [&str; 9] = [
+    "crates/splat-editor-state/",
     "crates/splat-file-state/",
     "crates/splat-git/",
     "crates/splat-import/",
     "crates/splat-markdown/",
     "crates/splat-notes/",
+    "crates/splat-ooxml/",
     "crates/splat-preview/",
     "crates/splat-i18n/",
 ];

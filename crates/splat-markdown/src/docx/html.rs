@@ -2,11 +2,9 @@
 //! with joined cells and the content of `<details>`, which Word shows unfolded.
 
 use super::xml::{Line, ParaProps, ParaStyle, Props, Runs};
-use super::{WordCtx, Writer, asked_size, cell_paragraph, cell_start};
+use super::{WordCtx, Writer, asked_size, cell_paragraph, cell_start, word_follows};
 use crate::doc::Align;
-use crate::markup::{self, Element, Node, raw_text};
-use crate::style::styled_element;
-use crate::url::{is_harmless, is_web_or_mail};
+use crate::markup::{self, AddressFor, Destination, Element, Node, Role, destination, raw_text};
 
 /// The highest number a list in Word can start with.
 const MAX_START: usize = i32::MAX as usize;
@@ -69,23 +67,11 @@ impl Writer<'_> {
     }
 
     fn html_element(&mut self, e: &Element, para: &HtmlPara, props: Props, runs: &mut Runs) {
-        if let Some(kind) = styled_element(&e.name) {
-            self.html_nodes(&e.children, para, props.inside(&kind), runs);
-            return;
-        }
-        match e.name.as_str() {
-            "br" => runs.line_break(),
-            "img" => {
-                let alt = e.attr("alt").unwrap_or("");
-                match e.attr("src").filter(|s| is_harmless(s)).and_then(self.export.image) {
-                    Some(picture) => {
-                        let picture = asked_size(picture, e.pixels("width"), e.pixels("height"));
-                        runs.picture(&self.picture(picture, alt));
-                    }
-                    None => runs.push(alt, props),
-                }
-            }
-            "a" => match e.attr("href").filter(|h| is_web_or_mail(h)) {
+        match e.role {
+            Role::Look(look) => self.html_nodes(&e.children, para, props.nested_in(&look.inline_kind()), runs),
+            Role::LineBreak => runs.line_break(),
+            Role::Picture => self.html_picture(e, props, runs),
+            Role::Link => match e.attr("href").filter(|h| word_follows(h)) {
                 Some(href) => {
                     let mut inner = Runs::default();
                     self.html_nodes(&e.children, para, props.linked(), &mut inner);
@@ -93,30 +79,36 @@ impl Writer<'_> {
                 }
                 None => self.html_nodes(&e.children, para, props, runs),
             },
-            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+            Role::Heading(level) => {
                 self.html_flush(para, runs);
                 let heading = HtmlPara {
-                    style: e.name[1..].parse().ok().map(ParaStyle::Heading),
+                    style: Some(ParaStyle::Heading(level)),
                     align: e.align().or(para.align),
                     ..para.clone()
                 };
                 self.html_nodes(&e.children, &heading, props, runs);
                 self.html_flush(&heading, runs);
             }
-            name if markup::makes_paragraphs(name) || matches!(name, "dt" | "dd") => {
+            Role::Paragraph
+            | Role::Division
+            | Role::Center
+            | Role::Section
+            | Role::Summary
+            | Role::Term
+            | Role::Definition => {
                 self.html_flush(para, runs);
                 let block = HtmlPara {
                     align: e
                         .align()
-                        .or((e.name == "center").then_some(Align::Center))
+                        .or((e.role == Role::Center).then_some(Align::Center))
                         .or(para.align),
                     ..para.clone()
                 };
-                let props = props.bold(props.text.bold || matches!(e.name.as_str(), "summary" | "dt"));
+                let props = props.bold(props.text.bold || matches!(e.role, Role::Summary | Role::Term));
                 self.html_nodes(&e.children, &block, props, runs);
                 self.html_flush(&block, runs);
             }
-            "blockquote" => {
+            Role::Quote => {
                 self.html_flush(para, runs);
                 let quote = HtmlPara {
                     quote: true,
@@ -125,40 +117,77 @@ impl Writer<'_> {
                 self.html_nodes(&e.children, &quote, props, runs);
                 self.html_flush(&quote, runs);
             }
-            "ul" | "ol" => {
+            Role::List { ordered } => {
                 self.html_flush(para, runs);
-                let id = if e.name == "ol" {
-                    self.numbers
-                        .push(e.attr("start").and_then(|s| s.parse().ok()).unwrap_or(1).min(MAX_START));
-                    self.numbers.len() + 1
-                } else {
-                    1
-                };
-                let level = para.list.map_or(0, |(_, l)| l + 1);
-                for item in e.children.iter().filter_map(Node::element).filter(|i| i.name == "li") {
-                    let item_para = HtmlPara {
-                        list: Some((id, level)),
-                        ..para.clone()
-                    };
-                    self.html_nodes(&item.children, &item_para, props, runs);
-                    self.html_flush(&item_para, runs);
-                }
+                self.html_list(e, ordered, para, props, runs);
             }
-            "pre" => {
+            Role::Preformatted => {
                 self.html_flush(para, runs);
                 let mut code = String::new();
                 raw_text(&e.children, &mut code);
                 self.code(code.trim_matches('\n'));
             }
-            "hr" => {
+            Role::Rule => {
                 self.html_flush(para, runs);
                 self.draw_rule(Line::Bottom);
             }
-            "table" => {
+            Role::Table => {
                 self.html_flush(para, runs);
                 self.html_table(e, props);
             }
-            _ => self.html_nodes(&e.children, para, props, runs),
+            // Word shows `<details>` unfolded, a definition list as paragraphs with its terms in bold, and of a
+            // `<picture>` the `<img>` among its sources.
+            Role::Details | Role::DefinitionList | Role::PictureSources => {
+                self.html_nodes(&e.children, para, props, runs);
+            }
+            // What changes nothing in Word, and parts of a list or table outside one, give way to what they hold.
+            Role::Presentational
+            | Role::ListItem
+            | Role::TableSection { .. }
+            | Role::TableRow
+            | Role::TableCell { .. }
+            | Role::Unknown => self.html_nodes(&e.children, para, props, runs),
+            Role::Empty | Role::Input | Role::Dropped => {}
+        }
+    }
+
+    fn html_picture(&mut self, e: &Element, props: Props, runs: &mut Runs) {
+        let alt = e.attr("alt").unwrap_or("");
+        let src = e.attr("src").filter(|src| match destination(src, AddressFor::Picture) {
+            Destination::Web | Destination::Relative => true,
+            // The pictures of a Word file come from files and the web.
+            Destination::PictureData | Destination::Mail | Destination::Refused => false,
+        });
+        match src.and_then(self.export.image) {
+            Some(picture) => {
+                let picture = asked_size(picture, e.pixels("width"), e.pixels("height"));
+                runs.picture(&self.picture(picture, alt));
+            }
+            None => runs.push(alt, props),
+        }
+    }
+
+    fn html_list(&mut self, e: &Element, ordered: bool, para: &HtmlPara, props: Props, runs: &mut Runs) {
+        let id = if ordered {
+            self.numbers
+                .push(e.attr("start").and_then(|s| s.parse().ok()).unwrap_or(1).min(MAX_START));
+            self.numbers.len() + 1
+        } else {
+            1
+        };
+        let level = para.list.map_or(0, |(_, l)| l + 1);
+        for item in e
+            .children
+            .iter()
+            .filter_map(Node::element)
+            .filter(|i| i.role == Role::ListItem)
+        {
+            let item_para = HtmlPara {
+                list: Some((id, level)),
+                ..para.clone()
+            };
+            self.html_nodes(&item.children, &item_para, props, runs);
+            self.html_flush(&item_para, runs);
         }
     }
 
@@ -181,7 +210,7 @@ impl Writer<'_> {
         for (row, in_head) in rows {
             self.raw("<w:tr>");
             for cell in row.cells() {
-                let header = in_head || cell.name == "th";
+                let header = in_head || cell.role == (Role::TableCell { header: true });
                 self.raw(&cell_start(cell.span(), header));
                 let mut runs = Runs::default();
                 let cell_para = HtmlPara {

@@ -8,16 +8,16 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::sel;
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceCustomization, NSLayoutConstraint, NSScrollView, NSSplitViewItem, NSTextInputClient,
-    NSTextView, NSWindow, NSWindowStyleMask,
+    NSAppearance, NSAppearanceCustomization, NSLayoutConstraint, NSLayoutXAxisAnchor, NSLayoutYAxisAnchor,
+    NSScrollView, NSSplitViewItem, NSTextInputClient, NSTextView, NSView, NSWindowStyleMask,
 };
-use objc2_foundation::{NSCoder, NSRange, NSRect, NSString, NSUserDefaults};
+use objc2_foundation::{NSArray, NSCoder, NSEdgeInsets, NSPoint, NSRange, NSRect, NSSize, NSString, NSUserDefaults};
 
 use super::layers::ForPanes;
 use super::sidebar::{Sidebar, SidebarTab};
 use super::views::{PreviewTextView, SourceTextView};
-use super::{scroll, string_of};
-use crate::util::{ns, perform_later, storage};
+use super::{geometry, string_of};
+use crate::util::{ns, storage};
 
 /// User defaults key of the frame the last moved or resized document window had.
 pub(super) const FRAME_KEY: &str = "DocumentWindowFrame";
@@ -69,7 +69,7 @@ pub(super) struct PaneState {
 }
 
 /// One of the two text views.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Side {
     Source,
     Preview,
@@ -91,9 +91,18 @@ impl<'a> Views<'a> {
     }
 }
 
-/// A text view that can only be asked things. Its layout queries may lay it out, which is not a change of what it holds.
+/// A text view that can only be asked things, as can its scroll view. Its layout queries may lay it out, which is not a
+/// change of what it holds.
 #[derive(Clone, Copy)]
 pub(super) struct ViewReader<'a>(&'a NSTextView);
+
+/// The edges of a pane's scroll view that what floats in a corner of it keeps to.
+pub(super) struct Edges {
+    /// The trailing edge of the scroll view.
+    pub(super) trailing: Retained<NSLayoutXAxisAnchor>,
+    /// The bottom edge of the scroll view.
+    pub(super) bottom: Retained<NSLayoutYAxisAnchor>,
+}
 
 impl<'a> ViewReader<'a> {
     pub(super) fn string(self) -> Retained<NSString> {
@@ -125,25 +134,36 @@ impl<'a> ViewReader<'a> {
         self.0.bounds()
     }
 
-    pub(super) fn window(self) -> Option<Retained<NSWindow>> {
-        self.0.window()
+    /// Whether the view's window is the key window.
+    pub(super) fn in_key_window(self) -> bool {
+        self.0.window().is_some_and(|window| window.isKeyWindow())
     }
 
-    pub(super) fn enclosing_scroll_view(self) -> Option<Retained<NSScrollView>> {
-        self.0.enclosingScrollView()
+    /// Where the view is scrolled to, as the origin of what its clip view shows.
+    pub(super) fn scroll_origin(self) -> Option<NSPoint> {
+        Some(self.0.enclosingScrollView()?.contentView().bounds().origin)
+    }
+
+    /// Whether `object` is the clip view of the view's scroll view, as a notification of its bounds names it.
+    pub(super) fn is_clip_view(self, object: &AnyObject) -> bool {
+        self.0
+            .enclosingScrollView()
+            .is_some_and(|scroll| std::ptr::eq(&*scroll.contentView() as &AnyObject, object))
+    }
+
+    /// How much of the pane a scroller takes away from the text; an overlay scroller takes nothing.
+    pub(super) fn scroller_room(self) -> f64 {
+        self.0.enclosingScrollView().map_or(0.0, |scroll| {
+            (scroll.bounds().size.width - scroll.documentVisibleRect().size.width).max(0.0)
+        })
     }
 
     pub(super) fn effective_appearance(self) -> Retained<NSAppearance> {
         self.0.effectiveAppearance()
     }
 
-    /// TextKit 2 lays out only what is in view; asking for `layoutManager` instead would switch the view back for good.
-    pub(super) fn uses_text_kit_2(self) -> bool {
-        self.0.textLayoutManager().is_some()
-    }
-
     pub(super) fn char_rect(self, index: usize) -> NSRect {
-        scroll::char_rect(self.0, index)
+        geometry::char_rect(self.0, index)
     }
 
     /// A rectangle of the view in the coordinates of `other`.
@@ -152,11 +172,11 @@ impl<'a> ViewReader<'a> {
     }
 
     pub(super) fn top_offset(self) -> Option<usize> {
-        scroll::top_offset(self.0)
+        geometry::top_offset(self.0)
     }
 
     pub(super) fn offset_at(self, y: f64) -> Option<usize> {
-        scroll::offset_at(self.0, y)
+        geometry::offset_at(self.0, y)
     }
 }
 
@@ -227,6 +247,93 @@ impl<'a> Panes<'a> {
     pub(super) fn silently<R>(&self, f: impl for<'v> FnOnce(Views<'v>) -> R) -> R {
         let views = self.views();
         crate::util::with_raised(&self.state.busy, || f(views))
+    }
+
+    /// Scrolls the view of `side` to `origin` as the controller's own change.
+    pub(super) fn scroll_silently(&self, side: Side, origin: NSPoint) {
+        self.silently(|views| {
+            if let Some(scroll) = views.of(side).enclosingScrollView() {
+                let clip = scroll.contentView();
+                clip.scrollToPoint(origin);
+                scroll.reflectScrolledClipView(&clip);
+            }
+        });
+    }
+
+    /// Lets the end of the text of `side` scroll up by `room`, clear of what floats over the bottom of its pane, while the
+    /// rest still scrolls beneath it.
+    pub(super) fn leave_room_below(&self, side: Side, room: f64) {
+        self.silently(|views| {
+            let Some(scroll) = views.of(side).enclosingScrollView() else {
+                return;
+            };
+            if (scroll.contentInsets().bottom - room).abs() < 0.5 {
+                return;
+            }
+            scroll.setAutomaticallyAdjustsContentInsets(false);
+            scroll.setContentInsets(NSEdgeInsets {
+                top: 0.0,
+                left: 0.0,
+                bottom: room,
+                right: 0.0,
+            });
+        });
+    }
+
+    /// Leaves `room` above the preview's scroll view in its pane, for the bar that stands there.
+    pub(super) fn leave_room_above_preview(&self, room: f64) {
+        self.silently(|views| {
+            let Some(scroll) = views.preview.enclosingScrollView() else {
+                return;
+            };
+            // SAFETY: The result is retained on return, and a pane's scroll view stays where the window put it.
+            let Some(pane) = (unsafe { scroll.superview() }) else {
+                return;
+            };
+            let bounds = pane.bounds();
+            let height = (bounds.size.height - room).max(0.0);
+            scroll.setFrame(NSRect::new(bounds.origin, NSSize::new(bounds.size.width, height)));
+        });
+    }
+
+    /// The pane of `side`, which holds its scroll view and what floats beside it.
+    fn pane(&self, side: Side) -> Option<(Retained<NSScrollView>, Retained<NSView>)> {
+        let scroll = self.views().of(side).enclosingScrollView()?;
+        // SAFETY: The result is retained on return, and a pane's scroll view stays where the window put it.
+        let pane = unsafe { scroll.superview() }?;
+        Some((scroll, pane))
+    }
+
+    /// Whether `view` floats in the pane of `side`.
+    pub(super) fn floats_beside(&self, side: Side, view: &NSView) -> bool {
+        // SAFETY: The result is retained on return, and only the main thread changes this view's place.
+        let parent = unsafe { view.superview() };
+        self.pane(side)
+            .zip(parent)
+            .is_some_and(|((_, pane), parent)| std::ptr::eq(&*pane, &*parent))
+    }
+
+    /// Puts `view` into the pane of `side`, beside the scroll view, which lays out only what it knows of, with the
+    /// constraints `place` makes from the scroll view's edges; a view that floats there already stays as it is.
+    pub(super) fn float_beside(
+        &self,
+        side: Side,
+        view: &NSView,
+        place: impl FnOnce(&Edges) -> Vec<Retained<NSLayoutConstraint>>,
+    ) {
+        if self.floats_beside(side, view) {
+            return;
+        }
+        let Some((scroll, pane)) = self.pane(side) else {
+            return;
+        };
+        pane.addSubview(view);
+        view.setTranslatesAutoresizingMaskIntoConstraints(false);
+        let edges = Edges {
+            trailing: scroll.trailingAnchor(),
+            bottom: scroll.bottomAnchor(),
+        };
+        NSLayoutConstraint::activateConstraints(&NSArray::from_retained_slice(&place(&edges)));
     }
 
     /// The widest an image shows in the preview.
@@ -317,7 +424,7 @@ impl<'a> Panes<'a> {
         if shows {
             self.select_tab(tab);
         }
-        self.host.object().invalidateRestorableState();
+        self.host.object().invalidate_restorable_state();
         shows
     }
 
@@ -330,7 +437,7 @@ impl<'a> Panes<'a> {
             self.toggle_sidebar_pane(item);
         }
         self.select_tab(tab);
-        self.host.object().invalidateRestorableState();
+        self.host.object().invalidate_restorable_state();
     }
 
     fn select_tab(&self, tab: SidebarTab) {
@@ -409,7 +516,7 @@ impl<'a> Panes<'a> {
                 .window()
                 .map(|w| w.makeFirstResponder(Some(self.views().source)));
         }
-        self.host.object().invalidateRestorableState();
+        self.host.object().invalidate_restorable_state();
         shown
     }
 
@@ -423,7 +530,9 @@ impl<'a> Panes<'a> {
         } else {
             item.setCollapsed(!shows);
         }
-        perform_later(self.host.object(), sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
+        self.host
+            .object()
+            .perform_later(sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
         shows
     }
 
@@ -552,27 +661,6 @@ impl Panes<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_raised_flag_goes_back_to_what_it_was() {
-        let flag = Cell::new(false);
-        crate::util::with_raised(&flag, || {
-            assert!(flag.get());
-            crate::util::with_raised(&flag, || assert!(flag.get()));
-            assert!(flag.get(), "the inner one must not lower it for the outer one");
-        });
-        assert!(!flag.get());
-    }
-
-    #[test]
-    fn a_raised_flag_comes_down_after_a_panic() {
-        let flag = Cell::new(false);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            crate::util::with_raised(&flag, || panic!("contained"));
-        }));
-        assert!(outcome.is_err());
-        assert!(!flag.get(), "the callbacks would ignore the user from then on");
-    }
 
     #[test]
     fn requests_during_an_animation_count_against_each_other_not_against_the_pane() {

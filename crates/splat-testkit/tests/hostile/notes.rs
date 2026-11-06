@@ -2,15 +2,16 @@
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
-use std::time::Instant;
 
 use splat_markdown::counts::{of_doc, of_range};
 use splat_markdown::front_matter::{self, Value};
 use splat_markdown::reader::parse;
 use splat_markdown::text::bytes;
-use splat_notes::{Node, Query, Tree, applied, hits_in_text, renames, scan, search};
+use splat_notes::{Query, Tree, applied, hits_in_text, renames, scan, search};
 
-use super::common::{MEASURING, NOTICEABLE, Stages, applies, grows_too_fast, numbered, scales};
+use splat_testkit::timing::{NOTICEABLE, Scaled, Stages, alone, grows_too_fast, holds_to_time, scales};
+
+use super::common::{applies, numbered};
 
 /// Every way through the notes that a text can take, without a disk.
 fn consume_note(text: &str) -> Stages {
@@ -71,19 +72,7 @@ fn consume_note(text: &str) -> Stages {
 }
 
 fn note_tree() -> Tree {
-    let note = |name: &str| Node {
-        name: name.to_string(),
-        path: Path::new("/v").join(name),
-        folder: false,
-        children: Vec::new(),
-    };
-    Tree {
-        root: "/v".into(),
-        nodes: vec![note("Here.md"), note("Old.md")],
-        top: vec![0, 1],
-        cut: false,
-        unreadable: 0,
-    }
+    Tree::of_notes(Path::new("/v"), &["Here.md", "Old.md"])
 }
 
 /// What is hard on the notes, with every count at `quarters` fourths of its full size.
@@ -182,31 +171,18 @@ fn note_cases(quarters: usize) -> Vec<(&'static str, String)> {
 }
 
 #[test]
-fn notes_built_to_hurt_take_linear_time() {
-    let _alone = MEASURING.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    let cases = std::sync::Mutex::new(note_cases(1).into_iter().zip(note_cases(4)).collect::<Vec<_>>());
-    let suspects = std::sync::Mutex::new(Vec::new());
-    let workers = std::thread::available_parallelism().map_or(2, |n| n.get().min(4));
-    std::thread::scope(|scope| {
-        for _ in 0..workers {
-            scope.spawn(|| {
-                loop {
-                    let Some(((name, small), (_, large))) = cases.lock().unwrap().pop() else {
-                        return;
-                    };
-                    if scales(name, small.clone(), large.clone(), consume_note).is_err() {
-                        suspects.lock().unwrap().push((name, small, large));
-                    }
-                }
-            });
-        }
-    });
-    let failures: Vec<String> = suspects
-        .into_inner()
-        .unwrap()
+fn notes_built_to_hurt_take_linear_time_and_memory() {
+    let cases = note_cases(1)
         .into_iter()
-        .filter_map(|(name, small, large)| scales(name, small, large, consume_note).err())
+        .zip(note_cases(4))
+        .map(|((name, small), (_, large))| Scaled {
+            name,
+            small: small.into(),
+            large: large.into(),
+            work: consume_note,
+        })
         .collect();
+    let failures = scales::<str>(cases);
     assert!(failures.is_empty(), "{failures:#?}");
 }
 
@@ -224,7 +200,6 @@ fn the_folders_of_a_large_tree_take_linear_time() {
         root
     };
     let walk = |root: &Path| {
-        let started = Instant::now();
         let tree = scan(root, &AtomicBool::new(false));
         let query = Query::Tag("tag".into());
         let mut hits = 0;
@@ -232,13 +207,14 @@ fn the_folders_of_a_large_tree_take_linear_time() {
             hits += found.hits.len()
         });
         assert_eq!(hits, tree.notes().count());
-        started.elapsed()
     };
     let (small, large) = (tree_of(100), tree_of(400));
-    let (small_took, large_took) = (walk(&small), walk(&large));
+    let alone = alone();
+    let (small_took, large_took) = (alone.fastest(3, || walk(&small)), alone.fastest(3, || walk(&large)));
+    drop(alone);
     std::fs::remove_dir_all(&small).unwrap();
     std::fs::remove_dir_all(&large).unwrap();
-    if cfg!(target_arch = "aarch64") && !cfg!(debug_assertions) && !cfg!(coverage) {
+    if holds_to_time() {
         assert!(
             !grows_too_fast(NOTICEABLE, small_took, large_took, 100, 400),
             "{small_took:?}, then {large_took:?}"

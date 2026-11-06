@@ -3,8 +3,7 @@
 use std::time::Duration;
 
 use splat_git::diff::changes;
-
-use super::common::{NOTICEABLE, grows_too_fast, shortest_of_three};
+use splat_testkit::timing::{NOTICEABLE, alone, grows_too_fast, holds_to_time};
 
 /// Lines of about fifty bytes, each different.
 fn numbered_lines(word: &str, count: usize) -> Vec<String> {
@@ -73,9 +72,11 @@ fn texts_that_differ(count: usize) -> Vec<(&'static str, String, String)> {
 fn comparing_texts_built_to_hurt_takes_linear_time() {
     let cases = texts_that_differ(50_000).into_iter().zip(texts_that_differ(200_000));
     for ((name, small_old, small_new), (_, large_old, large_new)) in cases {
-        let small = shortest_of_three(|| drop(std::hint::black_box(changes(&small_old, &small_new))));
-        let large = shortest_of_three(|| drop(std::hint::black_box(changes(&large_old, &large_new))));
-        if cfg!(target_arch = "aarch64") && !cfg!(debug_assertions) && !cfg!(coverage) {
+        let alone = alone();
+        let small = alone.fastest(3, || drop(std::hint::black_box(changes(&small_old, &small_new))));
+        let large = alone.fastest(3, || drop(std::hint::black_box(changes(&large_old, &large_new))));
+        drop(alone);
+        if holds_to_time() {
             let too_fast = grows_too_fast(NOTICEABLE, small, large, small_old.len(), large_old.len());
             assert!(!too_fast, "{name}: {small:?}, then {large:?}");
         }
@@ -86,10 +87,9 @@ fn comparing_texts_built_to_hurt_takes_linear_time() {
 #[test]
 fn ten_megabytes_that_differ_everywhere_stay_near_150_milliseconds() {
     for (name, old, new) in texts_that_differ(200_000) {
-        let took = shortest_of_three(|| drop(std::hint::black_box(changes(&old, &new))));
+        let took = alone().fastest(3, || drop(std::hint::black_box(changes(&old, &new))));
         eprintln!("{name}: {} bytes, {took:?}", old.len());
-        // A measured build counts every line it runs, which says nothing about the time of the real one.
-        if cfg!(target_arch = "aarch64") && !cfg!(debug_assertions) && !cfg!(coverage) {
+        if holds_to_time() {
             assert!(took < Duration::from_millis(600), "{name}: {took:?}");
         }
     }

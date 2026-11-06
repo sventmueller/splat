@@ -9,10 +9,20 @@ const MAX_LOADS: u32 = 3;
 /// A key counts as in use for this many requests after the last that named it.
 const IN_USE_FOR: u64 = 8;
 
-/// Who asks for renders: one document, by a number of its own.
-pub(super) type Owner = usize;
+/// Who asks for renders: one document, by a number that no other gets while the app runs.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Owner(u64);
 
-pub(super) struct RenderQueue<K, V> {
+impl Owner {
+    /// An owner that nobody was before.
+    pub fn unique() -> Owner {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        Owner(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
+/// What waits for WebKit, what it renders now and what came of it, by key.
+pub struct RenderQueue<K, V> {
     ready: bool,
     /// Attempts to load the page since it last finished loading.
     loads: u32,
@@ -68,25 +78,25 @@ impl<K: Clone + Eq + Hash, V: Clone> Default for RenderQueue<K, V> {
 
 impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     /// The page finished loading.
-    pub(super) fn page_ready(&mut self) {
+    pub fn page_ready(&mut self) {
         self.ready = true;
         self.loads = 0;
     }
 
     /// A load of the page starts; the number of the attempt that may give up on it.
-    pub(super) fn load_started(&mut self) -> u64 {
+    pub fn load_started(&mut self) -> u64 {
         self.loads += 1;
         self.job
     }
 
     /// The time limit of the load in attempt `job` ran out: whether to try once more.
-    pub(super) fn load_timed_out(&self, job: u64) -> bool {
+    pub fn load_timed_out(&self, job: u64) -> bool {
         job == self.job && !self.ready && self.loads < MAX_LOADS
     }
 
     /// All that `owner` needs now: what is neither rendered, failed nor queued gets queued, and what nobody needs any longer
     /// leaves the queue.
-    pub(super) fn request(&mut self, owner: Owner, keys: Vec<K>) {
+    pub fn request(&mut self, owner: Owner, keys: Vec<K>) {
         self.tick += 1;
         let mut wanted = HashSet::with_capacity(keys.len());
         for key in keys {
@@ -127,7 +137,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
 
     /// `owner` is gone: what only it asked for leaves the queue, what another asked for too goes to that one, and all it
     /// holds counts as no longer in use.
-    pub(super) fn forget(&mut self, owner: Owner) {
+    pub fn forget(&mut self, owner: Owner) {
         self.wanted.remove(&owner);
         self.turns.retain(|o| *o != owner);
         for key in self.waiting.remove(&owner).unwrap_or_default() {
@@ -146,7 +156,11 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// The next key to render and the number of its attempt, if the page is free.
-    pub(super) fn next(&mut self) -> Option<(K, u64)> {
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "it hands the page its next key, which ends no iteration"
+    )]
+    pub fn next(&mut self) -> Option<(K, u64)> {
         if !self.ready || self.current.is_some() {
             return None;
         }
@@ -169,12 +183,12 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
 
     /// Whether an answer of attempt `job` still counts. One from a page that was given up on or lost may come long after
     /// its key was queued anew.
-    pub(super) fn answer_counts(&self, job: u64) -> bool {
+    pub fn answer_counts(&self, job: u64) -> bool {
         job == self.job && self.current.is_some()
     }
 
     /// The page is done with `key` and free for the next; its result follows, possibly later.
-    pub(super) fn release(&mut self, key: &K) -> bool {
+    pub fn release(&mut self, key: &K) -> bool {
         if self.current.as_ref() != Some(key) {
             return false;
         }
@@ -182,16 +196,18 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         true
     }
 
-    pub(super) fn conversion_started(&mut self) {
+    /// The result of a key is being converted on another thread.
+    pub fn conversion_started(&mut self) {
         self.converting += 1;
     }
 
-    pub(super) fn conversion_ended(&mut self) {
+    /// A conversion that started ended.
+    pub fn conversion_ended(&mut self) {
         self.converting = self.converting.saturating_sub(1);
     }
 
     /// The result for `key`; `None` means it failed. Whether it can now be shown.
-    pub(super) fn store(&mut self, key: K, result: Option<V>) -> bool {
+    pub fn store(&mut self, key: K, result: Option<V>) -> bool {
         self.pending.remove(&key);
         self.retried.remove(&key);
         match result {
@@ -207,7 +223,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// How much memory the result for `key` holds; a picture of a large diagram can take as much as a thousand formulas.
-    pub(super) fn note_size(&mut self, key: K, bytes: usize) {
+    pub fn note_size(&mut self, key: K, bytes: usize) {
         self.bytes += bytes;
         if let Some(before) = self.sizes.insert(key, bytes) {
             self.bytes -= before;
@@ -215,22 +231,23 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// The memory all results hold.
-    pub(super) fn bytes(&self) -> usize {
+    pub fn bytes(&self) -> usize {
         self.bytes
     }
 
-    pub(super) fn note_error(&mut self, key: K, message: String) {
+    /// The renderer said what went wrong with `key`.
+    pub fn note_error(&mut self, key: K, message: String) {
         self.errors.insert(key, message);
     }
 
     /// Whether attempt `job` is still running when its time limit ran out.
-    pub(super) fn timed_out(&self, job: u64) -> bool {
+    pub fn timed_out(&self, job: u64) -> bool {
         job == self.job && self.current.is_some()
     }
 
     /// WebKit went away or stopped answering: the page has to load again. The running key gets a second chance, since
     /// WebKit can go away for reasons of its own, if anybody still wants it; only a second failure counts.
-    pub(super) fn lost_page(&mut self) {
+    pub fn lost_page(&mut self) {
         if let Some(key) = self.current.take() {
             match self.owner_of(&key) {
                 Some(owner) if self.retried.insert(key.clone()) => self.enqueue(owner, key),
@@ -248,17 +265,18 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// Nothing is queued, rendering or converting.
-    pub(super) fn idle(&self) -> bool {
+    pub fn idle(&self) -> bool {
         self.waiting.values().all(VecDeque::is_empty) && self.current.is_none() && self.converting == 0
     }
 
-    pub(super) fn rendered(&self, key: &K) -> Option<&V> {
+    /// The result for `key`, once it is rendered.
+    pub fn rendered(&self, key: &K) -> Option<&V> {
         self.done.get(key)
     }
 
     /// What a finished render reports: `None` while the key is still queued, else whether it worked, with the error of
     /// the renderer if it said one.
-    pub(super) fn outcome(&self, key: &K) -> Option<Result<(), Option<String>>> {
+    pub fn outcome(&self, key: &K) -> Option<Result<(), Option<String>>> {
         if let Some(message) = self.errors.get(key) {
             return Some(Err(Some(message.clone())));
         }
@@ -271,7 +289,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     /// Above `limit` results or `budget` bytes, drops what no open document needs or asked for in its last few requests, and
     /// returns it. Results still in use stay, however many there are: dropping them would only make the documents request
     /// them again.
-    pub(super) fn evict(&mut self, limit: usize, budget: usize) -> Vec<K> {
+    pub fn evict(&mut self, limit: usize, budget: usize) -> Vec<K> {
         if self.done.len() + self.failed.len() <= limit && self.bytes <= budget {
             return Vec::new();
         }
@@ -298,8 +316,8 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
 mod tests {
     use super::*;
 
-    const ONE: Owner = 1;
-    const OTHER: Owner = 2;
+    const ONE: Owner = Owner(1);
+    const OTHER: Owner = Owner(2);
 
     fn ready() -> RenderQueue<&'static str, u32> {
         let mut q = RenderQueue::default();

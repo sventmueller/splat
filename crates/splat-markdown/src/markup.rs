@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 
-use super::doc::Align;
+use super::doc::{Align, InlineKind};
 
 /// An element or text, with byte ranges into the HTML it was read from.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,13 +31,13 @@ impl Node {
     }
 }
 
-/// The first element named `name` among `nodes` and what they hold.
-pub fn find<'n>(nodes: &'n [Node], name: &str) -> Option<&'n Element> {
+/// The first element of `role` among `nodes` and what they hold.
+pub fn find(nodes: &[Node], role: Role) -> Option<&Element> {
     nodes.iter().filter_map(Node::element).find_map(|e| {
-        if e.name == name {
+        if e.role == role {
             Some(e)
         } else {
-            find(&e.children, name)
+            find(&e.children, role)
         }
     })
 }
@@ -47,60 +47,279 @@ pub fn raw_text(nodes: &[Node], out: &mut String) {
     for n in nodes {
         match n {
             Node::Text { text, .. } => out.push_str(text),
-            Node::Element(e) if e.name == "br" => out.push('\n'),
+            Node::Element(e) if e.role == Role::LineBreak => out.push('\n'),
             Node::Element(e) => raw_text(&e.children, out),
         }
     }
 }
 
-/// What an element is to the preview and the exports: everything said about elements by name, in one place.
-#[derive(Clone, Copy, Default)]
-struct ElementTraits {
-    /// It has no content and no closing tag.
-    void: bool,
-    /// Its opening closes an open `<p>`, as browsers do.
-    block: bool,
-    /// It makes paragraphs of its content, whatever else it means to a browser.
-    paragraphs: bool,
-    /// An exported page keeps it, as GitHub allows it; any other element gives way to its content.
-    kept: bool,
+/// What an element of embedded HTML is to the preview, the exports and the word count. Its name is read into it once,
+/// in [`Role::of`], and every writer says for each role what it makes of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Role {
+    /// Changes only how what it holds looks: `<b>`, `<em>`, `<kbd>`, `<span>` and the like.
+    Look(Look),
+    /// `<big>`, `<font>` and `<time>`: what they hold shows unchanged, and an exported page leaves out their tags.
+    Presentational,
+    /// `<a>`, a link around what it holds.
+    Link,
+    /// `<br>`.
+    LineBreak,
+    /// `<img>`.
+    Picture,
+    /// `<picture>`, which offers sources of one picture and an `<img>` among them.
+    PictureSources,
+    /// `<h1>` to `<h6>`, with the level.
+    Heading(u8),
+    /// `<p>`.
+    Paragraph,
+    /// `<div>`.
+    Division,
+    /// `<center>`, a division that centers what it holds.
+    Center,
+    /// `<section>`, `<article>`, `<header>`, `<footer>`, `<main>`, `<nav>`, `<aside>`, `<figure>`, `<figcaption>` and
+    /// `<address>`, which group paragraphs.
+    Section,
+    /// `<blockquote>`.
+    Quote,
+    /// `<pre>`, text that keeps its line breaks and spaces.
+    Preformatted,
+    /// `<hr>`, a horizontal rule.
+    Rule,
+    /// `<ul>`, or `<ol>` with numbered items.
+    List {
+        /// Whether it is `<ol>`.
+        ordered: bool,
+    },
+    /// `<li>`, an item of a list.
+    ListItem,
+    /// `<dl>`, terms with what explains them.
+    DefinitionList,
+    /// `<dt>`, a term.
+    Term,
+    /// `<dd>`, what explains a term.
+    Definition,
+    /// `<table>`.
+    Table,
+    /// `<thead>`, `<tbody>` or `<tfoot>`, a group of rows.
+    TableSection {
+        /// Whether it is `<thead>`, whose cells are headers.
+        head: bool,
+    },
+    /// `<tr>`, a row.
+    TableRow,
+    /// `<td>`, or `<th>` for a header.
+    TableCell {
+        /// Whether it is `<th>`.
+        header: bool,
+    },
+    /// `<details>`, which shows what it holds below its summary only when it is open.
+    Details,
+    /// `<summary>`, the title of `<details>`.
+    Summary,
+    /// `<source>`, `<meta>`, `<link>`, `<wbr>`, `<col>` and `<area>`: no content and nothing to show.
+    Empty,
+    /// `<input>`, a form field without content, which reading leaves out.
+    Input,
+    /// Scripts, styles, frames and forms, which reading leaves out with all they hold, as they run code, load pages or
+    /// ask for input.
+    Dropped,
+    /// Any other element, which gives way to what it holds.
+    Unknown,
 }
 
-fn traits(name: &str) -> ElementTraits {
-    let (void, block, paragraphs, kept) = match name {
-        "br" | "img" => (true, false, false, true),
-        "hr" => (true, true, false, true),
-        "input" | "source" | "meta" | "link" | "wbr" | "col" | "area" => (true, false, false, false),
-        "p" | "div" | "center" | "summary" => (false, true, true, true),
-        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "ul" | "ol" | "li" | "table" | "tr" | "td" | "th" | "blockquote"
-        | "pre" | "details" | "dl" | "dt" | "dd" => (false, true, false, true),
-        "section" | "article" | "header" | "footer" | "main" | "nav" | "aside" | "figure" | "figcaption"
-        | "address" => (false, false, true, true),
-        "span" | "b" | "strong" | "i" | "em" | "u" | "ins" | "s" | "del" | "strike" | "mark" | "sup" | "sub"
-        | "code" | "kbd" | "samp" | "tt" | "a" | "thead" | "tbody" | "tfoot" | "small" | "abbr" | "cite" | "q"
-        | "dfn" | "var" => (false, false, false, true),
-        _ => (false, false, false, false),
-    };
-    ElementTraits {
-        void,
-        block,
-        paragraphs,
-        kept,
+/// How an element in the role [`Role::Look`] makes what it holds look.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Look {
+    /// `<b>` and `<strong>`.
+    Strong,
+    /// `<i>`, `<em>`, `<cite>`, `<dfn>` and `<var>`.
+    Emph,
+    /// `<s>`, `<del>` and `<strike>`.
+    Strikethrough,
+    /// `<u>` and `<ins>`.
+    Underline,
+    /// `<mark>`.
+    Highlight,
+    /// `<sup>`.
+    Superscript,
+    /// `<sub>`.
+    Subscript,
+    /// `<kbd>`, `<code>`, `<samp>` and `<tt>`.
+    Code,
+    /// `<span>`, `<small>`, `<abbr>` and `<q>`, which only group text.
+    Plain,
+}
+
+impl Look {
+    /// The inline that looks the same.
+    pub fn inline_kind(self) -> InlineKind {
+        match self {
+            Look::Strong => InlineKind::Strong,
+            Look::Emph => InlineKind::Emph,
+            Look::Strikethrough => InlineKind::Strikethrough,
+            Look::Underline => InlineKind::Underline,
+            Look::Highlight => InlineKind::Highlight,
+            Look::Superscript => InlineKind::Superscript,
+            Look::Subscript => InlineKind::Subscript,
+            Look::Code => InlineKind::Kbd,
+            Look::Plain => InlineKind::Span,
+        }
+    }
+}
+
+impl Role {
+    /// The role of an element named `name`, in lower case.
+    pub fn of(name: &str) -> Role {
+        match name {
+            "b" | "strong" => Role::Look(Look::Strong),
+            "i" | "em" | "cite" | "dfn" | "var" => Role::Look(Look::Emph),
+            "s" | "del" | "strike" => Role::Look(Look::Strikethrough),
+            "u" | "ins" => Role::Look(Look::Underline),
+            "mark" => Role::Look(Look::Highlight),
+            "sup" => Role::Look(Look::Superscript),
+            "sub" => Role::Look(Look::Subscript),
+            "kbd" | "code" | "samp" | "tt" => Role::Look(Look::Code),
+            "span" | "small" | "abbr" | "q" => Role::Look(Look::Plain),
+            "big" | "font" | "time" => Role::Presentational,
+            "a" => Role::Link,
+            "br" => Role::LineBreak,
+            "img" => Role::Picture,
+            "picture" => Role::PictureSources,
+            "h1" => Role::Heading(1),
+            "h2" => Role::Heading(2),
+            "h3" => Role::Heading(3),
+            "h4" => Role::Heading(4),
+            "h5" => Role::Heading(5),
+            "h6" => Role::Heading(6),
+            "p" => Role::Paragraph,
+            "div" => Role::Division,
+            "center" => Role::Center,
+            "section" | "article" | "header" | "footer" | "main" | "nav" | "aside" | "figure" | "figcaption"
+            | "address" => Role::Section,
+            "blockquote" => Role::Quote,
+            "pre" => Role::Preformatted,
+            "hr" => Role::Rule,
+            "ul" => Role::List { ordered: false },
+            "ol" => Role::List { ordered: true },
+            "li" => Role::ListItem,
+            "dl" => Role::DefinitionList,
+            "dt" => Role::Term,
+            "dd" => Role::Definition,
+            "table" => Role::Table,
+            "thead" => Role::TableSection { head: true },
+            "tbody" | "tfoot" => Role::TableSection { head: false },
+            "tr" => Role::TableRow,
+            "td" => Role::TableCell { header: false },
+            "th" => Role::TableCell { header: true },
+            "details" => Role::Details,
+            "summary" => Role::Summary,
+            "source" | "meta" | "link" | "wbr" | "col" | "area" => Role::Empty,
+            "input" => Role::Input,
+            "script" | "style" | "iframe" | "frame" | "object" | "embed" | "form" | "button" | "select"
+            | "textarea" | "template" | "noscript" | "applet" => Role::Dropped,
+            _ => Role::Unknown,
+        }
+    }
+
+    /// Whether the element has no content and no closing tag, as `<br>` and `<img>`.
+    pub fn is_void(self) -> bool {
+        matches!(
+            self,
+            Role::LineBreak | Role::Picture | Role::Rule | Role::Empty | Role::Input
+        )
+    }
+
+    /// Whether the element makes paragraphs of what it holds, whatever else it means to a browser.
+    pub fn makes_paragraphs(self) -> bool {
+        matches!(
+            self,
+            Role::Paragraph | Role::Division | Role::Center | Role::Summary | Role::Section
+        )
+    }
+
+    /// Whether its opening tag closes an open `<p>`, as browsers do.
+    fn is_block(self) -> bool {
+        matches!(
+            self,
+            Role::Paragraph
+                | Role::Division
+                | Role::Center
+                | Role::Summary
+                | Role::Heading(_)
+                | Role::List { .. }
+                | Role::ListItem
+                | Role::Table
+                | Role::TableRow
+                | Role::TableCell { .. }
+                | Role::Quote
+                | Role::Preformatted
+                | Role::Details
+                | Role::DefinitionList
+                | Role::Term
+                | Role::Definition
+                | Role::Rule
+        )
+    }
+
+    /// Whether reading leaves the element out, with all it holds.
+    fn is_dropped(self) -> bool {
+        matches!(self, Role::Dropped | Role::Input)
     }
 }
 
 /// Whether an element of this name has no content and no closing tag, as `<br>` and `<img>`.
 pub fn is_void(name: &str) -> bool {
-    traits(name).void
+    Role::of(name).is_void()
 }
 
-/// Whether an element of this name makes paragraphs of its content, as `<p>`, `<div>` and `<section>` do.
-pub fn makes_paragraphs(name: &str) -> bool {
-    traits(name).paragraphs
+/// What an address in a link or a picture is used for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AddressFor {
+    /// A link, which leads somewhere on a click.
+    Link,
+    /// A picture, which is loaded and shown.
+    Picture,
 }
 
-pub(crate) fn kept_in_exports(name: &str) -> bool {
-    traits(name).kept
+/// Where an address in a document leads, which decides what each writer keeps of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Destination {
+    /// A page or a picture on the web: `http` or `https`.
+    Web,
+    /// A mail to write, `mailto`, as a link only.
+    Mail,
+    /// A path relative to the document, or an anchor in it.
+    Relative,
+    /// A picture inside the address, a `data:` URL of PNG, JPEG, GIF or WebP, as a picture only.
+    PictureData,
+    /// Any other scheme, as `javascript:` or `file:`, which nothing may follow.
+    Refused,
+}
+
+/// Where `url` leads as an address used for `used_for`: the one judgement of addresses for the preview and both
+/// exports.
+pub fn destination(url: &str, used_for: AddressFor) -> Destination {
+    const PICTURE_DATA: [&str; 4] = [
+        "data:image/png;",
+        "data:image/jpeg;",
+        "data:image/gif;",
+        "data:image/webp;",
+    ];
+    match (super::url::scheme(url).as_deref(), used_for) {
+        (None, _) => Destination::Relative,
+        (Some("http" | "https"), _) => Destination::Web,
+        (Some("mailto"), AddressFor::Link) => Destination::Mail,
+        (Some("data"), AddressFor::Picture) => {
+            let lower = url.trim().to_ascii_lowercase();
+            if PICTURE_DATA.iter().any(|kind| lower.starts_with(kind)) {
+                Destination::PictureData
+            } else {
+                Destination::Refused
+            }
+        }
+        _ => Destination::Refused,
+    }
 }
 
 /// An HTML element with its attributes and content, and where it stands in the HTML it was read from, in bytes.
@@ -108,6 +327,8 @@ pub(crate) fn kept_in_exports(name: &str) -> bool {
 pub struct Element {
     /// The tag name in lower case.
     pub name: String,
+    /// What the element is, read from its name.
+    pub role: Role,
     /// The attributes in source order, names in lower case and values with entities decoded.
     pub attrs: Vec<(String, String)>,
     /// The elements and text inside it.
@@ -146,15 +367,15 @@ impl Element {
     pub fn rows(&self) -> Vec<(&Element, bool)> {
         let mut rows = Vec::new();
         for child in self.children.iter().filter_map(Node::element) {
-            match child.name.as_str() {
-                "tr" => rows.push((child, false)),
-                "thead" | "tbody" | "tfoot" => rows.extend(
+            match child.role {
+                Role::TableRow => rows.push((child, false)),
+                Role::TableSection { head } => rows.extend(
                     child
                         .children
                         .iter()
                         .filter_map(Node::element)
-                        .filter(|r| r.name == "tr")
-                        .map(|r| (r, child.name == "thead")),
+                        .filter(|r| r.role == Role::TableRow)
+                        .map(|r| (r, head)),
                 ),
                 _ => {}
             }
@@ -167,7 +388,7 @@ impl Element {
         self.children
             .iter()
             .filter_map(Node::element)
-            .filter(|c| c.name == "td" || c.name == "th")
+            .filter(|c| matches!(c.role, Role::TableCell { .. }))
     }
 
     /// How many columns a table cell spans, within what a table can take.
@@ -195,11 +416,6 @@ pub(crate) fn pixels(value: &str) -> Option<u32> {
     })
 }
 
-/// Elements dropped with everything inside them: they run code, load pages or ask for input.
-pub(crate) const DROPPED: [&str; 14] = [
-    "script", "style", "iframe", "frame", "object", "embed", "form", "input", "button", "select", "textarea",
-    "template", "noscript", "applet",
-];
 /// Elements nested deeper give way to their content: every consumer of the tree recurses, and a few kilobytes of
 /// nested tags would otherwise overflow the stack.
 const MAX_DEPTH: usize = 64;
@@ -209,6 +425,7 @@ const MAX_DEPTH: usize = 64;
 pub fn parse(html: &str) -> Vec<Node> {
     let mut stack: Vec<Element> = vec![Element {
         name: String::new(),
+        role: Role::Unknown,
         attrs: Vec::new(),
         children: Vec::new(),
         tag: 0..0,
@@ -264,15 +481,17 @@ fn open_element(
     tag: Range<usize>,
 ) -> usize {
     let end = tag.end;
-    let empty = self_closing || is_void(&name);
-    if DROPPED.contains(&name.as_str()) {
+    let role = Role::of(&name);
+    let empty = self_closing || role.is_void();
+    if role.is_dropped() {
         return if empty { end } else { skip_to_close(html, end, &name) };
     }
-    if traits(&name).block {
-        close_implicitly(stack, &name, tag.start);
+    if role.is_block() {
+        close_implicitly(stack, role, tag.start);
     }
     let element = Element {
         name,
+        role,
         attrs,
         children: Vec::new(),
         tag: tag.clone(),
@@ -314,18 +533,23 @@ fn pop(stack: &mut Vec<Element>, end: usize, closed: bool) {
 }
 
 /// A new `<li>` ends the open one, a new row or cell the open one and all it holds, a block element an open `<p>`.
-fn close_implicitly(stack: &mut Vec<Element>, name: &str, at: usize) {
-    let ends = |open: &str| match name {
-        "li" => open == "li" || open == "p",
-        "tr" => matches!(open, "tr" | "td" | "th" | "p"),
-        "td" | "th" => matches!(open, "td" | "th" | "p"),
-        "dt" | "dd" => matches!(open, "dt" | "dd" | "p"),
-        _ => open == "p",
+fn close_implicitly(stack: &mut Vec<Element>, opening: Role, at: usize) {
+    let ends = |open: Role| match opening {
+        Role::ListItem => matches!(open, Role::ListItem | Role::Paragraph),
+        Role::TableRow => matches!(open, Role::TableRow | Role::TableCell { .. } | Role::Paragraph),
+        Role::TableCell { .. } => matches!(open, Role::TableCell { .. } | Role::Paragraph),
+        Role::Term | Role::Definition => matches!(open, Role::Term | Role::Definition | Role::Paragraph),
+        _ => open == Role::Paragraph,
     };
-    let barrier = |open: &str| matches!(open, "ul" | "ol" | "table" | "dl" | "details" | "blockquote" | "div");
-    let inside = stack.iter().rposition(|e| barrier(&e.name)).map_or(1, |b| b + 1);
-    if let Some(pos) = stack[inside..].iter().position(|e| ends(&e.name)) {
-        while stack.len() > inside + pos {
+    let barrier = |open: Role| {
+        matches!(
+            open,
+            Role::List { .. } | Role::Table | Role::DefinitionList | Role::Details | Role::Quote | Role::Division
+        )
+    };
+    let around = stack.iter().rposition(|e| barrier(e.role)).map_or(1, |b| b + 1);
+    if let Some(pos) = stack[around..].iter().position(|e| ends(e.role)) {
+        while stack.len() > around + pos {
             pop(stack, at, false);
         }
     }
@@ -609,17 +833,64 @@ mod tests {
 
     #[test]
     fn elements_are_said_to_be_one_thing_in_one_place() {
-        for name in ["b", "em", "del", "mark", "sup", "sub", "kbd", "var", "dfn", "cite", "u"] {
-            assert!(
-                crate::style::styled_element(name).is_some() && kept_in_exports(name),
-                "{name} looks different in the preview and must in a page too"
+        for (name, look) in [
+            ("b", Look::Strong),
+            ("em", Look::Emph),
+            ("del", Look::Strikethrough),
+            ("mark", Look::Highlight),
+            ("sup", Look::Superscript),
+            ("sub", Look::Subscript),
+            ("kbd", Look::Code),
+            ("var", Look::Emph),
+            ("u", Look::Underline),
+            ("abbr", Look::Plain),
+        ] {
+            assert_eq!(Role::of(name), Role::Look(look), "{name}");
+            assert_eq!(
+                crate::style::styled_element(name),
+                Some(look.inline_kind()),
+                "{name} looks the same in the preview and both exports"
             );
         }
-        for name in ["section", "div", "p", "summary"] {
-            assert!(makes_paragraphs(name) && kept_in_exports(name), "{name}");
+        assert_eq!(crate::style::styled_element("font"), Some(InlineKind::Span));
+        assert_eq!(crate::style::styled_element("div"), None);
+        for name in ["section", "div", "p", "summary", "center"] {
+            assert!(Role::of(name).makes_paragraphs(), "{name}");
         }
-        assert!(is_void("br") && !is_void("div"));
-        assert!(!kept_in_exports("script"));
+        assert!(!Role::of("li").makes_paragraphs());
+        assert!(is_void("br") && is_void("input") && !is_void("div") && !is_void("script"));
+        assert_eq!(
+            (Role::of("h4"), Role::of("ol"), Role::of("th"), Role::of("thead")),
+            (
+                Role::Heading(4),
+                Role::List { ordered: true },
+                Role::TableCell { header: true },
+                Role::TableSection { head: true }
+            )
+        );
+        assert_eq!(Role::of("blink"), Role::Unknown);
+    }
+
+    #[test]
+    fn an_address_leads_where_its_scheme_says_and_only_where_its_use_allows() {
+        use AddressFor::{Link, Picture};
+        for (url, used_for, wanted) in [
+            ("https://a.de", Link, Destination::Web),
+            ("HTTP://a.de/b.png", Picture, Destination::Web),
+            ("mailto:a@b.de", Link, Destination::Mail),
+            ("mailto:a@b.de", Picture, Destination::Refused),
+            ("bild.png", Picture, Destination::Relative),
+            ("#anker", Link, Destination::Relative),
+            ("data:image/png;base64,AA", Picture, Destination::PictureData),
+            (" DATA:image/webp;base64,AA", Picture, Destination::PictureData),
+            ("data:image/png;base64,AA", Link, Destination::Refused),
+            ("data:image/svg+xml;base64,AA", Picture, Destination::Refused),
+            ("data:text/html,x", Picture, Destination::Refused),
+            ("java\tscript:x", Link, Destination::Refused),
+            ("file:///etc/passwd", Link, Destination::Refused),
+        ] {
+            assert_eq!(destination(url, used_for), wanted, "{url:?} for {used_for:?}");
+        }
     }
 
     #[test]

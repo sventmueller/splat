@@ -18,11 +18,10 @@ use std::fmt;
 use roxmltree::Document;
 
 use crate::package::{
-    DOCUMENT_TYPE, MACRO_DOCUMENT_TYPE, MACRO_TEMPLATE_TYPE, Package, PackageError, Relationships, TEMPLATE_TYPE,
+    DOCUMENT_TYPE, MACRO_DOCUMENT_TYPE, MACRO_TEMPLATE_TYPE, Package, Relationships, TEMPLATE_TYPE, WordError,
 };
 use crate::rich::Rich;
-use crate::xml::{XmlError, parse};
-use crate::zip::ZipError;
+use crate::xml::{XmlBudget, parse};
 use body::{NotesPart, Walker};
 use numbering::Numbering;
 use package::{W, w_attr, w_val};
@@ -55,6 +54,8 @@ pub enum MissingReason {
     Absent,
     /// A part that cannot be read.
     Damaged,
+    /// A part larger than any one entry of the file may inflate to.
+    TooLarge,
     /// Bytes in no picture format a Markdown file can point to.
     UnknownFormat,
 }
@@ -65,6 +66,7 @@ impl fmt::Display for MissingReason {
             MissingReason::NoPart => "no part of the file",
             MissingReason::Absent => "not in the file",
             MissingReason::Damaged => "damaged",
+            MissingReason::TooLarge => "too large",
             MissingReason::UnknownFormat => "in no known picture format",
         })
     }
@@ -87,60 +89,11 @@ pub struct Imported {
     pub missing: Vec<MissingPicture>,
 }
 
-/// Why a Word file cannot be read.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ImportError {
-    /// Another kind of file, an old `.doc` among them.
-    NotAWordFile,
-    /// A file protected by a password.
-    Encrypted,
-    /// More than the import reads into memory.
-    TooLarge,
-    /// A Word file whose structure is broken.
-    Damaged,
-}
-
-impl fmt::Display for ImportError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            ImportError::NotAWordFile => "not a Word file in the .docx format",
-            ImportError::Encrypted => "the Word file is protected by a password",
-            ImportError::TooLarge => "the Word file is larger than an import may read",
-            ImportError::Damaged => "the Word file is damaged",
-        })
-    }
-}
-
-impl std::error::Error for ImportError {}
-
-impl From<PackageError> for ImportError {
-    fn from(error: PackageError) -> ImportError {
-        match error {
-            PackageError::NotAWordFile => ImportError::NotAWordFile,
-            PackageError::Encrypted => ImportError::Encrypted,
-            PackageError::TooLarge => ImportError::TooLarge,
-            PackageError::Damaged => ImportError::Damaged,
-        }
-    }
-}
-
-impl From<ZipError> for ImportError {
-    fn from(error: ZipError) -> ImportError {
-        PackageError::from(error).into()
-    }
-}
-
-impl From<XmlError> for ImportError {
-    fn from(error: XmlError) -> ImportError {
-        PackageError::from(error).into()
-    }
-}
-
 /// The main parts a Word file is read for.
 const MAIN_TYPES: [&str; 4] = [DOCUMENT_TYPE, TEMPLATE_TYPE, MACRO_DOCUMENT_TYPE, MACRO_TEMPLATE_TYPE];
 
-fn part_document(text: Option<&String>) -> Result<Option<Document<'_>>, ImportError> {
-    Ok(text.map(|text| parse(text)).transpose()?)
+fn part_document<'t>(text: Option<&'t String>, budget: &XmlBudget) -> Result<Option<Document<'t>>, WordError> {
+    Ok(text.map(|text| parse(text, budget)).transpose()?)
 }
 
 /// The notes of a footnotes or endnotes part by their number.
@@ -180,11 +133,16 @@ fn look_through(document: &Document, styles: &Styles) -> (bool, HashSet<String>)
 }
 
 /// The document in `bytes`, whose pictures go into `images_folder` next to the Markdown.
-pub fn import(bytes: &[u8], images_folder: &str) -> Result<Imported, ImportError> {
-    let package = Package::open(bytes, &MAIN_TYPES)?;
-    let main_text = package.text(&package.main)?.ok_or(ImportError::Damaged)?;
+pub fn import(bytes: &[u8], images_folder: &str) -> Result<Imported, WordError> {
+    import_within(bytes, images_folder, &XmlBudget::default())
+}
+
+/// `import` with the XML of all parts coming out of one `budget`.
+pub(crate) fn import_within(bytes: &[u8], images_folder: &str, budget: &XmlBudget) -> Result<Imported, WordError> {
+    let package = Package::open(bytes, &MAIN_TYPES, budget)?;
+    let main_text = package.text(&package.main)?.ok_or(WordError::Damaged)?;
     let rels = package.relationships(&package.main)?;
-    let related = |kind: &str| -> Result<Option<String>, ImportError> {
+    let related = |kind: &str| -> Result<Option<String>, WordError> {
         match rels.of_type(kind).and_then(|rel| rel.part.as_deref()) {
             Some(part) => Ok(package.text(part)?),
             None => Ok(None),
@@ -195,12 +153,13 @@ pub fn import(bytes: &[u8], images_folder: &str) -> Result<Imported, ImportError
     let footnotes_text = related("footnotes")?;
     let endnotes_text = related("endnotes")?;
 
-    let main_document = parse(&main_text)?;
-    let styles = part_document(styles_text.as_ref())?.map_or_else(Styles::default, |document| Styles::read(&document));
-    let numbering =
-        part_document(numbering_text.as_ref())?.map_or_else(Numbering::default, |document| Numbering::read(&document));
-    let footnotes = part_document(footnotes_text.as_ref())?;
-    let endnotes = part_document(endnotes_text.as_ref())?;
+    let main_document = parse(&main_text, budget)?;
+    let styles =
+        part_document(styles_text.as_ref(), budget)?.map_or_else(Styles::default, |document| Styles::read(&document));
+    let numbering = part_document(numbering_text.as_ref(), budget)?
+        .map_or_else(Numbering::default, |document| Numbering::read(&document));
+    let footnotes = part_document(footnotes_text.as_ref(), budget)?;
+    let endnotes = part_document(endnotes_text.as_ref(), budget)?;
     let foot_rels = note_rels(&package, &rels, "footnotes")?;
     let end_rels = note_rels(&package, &rels, "endnotes")?;
 
@@ -208,7 +167,7 @@ pub fn import(bytes: &[u8], images_folder: &str) -> Result<Imported, ImportError
         .root_element()
         .children()
         .find(|node| package::is_w(*node, "body"))
-        .ok_or(ImportError::Damaged)?;
+        .ok_or(WordError::Damaged)?;
     let (has_heading_1, anchors) = look_through(&main_document, &styles);
     let mut walker = Walker::new(
         &package.archive,
@@ -238,7 +197,7 @@ pub fn import(bytes: &[u8], images_folder: &str) -> Result<Imported, ImportError
     })
 }
 
-fn note_rels(package: &Package, rels: &Relationships, kind: &str) -> Result<Relationships, ImportError> {
+fn note_rels(package: &Package, rels: &Relationships, kind: &str) -> Result<Relationships, WordError> {
     match rels.of_type(kind).and_then(|rel| rel.part.as_deref()) {
         Some(part) => Ok(package.relationships(part)?),
         None => Ok(Relationships::default()),

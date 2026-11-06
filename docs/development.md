@@ -118,6 +118,7 @@ permissions for the two.
 | `cargo test --release` | unit, randomised and translation tests |
 | `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | a longer randomised search; `SPLAT_FUZZ_SEED` varies the inputs |
 | `SPLAT_I18N_ONLY=fr cargo test --release i18n` | one language, while others are incomplete |
+| `SPLAT_WITHOUT_GIT=1 cargo test --release` | on a machine without `git`: the tests of `splat-git` that compare with it pass without comparing; without the variable they fail there |
 | `cargo clippy --release --all-targets [--features selftest]` | lints, including the justification of every `unsafe` block, the length of functions and, in the library, number conversions |
 | `cargo xtask check-library` | the library builds for Linux, so nothing in it needs macOS |
 | `cargo xtask vendor check` | the JavaScript libraries match `vendor.lock` byte for byte |
@@ -127,21 +128,24 @@ permissions for the two.
 | `cargo xtask selftest typing [--by-hand]` | types through saves, with keys through the app's event queue or, with `--by-hand`, from a person: what is typed stays and shows as unsaved. Takes about a minute. On a locked screen the keys go straight to the window, and what needs the app in front reports as skipped |
 | `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | timings for opening, typing and scrolling a large file; `--keystroke-ms` fails when the fastest keystroke takes longer |
 | `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, the same result in a quarter of the time at most |
-| `cargo test --release --test hostile --test hostile_import` | documents built to overflow the stack or take quadratic time, each at two sizes whose times must grow as the text does, through parsing, layout, both exports, keystrokes and commands, and the same for repositories, notes and foreign formats, also a ZIP bomb |
+| `cargo test --release --test hostile --test hostile_import` | documents built to overflow the stack or take quadratic time or memory, each at two sizes whose time and peak memory must grow as the text does, through parsing, layout, both exports, keystrokes and commands, and the same for repositories, notes and foreign formats, also a ZIP bomb and a Word file full in every part. Time counts only with `--release` on Apple Silicon, one measurement at a time; memory counts in every build |
 | `make mutants` | faults built into `crates/splat-markdown`, `crates/splat-preview`, `crates/splat-file-state`, `crates/splat-git`, `crates/splat-import` and `crates/splat-notes` one by one, through [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); says which ones no test notices. Takes hours; `FILE=crates/splat-preview/src/bridge/mod.rs` narrows it |
 | `make fuzz` | random input through [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), which needs rustup's nightly: keystrokes that must read as a full parse, every output, edits in the preview, every command, a file that saves as it opened, foreign formats, the objects and comparisons of Git, and word counts, metadata, searches and renames. `SECONDS=600` searches longer |
 | `cargo test --release --test fuzz_seeds` | the seeds in `fuzz/seeds/` through the checks of those fuzz targets, without a fuzzer; part of every `cargo test` |
 | `cargo test --profile checked --workspace` | the tests with what a debug build checks on top: after every partial parse the blocks fit their text, and what it carries on is what the text says. Part of `make test-long` |
-| `cargo test --release --test entry_points --test structure` | from the sources: everything the system calls is guarded against panics, and modules depend downwards only |
+| `cargo test --release --test entry_points --test structure` | from the sources: everything the system calls is guarded against panics, modules depend downwards only, and the names in the tables of `docs/` exist in the code |
 | `cargo test --release --test decoder` | the decoder process decodes images and reaches neither files nor the network |
 | `make coverage` | line coverage of `cargo test` and all self-tests, through [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fails below the floors. Occupies the Mac for about five minutes, also on a locked screen |
-| `make coverage-library` | the crates `splat-markdown`, `splat-preview`, `splat-file-state`, `splat-git`, `splat-import`, `splat-notes` and `splat-i18n` against their higher floors, measured by `cargo test` alone |
+| `make coverage-library` | the crates `splat-markdown`, `splat-preview`, `splat-file-state`, `splat-git`, `splat-import`, `splat-ooxml`, `splat-notes`, `splat-editor-state` and `splat-i18n` against their higher floors, measured by `cargo test` alone |
 
-Unit tests sit next to the code they test. `crates/splat-testkit/tests/` holds what reaches the model and the preview from
-outside: the randomised tests in `robustness.rs`, which share the generator of `splat-testkit` with those of `sync.rs`, the
-documents built to hurt in `hostile.rs`, and the seeds of the fuzz targets in `fuzz_seeds.rs`. `tests/` holds what looks at
-all of the program: its sources, its translations and the decoder test, which starts the built program. Decisions in `src/editor/` that need no window live in free functions with tests of their
-own: everything the controller knows and how that changes in `state.rs`, the rules of rendering in `render_queue.rs`, the text copy in `sync.rs`, paragraph styles, fonts and colours as values in `render.rs`, what toolbar identifiers stand for in `toolbar.rs`, what a link click means in `navigation.rs`.
+Unit tests sit next to the code they test. `crates/splat-testkit/tests/` holds what reaches the model and the preview
+from outside: the randomised tests in `robustness.rs`, which share the generator of `splat-testkit` with those of
+`sync.rs` in `splat-editor-state`, the documents built to hurt in `hostile.rs`, and the seeds of the fuzz targets in
+`fuzz_seeds.rs`. `tests/` holds what looks at all of the program: its sources, its translations and the decoder test,
+which starts the built program. What the window decides without needing one lives in `crates/splat-editor-state/`, whose
+tests `make coverage-library` holds to the higher floors; in `src/editor/` the rest are free functions with tests of
+their own: paragraph styles, fonts and colours as values in `render.rs`, what toolbar identifiers stand for in
+`toolbar.rs`.
 
 A step of the window self-test waits for a named condition, not for a time; only what gives no signal, like the absence of something, keeps a pause with its reason. The self-test build runs panes and popovers without their animations, which never end without a display, and no check looks at an animation. Waiting in vain is a failed check that names what never came, a step that panics is a failed check as well, and the run goes on either way. A check that cannot say anything in this run reports `SELFTEST SKIP`: xtask lists it, and it neither passes nor fails. xtask holds each mode, and `--scenarios` of its own, to about nine tenths of its checks. The window
 self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios/`: every formatting and
@@ -187,13 +191,26 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `crates/splat-preview/`: the preview layout in `layout/`, with embedded HTML in `layout/html.rs`, and the mapping between
   preview and source (`Bridge`, `Index`). A `Bridge` refuses a layout of another version of the `Doc`.
 - `crates/splat-file-state/`: which text a file holds, in which format, and what a look at it means.
-- `crates/splat-import/`: foreign formats as Markdown through one model in `rich.rs`: HTML, RTF and separated text from the
-  clipboard, Word files with their formulas in `docx/`, a ZIP reader, the Word package that import and templates share in
-  `package.rs`, and the look of a Word template in `template/`.
+- `crates/splat-import/`: foreign formats as Markdown through one model in `rich.rs`: HTML, RTF in the code pages its
+  fonts name (`rtf/code_page.rs`) and separated text from the clipboard, Word files with their formulas in `docx/`, the
+  Word package that import and templates share in `package.rs`, one budget for all the XML of an import or a merge in
+  `xml.rs`, and the look of a Word template in `template/`.
+- `crates/splat-ooxml/`: what reading and writing Word files share: ZIP archives in `zip.rs`, read from anywhere within
+  limits and written as the export stores them, their CRC-32 checksum, and XML escaping in `xml.rs`.
 - `crates/splat-git/`: what a file holds in the last commit, read from the repository's files without the `git` program, and
-  where a text differs from it (`diff.rs`).
+  where a text differs from it (`diff.rs`); also how a Mac volume compares file names (`folded_name`).
 - `crates/splat-notes/`: the folder around a document, the search through it, what its links resolve to and what a rename
   changes in them.
+- `crates/splat-editor-state/`: what the editor window knows and decides without a window. Everything the controller
+  knows about the document and every way that changes in `state.rs`, whose fields are private; `model.rs`, which lends
+  the state and the text copy to closures that cannot reach a view; the text copy and the block bookkeeping in
+  `sync.rs`, with randomised tests; the rules of what WebKit renders when in `render_queue.rs`, and when an update runs
+  and which blocks of a large preview render when in `progress.rs`. Also what a link click means and where opening a
+  link leads (`navigation.rs`, `links.rs`), the BibTeX file (`bibtex.rs`) and the code host of the repository
+  (`repository.rs`), the sidebar's rows, searches and renames (`notes.rs`), the outline (`outline.rs`), the marks for
+  what changed since the last commit (`changes.rs`), what an edit in the preview changed and what a drop inserts
+  (`editing.rs`), new files beside a document (`files.rs`), the metadata form (`metadata.rs`), the word count
+  (`word_count.rs`), and the worker threads and `contained` (`lanes.rs`).
 - `crates/splat-i18n/` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table
   of the interface language at its start.
 - `crates/splat-testkit/`: the generator of the randomised tests and the checks of the fuzz targets.
@@ -203,18 +220,16 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | Module | Responsibility |
 |---|---|
 | `controller.rs` | class, delegate methods that forward, `invalidate`, and what the rest of the program tells an editor; only it reaches the components |
-| `panes.rs` | `Panes`: the text views, the outline, showing and hiding panes, and what gives access to the views |
-| `controller/layers.rs` | who may reach whom: a component gets a handle of the controller that offers what lies below it, and the compiler holds to that |
-| `state.rs` | what the controller knows about the document and every way that changes; its fields are private, and it touches no view |
-| `model.rs` | lends the state and the text copy to closures that cannot reach a view |
-| `actions.rs` | command registry: selector, title, shortcut, symbol, when the command applies |
+| `panes.rs` | `Panes`: the text views, the outline, showing and hiding panes, scrolling and insets of the panes, and what gives access to the views; `ViewReader` can only ask them |
+| `controller/layers.rs` | who may reach whom: a component gets a handle of the controller that offers what lies below it, and `Object`, the controller as AppKit knows it; what it needs from above or what arrives for it later goes to the controller as a `Message`, through a `Messenger` from other threads and sheets. The compiler holds to that |
+| `geometry.rs` | `TextGeometry`: where the text of a view lies and how it shows a highlight, in TextKit 2 for the source and TextKit 1 for the preview |
+| `actions.rs` | command registry: one row per command gives its `Action`, its `Spec` (selector, title, shortcut, symbol, when the command applies) and the controller's method for it |
 | `editing.rs` | `Editing`: running and validating commands, typing in the preview |
 | `update.rs` | `Updater`: parsing, colouring, updating the preview; after an edit only the affected paragraphs |
-| `sync.rs` | text copy and block bookkeeping, without AppKit and with randomised tests |
 | `progressive.rs` | `Progressive`: rendering large previews step by step |
 | `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selection and scroll position of both panes in step |
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: the formula and diagram editor |
-| `navigation.rs`, `links.rs` | `Links`: links, wiki links, tags, task checkboxes, folding, footnotes |
+| `navigation.rs` | `Links`: links, wiki links, tags, task checkboxes, folding, footnotes |
 | `env.rs` | what the preview reads from outside the text: typographic punctuation, the repository for `@name` and `#12`, the BibTeX file, embedded notes |
 | `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | preview text, local and remote images; `Pictures` in `images.rs` |
 | `attributes.rs` | text attributes; each key only gets a value of the type it expects |
@@ -224,7 +239,7 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |
 | `decoder.rs` | sandboxed helper processes that decode images and graphics |
 | `export.rs`, `outline.rs` | `Sharing`: HTML and Word export, the share file, printing; the outline sidebar |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor; the rules of what renders when, apart from WebKit |
+| `js.rs`, `mathfield.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor |
 | `webkit.rs` | calls into WebKit; only the navigation delegate's lifetime stays with `js.rs` and `mathfield.rs` |
 | `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
@@ -272,11 +287,13 @@ The source text in the left text view is the single source of truth.
    lends it to `Send` closures, and no view is `Send`, so the compiler checks this. It changes through its own methods
    only, whose tests need no window.
 3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `renders_arrived` and `image_arrived`, never in the
-   middle of an update.
+   middle of an update. What another thread, a sheet or a panel answers reaches the controller as a `Message` through a
+   `Messenger`, on the main thread and only while the window is open.
 4. Redrawing without a text change goes through `invalidate(reason)` only.
 5. The text copy is not held across a change of the source, or that change copies the whole text: `with_text` lends it
    for the length of a `Send` closure only.
-6. A new command needs an entry in `actions.rs`, a method in `controller.rs` and a branch in `Editing::perform`.
+6. A new command needs a row in `actions.rs`, which gives it its method in `controller.rs` as well, and a branch in
+   `Editing::perform`, which the compiler asks for.
 7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
    the helper process only, through `decoder::decode_native`; a test scans the sources for other calls.
 8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
@@ -293,11 +310,12 @@ The menu bar, the toolbar and the context menu all build their items from the re
 [src/editor/actions.rs](../src/editor/actions.rs), and menu validation reads there when a command applies and whether it
 shows a checkmark. A new command needs:
 
-1. a variant of `Action` with its `Spec`: selector, title, toolbar label, tooltip (starting with a verb, at most 75
-   characters), shortcut, SF Symbol and when it applies
-2. the method in `src/editor/controller.rs`
-3. a branch in `Editing::perform`
-4. its texts in every `Localizable.strings`
+1. a row of `commands!`: the variant of `Action`, its selector, when it applies and what of its `Spec` it has: title,
+   toolbar label, tooltip (starting with a verb, at most 75 characters), shortcut and SF Symbol. The same row gives
+   `src/editor/controller.rs` the method AppKit finds the command's target by
+2. a branch in `Editing::perform`, which the compiler asks for; a command with variants in a submenu reads the one
+   chosen as a `Choice` of `Action::choices`
+3. its texts in every `Localizable.strings`
 
 The test `every_command_has_a_method_and_every_method_a_command` checks that registry and methods match. Apple's
 standard shortcuts such as ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F and ⌘, stay untouched.

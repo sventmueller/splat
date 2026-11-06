@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn a_generated_file_may_be_anything_but_gives_no_panic() {
     let template = full_template();
-    assert_eq!(apply_template(b"", &template), Err(TemplateError::NotAWordFile));
+    assert_eq!(apply_template(b"", &template), Err(WordError::NotAWordFile));
     let mut parts = template_parts(DOCUMENT_TYPE);
     without_part(&mut parts, "word/styles.xml");
     without_part(&mut parts, "word/numbering.xml");

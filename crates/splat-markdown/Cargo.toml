@@ -10,15 +10,16 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-caseless = "0.2"
-comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
-entities = "1"
-splat-i18n = { path = "../splat-i18n" }
-unicode-normalization = "0.1"
-unicode-width = "0.2"
+caseless.workspace = true
+comrak = { workspace = true, features = ["shortcodes", "attributes"] }
+entities.workspace = true
+splat-i18n.workspace = true
+splat-ooxml.workspace = true
+unicode-normalization.workspace = true
+unicode-width.workspace = true
 
 [dev-dependencies]
-roxmltree = "0.21"
+roxmltree.workspace = true
 
 [features]
 selftest = []

@@ -2,18 +2,16 @@
 //! source has the focus, and replacing the preview blocks that changed. What is known after each step lies in `state`.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
-use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use objc2::rc::Weak;
-use objc2::{MainThreadMarker, Message, sel};
+use objc2::{Message as _, sel};
 use objc2_app_kit::NSTextStorage;
 use objc2_foundation::NSRange;
 
 use super::attributes::{attributed, set_typing_attributes};
-use super::layers::ForUpdater;
+use super::layers::{ForUpdater, Message};
+use super::panes::Side;
 use super::panes::Views;
 use super::render::{Live, RenderCtx};
 use super::state::{
@@ -28,93 +26,15 @@ use crate::markdown::text::TextAt;
 use crate::preview::layout::{Layout, Resolver, TopBlock};
 use crate::preview::map::Index;
 use crate::util::{
-    Lane, contained, free_in_background, from_nsrange, insert_text, ns, perform_later, shown_to_ns, storage, to_nsrange,
+    Lane, contained, free_in_background, from_nsrange, insert_text, ns, shown_to_ns, storage, to_nsrange,
 };
-
-/// Up to this many changed blocks render at once; more show as plain text first and render while idle.
-pub(super) const PROGRESSIVE_FROM: usize = 300;
-/// Blocks rendered right away around the visible part when rendering progressively.
-const EAGER_BLOCKS: usize = 120;
-/// A whole new text of this many UTF-16 units or more is parsed in the background, so the window of a large document
-/// opens before its colors and preview are ready.
-const BACKGROUND_FROM: usize = 200_000;
-
-/// Whether `invalidate` updates right away rather than through `catch_up`.
-pub(super) fn updates_at_once(why: Invalidate, len_u16: usize) -> bool {
-    match why {
-        Invalidate::Text => len_u16 < BACKGROUND_FROM,
-        Invalidate::Preview => true,
-        Invalidate::Zoom
-        | Invalidate::Appearance
-        | Invalidate::Arrivals
-        | Invalidate::RemoteAllowed
-        | Invalidate::Layout => false,
-    }
-}
-
-/// Images that finished loading and wait to be shown, by resolved path or URL.
-#[derive(Default)]
-struct Arrivals {
-    keys: RefCell<HashSet<String>>,
-    scheduled: Cell<bool>,
-}
-
-impl Arrivals {
-    /// Whether showing them still has to be scheduled.
-    fn add(&self, key: String) -> bool {
-        self.keys.borrow_mut().insert(key);
-        !self.scheduled.replace(true)
-    }
-
-    fn take(&self) -> HashSet<String> {
-        self.scheduled.set(false);
-        std::mem::take(&mut *self.keys.borrow_mut())
-    }
-
-    /// They could not be shown now and have to be scheduled again.
-    fn put_back(&self, keys: HashSet<String>) {
-        self.keys.borrow_mut().extend(keys);
-        self.scheduled.set(true);
-    }
-
-    #[cfg(feature = "selftest")]
-    fn is_scheduled(&self) -> bool {
-        self.scheduled.get()
-    }
-}
+use splat_editor_state::progress::{Arrivals, Parsing, eager_blocks, updates_at_once};
 
 #[derive(Default)]
 pub(super) struct UpdateState {
     fonts: RefCell<Option<SourceFonts>>,
     arrivals: Arrivals,
     parsing: Cell<Parsing>,
-}
-
-/// Where the background parse of a document stands. Each one holds a copy of the text, so while keys come faster than a
-/// parse only the newest waits.
-#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-enum Parsing {
-    #[default]
-    Idle,
-    Running,
-    /// Another is due when this one ends.
-    RunningWithAnotherDue,
-}
-
-impl Parsing {
-    /// What asking for a parse comes to, and whether one starts now.
-    fn asked(self) -> (Parsing, bool) {
-        match self {
-            Parsing::Idle => (Parsing::Running, true),
-            Parsing::Running | Parsing::RunningWithAnotherDue => (Parsing::RunningWithAnotherDue, false),
-        }
-    }
-
-    /// What the end of a parse comes to, and whether another one is due.
-    fn ended(self) -> (Parsing, bool) {
-        debug_assert_ne!(self, Parsing::Idle, "a parse ended that never started");
-        (Parsing::Idle, self == Parsing::RunningWithAnotherDue)
-    }
 }
 
 pub(super) struct Images {
@@ -156,17 +76,6 @@ pub(super) fn render_key(figure: &Figure, dark: bool, macros: &Arc<str>) -> js::
     }
 }
 
-/// The changed blocks rendered right away: all of them, or for a large change those around the visible block, which
-/// `visible` finds.
-fn eager_blocks(changed: Range<usize>, visible: impl FnOnce() -> usize) -> Range<usize> {
-    if changed.len() <= PROGRESSIVE_FROM {
-        return changed;
-    }
-    let near = visible().clamp(changed.start, changed.end);
-    let from = near.saturating_sub(EAGER_BLOCKS / 4).max(changed.start);
-    from..(from + EAGER_BLOCKS).min(changed.end)
-}
-
 pub(super) struct Updater<'a> {
     host: ForUpdater<'a>,
     state: &'a UpdateState,
@@ -192,9 +101,7 @@ impl Updater<'_> {
         self.host
             .model()
             .source_edited(from_nsrange(range), delta, &inserted, storage.length());
-        if let Some(document) = self.host.document() {
-            document.text_changed();
-        }
+        self.host.tell_document_text_changed();
     }
 
     /// Replaces the whole source, e.g. after loading or reverting, without an undo step. The caret and the scroll
@@ -203,8 +110,7 @@ impl Updater<'_> {
         let panes = self.host.panes();
         let source = panes.source();
         let selection = source.selected_range();
-        let clip = source.enclosing_scroll_view().map(|s| s.contentView());
-        let origin = clip.as_ref().map(|c| c.bounds().origin);
+        let origin = source.scroll_origin();
         // A plain string would take the attributes of the replaced text's first character, or TextKit's default font
         // in an empty view, until the colors arrive from the background.
         let fonts = self.state.fonts.borrow().clone();
@@ -222,11 +128,8 @@ impl Updater<'_> {
             };
             self.host.selection().set_source_selection(NSRange::new(start, 0));
         });
-        if let (Some(clip), Some(origin)) = (clip, origin) {
-            clip.scrollToPoint(origin);
-            if let Some(scroll) = source.enclosing_scroll_view() {
-                scroll.reflectScrolledClipView(&clip);
-            }
+        if let Some(origin) = origin {
+            panes.scroll_silently(Side::Source, origin);
         }
         self.host.invalidate(Invalidate::Text);
     }
@@ -275,7 +178,7 @@ impl Updater<'_> {
     /// The right one while typing in the source: runs `catch_up` once the keys pause for a moment.
     pub(super) fn schedule_update(&self) {
         if self.host.model().schedule_update() {
-            perform_later(self.host.object(), sel!(scheduledUpdateDue), 0.04, false);
+            self.host.object().perform_later(sel!(scheduledUpdateDue), 0.04, false);
         }
     }
 
@@ -294,7 +197,7 @@ impl Updater<'_> {
 
     /// Asks the shared renderer for formulas and diagrams after a short pause in typing.
     pub(super) fn schedule_render_requests(&self) {
-        perform_later(self.host.object(), sel!(requestRenders), 0.35, false);
+        self.host.object().perform_later(sel!(requestRenders), 0.35, false);
     }
 
     pub(super) fn request_renders(&self) {
@@ -314,11 +217,11 @@ impl Updater<'_> {
         });
         self.host.model().change(move |st| st.set_macros(macros));
         if current.is_empty() {
-            js::asks_for_nothing(self.host.object());
+            self.host.object().asks_for_no_renders();
             return;
         }
         let renderer = js::renderer(self.host.mtm());
-        let owner = renderer.listen(self.host.object());
+        let owner = self.host.object().listen_to(&renderer);
         let mut keys = current;
         // Rendering ahead for the other appearance makes switching instant, but not at the price of doubling the
         // work for documents full of formulas.
@@ -331,7 +234,7 @@ impl Updater<'_> {
     /// The renderer calls this when formulas and diagrams arrive, possibly while this controller is itself rendering
     /// and would see its own state half-changed; the update therefore waits for the current event to finish.
     pub(super) fn renders_arrived(&self) {
-        perform_later(self.host.object(), sel!(applyArrivedRenders), 0.0, true);
+        self.host.object().perform_later(sel!(applyArrivedRenders), 0.0, true);
     }
 
     pub(super) fn apply_arrived_renders(&self) {
@@ -365,7 +268,7 @@ impl Updater<'_> {
     /// collected, and also not wait until the last one, as a pause in arrivals would make them.
     pub(super) fn image_arrived(&self, key: String) {
         if self.state.arrivals.add(key) {
-            perform_later(self.host.object(), sel!(showArrivedImages), 0.1, true);
+            self.host.object().perform_later(sel!(showArrivedImages), 0.1, true);
         }
     }
 
@@ -375,7 +278,7 @@ impl Updater<'_> {
         let arrived = self.state.arrivals.take();
         if self.host.under_way().defers_background_results() {
             self.state.arrivals.put_back(arrived);
-            perform_later(self.host.object(), sel!(showArrivedImages), 0.1, true);
+            self.host.object().perform_later(sel!(showArrivedImages), 0.1, true);
             return;
         }
         let doc_dir = self.host.doc_dir();
@@ -409,7 +312,7 @@ impl Updater<'_> {
             });
             self.host.invalidate(Invalidate::Zoom);
         }
-        self.host.object().invalidateRestorableState();
+        self.host.object().invalidate_restorable_state();
     }
 
     pub(super) fn appearance_changed(&self) {
@@ -512,7 +415,7 @@ impl Updater<'_> {
         let env = super::env::Env::known(self.host.doc_dir(), &text);
         let macros = self.host.model().read(|st| st.macros());
         let with_layout = self.host.panes().preview_visible();
-        let me = dispatch2::MainThreadBound::new(Weak::from(self.host.object()), self.host.mtm());
+        let messenger = self.host.object().messenger();
         PARSER.run(move || {
             let current = || latest.load(std::sync::atomic::Ordering::SeqCst) == generation;
             let work = || {
@@ -538,11 +441,10 @@ impl Updater<'_> {
             };
             // Whatever became of it, the main thread hears: the next parse waits for that.
             let background = contained(work).flatten();
-            crate::util::main_soon(move || {
-                let Some(mtm) = MainThreadMarker::new() else { return };
-                if let Some(c) = me.get(mtm).load() {
-                    c.parse_ended(generation, &text, background);
-                }
+            messenger.send_soon(Message::Parsed {
+                generation,
+                text,
+                background: background.map(Box::new),
             });
         });
     }
@@ -715,79 +617,5 @@ fn images_for(dark: bool, doc_dir: Option<PathBuf>, text: &str, macros: Arc<str>
         dark,
         env: super::env::Env::known(doc_dir, text),
         macros,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_the_newest_parse_waits_behind_the_one_running() {
-        let (running, starts) = Parsing::Idle.asked();
-        assert_eq!((running, starts), (Parsing::Running, true));
-        let (due, starts) = running.asked();
-        assert_eq!((due, starts), (Parsing::RunningWithAnotherDue, false));
-        assert_eq!(due.asked(), (Parsing::RunningWithAnotherDue, false), "still one");
-        assert_eq!(due.ended(), (Parsing::Idle, true));
-        assert_eq!(running.ended(), (Parsing::Idle, false));
-    }
-
-    #[test]
-    fn small_changes_render_at_once_large_ones_around_the_visible_block() {
-        assert_eq!(eager_blocks(3..40, || unreachable!()), 3..40);
-        let changed = 10..10 + 3 * PROGRESSIVE_FROM;
-        for visible in [0, 10, 11, 500, changed.end - 1, changed.end, changed.end + 50] {
-            let eager = eager_blocks(changed.clone(), || visible);
-            assert!(eager.len() <= EAGER_BLOCKS, "{eager:?} for {visible}");
-            assert!(
-                changed.start <= eager.start && eager.end <= changed.end,
-                "{eager:?} for {visible}"
-            );
-            let seen = visible.clamp(changed.start, changed.end - 1);
-            assert!(eager.contains(&seen), "{eager:?} misses {seen}");
-        }
-    }
-
-    #[test]
-    fn images_that_arrive_together_are_shown_together() {
-        let arrivals = Arrivals::default();
-        assert!(arrivals.add("a".into()), "the first one schedules the showing");
-        assert!(!arrivals.add("b".into()), "the next ones wait for it");
-        assert_eq!(arrivals.take().len(), 2);
-        assert!(arrivals.take().is_empty());
-        assert!(
-            arrivals.add("c".into()),
-            "the next arrival after the showing schedules anew"
-        );
-    }
-
-    #[test]
-    fn images_that_could_not_be_shown_wait_with_the_ones_arriving_meanwhile() {
-        let arrivals = Arrivals::default();
-        arrivals.add("a".into());
-        arrivals.put_back(arrivals.take());
-        assert!(
-            !arrivals.add("b".into()),
-            "putting them back comes with its own schedule"
-        );
-        assert_eq!(arrivals.take().len(), 2);
-    }
-
-    #[test]
-    fn only_a_large_new_text_waits_for_the_background() {
-        assert!(updates_at_once(Invalidate::Text, 0));
-        assert!(updates_at_once(Invalidate::Text, BACKGROUND_FROM - 1));
-        assert!(!updates_at_once(Invalidate::Text, BACKGROUND_FROM));
-        assert!(updates_at_once(Invalidate::Preview, BACKGROUND_FROM));
-        for why in [
-            Invalidate::Zoom,
-            Invalidate::Appearance,
-            Invalidate::Arrivals,
-            Invalidate::RemoteAllowed,
-            Invalidate::Layout,
-        ] {
-            assert!(!updates_at_once(why, 0), "{why:?}");
-        }
     }
 }

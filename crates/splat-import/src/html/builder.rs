@@ -72,7 +72,7 @@ impl Pre {
         }
     }
 
-    /// Takes in a closing tag; whether it ends the text.
+    /// Takes in a closing tag and returns whether it ends the text.
     fn close(&mut self, name: &str) -> bool {
         if name == self.element {
             if self.nested == 0 {

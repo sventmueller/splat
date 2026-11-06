@@ -4,19 +4,17 @@ use std::cell::{Cell, OnceCell, RefCell};
 
 use objc2::rc::Retained;
 use objc2::{MainThreadOnly, define_class, msg_send, sel};
-use objc2_app_kit::{
-    NSBox, NSBoxType, NSColor, NSFont, NSLayoutConstraint, NSScrollView, NSTextField, NSTitlePosition, NSView,
-};
+use objc2_app_kit::{NSBox, NSBoxType, NSColor, NSFont, NSLayoutConstraint, NSTextField, NSTitlePosition, NSView};
 use objc2_foundation::{
-    NSArray, NSEdgeInsets, NSNumber, NSNumberFormatter, NSNumberFormatterStyle, NSObjectProtocol, NSPoint, NSRect,
-    NSSize, NSUserDefaults,
+    NSNumber, NSNumberFormatter, NSNumberFormatterStyle, NSObjectProtocol, NSPoint, NSSize, NSUserDefaults,
 };
 
 use super::layers::ForCounter;
 use super::panes::Side;
-use crate::i18n::{t, tf};
+use crate::i18n::t;
 use crate::markdown::counts::{self, Counts};
-use crate::util::{contained, ns, perform_later};
+use crate::util::{contained, ns};
+use splat_editor_state::word_count::{shows, summary};
 
 /// User defaults key of the switch in the View menu; without an answer the count stays hidden.
 const HIDDEN_KEY: &str = "HidesWordCount";
@@ -75,10 +73,6 @@ pub(super) fn is_on() -> bool {
     shows(hides)
 }
 
-fn shows(hides: Option<bool>) -> bool {
-    hides == Some(false)
-}
-
 pub(super) fn set_on(on: bool) {
     NSUserDefaults::standardUserDefaults().setBool_forKey(!on, &ns(HIDDEN_KEY));
 }
@@ -89,28 +83,6 @@ fn number(n: usize) -> String {
         NSNumberFormatterStyle::DecimalStyle,
     )
     .to_string()
-}
-
-/// What the corner says. Labels in front of the figures spare the plural forms of 35 languages.
-fn summary(of_text: Counts, of_selection: Option<Counts>, number: impl Fn(usize) -> String) -> String {
-    match of_selection {
-        Some(selected) => tf(
-            "Auswahl – Wörter: {} von {} · Zeichen: {}",
-            &[
-                &number(selected.words),
-                &number(of_text.words),
-                &number(selected.characters),
-            ],
-        ),
-        None => tf(
-            "Wörter: {} · Zeichen: {} · Lesezeit: {} Min.",
-            &[
-                &number(of_text.words),
-                &number(of_text.characters),
-                &number(of_text.reading_minutes()),
-            ],
-        ),
-    }
 }
 
 impl WordCounter<'_> {
@@ -136,7 +108,7 @@ impl WordCounter<'_> {
 
     pub(super) fn text_changed(&self) {
         if is_on() {
-            perform_later(self.host.object(), sel!(countWords), SETTLE_SECONDS, true);
+            self.host.object().perform_later(sel!(countWords), SETTLE_SECONDS, true);
         }
     }
 
@@ -206,65 +178,28 @@ impl WordCounter<'_> {
             Side::Source
         };
         let below_the_pill = if is_on() { PILL_HEIGHT + PILL_MARGIN } else { 0.0 };
-        for (each, holds_it) in [
-            (Side::Source, matches!(side, Side::Source)),
-            (Side::Preview, matches!(side, Side::Preview)),
-        ] {
-            if let Some(scroll) = panes.reader(each).enclosing_scroll_view() {
-                leave_room_below(&scroll, if holds_it { below_the_pill } else { 0.0 });
-            }
+        for each in [Side::Source, Side::Preview] {
+            panes.leave_room_below(each, if each == side { below_the_pill } else { 0.0 });
         }
-        let Some(scroll) = panes.reader(side).enclosing_scroll_view() else {
-            return;
-        };
-        // SAFETY: The result is retained on return, and only the main thread changes this view's place.
-        let parent = unsafe { pill.superview() };
-        // SAFETY: The result is retained on return, and a pane's scroll view stays where the window put it.
-        let Some(pane) = (unsafe { scroll.superview() }) else {
-            return;
-        };
-        let already_there = parent.is_some_and(|parent| std::ptr::eq(&*parent, &*pane));
-        if !already_there {
-            pane.addSubview(pill);
-            pill.setTranslatesAutoresizingMaskIntoConstraints(false);
+        panes.float_beside(side, pill, |edges| {
             let width = pill.widthAnchor().constraintEqualToConstant(pill.frame().size.width);
             let margin = pill
                 .trailingAnchor()
-                .constraintEqualToAnchor_constant(&scroll.trailingAnchor(), -PILL_MARGIN);
-            NSLayoutConstraint::activateConstraints(&NSArray::from_retained_slice(&[
-                width.clone(),
-                margin.clone(),
+                .constraintEqualToAnchor_constant(&edges.trailing, -PILL_MARGIN);
+            *self.state.width.borrow_mut() = Some(width.clone());
+            *self.state.margin.borrow_mut() = Some(margin.clone());
+            vec![
+                width,
+                margin,
                 pill.heightAnchor().constraintEqualToConstant(PILL_HEIGHT),
                 pill.bottomAnchor()
-                    .constraintEqualToAnchor_constant(&scroll.bottomAnchor(), -PILL_MARGIN),
-            ]));
-            *self.state.width.borrow_mut() = Some(width);
-            *self.state.margin.borrow_mut() = Some(margin);
-        }
+                    .constraintEqualToAnchor_constant(&edges.bottom, -PILL_MARGIN),
+            ]
+        });
         if let Some(margin) = &*self.state.margin.borrow() {
-            margin.setConstant(-(PILL_MARGIN + scroller_room(&scroll)));
+            margin.setConstant(-(PILL_MARGIN + panes.reader(side).scroller_room()));
         }
     }
-}
-
-/// Lets the end of the text scroll up clear of the pill, while the rest still scrolls beneath it.
-fn leave_room_below(scroll: &NSScrollView, room: f64) {
-    if (scroll.contentInsets().bottom - room).abs() < 0.5 {
-        return;
-    }
-    scroll.setAutomaticallyAdjustsContentInsets(false);
-    scroll.setContentInsets(NSEdgeInsets {
-        top: 0.0,
-        left: 0.0,
-        bottom: room,
-        right: 0.0,
-    });
-}
-
-/// How much of the pane a scroller takes away from the text; an overlay scroller takes nothing.
-fn scroller_room(scroll: &NSScrollView) -> f64 {
-    let bounds: NSRect = scroll.bounds();
-    (bounds.size.width - scroll.documentVisibleRect().size.width).max(0.0)
 }
 
 #[cfg(feature = "selftest")]
@@ -301,8 +236,7 @@ impl WordCounter<'_> {
     }
 
     pub(super) fn sits_in_the_rightmost_pane(&self) -> bool {
-        // SAFETY: The result is retained on return, and only the main thread changes this view's place.
-        let Some(parent) = self.state.pill.get().and_then(|p| unsafe { p.superview() }) else {
+        let Some(pill) = self.state.pill.get() else {
             return false;
         };
         let panes = self.host.panes();
@@ -311,12 +245,7 @@ impl WordCounter<'_> {
         } else {
             Side::Source
         };
-        panes
-            .reader(side)
-            .enclosing_scroll_view()
-            // SAFETY: The result is retained on return, and a pane's scroll view stays where the window put it.
-            .and_then(|scroll| unsafe { scroll.superview() })
-            .is_some_and(|pane| std::ptr::eq(&*pane, &*parent))
+        panes.floats_beside(side, pill)
     }
 
     /// Whether the last line of `view` shows, above the pill, as the view is scrolled now.
@@ -330,7 +259,7 @@ impl WordCounter<'_> {
         };
         pane.layoutSubtreeIfNeeded();
         let last = crate::util::storage(view).length().saturating_sub(1);
-        let line = view.convertRect_toView(super::scroll::char_rect(view, last), Some(&pane));
+        let line = view.convertRect_toView(super::geometry::char_rect(view, last), Some(&pane));
         let shown = view.convertRect_toView(view.visibleRect(), Some(&pane));
         let pill = pill.frame();
         let (top, bottom) = (line.origin.y, line.origin.y + line.size.height);
@@ -350,41 +279,5 @@ pub(super) fn menu_title() -> &'static str {
         t("Wortanzahl ausblenden")
     } else {
         t("Wortanzahl einblenden")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn counts(words: usize, characters: usize) -> Counts {
-        Counts {
-            words,
-            characters,
-            signs: 0,
-        }
-    }
-
-    #[test]
-    fn the_count_shows_only_once_someone_asked_for_it() {
-        assert!(!shows(None));
-        assert!(!shows(Some(true)));
-        assert!(shows(Some(false)));
-    }
-
-    #[test]
-    fn the_corner_tells_of_the_selection_as_long_as_there_is_one() {
-        let plain = |n: usize| n.to_string();
-        let whole = summary(counts(460, 2000), None, plain);
-        assert!(
-            whole.contains("460") && whole.contains("2000") && whole.contains('2'),
-            "{whole}"
-        );
-        let part = summary(counts(460, 2000), Some(counts(3, 11)), plain);
-        assert!(
-            part.contains('3') && part.contains("460") && part.contains("11"),
-            "{part}"
-        );
-        assert!(!part.contains("2000"), "{part}");
     }
 }

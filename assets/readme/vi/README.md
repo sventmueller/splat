@@ -634,6 +634,7 @@ Cách build, kiểm thử, cấu trúc mã nguồn và các quy tắc mà mã tu
 | [entities](https://github.com/p-jackson/entities) | 1 | tên của các tham chiếu ký tự HTML | MIT |
 | [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | giải nén tệp Word và đối tượng Git | MIT, Zlib hoặc Apache-2.0 |
 | [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | đọc XML của tệp Word | MIT hoặc Apache-2.0 |
+| [encoding_rs](https://github.com/hsivonen/encoding_rs) | 0.8 | đọc văn bản RTF viết bằng các bảng mã cũ | MIT hoặc Apache-2.0, BSD-3-Clause |
 | [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | tên và tìm kiếm trên các chữ cái dựng sẵn và tổ hợp | MIT hoặc Apache-2.0, Unicode-3.0 |
 | [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | giữ nguyên văn bản kiểu `:shortcode:` trong văn bản đã nhập | MIT hoặc Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | hiển thị công thức | Apache-2.0 |

@@ -86,8 +86,13 @@ impl<'a> Iterator for Entries<'a> {
     }
 }
 
-/// The name as a case-insensitive file system with Unicode folding treats it, as far as ASCII letters and what decomposes
-/// into them go; other scripts keep their case.
+/// A key for a file name that is the same for the names a case-insensitive Mac volume takes for one file, as far as
+/// Latin letters go: decomposed into Unicode's NFD, with ASCII letters, and so the letters that decompose into them, in
+/// lower case. Letters of other scripts keep their case, although the volume ignores it.
+pub fn folded_name(name: &str) -> String {
+    folded(name).collect()
+}
+
 fn folded(name: &str) -> impl Iterator<Item = char> + '_ {
     name.nfd().map(|letter| letter.to_ascii_lowercase())
 }
@@ -222,6 +227,20 @@ mod tests {
         assert_eq!(
             lookup(&tree, "a\u{308}rger.md".as_bytes()).unwrap().unwrap().oid,
             Oid([1; 20])
+        );
+    }
+
+    #[test]
+    fn a_folded_name_is_the_same_for_every_case_and_form_a_volume_takes_for_it() {
+        let key = folded_name("Müller.md");
+        for same in ["Mu\u{308}ller.md", "MÜLLER.MD", "MU\u{308}LLER.md", "müller.md"] {
+            assert_eq!(folded_name(same), key, "{same}");
+        }
+        assert_ne!(folded_name("Muller.md"), key);
+        assert_ne!(
+            folded_name("Ωmega.md"),
+            folded_name("ωmega.md"),
+            "other scripts keep their case"
         );
     }
 

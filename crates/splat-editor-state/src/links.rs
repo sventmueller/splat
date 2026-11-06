@@ -1,8 +1,11 @@
 //! Where a link in a document may lead when it is opened. A document can carry links to apps, scripts and
 //! installers; none of them may start from a click.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
+use crate::markdown::url::percent_decode;
+
+/// Where a link leads, by what may happen when it opens.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LinkTarget {
     /// http, https and mailto, handed to the default browser or mail app.
@@ -21,6 +24,7 @@ pub enum LinkTarget {
 
 const MARKDOWN: [&str; 6] = ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn"];
 
+/// Where the link address `target` of a document in `doc_dir` leads.
 pub fn classify(target: &str, doc_dir: Option<&Path>) -> LinkTarget {
     let target = target.trim();
     if let Some(anchor) = target.strip_prefix('#') {
@@ -118,6 +122,21 @@ pub fn find_note(dir: &Path, name: &str) -> Option<PathBuf> {
     None
 }
 
+/// The file an image link names; a picture Obsidian embeds as `![[name.png]]` may sit in any folder below the
+/// document's. Only there is it searched for, so a document cannot fish for a file name across the disk.
+pub fn locate(path: &Path, doc_dir: Option<&Path>) -> PathBuf {
+    let below_document = doc_dir
+        .and_then(|dir| path.strip_prefix(dir).ok())
+        .is_some_and(|rest| rest.components().all(|c| matches!(c, Component::Normal(_))));
+    if path.exists() || !below_document {
+        return path.to_path_buf();
+    }
+    path.parent()
+        .zip(path.file_name().and_then(|n| n.to_str()))
+        .and_then(|(dir, name)| find_note(dir, name))
+        .unwrap_or_else(|| path.to_path_buf())
+}
+
 fn local(path: PathBuf) -> LinkTarget {
     let markdown = path
         .extension()
@@ -131,38 +150,13 @@ fn local(path: PathBuf) -> LinkTarget {
 }
 
 /// The path part of a link, without `?query` and `#fragment`.
-pub(super) fn strip_suffixes(target: &str) -> &str {
+pub fn strip_suffixes(target: &str) -> &str {
     let end = target.find(['?', '#']).unwrap_or(target.len());
     &target[..end]
 }
 
-/// Decodes `%XX` escapes; invalid escapes and bytes stay as they are.
-pub fn percent_decode(s: &str) -> String {
-    fn hex(b: u8) -> Option<u8> {
-        (b as char).to_digit(16).and_then(|d| u8::try_from(d).ok())
-    }
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && let (Some(hi), Some(lo)) = (
-                bytes.get(i + 1).and_then(|b| hex(*b)),
-                bytes.get(i + 2).and_then(|b| hex(*b)),
-            )
-        {
-            out.push(hi * 16 + lo);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 /// Relative path from `dir` to `target`, falling back to the absolute path.
-pub(super) fn relative_path(dir: Option<&Path>, target: &Path) -> String {
+pub fn relative_path(dir: Option<&Path>, target: &Path) -> String {
     let Some(dir) = dir else {
         return target.to_string_lossy().into_owned();
     };
@@ -262,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn embeds_and_pictures_are_looked_up_below_the_document_only() {
+    fn notes_and_pictures_are_looked_up_below_the_document_only() {
         let root = std::env::temp_dir().join(format!("splat-lookup-{}", std::process::id()));
         let docs = root.join("docs");
         let deep = docs.join("a/b");
@@ -274,24 +268,28 @@ mod tests {
         let outside = root.join("bild.png");
         assert_eq!(find_note(&docs, "Notiz"), Some(deep.join("Notiz.md")));
         assert_eq!(find_note(&docs, &outside.to_string_lossy()), None);
-        assert!(super::super::env::embedded_note(&docs, "Notiz").is_some());
-        assert!(super::super::env::embedded_note(&docs, ".env").is_none());
-        let images = super::super::images::locate;
-        assert_eq!(images(&docs.join("bild.png"), Some(&docs)), deep.join("bild.png"));
-        let elsewhere = root.join("other/bild.png");
-        assert_eq!(images(&elsewhere, Some(&docs)), elsewhere);
+        assert_eq!(find_note(&docs, "a/b/Notiz.md"), Some(deep.join("Notiz.md")));
+        assert_eq!(find_note(&docs, "Notiz#Kapitel|Titel"), Some(deep.join("Notiz.md")));
+        assert_eq!(find_note(&docs, "../Notiz"), None);
+        assert_eq!(find_note(&docs, " "), None);
         assert_eq!(
-            images(&docs.join("../x/bild.png"), Some(&docs)),
+            classify_wiki("Notiz", Some(&docs)),
+            LinkTarget::Document(deep.join("Notiz.md"))
+        );
+        assert_eq!(
+            classify_wiki("bild.png", Some(&docs)),
+            LinkTarget::File(deep.join("bild.png"))
+        );
+        assert_eq!(classify_wiki("Fehlt", Some(&docs)), LinkTarget::Nothing);
+        assert_eq!(classify_wiki("Notiz", None), LinkTarget::Nothing);
+        assert_eq!(locate(&docs.join("bild.png"), Some(&docs)), deep.join("bild.png"));
+        let elsewhere = root.join("other/bild.png");
+        assert_eq!(locate(&elsewhere, Some(&docs)), elsewhere);
+        assert_eq!(
+            locate(&docs.join("../x/bild.png"), Some(&docs)),
             docs.join("../x/bild.png")
         );
+        assert_eq!(locate(&deep.join("bild.png"), None), deep.join("bild.png"));
         std::fs::remove_dir_all(&root).unwrap();
-    }
-
-    #[test]
-    fn percent_escapes_decode_on_byte_level() {
-        assert_eq!(percent_decode("a%20b%2"), "a b%2");
-        assert_eq!(percent_decode("%€.png"), "%€.png");
-        assert_eq!(percent_decode("%C3%A4"), "ä");
-        assert_eq!(percent_decode("%zz%"), "%zz%");
     }
 }

@@ -25,7 +25,7 @@ fn moved(r: &mut Range<Byte>, delta: isize) {
 }
 
 /// Moves every source offset of a block by `delta`. The patterns name every field, so a new offset cannot be missed.
-pub fn shift_block(b: &mut Block, delta: isize) {
+pub(crate) fn shift_block(b: &mut Block, delta: isize) {
     if delta == 0 {
         return;
     }

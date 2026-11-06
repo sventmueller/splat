@@ -8,13 +8,12 @@ use std::ops::Range;
 use super::commands::heading_anchors;
 use super::doc::output::{BlockOutput, Callout, Code, Note, write_block};
 use super::doc::{
-    AlertKind, Align, Block, BlockKind, Figure, Inline, InlineKind, ListKind, Piece, code_figure, plain_text,
+    AlertKind, Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, Piece, code_figure, plain_text,
 };
-use super::markup::{self, Element, Node, is_void, kept_in_exports, read_tag, stray_closes};
-use super::reader::parse;
+use super::markup::{self, AddressFor, Destination, Node, Role, destination, read_tag, stray_closes};
 use super::style::html_element;
 use super::text::{Byte, offsets, right_to_left};
-use super::typography::{Open, Quotes, Running, Segment, TextMark, Within, citation_shown};
+use super::typography::{Open, Quotes, Running, Segment, Shorthand, Typesetting, Within, citation_shown};
 use splat_i18n::t;
 
 /// What the page needs from outside the text.
@@ -40,13 +39,13 @@ const KEPT_ATTRIBUTES: [&str; 11] = [
     "align", "title", "alt", "width", "height", "colspan", "rowspan", "start", "open", "href", "src",
 ];
 
-/// `text` as a self-contained HTML page.
-pub fn to_html(text: &str, export: &Export) -> String {
-    let doc = parse(text);
+/// The document as a self-contained HTML page.
+pub fn to_html(doc: &Doc, export: &Export) -> String {
+    let text = doc.text();
     let mut page = Page {
-        text: doc.text(),
+        text,
         export,
-        anchors: heading_anchors(&doc)
+        anchors: heading_anchors(doc)
             .into_iter()
             .map(|h| (h.range.start, h.anchor))
             .collect(),
@@ -54,7 +53,7 @@ pub fn to_html(text: &str, export: &Export) -> String {
         open: Open::default(),
         body: String::with_capacity(text.len() + text.len() / 2),
     };
-    for block in &doc.blocks {
+    for block in doc.blocks() {
         page.block(block);
     }
     page.footnotes();
@@ -101,7 +100,7 @@ struct Page<'a> {
 
 /// What surrounds running text and changes what it may turn into.
 #[derive(Clone, Copy, Default)]
-struct Inside {
+struct Around {
     link: bool,
     code: bool,
 }
@@ -239,16 +238,16 @@ impl<'a> Page<'a> {
     /// The running text of a block.
     fn leaf(&mut self, inlines: &[Inline]) {
         self.open = Open::default();
-        self.inlines(inlines, Inside::default());
+        self.inlines(inlines, Around::default());
     }
 
-    fn inlines(&mut self, inlines: &[Inline], around: Inside) {
+    fn inlines(&mut self, inlines: &[Inline], around: Around) {
         for inline in inlines {
             self.inline(inline, around);
         }
     }
 
-    fn inline(&mut self, i: &Inline, around: Inside) {
+    fn inline(&mut self, i: &Inline, around: Around) {
         // A pair of HTML tags keeps its tags, cleaned, whatever it means to the other outputs.
         if let Some((open, close)) = self.html_tags(i) {
             self.body.push_str(&clean_tag(open, self.export));
@@ -256,7 +255,7 @@ impl<'a> Page<'a> {
             let link = matches!(i.kind, InlineKind::Link { .. });
             self.inlines(
                 &i.children,
-                Inside {
+                Around {
                     link: around.link || link,
                     code: around.code || code,
                 },
@@ -280,7 +279,7 @@ impl<'a> Page<'a> {
                 None => self.inlines(&i.children, around),
             },
             Piece::Link { url, title } => {
-                let url = safe_url(url, Address::Link, self.export);
+                let url = safe_url(url, AddressFor::Link, self.export);
                 self.link(&url, title, i, around);
             }
             Piece::WikiPage(target) => {
@@ -289,7 +288,7 @@ impl<'a> Page<'a> {
                 } else {
                     format!("{target}.md")
                 };
-                let url = safe_url(&file, Address::Link, self.export);
+                let url = safe_url(&file, AddressFor::Link, self.export);
                 self.link(&url, "", i, around);
             }
             // Written as a tag, it keeps its size and all else the tag says.
@@ -332,12 +331,12 @@ impl<'a> Page<'a> {
         (i.written_as_html(self.text) && close.starts_with("</")).then_some((open, close))
     }
 
-    fn wrapped(&mut self, name: &str, i: &Inline, around: Inside) {
+    fn wrapped(&mut self, name: &str, i: &Inline, around: Around) {
         self.body.push_str(&format!("<{name}>"));
         let code = matches!(i.kind, InlineKind::Kbd);
         self.inlines(
             &i.children,
-            Inside {
+            Around {
                 code: around.code || code,
                 ..around
             },
@@ -345,18 +344,18 @@ impl<'a> Page<'a> {
         self.body.push_str(&format!("</{name}>"));
     }
 
-    fn link(&mut self, url: &str, title: &str, i: &Inline, around: Inside) {
+    fn link(&mut self, url: &str, title: &str, i: &Inline, around: Around) {
         self.body.push_str(&format!("<a href=\"{}\"", escape(url)));
         if !title.is_empty() {
             self.body.push_str(&format!(" title=\"{}\"", escape(title)));
         }
         self.body.push('>');
-        self.inlines(&i.children, Inside { link: true, ..around });
+        self.inlines(&i.children, Around { link: true, ..around });
         self.body.push_str("</a>");
     }
 
     fn image_source(&self, url: &str) -> String {
-        (self.export.embed)(url).unwrap_or_else(|| safe_url(url, Address::Image, self.export))
+        (self.export.embed)(url).unwrap_or_else(|| safe_url(url, AddressFor::Picture, self.export))
     }
 
     fn image(&mut self, src: &str, alt: &str, title: &str) {
@@ -369,26 +368,31 @@ impl<'a> Page<'a> {
     }
 
     /// Running text, with typographic punctuation, tags, references and citations as in the preview.
-    fn text(&mut self, literal: &str, at: Byte, around: Inside) {
+    fn text(&mut self, literal: &str, at: Byte, around: Around) {
         let within = Within {
             code: around.code,
             link: around.link,
             html: false,
         };
-        let running = Running::of(self.text, literal, at, within, self.export.quotes, &mut self.open, true);
+        let setting = Typesetting {
+            source: self.text,
+            quotes: self.export.quotes,
+            references: true,
+        };
+        let running = Running::of(&setting, literal, at, within, &mut self.open);
         let export = &self.export;
-        let segments = running.segments(|_, mark| match mark {
-            TextMark::Tag(name) => Some(format!("<span class=\"tag\">#{}</span>", escape(name))),
-            TextMark::Reference(reference) => (export.reference)(reference)
+        let segments = running.segments(|_, shorthand| match shorthand {
+            Shorthand::Tag(name) => Some(format!("<span class=\"tag\">#{}</span>", escape(name))),
+            Shorthand::Reference(reference) => (export.reference)(reference)
                 .map(|url| format!("<a href=\"{}\">{}</a>", escape(&url), escape(reference))),
-            TextMark::Citation(keys) => {
+            Shorthand::Citation(keys) => {
                 citation_shown(keys, export.citation).map(|shown_as| format!("<cite>{}</cite>", escape(&shown_as)))
             }
         });
         for segment in segments {
             match segment {
                 Segment::Text(text) => self.body.push_str(&escape(text)),
-                Segment::Mark(html) => self.body.push_str(&html),
+                Segment::Shorthand(html) => self.body.push_str(&html),
             }
         }
     }
@@ -451,7 +455,7 @@ impl<'a> BlockOutput<'a> for Page<'a> {
     fn html_block(&mut self, _block: &'a Block, literal: &'a str, (): ()) {
         // An element closed in a later block, as `</details>` after the Markdown it wraps, closes here.
         for name in stray_closes(literal) {
-            if kept_in_exports(&name) {
+            if keeps_tags(&name) {
                 self.body.push_str(&format!("</{name}>"));
             }
         }
@@ -488,17 +492,55 @@ impl<'a> BlockOutput<'a> for Page<'a> {
     }
 }
 
-/// The direction an embedded element gets, as Markdown's blocks of the same kind get it.
-fn element_direction(e: &Element) -> Option<&'static str> {
-    match e.name.as_str() {
-        "p" | "li" | "dt" | "dd" => Some("auto"),
-        "blockquote" | "ul" | "ol" | "table" => {
-            let mut text = String::new();
-            markup::raw_text(&e.children, &mut text);
-            Some(direction(right_to_left(&text)))
-        }
-        _ => None,
+/// How a page writes an embedded element.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OnPage {
+    /// With its tags, which give its text the direction it reads in.
+    Tags(Reading),
+    /// Only what it holds, as GitHub keeps no other tags.
+    Content,
+}
+
+/// The direction a page gives the text of an embedded element, as Markdown's blocks of the same kind get it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Reading {
+    /// The one of the text around it.
+    Around,
+    /// The one of its first letter, as a paragraph's.
+    FirstLetter,
+    /// The one of its text as a whole, as a quote's, a list's or a table's.
+    AllOfIt,
+}
+
+fn on_page(role: Role) -> OnPage {
+    match role {
+        Role::Paragraph | Role::ListItem | Role::Term | Role::Definition => OnPage::Tags(Reading::FirstLetter),
+        Role::Quote | Role::List { .. } | Role::Table => OnPage::Tags(Reading::AllOfIt),
+        Role::Look(_)
+        | Role::Link
+        | Role::LineBreak
+        | Role::Picture
+        | Role::Heading(_)
+        | Role::Division
+        | Role::Center
+        | Role::Section
+        | Role::Summary
+        | Role::Preformatted
+        | Role::Rule
+        | Role::TableSection { .. }
+        | Role::TableRow
+        | Role::TableCell { .. } => OnPage::Tags(Reading::Around),
+        // A browser folds `<details>` and sets out `<dl>` itself, which the preview and Word do in their own way.
+        Role::Details | Role::DefinitionList => OnPage::Tags(Reading::Around),
+        // GitHub keeps neither `<picture>` nor `<source>`, which leaves a page the `<img>` among them.
+        Role::PictureSources => OnPage::Content,
+        Role::Presentational | Role::Empty | Role::Input | Role::Dropped | Role::Unknown => OnPage::Content,
     }
+}
+
+/// Whether a page keeps the tags of an element named `name`.
+fn keeps_tags(name: &str) -> bool {
+    matches!(on_page(Role::of(name)), OnPage::Tags(_))
 }
 
 /// Embedded HTML with only the elements and attributes a page may show without running anything.
@@ -509,13 +551,22 @@ fn clean_html(nodes: &[Node], export: &Export) -> String {
             Node::Text { text, .. } => out.push_str(&escape(text)),
             Node::Element(e) => {
                 let inner = clean_html(&e.children, export);
-                if !kept_in_exports(&e.name) {
+                let OnPage::Tags(reading) = on_page(e.role) else {
                     out.push_str(&inner);
                     continue;
-                }
+                };
+                let dir = match reading {
+                    Reading::Around => None,
+                    Reading::FirstLetter => Some("auto"),
+                    Reading::AllOfIt => {
+                        let mut text = String::new();
+                        markup::raw_text(&e.children, &mut text);
+                        Some(direction(right_to_left(&text)))
+                    }
+                };
                 let align = e.align().and_then(Align::html_name);
-                out.push_str(&open_tag(&e.name, &e.attrs, align, element_direction(e), export));
-                if is_void(&e.name) {
+                out.push_str(&open_tag(&e.name, &e.attrs, align, dir, export));
+                if e.role.is_void() {
                     continue;
                 }
                 out.push_str(&inner);
@@ -536,8 +587,8 @@ fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, dir: Op
             continue;
         }
         let value = match key.as_str() {
-            "href" => safe_url(value, Address::Link, export),
-            "src" => (export.embed)(value).unwrap_or_else(|| safe_url(value, Address::Image, export)),
+            "href" => safe_url(value, AddressFor::Link, export),
+            "src" => (export.embed)(value).unwrap_or_else(|| safe_url(value, AddressFor::Picture, export)),
             _ => value.clone(),
         };
         if key == "open" {
@@ -560,7 +611,7 @@ fn open_tag(name: &str, attrs: &[(String, String)], align: Option<&str>, dir: Op
 fn clean_tag(raw: &str, export: &Export) -> String {
     let trimmed = raw.trim();
     match read_tag(trimmed, 0) {
-        Some((markup::Tag::Open { name, attrs, .. }, _)) if kept_in_exports(&name) => {
+        Some((markup::Tag::Open { name, attrs, .. }, _)) if keeps_tags(&name) => {
             let align = attrs
                 .iter()
                 .find(|(k, _)| k == "align")
@@ -568,40 +619,17 @@ fn clean_tag(raw: &str, export: &Export) -> String {
                 .filter(|v| matches!(v.as_str(), "left" | "center" | "right"));
             open_tag(&name, &attrs, align.as_deref(), None, export)
         }
-        Some((markup::Tag::Close { name }, _)) if kept_in_exports(&name) => format!("</{name}>"),
+        Some((markup::Tag::Close { name }, _)) if keeps_tags(&name) => format!("</{name}>"),
         _ => String::new(),
     }
 }
 
-/// What an address is for, which decides what may stand there.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Address {
-    Link,
-    Image,
-}
-
-/// Web and mail links, in-page anchors and relative paths stay; every other scheme, such as `javascript:` or
-/// `file:`, is dropped. Images may also be embedded PNG, JPEG, GIF or WebP data.
-fn safe_url(url: &str, what: Address, export: &Export) -> String {
-    let lower = url.trim().to_ascii_lowercase();
-    match super::url::scheme(url).as_deref() {
-        None => (export.rebase)(url),
-        Some("http" | "https") => url.to_string(),
-        Some("mailto") if what == Address::Link => url.to_string(),
-        Some("data")
-            if what == Address::Image
-                && [
-                    "data:image/png;",
-                    "data:image/jpeg;",
-                    "data:image/gif;",
-                    "data:image/webp;",
-                ]
-                .iter()
-                .any(|p| lower.starts_with(p)) =>
-        {
-            url.to_string()
-        }
-        _ => "#".to_string(),
+/// The address a page writes for `url`: a relative path as seen from the page, `#` for one nothing may follow.
+fn safe_url(url: &str, used_for: AddressFor, export: &Export) -> String {
+    match destination(url, used_for) {
+        Destination::Relative => (export.rebase)(url),
+        Destination::Web | Destination::Mail | Destination::PictureData => url.to_string(),
+        Destination::Refused => "#".to_string(),
     }
 }
 
@@ -705,7 +733,7 @@ mod tests {
 
     fn export(text: &str) -> String {
         to_html(
-            text,
+            &crate::reader::parse(text),
             &Export {
                 title: "T <1>",
                 figure: &|f| match f {
@@ -1003,12 +1031,45 @@ mod tests {
             citation: &|_| None,
         };
         let png = "data:image/png;base64,AA";
-        assert_eq!(safe_url("mailto:a@b.de", Address::Link, &e), "mailto:a@b.de");
-        assert_eq!(safe_url("mailto:a@b.de", Address::Image, &e), "#");
-        assert_eq!(safe_url(png, Address::Image, &e), png);
-        assert_eq!(safe_url(png, Address::Link, &e), "#");
-        assert_eq!(safe_url("data:text/html;base64,AA", Address::Image, &e), "#");
-        assert_eq!(safe_url("data:image/svg+xml;base64,AA", Address::Image, &e), "#");
+        assert_eq!(safe_url("mailto:a@b.de", AddressFor::Link, &e), "mailto:a@b.de");
+        assert_eq!(safe_url("mailto:a@b.de", AddressFor::Picture, &e), "#");
+        assert_eq!(safe_url(png, AddressFor::Picture, &e), png);
+        assert_eq!(safe_url(png, AddressFor::Link, &e), "#");
+        assert_eq!(safe_url("data:text/html;base64,AA", AddressFor::Picture, &e), "#");
+        assert_eq!(safe_url("data:image/svg+xml;base64,AA", AddressFor::Picture, &e), "#");
+    }
+
+    #[test]
+    fn a_page_keeps_the_tags_github_keeps_and_the_content_of_all_others() {
+        for (html, kept) in [
+            ("<p>a</p>", "<p dir=\"auto\">a</p>"),
+            ("<ul><li>a</li></ul>", "<ul dir=\"ltr\"><li dir=\"auto\">a</li></ul>"),
+            (
+                "<dl><dt>a</dt><dd>b</dd></dl>",
+                "<dl><dt dir=\"auto\">a</dt><dd dir=\"auto\">b</dd></dl>",
+            ),
+            (
+                "<details><summary>a</summary>b</details>",
+                "<details><summary>a</summary>b</details>",
+            ),
+            (
+                "<picture><source srcset=\"a.webp\"><img src=\"a.png\"></picture>",
+                "<img src=\"../docs/a.png\">",
+            ),
+            (
+                "<p><font>a</font><blink>b</blink>c<wbr>d</p>",
+                "<p dir=\"auto\">abcd</p>",
+            ),
+            (
+                "<p><abbr>a</abbr><small>b</small></p>",
+                "<p dir=\"auto\"><abbr>a</abbr><small>b</small></p>",
+            ),
+        ] {
+            let page = export(&format!("{html}\n"));
+            assert!(page.contains(kept), "{html}: {page}");
+        }
+        let page = export("<details>\n\nInhalt\n\n</details>\n\n<blink>\n\nx\n\n</blink>\n");
+        assert!(page.contains("</details>") && !page.contains("</blink>"), "{page}");
     }
 
     #[test]

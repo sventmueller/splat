@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -67,9 +67,9 @@ pub fn is_remote(url: &str) -> bool {
     crate::markdown::url::is_https(url)
 }
 
-/// A host on the public internet: requests to `localhost`, `.local` names or private, loopback and link-local
-/// addresses would let a document send requests to routers and local services. This reads the address only: a public name
-/// that resolves to a private address passes, and then still needs a certificate for that name to get an answer.
+/// A host on the public internet: requests to `localhost`, `.local` names or addresses that are not public would let a
+/// document send requests to routers and local services. This reads the address only: a public name that resolves to a
+/// private address passes, and then still needs a certificate for that name to get an answer.
 fn public_host(url: &NSURL) -> bool {
     if url
         .scheme()
@@ -89,27 +89,63 @@ fn public_host(url: &NSURL) -> bool {
         return false;
     }
     match host.parse::<IpAddr>() {
-        Ok(IpAddr::V4(ip)) => {
-            !(ip.is_private()
-                || ip.is_loopback()
-                || ip.is_link_local()
-                || ip.is_unspecified()
-                || ip.is_broadcast()
-                || ip.octets()[0] == 100 && ip.octets()[1] >= 64 && ip.octets()[1] < 128)
+        Ok(IpAddr::V4(ip)) => public_v4(ip),
+        Ok(IpAddr::V6(ip)) => public_v6(ip),
+        // The system also reads `127.1`, `0x7f.1` or `0177.0.0.1` as addresses, and an IPv6 address with a zone such as
+        // `fe80::1%en0`; a real name never ends in a number and holds no colon.
+        Err(_) => {
+            !host.contains(':')
+                && !host
+                    .rsplit('.')
+                    .next()
+                    .is_some_and(|last| last.bytes().all(|b| b.is_ascii_digit()) || last.starts_with("0x"))
         }
-        Ok(IpAddr::V6(ip)) => {
-            let first = ip.segments()[0];
-            !(ip.is_loopback()
-                || ip.is_unspecified()
-                || first & 0xfe00 == 0xfc00
-                || first & 0xffc0 == 0xfe80
-                || ip.to_ipv4_mapped().is_some())
-        }
-        // The system also reads `127.1`, `0x7f.1` or `0177.0.0.1` as addresses; a real name never ends in a number.
-        Err(_) => !host
-            .rsplit('.')
-            .next()
-            .is_some_and(|last| last.bytes().all(|b| b.is_ascii_digit()) || last.starts_with("0x")),
+    }
+}
+
+/// Whether an IPv4 address belongs to a host on the public internet, by IANA's registry of special-purpose addresses.
+fn public_v4(ip: Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    !(a == 0 // this network
+        || a == 10 // private
+        || a == 100 && b & 0xc0 == 64 // shared by carriers
+        || a == 127 // loopback
+        || a == 169 && b == 254 // link-local
+        || a == 172 && b & 0xf0 == 16 // private
+        || a == 192 && b == 0 && c == 0 // protocol assignments
+        || a == 192 && b == 0 && c == 2 // documentation
+        || a == 192 && b == 88 && c == 99 // 6to4 relays
+        || a == 192 && b == 168 // private
+        || a == 198 && b & 0xfe == 18 // benchmarking
+        || a == 198 && b == 51 && c == 100 // documentation
+        || a == 203 && b == 0 && c == 113 // documentation
+        || a >= 224) // multicast, reserved and broadcast
+}
+
+/// Whether an IPv6 address belongs to a host on the public internet: global unicast outside the special-purpose ranges,
+/// or an address that reaches a public IPv4 address. IPv4-compatible addresses (`::a.b.c.d`) are deprecated and lie
+/// outside global unicast, so they stay blocked whatever they hold.
+fn public_v6(ip: Ipv6Addr) -> bool {
+    if let Some(embedded) = embedded_v4(ip) {
+        return public_v4(embedded);
+    }
+    let [a, b, ..] = ip.segments();
+    a & 0xe000 == 0x2000 // global unicast
+        && !(a == 0x2001 && b < 0x0200) // protocol assignments: Teredo, benchmarking, ORCHID
+        && !(a == 0x2001 && b == 0x0db8) // documentation
+        && !(a == 0x3fff && b < 0x1000) // documentation
+}
+
+/// The IPv4 address an IPv6 address reaches: mapped (`::ffff:0:0/96`), through the well-known NAT64 prefix
+/// (`64:ff9b::/96`) or through 6to4 (`2002::/16`). The local NAT64 prefix `64:ff9b:1::/48` places it where each network
+/// chooses, and stays blocked as outside global unicast.
+fn embedded_v4(ip: Ipv6Addr) -> Option<Ipv4Addr> {
+    let s = ip.segments();
+    let of = |high: u16, low: u16| Ipv4Addr::from((u32::from(high) << 16) | u32::from(low));
+    match s {
+        [0, 0, 0, 0, 0, 0xffff, high, low] | [0x64, 0xff9b, 0, 0, 0, 0, high, low] => Some(of(high, low)),
+        [0x2002, high, low, ..] => Some(of(high, low)),
+        _ => None,
     }
 }
 
@@ -548,6 +584,123 @@ mod tests {
         assert_eq!(failure_of(None, Some(404)), Failure::Final);
         assert_eq!(failure_of(None, Some(200)), Failure::Final);
         assert_eq!(failure_of(Some(CANCELLED), None), Failure::Final, "over the size limit");
+    }
+
+    #[test]
+    fn only_addresses_of_the_public_internet_count_as_public() {
+        let public = [
+            "1.1.1.1",
+            "93.184.216.34",
+            "9.255.255.255",
+            "11.0.0.0",
+            "100.63.255.255",
+            "100.128.0.0",
+            "126.255.255.255",
+            "128.0.0.0",
+            "169.253.255.255",
+            "169.255.0.0",
+            "172.15.255.255",
+            "172.32.0.0",
+            "192.0.1.0",
+            "192.0.3.0",
+            "192.88.98.255",
+            "192.167.255.255",
+            "192.169.0.0",
+            "198.17.255.255",
+            "198.20.0.0",
+            "198.51.99.255",
+            "203.0.112.255",
+            "223.255.255.255",
+            "2606:4700::1111",
+            "2a00:1450:4001:80b::200e",
+            "2001:200::1",
+            "2001:db9::1",
+            "2a01:4f8::1",
+            "3fff:1000::1",
+            "::ffff:93.184.216.34",
+            "64:ff9b::93.184.216.34",
+            "2002:5db8:d822::1",
+        ];
+        let blocked = [
+            ("0.0.0.0", "unspecified"),
+            ("0.1.2.3", "this network"),
+            ("10.0.0.1", "private"),
+            ("100.64.0.1", "carrier-grade NAT"),
+            ("100.127.255.255", "carrier-grade NAT"),
+            ("127.0.0.1", "loopback"),
+            ("127.255.255.254", "loopback"),
+            ("169.254.169.254", "link-local, as cloud metadata"),
+            ("172.16.0.1", "private"),
+            ("172.31.255.255", "private"),
+            ("192.0.0.170", "protocol assignments, NAT64 discovery"),
+            ("192.0.2.1", "documentation"),
+            ("192.88.99.1", "6to4 relays"),
+            ("192.168.0.1", "private"),
+            ("198.18.0.1", "benchmarking"),
+            ("198.19.255.255", "benchmarking"),
+            ("198.51.100.1", "documentation"),
+            ("203.0.113.1", "documentation"),
+            ("224.0.0.1", "multicast"),
+            ("239.255.255.250", "multicast, SSDP"),
+            ("240.0.0.1", "reserved"),
+            ("255.255.255.255", "broadcast"),
+            ("::", "unspecified"),
+            ("::1", "loopback"),
+            ("::127.0.0.1", "IPv4-compatible"),
+            ("::8.8.8.8", "IPv4-compatible, deprecated even when public"),
+            ("::ffff:127.0.0.1", "mapped loopback"),
+            ("::ffff:192.168.0.1", "mapped private"),
+            ("::ffff:0:10.0.0.1", "translated"),
+            ("64:ff9b::7f00:1", "NAT64 of loopback"),
+            ("64:ff9b::192.168.1.1", "NAT64 of private"),
+            ("64:ff9b::a9fe:a9fe", "NAT64 of link-local"),
+            ("64:ff9b:1::5db8:d822", "local NAT64"),
+            ("2002:7f00:1::1", "6to4 of loopback"),
+            ("2002:c0a8:101::1", "6to4 of private"),
+            ("2002:e000:1::1", "6to4 of multicast"),
+            ("100::1", "discard only"),
+            ("2001::1", "Teredo"),
+            ("2001:2::1", "benchmarking"),
+            ("2001:db8::1", "documentation"),
+            ("3fff::1", "documentation"),
+            ("5f00::1", "segment routing"),
+            ("fc00::1", "unique local"),
+            ("fd12:3456::1", "unique local"),
+            ("fe80::1", "link-local"),
+            ("febf::1", "link-local"),
+            ("fec0::1", "site-local"),
+            ("ff02::1", "multicast"),
+            ("ff0e::1", "global multicast"),
+        ];
+        let is_public = |address: &str| match address.parse::<IpAddr>().expect(address) {
+            IpAddr::V4(ip) => public_v4(ip),
+            IpAddr::V6(ip) => public_v6(ip),
+        };
+        for address in public {
+            assert!(is_public(address), "{address}");
+        }
+        for (address, kind) in blocked {
+            assert!(!is_public(address), "{address}: {kind}");
+        }
+    }
+
+    #[test]
+    fn a_host_written_as_an_address_is_read_as_one() {
+        let ok = |s: &str| NSURL::URLWithString(&ns(s)).is_some_and(|url| public_host(&url));
+        assert!(ok("https://[2606:4700::1111]/x.png"));
+        assert!(ok("https://[::ffff:93.184.216.34]/x.png"));
+        for blocked in [
+            "https://[64:ff9b::7f00:1]/x",
+            "https://[2002:c0a8:101::1]/x",
+            "https://[ff02::1]/x",
+            "https://[::127.0.0.1]/x",
+            "https://[fe80::1%25en0]/x",
+            "https://224.0.0.251/x",
+            "https://198.18.0.1/x",
+            "https://0.0.0.0/x",
+        ] {
+            assert!(!ok(blocked), "{blocked}");
+        }
     }
 
     #[test]

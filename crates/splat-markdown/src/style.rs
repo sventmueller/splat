@@ -1,6 +1,7 @@
 //! How text looks, and which Markdown and HTML make it look so: the one table behind the preview and both exports.
 
 use super::doc::InlineKind;
+use super::markup::Role;
 
 /// Where text stands on its line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -14,8 +15,8 @@ pub enum Baseline {
     Sub,
 }
 
-/// The look of a piece of text. A new look needs a field here and its case in `inside`; each output then says what the
-/// field means to it.
+/// The look of a piece of text. A new look needs a field here and its case in `nested_in`; each output then says what
+/// the field means to it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct TextStyle {
     /// Inside strong text, `**text**` or `<strong>`.
@@ -38,7 +39,7 @@ pub struct TextStyle {
 
 impl TextStyle {
     /// The style of text inside an inline of this kind.
-    pub fn inside(mut self, kind: &InlineKind) -> TextStyle {
+    pub fn nested_in(mut self, kind: &InlineKind) -> TextStyle {
         match kind {
             InlineKind::Strong => self.bold = true,
             InlineKind::Emph => self.italic = true,
@@ -84,18 +85,11 @@ pub(crate) fn html_element(kind: &InlineKind) -> Option<&'static str> {
 
 /// The inline an HTML element stands for, when it only changes how its content looks.
 pub fn styled_element(name: &str) -> Option<InlineKind> {
-    Some(match name {
-        "u" | "ins" => InlineKind::Underline,
-        "mark" => InlineKind::Highlight,
-        "sup" => InlineKind::Superscript,
-        "sub" => InlineKind::Subscript,
-        "b" | "strong" => InlineKind::Strong,
-        "i" | "em" | "cite" | "dfn" | "var" => InlineKind::Emph,
-        "s" | "del" | "strike" => InlineKind::Strikethrough,
-        "kbd" | "code" | "samp" | "tt" => InlineKind::Kbd,
-        "span" | "small" | "big" | "abbr" | "font" | "q" | "time" => InlineKind::Span,
-        _ => return None,
-    })
+    match Role::of(name) {
+        Role::Look(look) => Some(look.inline_kind()),
+        Role::Presentational => Some(InlineKind::Span),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -113,14 +107,14 @@ mod tests {
         ] {
             let plain = TextStyle::default();
             assert_eq!(
-                plain.inside(&styled_element(name).unwrap()),
-                plain.inside(&kind),
+                plain.nested_in(&styled_element(name).unwrap()),
+                plain.nested_in(&kind),
                 "{name}"
             );
         }
         assert!(styled_element("div").is_none());
         assert_eq!(
-            TextStyle::default().inside(&styled_element("span").unwrap()),
+            TextStyle::default().nested_in(&styled_element("span").unwrap()),
             TextStyle::default()
         );
     }
@@ -128,8 +122,8 @@ mod tests {
     #[test]
     fn looks_add_up() {
         let both = TextStyle::default()
-            .inside(&InlineKind::Strong)
-            .inside(&InlineKind::Emph);
+            .nested_in(&InlineKind::Strong)
+            .nested_in(&InlineKind::Emph);
         assert!(both.bold && both.italic && !both.code);
     }
 }

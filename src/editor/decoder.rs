@@ -34,19 +34,132 @@ const MAX_PDF: usize = 128 << 20;
 /// Beyond the `MAX_SIDE` of `safe_image`; the helper is trusted for no more than a sane number.
 const NATURAL_SIDE: u32 = 1 << 20;
 
-const IMAGE: u8 = 1;
-const FORMULA_SVG: u8 = 2;
-const SELF_CHECK: u8 = 3;
-const NATIVE_IMAGE: u8 = 4;
-const PASTED_TIFF: u8 = 5;
+/// What the app asks a helper for, in the first byte of a request.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Request {
+    /// A picture file as pixels, or an SVG as a PDF.
+    Image,
+    /// A formula's SVG as a PDF.
+    FormulaSvg,
+    /// Whether the helper can reach a file or the network.
+    SelfCheck,
+    /// What only the system's decoders read, as pixels.
+    NativeImage,
+    /// A TIFF from the pasteboard as a PNG.
+    PastedTiff,
+}
 
-const NOTHING: u8 = 0;
-const PDF: u8 = 1;
-const RGBA: u8 = 2;
-const PNG: u8 = 3;
+/// What kind of answer follows, in the first byte of an answer.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Answer {
+    Nothing,
+    Pdf,
+    Rgba,
+    Png,
+}
+
+/// A first byte that names no request or answer.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct UnknownCode(u8);
+
+impl From<UnknownCode> for std::io::Error {
+    fn from(UnknownCode(code): UnknownCode) -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, format!("unknown code {code}"))
+    }
+}
+
+impl From<Request> for u8 {
+    fn from(request: Request) -> u8 {
+        match request {
+            Request::Image => 1,
+            Request::FormulaSvg => 2,
+            Request::SelfCheck => 3,
+            Request::NativeImage => 4,
+            Request::PastedTiff => 5,
+        }
+    }
+}
+
+impl TryFrom<u8> for Request {
+    type Error = UnknownCode;
+
+    fn try_from(code: u8) -> Result<Request, UnknownCode> {
+        match code {
+            1 => Ok(Request::Image),
+            2 => Ok(Request::FormulaSvg),
+            3 => Ok(Request::SelfCheck),
+            4 => Ok(Request::NativeImage),
+            5 => Ok(Request::PastedTiff),
+            _ => Err(UnknownCode(code)),
+        }
+    }
+}
+
+impl From<Answer> for u8 {
+    fn from(answer: Answer) -> u8 {
+        match answer {
+            Answer::Nothing => 0,
+            Answer::Pdf => 1,
+            Answer::Rgba => 2,
+            Answer::Png => 3,
+        }
+    }
+}
+
+impl TryFrom<u8> for Answer {
+    type Error = UnknownCode;
+
+    fn try_from(code: u8) -> Result<Answer, UnknownCode> {
+        match code {
+            0 => Ok(Answer::Nothing),
+            1 => Ok(Answer::Pdf),
+            2 => Ok(Answer::Rgba),
+            3 => Ok(Answer::Png),
+            _ => Err(UnknownCode(code)),
+        }
+    }
+}
+
+impl Request {
+    /// The most bytes a request of this kind may carry, without the side it names.
+    fn most_bytes(self) -> usize {
+        match self {
+            Request::PastedTiff => MAX_PASTED_BYTES,
+            Request::Image | Request::FormulaSvg | Request::SelfCheck | Request::NativeImage => MAX_FILE_BYTES,
+        }
+    }
+
+    /// Whether the helper for what only the system's decoders read answers it.
+    fn is_native(self) -> bool {
+        match self {
+            Request::NativeImage | Request::PastedTiff => true,
+            Request::Image | Request::FormulaSvg | Request::SelfCheck => false,
+        }
+    }
+
+    /// Which kind of answer a request can have, so that a helper gets only as much memory out of the app as that kind
+    /// takes.
+    fn may_have(self, answer: Answer) -> bool {
+        match (self, answer) {
+            (_, Answer::Nothing)
+            | (Request::Image, Answer::Pdf | Answer::Rgba)
+            | (Request::FormulaSvg, Answer::Pdf)
+            | (Request::NativeImage, Answer::Rgba)
+            | (Request::PastedTiff, Answer::Png) => true,
+            (Request::Image, Answer::Png)
+            | (Request::FormulaSvg, Answer::Rgba | Answer::Png)
+            | (Request::NativeImage, Answer::Pdf | Answer::Png)
+            | (Request::PastedTiff, Answer::Pdf | Answer::Rgba)
+            | (Request::SelfCheck, Answer::Pdf | Answer::Rgba | Answer::Png) => false,
+        }
+    }
+}
 
 /// A screenshot of a large display can come as an uncompressed TIFF far beyond any image file a document holds.
 const MAX_PASTED_BYTES: usize = 1 << 30;
+
+/// The longest side a request for pixels names, in front of its file.
+const SIDE_BYTES: usize = 4;
 
 /// Everything the helper may do once it runs untrusted data: compute, and use the pipes it was started with.
 const PROFILE: &str = "(version 1)\n(deny default)\n";
@@ -83,14 +196,14 @@ pub fn serve() -> ! {
     let fonts = mapped_system_fonts();
     lock(PROFILE);
     answer_requests(holds_nothing, |kind, payload| match kind {
-        IMAGE => payload.split_first_chunk::<4>().and_then(|(side, image)| {
+        Request::Image => payload.split_first_chunk::<4>().and_then(|(side, image)| {
             safe_image::decode(image, fonts.clone(), u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))
         }),
-        FORMULA_SVG => std::str::from_utf8(payload)
+        Request::FormulaSvg => std::str::from_utf8(payload)
             .ok()
             .and_then(|svg| safe_image::formula_to_pdf(svg, fonts.clone()))
             .map(Decoded::Pdf),
-        _ => None,
+        Request::SelfCheck | Request::NativeImage | Request::PastedTiff => None,
     })
 }
 
@@ -106,11 +219,11 @@ pub fn serve_native() -> ! {
     png_of_tiff(WARM_UP[0]);
     lock(NATIVE_PROFILE);
     answer_requests(holds_nothing, |kind, payload| match kind {
-        NATIVE_IMAGE => payload
+        Request::NativeImage => payload
             .split_first_chunk::<4>()
             .and_then(|(side, image)| native_pixels(image, u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE))),
-        PASTED_TIFF => png_of_tiff(payload).map(Decoded::Png),
-        _ => None,
+        Request::PastedTiff => png_of_tiff(payload).map(Decoded::Png),
+        Request::Image | Request::FormulaSvg | Request::SelfCheck => None,
     })
 }
 
@@ -124,7 +237,7 @@ fn lock(profile: &str) {
     }
 }
 
-fn answer_requests(holds_nothing: bool, decode: impl Fn(u8, &[u8]) -> Option<Decoded>) -> ! {
+fn answer_requests(holds_nothing: bool, decode: impl Fn(Request, &[u8]) -> Option<Decoded>) -> ! {
     let mut input = BufReader::new(std::io::stdin().lock());
     let mut output = BufWriter::new(std::io::stdout().lock());
     loop {
@@ -132,8 +245,11 @@ fn answer_requests(holds_nothing: bool, decode: impl Fn(u8, &[u8]) -> Option<Dec
             std::process::exit(0);
         };
         let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode(kind, &payload)));
-        let written = if kind == SELF_CHECK {
-            output.write_all(&[SELF_CHECK, u8::from(escapes(&payload) || !holds_nothing)])
+        let written = if kind == Request::SelfCheck {
+            output.write_all(&[
+                u8::from(Request::SelfCheck),
+                u8::from(escapes(&payload) || !holds_nothing),
+            ])
         } else {
             write_answer(&mut output, answer.ok().flatten())
         };
@@ -354,33 +470,34 @@ fn holds_no_descriptor() -> bool {
     cfg!(coverage) || (3..256).all(|fd| unsafe { fcntl(fd, F_GETFD) } == -1)
 }
 
-fn read_request(input: &mut impl Read) -> std::io::Result<(u8, Vec<u8>)> {
+/// A request as the helper reads it. A request it does not know ends it, as the app sends none.
+fn read_request(input: &mut impl Read) -> std::io::Result<(Request, Vec<u8>)> {
     let mut head = [0u8; 9];
     input.read_exact(&mut head)?;
+    let kind = Request::try_from(head[0])?;
     let len = usize::try_from(u64::from_le_bytes(head[1..].try_into().expect("8 bytes"))).unwrap_or(usize::MAX);
-    let most = if head[0] == PASTED_TIFF {
-        MAX_PASTED_BYTES
-    } else {
-        MAX_FILE_BYTES + 4
+    let most = match kind {
+        Request::PastedTiff => MAX_PASTED_BYTES,
+        Request::Image | Request::FormulaSvg | Request::SelfCheck | Request::NativeImage => MAX_FILE_BYTES + SIDE_BYTES,
     };
     if len > most {
         return Err(std::io::ErrorKind::InvalidData.into());
     }
     let mut payload = vec![0; len];
     input.read_exact(&mut payload)?;
-    Ok((head[0], payload))
+    Ok((kind, payload))
 }
 
 fn write_answer(output: &mut impl Write, answer: Option<Decoded>) -> std::io::Result<()> {
     match answer {
-        None => output.write_all(&[NOTHING]),
+        None => output.write_all(&[u8::from(Answer::Nothing)]),
         Some(Decoded::Pdf(pdf)) => {
-            output.write_all(&[PDF])?;
+            output.write_all(&[u8::from(Answer::Pdf)])?;
             output.write_all(&(pdf.len() as u64).to_le_bytes())?;
             output.write_all(&pdf)
         }
         Some(Decoded::Png(png)) => {
-            output.write_all(&[PNG])?;
+            output.write_all(&[u8::from(Answer::Png)])?;
             output.write_all(&(png.len() as u64).to_le_bytes())?;
             output.write_all(&png)
         }
@@ -390,7 +507,7 @@ fn write_answer(output: &mut impl Write, answer: Option<Decoded>) -> std::io::Re
             pixels,
             natural,
         }) => {
-            output.write_all(&[RGBA])?;
+            output.write_all(&[u8::from(Answer::Rgba)])?;
             for side in [width, height, natural.0, natural.1] {
                 output.write_all(&side.to_le_bytes())?;
             }
@@ -421,10 +538,10 @@ impl Helper {
         })
     }
 
-    fn exchange(&mut self, kind: u8, side: Option<u32>, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
+    fn exchange(&mut self, kind: Request, side: Option<u32>, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
         let prefix = side.map(u32::to_le_bytes);
         let prefix = prefix.as_ref().map_or(&[][..], |p| &p[..]);
-        self.input.write_all(&[kind])?;
+        self.input.write_all(&[u8::from(kind)])?;
         self.input
             .write_all(&((prefix.len() + payload.len()) as u64).to_le_bytes())?;
         self.input.write_all(prefix)?;
@@ -434,17 +551,9 @@ impl Helper {
     }
 }
 
-/// Which kind of answer a request can have, so that a helper gets only as much memory out of the app as that kind takes.
-fn may_answer(kind: u8, tag: u8) -> bool {
-    matches!(
-        (kind, tag),
-        (_, NOTHING) | (IMAGE, PDF | RGBA) | (FORMULA_SVG, PDF) | (NATIVE_IMAGE, RGBA) | (PASTED_TIFF, PNG)
-    )
-}
-
 /// The answer of a helper to a request of `kind`. It may have been taken over: nothing it sends is trusted beyond these
 /// bounds.
-fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::Result<Option<Decoded>> {
+fn read_answer(input: &mut impl Read, kind: Request, side: Option<u32>) -> std::io::Result<Option<Decoded>> {
     let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidData);
     let u32_from = |input: &mut dyn Read| -> std::io::Result<u32> {
         let mut b = [0u8; 4];
@@ -453,12 +562,13 @@ fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::R
     };
     let mut tag = [0u8; 1];
     input.read_exact(&mut tag)?;
-    if !may_answer(kind, tag[0]) {
+    let answer = Answer::try_from(tag[0])?;
+    if !kind.may_have(answer) {
         return Err(invalid());
     }
-    match tag[0] {
-        NOTHING => Ok(None),
-        PDF => {
+    match answer {
+        Answer::Nothing => Ok(None),
+        Answer::Pdf => {
             let mut len = [0u8; 8];
             input.read_exact(&mut len)?;
             let len = usize::try_from(u64::from_le_bytes(len)).map_err(|_| invalid())?;
@@ -469,7 +579,7 @@ fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::R
             input.read_exact(&mut pdf)?;
             Ok(pdf.starts_with(b"%PDF").then_some(Decoded::Pdf(pdf)))
         }
-        PNG => {
+        Answer::Png => {
             let mut len = [0u8; 8];
             input.read_exact(&mut len)?;
             let len = usize::try_from(u64::from_le_bytes(len)).map_err(|_| invalid())?;
@@ -480,7 +590,7 @@ fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::R
             input.read_exact(&mut png)?;
             Ok(png.starts_with(b"\x89PNG").then_some(Decoded::Png(png)))
         }
-        RGBA => {
+        Answer::Rgba => {
             let width = u32_from(input)?;
             let height = u32_from(input)?;
             let natural = (u32_from(input)?, u32_from(input)?);
@@ -500,7 +610,6 @@ fn read_answer(input: &mut impl Read, kind: u8, side: Option<u32>) -> std::io::R
                 natural,
             }))
         }
-        _ => Err(invalid()),
     }
 }
 
@@ -594,11 +703,11 @@ enum HelperFailure {
     Ended,
 }
 
-fn asked(kind: u8, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>, HelperFailure> {
-    if payload.len() > MAX_FILE_BYTES && kind != PASTED_TIFF || payload.len() > MAX_PASTED_BYTES {
+fn asked(kind: Request, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>, HelperFailure> {
+    if payload.len() > kind.most_bytes() {
         return Err(HelperFailure::TooLarge);
     }
-    let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if matches!(kind, NATIVE_IMAGE | PASTED_TIFF) {
+    let (pool, arg): (&'static [Mutex<Option<Helper>>], &str) = if kind.is_native() {
         (&NATIVE_HELPERS, NATIVE_ARG)
     } else {
         (&HELPERS, ARG)
@@ -616,7 +725,7 @@ fn asked(kind: u8, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>,
         let watch = std::thread::spawn(move || {
             let overrun = overrun(&finished, TIMEOUT, most_memory(), || memory_of(pid));
             if overrun.is_some() {
-                crate::util::end_process(pid);
+                crate::util::end_child(pid);
             }
             overrun
         });
@@ -637,7 +746,7 @@ fn asked(kind: u8, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>,
 }
 
 /// What a helper answers; why there is none goes to the log, as a picture that does not show says nothing about that.
-fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
+fn request(kind: Request, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
     asked(kind, side, payload).unwrap_or_else(|failure| {
         crate::diag::report("a decoder helper gave no answer", format!("{failure:?}"));
         None
@@ -647,7 +756,7 @@ fn request(kind: u8, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
 /// An image file or download as pixels no wider or higher than `side`: PNG, JPEG, GIF, WebP and BMP from one helper, an
 /// SVG as a PDF from there and as pixels from the other, so that this process reads no PDF.
 pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
-    match request(IMAGE, Some(side), bytes)? {
+    match request(Request::Image, Some(side), bytes)? {
         Decoded::Pdf(pdf) => decode_native(&pdf, side),
         Decoded::Png(_) => None,
         pixels => Some(pixels),
@@ -656,12 +765,12 @@ pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
 
 /// What only the system's decoders read, as pixels no wider or higher than `side`.
 pub fn decode_native(bytes: &[u8], side: u32) -> Option<Decoded> {
-    request(NATIVE_IMAGE, Some(side), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
+    request(Request::NativeImage, Some(side), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
 }
 
 /// A TIFF from the pasteboard as a PNG file.
 pub fn png_of_pasted_tiff(tiff: &[u8]) -> Option<Vec<u8>> {
-    match request(PASTED_TIFF, None, tiff)? {
+    match request(Request::PastedTiff, None, tiff)? {
         Decoded::Png(png) => Some(png),
         _ => None,
     }
@@ -674,7 +783,7 @@ pub fn pdf_to_pixels(pdf: &[u8], side: u32) -> Option<Decoded> {
 
 /// A formula as rendered by WebKit: MathJax draws the glyphs of its fonts as paths and leaves other characters as text.
 pub fn svg_to_pdf(svg: &str) -> Option<Vec<u8>> {
-    match request(FORMULA_SVG, None, svg.as_bytes())? {
+    match request(Request::FormulaSvg, None, svg.as_bytes())? {
         Decoded::Pdf(pdf) => Some(pdf),
         Decoded::Png(_) | Decoded::Rgba { .. } => None,
     }
@@ -689,13 +798,13 @@ pub fn svg_to_pixels(svg: &str, side: u32) -> Option<Decoded> {
 #[cfg(feature = "selftest")]
 pub fn self_check(arg: &str, path: &str) -> Option<bool> {
     let mut helper = Helper::start(arg)?;
-    helper.input.write_all(&[SELF_CHECK]).ok()?;
+    helper.input.write_all(&[u8::from(Request::SelfCheck)]).ok()?;
     helper.input.write_all(&(path.len() as u64).to_le_bytes()).ok()?;
     helper.input.write_all(path.as_bytes()).ok()?;
     helper.input.flush().ok()?;
     let mut answer = [0u8; 2];
     helper.output.read_exact(&mut answer).ok()?;
-    (answer[0] == SELF_CHECK).then_some(answer[1] != 0)
+    (Request::try_from(answer[0]) == Ok(Request::SelfCheck)).then_some(answer[1] != 0)
 }
 
 /// Ends the helpers as a crash would, without telling the pool.
@@ -812,7 +921,7 @@ mod tests {
     }
 
     fn rgba(width: u32, height: u32, natural: (u32, u32), pixels: usize) -> Vec<u8> {
-        let mut answer = vec![RGBA];
+        let mut answer = vec![u8::from(Answer::Rgba)];
         for value in [width, height, natural.0, natural.1] {
             answer.extend_from_slice(&value.to_le_bytes());
         }
@@ -821,17 +930,17 @@ mod tests {
     }
 
     fn read(answer: &[u8], side: Option<u32>) -> std::io::Result<Option<Decoded>> {
-        read_answer(&mut std::io::Cursor::new(answer), IMAGE, side)
+        read_answer(&mut std::io::Cursor::new(answer), Request::Image, side)
     }
 
     #[test]
     fn an_honest_answer_comes_through() {
-        assert!(read(&[NOTHING], None).unwrap().is_none());
+        assert!(read(&[u8::from(Answer::Nothing)], None).unwrap().is_none());
         let Decoded::Rgba { width, height, .. } = read(&rgba(2, 1, (2, 1), 8), Some(10)).unwrap().unwrap() else {
             panic!()
         };
         assert_eq!((width, height), (2, 1));
-        let mut pdf = vec![PDF];
+        let mut pdf = vec![u8::from(Answer::Pdf)];
         pdf.extend_from_slice(&5u64.to_le_bytes());
         pdf.extend_from_slice(b"%PDF-");
         assert!(matches!(read(&pdf, None).unwrap(), Some(Decoded::Pdf(_))));
@@ -854,10 +963,10 @@ mod tests {
         ] {
             assert!(read(&answer, Some(10)).is_err(), "{name}");
         }
-        let mut huge_pdf = vec![PDF];
+        let mut huge_pdf = vec![u8::from(Answer::Pdf)];
         huge_pdf.extend_from_slice(&(MAX_PDF as u64 + 1).to_le_bytes());
         assert!(read(&huge_pdf, None).is_err(), "a PDF over the limit is not even read");
-        let mut no_pdf = vec![PDF];
+        let mut no_pdf = vec![u8::from(Answer::Pdf)];
         no_pdf.extend_from_slice(&3u64.to_le_bytes());
         no_pdf.extend_from_slice(b"abc");
         assert!(
@@ -898,21 +1007,34 @@ mod tests {
 
     #[test]
     fn a_helper_answers_only_in_the_kind_its_request_has() {
-        let mut huge_png = vec![PNG];
+        let mut huge_png = vec![u8::from(Answer::Png)];
         huge_png.extend_from_slice(&(MAX_PASTED_BYTES as u64).to_le_bytes());
-        for kind in [IMAGE, FORMULA_SVG, NATIVE_IMAGE] {
+        for kind in [
+            Request::Image,
+            Request::FormulaSvg,
+            Request::NativeImage,
+            Request::SelfCheck,
+        ] {
             let read = read_answer(&mut std::io::Cursor::new(&huge_png), kind, Some(10));
             let error = read.err().expect("no room is made for it");
-            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData, "{kind}");
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData, "{kind:?}");
         }
-        let mut png = vec![PNG];
+        let mut png = vec![u8::from(Answer::Png)];
         png.extend_from_slice(&4u64.to_le_bytes());
         png.extend_from_slice(b"\x89PNG");
-        let pasted = read_answer(&mut std::io::Cursor::new(&png), PASTED_TIFF, None);
+        let pasted = read_answer(&mut std::io::Cursor::new(&png), Request::PastedTiff, None);
         assert!(matches!(pasted.unwrap(), Some(Decoded::Png(_))));
-        let pixels = read_answer(&mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)), PASTED_TIFF, None);
+        let pixels = read_answer(
+            &mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)),
+            Request::PastedTiff,
+            None,
+        );
         assert!(pixels.is_err(), "pixels are no answer to a pasted picture");
-        let pdf_of_formula = read_answer(&mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)), FORMULA_SVG, None);
+        let pdf_of_formula = read_answer(
+            &mut std::io::Cursor::new(rgba(1, 1, (1, 1), 4)),
+            Request::FormulaSvg,
+            None,
+        );
         assert!(pdf_of_formula.is_err(), "and none to a formula");
     }
 
@@ -960,11 +1082,14 @@ mod tests {
 
     #[test]
     fn requests_and_answers_cross_the_pipe_intact() {
-        let mut wire = vec![IMAGE];
+        let mut wire = vec![u8::from(Request::Image)];
         wire.extend_from_slice(&3u64.to_le_bytes());
         wire.extend_from_slice(b"abc");
-        assert_eq!(read_request(&mut wire.as_slice()).unwrap(), (IMAGE, b"abc".to_vec()));
-        let mut huge = vec![IMAGE];
+        assert_eq!(
+            read_request(&mut wire.as_slice()).unwrap(),
+            (Request::Image, b"abc".to_vec())
+        );
+        let mut huge = vec![u8::from(Request::Image)];
         huge.extend_from_slice(&(MAX_FILE_BYTES as u64 + 1).to_le_bytes());
         assert!(read_request(&mut huge.as_slice()).is_err());
         let mut out = Vec::new();
@@ -980,15 +1105,60 @@ mod tests {
             }),
         )
         .unwrap();
-        let mut expected = vec![NOTHING, PDF];
+        let mut expected = vec![u8::from(Answer::Nothing), u8::from(Answer::Pdf)];
         expected.extend_from_slice(&4u64.to_le_bytes());
         expected.extend_from_slice(b"%PDF");
-        expected.push(RGBA);
+        expected.push(u8::from(Answer::Rgba));
         for side in [1u32, 1, 9, 9] {
             expected.extend_from_slice(&side.to_le_bytes());
         }
         expected.extend_from_slice(&[1, 2, 3, 4]);
         assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn every_code_names_one_request_or_answer_and_the_rest_none() {
+        let requests: Vec<Request> = (0..=u8::MAX).filter_map(|code| Request::try_from(code).ok()).collect();
+        let answers: Vec<Answer> = (0..=u8::MAX).filter_map(|code| Answer::try_from(code).ok()).collect();
+        assert_eq!(requests.len(), 5);
+        assert_eq!(answers.len(), 4);
+        for code in 0..=u8::MAX {
+            match Request::try_from(code) {
+                Ok(request) => assert_eq!(u8::from(request), code),
+                Err(unknown) => assert_eq!(unknown, UnknownCode(code)),
+            }
+            match Answer::try_from(code) {
+                Ok(answer) => assert_eq!(u8::from(answer), code),
+                Err(unknown) => assert_eq!(unknown, UnknownCode(code)),
+            }
+        }
+    }
+
+    #[test]
+    fn a_request_the_helper_does_not_know_ends_it() {
+        let mut wire = vec![9];
+        wire.extend_from_slice(&0u64.to_le_bytes());
+        let error = read_request(&mut wire.as_slice()).expect_err("no request");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        let mut tiff = vec![u8::from(Request::PastedTiff)];
+        tiff.extend_from_slice(&((MAX_FILE_BYTES + SIDE_BYTES + 1) as u64).to_le_bytes());
+        assert!(
+            read_request(&mut tiff.as_slice()).is_err_and(|e| e.kind() == std::io::ErrorKind::UnexpectedEof),
+            "a pasted picture may be larger than a file"
+        );
+    }
+
+    #[test]
+    fn only_pictures_of_the_system_go_to_its_helper_and_only_pasted_ones_may_be_huge() {
+        assert!(Request::NativeImage.is_native() && Request::PastedTiff.is_native());
+        assert!(!Request::Image.is_native() && !Request::FormulaSvg.is_native() && !Request::SelfCheck.is_native());
+        assert_eq!(Request::PastedTiff.most_bytes(), MAX_PASTED_BYTES);
+        assert_eq!(Request::Image.most_bytes(), MAX_FILE_BYTES);
+        let too_large = vec![0; MAX_FILE_BYTES + 1];
+        assert_eq!(
+            asked(Request::Image, Some(1), &too_large).err(),
+            Some(HelperFailure::TooLarge)
+        );
     }
 
     #[test]

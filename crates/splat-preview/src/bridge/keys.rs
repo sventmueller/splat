@@ -4,9 +4,10 @@
 use std::ops::Range;
 
 use crate::Shown;
-use crate::layout::{Atom, Marker, ParaKind, RunMap};
+use crate::layout::{Atom, ItemMarker, ParaKind, RunMap};
 use splat_markdown::commands::{Edit, LinePrefix, leaf_at, line_span};
 use splat_markdown::doc::{BlockKind, Inline, InlineKind, ListKind, block_path, inline_path, walk_inlines};
+use splat_markdown::markup::{Role, Tag, attribute_range, read_tag};
 use splat_markdown::table;
 use splat_markdown::text::{Byte, Direction, TextAt, line_end, line_start, lines_with_ends, shifted, signed, units};
 
@@ -118,33 +119,33 @@ impl Bridge<'_> {
         // A code span holds nothing but its text, so it comes first, from inside out.
         let mut code = None;
         walk_inlines(leaf.inlines(), &mut |i: &Inline| {
-            if matches!(i.kind, InlineKind::Code(_)) && i.range.start < at && at < i.range.end {
+            if matches!(i.kind(), InlineKind::Code(_)) && i.range().start < at && at < i.range().end {
                 code = Some(i);
             }
         });
         if let Some(span) = code {
             let content = span.code_content(self.text);
             if at <= content.start {
-                at = span.range.start;
+                at = span.range().start;
             } else if at >= content.end {
-                at = span.range.end;
+                at = span.range().end;
             } else {
-                open.push_str(self.text.at(span.range.start..content.start));
-                close.push_str(self.text.at(content.end..span.range.end));
+                open.push_str(self.text.at(span.range().start..content.start));
+                close.push_str(self.text.at(content.end..span.range().end));
             }
         }
         for i in path.iter().rev() {
-            if !(i.range.start < at && at < i.range.end) || matches!(i.kind, InlineKind::Image { .. }) {
+            if !(i.range().start < at && at < i.range().end) || matches!(i.kind(), InlineKind::Image { .. }) {
                 continue;
             }
             let content = i.content_range();
             if at <= content.start {
-                at = i.range.start;
+                at = i.range().start;
             } else if at >= content.end {
-                at = i.range.end;
+                at = i.range().end;
             } else {
-                open.insert_str(0, self.text.at(i.range.start..content.start));
-                close.push_str(self.text.at(content.end..i.range.end));
+                open.insert_str(0, self.text.at(i.range().start..content.start));
+                close.push_str(self.text.at(content.end..i.range().end));
             }
         }
         (at, close, open)
@@ -391,7 +392,7 @@ impl Bridge<'_> {
     /// Toggles the checkbox of the task item whose marker sits in the paragraph at `p`.
     pub fn toggle_task(&self, p: Shown) -> Option<Edit> {
         let para_index = self.index.para_at(p)?;
-        let Some(Marker::Task {
+        let Some(ItemMarker::Task {
             checked,
             symbol: Some(symbol),
         }) = self.index.para(self.layout, para_index).style.marker.clone()
@@ -413,8 +414,8 @@ impl Bridge<'_> {
 /// The change to a `<details>` tag that adds or removes its `open` attribute.
 pub(super) fn toggle_open(tag: &str, open: bool) -> Option<(Range<usize>, String)> {
     let is_details = matches!(
-        splat_markdown::markup::read_tag(tag, 0),
-        Some((splat_markdown::markup::Tag::Open { name, .. }, end)) if name == "details" && end == tag.len()
+        read_tag(tag, 0),
+        Some((Tag::Open { name, .. }, end)) if Role::of(&name) == Role::Details && end == tag.len()
     );
     if !is_details {
         return None;
@@ -427,6 +428,6 @@ pub(super) fn toggle_open(tag: &str, open: bool) -> Option<(Range<usize>, String
         };
         return Some((end..end, " open".to_string()));
     }
-    let attribute = splat_markdown::markup::attribute_range(tag, "open")?;
+    let attribute = attribute_range(tag, "open")?;
     Some((tag[..attribute.start].trim_end().len()..attribute.end, String::new()))
 }

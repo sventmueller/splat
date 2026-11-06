@@ -3,8 +3,8 @@ use std::ops::Range;
 use super::Edit;
 use crate::doc::{BlockKind, Doc};
 use crate::text::{
-    Byte, ContainerMark, TextAt, block_indent, container_mark, growth, indent_len, line_end, line_start,
-    lines_with_ends, next_quote_mark, shifted,
+    Byte, ContainerMark, TextAt, block_indent, growth, indent_len, line_end, line_marks, line_start, lines_with_ends,
+    shifted, with_its_space,
 };
 
 /// The kinds of list the list commands write and the menus check.
@@ -20,6 +20,7 @@ pub enum ListStyle {
 
 /// Byte range of the full lines touched by `sel`, without the final newline.
 pub fn line_span(text: &str, sel: &Range<Byte>) -> Range<Byte> {
+    let sel = text.fit(sel.clone());
     let start = line_start(text, sel.start);
     let mut end_anchor = sel.end;
     if sel.end > sel.start {
@@ -48,57 +49,39 @@ pub struct LinePrefix {
 }
 
 impl LinePrefix {
-    /// Where the first `quotes` quote marks of `line` end, with the space that belongs to each.
+    /// Where the first `quotes` quote marks of `line` end, with the space or tab that belongs to each.
     pub fn quote_end_of(line: &str, quotes: usize) -> usize {
-        let mut end = 0;
-        for _ in 0..quotes {
-            let Some(mark) = next_quote_mark(line, end) else {
-                break;
-            };
-            end = mark + 1 + usize::from(line[mark + 1..].starts_with(' '));
-        }
-        end
+        line_marks(line)
+            .take_while(|mark| mark.kind == ContainerMark::Quote)
+            .take(quotes)
+            .last()
+            .map_or(0, |mark| with_its_space(line, mark.range.end))
     }
 
     /// The prefixes `line` starts with.
     pub fn parse(line: &str) -> LinePrefix {
         let b = line.as_bytes();
-        let quote_end = LinePrefix::quote_end_of(line, usize::MAX);
-        let i = quote_end;
+        let mut marks = line_marks(line).peekable();
+        let mut quote_end = 0;
+        while let Some(quote) = marks.next_if(|mark| mark.kind == ContainerMark::Quote) {
+            quote_end = with_its_space(line, quote.range.end);
+        }
         let mut p = LinePrefix {
             quote_end,
-            content: i,
+            content: quote_end,
             ..Default::default()
         };
-        let marker_start = i + indent_len(&line[i..]);
-        let mut j = marker_start;
-        let space_or_end = |c: Option<&u8>| c.is_none_or(|c| matches!(c, b' ' | b'\t'));
-        let kind = container_mark(&line[j..]).and_then(|(mark, len)| {
-            let style = match mark {
-                ContainerMark::Quote => return None,
-                ContainerMark::Bullet => ListStyle::Bullet,
-                ContainerMark::Number if len <= 10 => ListStyle::Numbered,
-                ContainerMark::Number => return None,
+        if let Some(marker) = marks.next() {
+            let (style, end) = match marks.next_if(|mark| mark.kind == ContainerMark::Task) {
+                Some(task) => (ListStyle::Task, task.range.end),
+                None if marker.kind == ContainerMark::Bullet => (ListStyle::Bullet, marker.range.end),
+                None => (ListStyle::Numbered, marker.range.end),
             };
-            space_or_end(b.get(j + len)).then(|| {
-                j += len;
-                style
-            })
-        });
-        if let Some(mut k) = kind {
-            while j < b.len() && matches!(b[j], b' ' | b'\t') {
-                j += 1;
-            }
-            if b[j..].len() >= 3 && b[j] == b'[' && matches!(b[j + 1], b' ' | b'x' | b'X') && b[j + 2] == b']' {
-                j += 3;
-                while j < b.len() && matches!(b[j], b' ' | b'\t') {
-                    j += 1;
-                }
-                k = ListStyle::Task;
-            }
-            p.list = Some((marker_start..j, k));
-            p.content = j;
+            let end = end + indent_len(&line[end..]);
+            p.list = Some((marker.range.start..end, style));
+            p.content = end;
         }
+        let space_or_end = |c: Option<&u8>| c.is_none_or(|c| matches!(c, b' ' | b'\t'));
         let rest = &line[p.content..];
         if let Some(indent) = block_indent(rest) {
             let hashes = rest[indent..].bytes().take_while(|&c| c == b'#').count();
@@ -144,6 +127,7 @@ fn map_lines(text: &str, sel: &Range<Byte>, mut f: impl FnMut(usize, &str, &Line
 /// Makes the lines of the selection headings of `level`, or plain text for level 0, replacing the underline of a setext
 /// title.
 pub fn set_heading(doc: &Doc, sel: Range<Byte>, level: u8) -> Edit {
+    let sel = doc.fit(sel);
     let text = doc.text();
     let span = line_span(text, &sel);
     let several_lines = text.at(span.clone()).contains(['\n', '\r']);
@@ -191,6 +175,7 @@ pub(super) fn setext_underline_behind(text: &str, span: &Range<Byte>) -> Option<
 /// Makes the lines of the selection items of a `style` list, or takes their markers off when all of them are such items
 /// already; blank lines stay as they are.
 pub fn toggle_list(text: &str, sel: Range<Byte>, style: ListStyle) -> Edit {
+    let sel = text.fit(sel);
     let span = line_span(text, &sel);
     let all_same = lines_with_ends(text.at(span.clone()))
         .map(|(l, _)| l)
@@ -220,6 +205,7 @@ pub fn toggle_list(text: &str, sel: Range<Byte>, style: ListStyle) -> Edit {
 
 /// Puts `> ` in front of the lines of the selection, or takes one quote level off when all of them are quoted.
 pub fn toggle_quote(text: &str, sel: Range<Byte>) -> Edit {
+    let sel = text.fit(sel);
     let span = line_span(text, &sel);
     let all_quoted = lines_with_ends(text.at(span.clone())).all(|(l, _)| LinePrefix::parse(l).quote_end > 0);
     map_lines(text, &sel, |_, line, _| {
@@ -339,6 +325,10 @@ mod tests {
         assert_eq!(LinePrefix::parse("    > a").quote_end, 0, "that much is code");
         assert_eq!(LinePrefix::parse(">   > a").quote_end, 6);
         assert_eq!(LinePrefix::parse("  - a").list, Some((2..4, ListStyle::Bullet)));
+        assert_eq!(LinePrefix::parse(">\t> a").quote_end, 4, "a tab belongs to its mark");
+        assert_eq!(LinePrefix::quote_end_of("> > > a", 2), 4);
+        let nested = LinePrefix::parse("> - > a");
+        assert_eq!((nested.quote_end, nested.list), (2, Some((2..4, ListStyle::Bullet))));
     }
 
     #[test]

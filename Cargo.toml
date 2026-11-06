@@ -7,6 +7,41 @@ exclude = ["fuzz", "vendor/comrak"]
 [patch.crates-io]
 comrak = { path = "vendor/comrak" }
 
+[workspace.dependencies]
+splat-editor-state = { path = "crates/splat-editor-state" }
+splat-file-state = { path = "crates/splat-file-state" }
+splat-git = { path = "crates/splat-git" }
+splat-i18n = { path = "crates/splat-i18n" }
+splat-import = { path = "crates/splat-import" }
+splat-markdown = { path = "crates/splat-markdown" }
+splat-notes = { path = "crates/splat-notes" }
+splat-ooxml = { path = "crates/splat-ooxml" }
+splat-preview = { path = "crates/splat-preview" }
+splat-testkit = { path = "crates/splat-testkit" }
+block2 = "0.6.2"
+caseless = "0.2"
+comrak = { version = "0.59", default-features = false }
+dispatch2 = "0.3"
+emojis = "0.9"
+encoding_rs = "0.8"
+entities = "1"
+image = { version = "0.25", default-features = false }
+krilla = "0.8"
+krilla-svg = "0.8"
+libc = "0.2"
+miniz_oxide = "0.9"
+objc2 = "0.6.5"
+objc2-app-kit = "0.3.2"
+objc2-foundation = "0.3.2"
+objc2-uniform-type-identifiers = "0.3.2"
+objc2-web-kit = "0.3.2"
+proc-macro2 = { version = "1", default-features = false }
+roxmltree = "0.21"
+syn = { version = "3", default-features = false }
+unicode-normalization = "0.1"
+unicode-width = "0.2"
+usvg = "0.47"
+
 [workspace.package]
 edition = "2024"
 license = "MIT OR Apache-2.0"
@@ -44,33 +79,35 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-splat-file-state = { path = "crates/splat-file-state" }
-splat-git = { path = "crates/splat-git" }
-splat-i18n = { path = "crates/splat-i18n" }
-splat-import = { path = "crates/splat-import" }
-splat-markdown = { path = "crates/splat-markdown" }
-splat-notes = { path = "crates/splat-notes" }
-splat-preview = { path = "crates/splat-preview" }
+splat-editor-state.workspace = true
+splat-file-state.workspace = true
+splat-git.workspace = true
+splat-i18n.workspace = true
+splat-import.workspace = true
+splat-markdown.workspace = true
+splat-notes.workspace = true
+splat-preview.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
-block2 = "0.6.2"
-dispatch2 = "0.3"
-libc = "0.2"
-objc2 = { version = "0.6.5", features = ["catch-all"] }
-objc2-app-kit = { version = "0.3.2", features = ["objc2-uniform-type-identifiers"] }
-objc2-foundation = "0.3.2"
-objc2-uniform-type-identifiers = "0.3.2"
-objc2-web-kit = "0.3.2"
-krilla = "0.8"
-krilla-svg = "0.8"
-usvg = "0.47"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+block2.workspace = true
+dispatch2.workspace = true
+libc.workspace = true
+objc2 = { workspace = true, features = ["catch-all"] }
+objc2-app-kit = { workspace = true, features = ["objc2-uniform-type-identifiers"] }
+objc2-foundation.workspace = true
+objc2-uniform-type-identifiers.workspace = true
+objc2-web-kit.workspace = true
+krilla.workspace = true
+krilla-svg.workspace = true
+usvg.workspace = true
+image = { workspace = true, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 
 [dev-dependencies]
-splat-testkit = { path = "crates/splat-testkit" }
+splat-ooxml.workspace = true
+splat-testkit = { workspace = true, features = ["sources"] }
 
 [features]
-selftest = ["splat-markdown/selftest"]
+selftest = ["splat-editor-state/selftest", "splat-markdown/selftest"]
 
 # What ships does what the tests saw: an overflow ends in `contained` instead of a wrong offset. A keystroke costs the same;
 # measured on a full layout of 10 MB, about a fifth more.

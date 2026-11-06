@@ -1,6 +1,8 @@
 //! XML from anywhere, read with roxmltree without letting it take quadratic time: it compares each attribute with those of
 //! its element and looks through the namespaces in scope for each prefix.
 
+use std::cell::Cell;
+
 use roxmltree::{Document, Error, ParsingOptions};
 
 /// Why a part of a Word file cannot be read as XML.
@@ -14,23 +16,65 @@ pub(crate) enum XmlError {
 const MOST_ATTRIBUTES: usize = 256;
 /// More than in scope anywhere in what Word or LibreOffice write.
 const MOST_NAMESPACES: usize = 256;
-/// About as many nodes as a `word/document.xml` of the size allowed can hold when it is not made to hurt.
+/// More than all the XML of a Word file that is not made to hurt; the text of a part stays in memory while it is read.
+pub(crate) const MOST_XML_BYTES: u64 = 128 << 20;
+/// About as many nodes as XML of that size holds when it is not made to hurt.
 const MOST_NODES: u32 = 16_000_000;
 
-/// `text` as a document with neither a document type nor more than the limits above.
-pub(crate) fn parse(text: &str) -> Result<Document<'_>, XmlError> {
+/// What all the XML read for one import or one template merge may take together, as several parts are in memory at
+/// once: the bytes of their text, taken when a part is read, and the nodes parsed from them.
+#[derive(Debug)]
+pub(crate) struct XmlBudget {
+    bytes: Cell<u64>,
+    nodes: Cell<u32>,
+}
+
+impl Default for XmlBudget {
+    fn default() -> XmlBudget {
+        XmlBudget::new(MOST_XML_BYTES, MOST_NODES)
+    }
+}
+
+impl XmlBudget {
+    /// A budget of `bytes` of text and `nodes` parsed from it.
+    pub(crate) fn new(bytes: u64, nodes: u32) -> XmlBudget {
+        XmlBudget {
+            bytes: Cell::new(bytes),
+            nodes: Cell::new(nodes),
+        }
+    }
+
+    /// Takes `bytes` of XML text from the budget, or fails with `TooLarge` if fewer are left.
+    pub(crate) fn take_bytes(&self, bytes: u64) -> Result<(), XmlError> {
+        let left = self.bytes.get().checked_sub(bytes).ok_or(XmlError::TooLarge)?;
+        self.bytes.set(left);
+        Ok(())
+    }
+
+    /// How many nodes are left for parts still to be parsed.
+    #[cfg(test)]
+    pub(crate) fn nodes_left(&self) -> u32 {
+        self.nodes.get()
+    }
+}
+
+/// `text` as a document with neither a document type nor more than the limits above; its nodes come out of `budget`.
+pub(crate) fn parse<'t>(text: &'t str, budget: &XmlBudget) -> Result<Document<'t>, XmlError> {
     if !within_limits(text.as_bytes()) {
         return Err(XmlError::Damaged);
     }
     let options = ParsingOptions {
         allow_dtd: false,
-        nodes_limit: MOST_NODES,
+        nodes_limit: budget.nodes.get(),
         ..ParsingOptions::default()
     };
-    Document::parse_with_options(text, options).map_err(|error| match error {
+    let document = Document::parse_with_options(text, options).map_err(|error| match error {
         Error::NodesLimitReached => XmlError::TooLarge,
         _ => XmlError::Damaged,
-    })
+    })?;
+    let nodes = u32::try_from(document.descendants().count()).unwrap_or(u32::MAX);
+    budget.nodes.set(budget.nodes.get().saturating_sub(nodes));
+    Ok(document)
 }
 
 /// Whether no element has too many attributes and too many namespaces are nowhere in scope. It only has to be right for
@@ -141,6 +185,38 @@ fn read_tag(xml: &[u8], at: usize) -> ReadTag {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(text: &str) -> Result<Document<'_>, XmlError> {
+        super::parse(text, &XmlBudget::default())
+    }
+
+    #[test]
+    fn parts_share_one_budget_of_nodes() {
+        let budget = XmlBudget::new(0, 7);
+        let doc = super::parse("<a><b/><c/></a>", &budget).unwrap();
+        assert_eq!(doc.descendants().count(), 4);
+        assert_eq!(budget.nodes.get(), 3);
+        assert!(super::parse("<a><b/></a>", &budget).is_ok());
+        assert_eq!(budget.nodes.get(), 0);
+        assert_eq!(super::parse("<a/>", &budget).unwrap_err(), XmlError::TooLarge);
+        let one_part_too_many = XmlBudget::new(0, 3);
+        assert_eq!(
+            super::parse("<a><b/><c/></a>", &one_part_too_many).unwrap_err(),
+            XmlError::TooLarge
+        );
+    }
+
+    #[test]
+    fn parts_share_one_budget_of_bytes() {
+        let budget = XmlBudget::new(10, 0);
+        assert_eq!(budget.take_bytes(6), Ok(()));
+        assert_eq!(budget.take_bytes(5), Err(XmlError::TooLarge));
+        assert_eq!(budget.take_bytes(4), Ok(()));
+        assert_eq!(budget.take_bytes(1), Err(XmlError::TooLarge));
+        let default = XmlBudget::default();
+        assert_eq!(default.take_bytes(MOST_XML_BYTES + 1), Err(XmlError::TooLarge));
+        assert_eq!(default.take_bytes(MOST_XML_BYTES), Ok(()));
+    }
 
     fn attributes(count: usize) -> String {
         (0..count).map(|n| format!(" a{n}=\"1\"")).collect()

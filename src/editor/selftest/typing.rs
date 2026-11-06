@@ -98,6 +98,11 @@ impl Run {
         std::fs::read(&self.path).unwrap_or_default()
     }
 
+    /// The file holds the text and nothing waits to be written.
+    fn written_out(&self) -> bool {
+        self.file() == self.e.exact_text().into_bytes() && self.e.document().is_some_and(|d| !d.isDocumentEdited())
+    }
+
     /// What holds after every key.
     fn look(&self, tick: usize) {
         let text = self.e.exact_text();
@@ -181,73 +186,86 @@ impl Run {
             self.autosaves.get(),
             self.saves_asked.get()
         );
-        // The look at the files comes every two seconds, and it is what used to take the text away.
-        after(3.0, move || {
-            self.look(usize::MAX);
-            let lost = self.lost.borrow().clone();
-            check(
-                "what is typed stays through every save",
-                lost.is_empty(),
-                &lost.join("; "),
-            );
-            check_in_front(
-                self.e.mtm(),
-                "text no file holds shows as unsaved after every key",
-                self.unmarked.get() == 0,
-                &format!("{} times not", self.unmarked.get()),
-            );
-            let saves_begun = crate::test_hooks::SAVES_ASKED_FOR.load(std::sync::atomic::Ordering::Relaxed);
-            check_in_front(
-                self.e.mtm(),
-                "every Command-S on unsaved text starts a save",
-                saves_begun >= self.saves_asked.get() && (self.by_hand || self.saves_asked.get() > 0),
-                &format!("{saves_begun} saves began for {} keys", self.saves_asked.get()),
-            );
-            check(
-                "the file was written while typing went on",
-                self.autosaves.get() > 0,
-                &format!(
-                    "the file never changed, with Command-S on unsaved text seen {} times",
-                    self.saves_asked.get()
-                ),
-            );
-            let typed = self.e.exact_text();
-            let undo = self.e.document().and_then(|d| d.undoManager());
-            if let Some(undo) = &undo {
-                undo.undo();
-            }
-            let undone = self.e.exact_text();
-            check(
-                "what is typed through saves can still be undone",
-                undone.len() < typed.len() && typed.starts_with(&undone),
-                &format!("{} bytes of {}", undone.len(), typed.len()),
-            );
-            if let Some(undo) = &undo {
-                undo.redo();
-            }
-            check(
-                "what was undone comes back",
-                self.e.exact_text() == typed,
-                &format!("{} bytes of {}", self.e.exact_text().len(), typed.len()),
-            );
-            if let Some(document) = self.e.document() {
-                // SAFETY: NSDocument's action method, called on the main thread without a sender.
-                unsafe { document.saveDocument(None) };
-            }
-            let this = self.clone();
-            after(3.0, move || {
+        // The autosave that comes every two seconds is what used to take the text away, so its end is waited for.
+        let written = self.clone();
+        super::wait(
+            0.0,
+            6.0,
+            2,
+            move || written.written_out(),
+            move |_| {
+                self.look(usize::MAX);
+                let lost = self.lost.borrow().clone();
                 check(
-                    "a last save writes all that was typed",
-                    this.file() == this.e.exact_text().into_bytes(),
+                    "what is typed stays through every save",
+                    lost.is_empty(),
+                    &lost.join("; "),
+                );
+                check_in_front(
+                    self.e.mtm(),
+                    "text no file holds shows as unsaved after every key",
+                    self.unmarked.get() == 0,
+                    &format!("{} times not", self.unmarked.get()),
+                );
+                let saves_begun = crate::test_hooks::SAVES_ASKED_FOR.load(std::sync::atomic::Ordering::Relaxed);
+                check_in_front(
+                    self.e.mtm(),
+                    "every Command-S on unsaved text starts a save",
+                    saves_begun >= self.saves_asked.get() && (self.by_hand || self.saves_asked.get() > 0),
+                    &format!("{saves_begun} saves began for {} keys", self.saves_asked.get()),
+                );
+                check(
+                    "the file was written while typing went on",
+                    self.autosaves.get() > 0,
                     &format!(
-                        "{} bytes on file, {} in the view",
-                        this.file().len(),
-                        this.e.exact_text().len()
+                        "the file never changed, with Command-S on unsaved text seen {} times",
+                        self.saves_asked.get()
                     ),
                 );
-                finish();
-            });
-        });
+                let typed = self.e.exact_text();
+                let undo = self.e.document().and_then(|d| d.undoManager());
+                if let Some(undo) = &undo {
+                    undo.undo();
+                }
+                let undone = self.e.exact_text();
+                check(
+                    "what is typed through saves can still be undone",
+                    undone.len() < typed.len() && typed.starts_with(&undone),
+                    &format!("{} bytes of {}", undone.len(), typed.len()),
+                );
+                if let Some(undo) = &undo {
+                    undo.redo();
+                }
+                check(
+                    "what was undone comes back",
+                    self.e.exact_text() == typed,
+                    &format!("{} bytes of {}", self.e.exact_text().len(), typed.len()),
+                );
+                if let Some(document) = self.e.document() {
+                    // SAFETY: NSDocument's action method, called on the main thread without a sender.
+                    unsafe { document.saveDocument(None) };
+                }
+                let (this, saved) = (self.clone(), self.clone());
+                super::wait(
+                    0.0,
+                    10.0,
+                    1,
+                    move || saved.written_out(),
+                    move |_| {
+                        check(
+                            "a last save writes all that was typed",
+                            this.file() == this.e.exact_text().into_bytes(),
+                            &format!(
+                                "{} bytes on file, {} in the view",
+                                this.file().len(),
+                                this.e.exact_text().len()
+                            ),
+                        );
+                        finish();
+                    },
+                );
+            },
+        );
     }
 }
 
