@@ -216,13 +216,15 @@ impl<'t> Walker<'t> {
 }
 
 /// What opens a link at the start of `rest`: a tag `<a …>`, the `<` of an address in angle brackets, a `[`, or nothing
-/// for an address that is its own link.
+/// for an address that is its own link. `None` for the prefix of a line in front of it.
 fn opening_of_link(rest: &str) -> Option<usize> {
     let is_tag = rest.starts_with("<a") && rest[2..].starts_with([' ', '\t', '\n', '\r', '>']);
     if is_tag {
         Some(rest.find('>')? + 1)
     } else if rest.starts_with(['[', '<']) {
         Some(1)
+    } else if rest.starts_with([' ', '\t', '>']) {
+        None
     } else {
         Some(0)
     }
@@ -411,6 +413,25 @@ mod tests {
         }
         let literals: Vec<&str> = found.iter().map(|(l, _)| l.as_str()).collect();
         assert_eq!(literals, expected, "in {source:?}");
+    }
+
+    #[test]
+    fn a_link_behind_the_prefix_of_a_line_keeps_its_brackets() {
+        for source in [
+            "a\r\n [t](u) b\r\n",
+            "[x](y) a\r\n  [t](u) b\r\n",
+            "> a\r\n>  [t](u) b\r\n",
+        ] {
+            let mut links = Vec::new();
+            walk_blocks(&parse(source).blocks, &mut |b: &Block| {
+                walk_inlines(b.inlines(), &mut |i: &Inline| {
+                    if matches!(i.kind, InlineKind::Link { .. }) {
+                        links.push(source.at(i.range.clone()).to_string());
+                    }
+                });
+            });
+            assert_eq!(links.last().map(String::as_str), Some("[t](u)"), "{source:?}");
+        }
     }
 
     #[test]

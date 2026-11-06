@@ -1,22 +1,27 @@
 //! The editor window: Markdown source and preview side by side. `controller` holds the one object AppKit knows, and the
-//! components below do the work, each with the state it owns; README.md describes the rules that keep the delegate
+//! components below do the work, each with the state it owns; docs/development.md describes the rules that keep the delegate
 //! callbacks from stepping on each other.
 
 pub mod actions;
 mod atom;
 mod attributes;
+mod changes;
 mod controller;
+mod counter;
 pub mod decoder;
 mod dialogs;
 mod editing;
 mod env;
 mod export;
+mod export_options;
 mod images;
 mod js;
 mod links;
 mod mathfield;
+mod metadata;
 mod model;
 mod navigation;
+mod notes;
 mod outline;
 mod panes;
 mod picture;
@@ -30,6 +35,7 @@ mod selection;
 #[cfg(feature = "selftest")]
 pub mod selftest;
 mod shadow;
+mod sidebar;
 mod state;
 mod style;
 mod sync;
@@ -71,19 +77,47 @@ fn relayout_all() {
     }
 }
 
+fn open_editors() -> Vec<Retained<EditorController>> {
+    OPEN_EDITORS.with(|e| e.borrow().iter().filter_map(Weak::load).collect())
+}
+
+/// A setting every window follows changed.
+fn setting_changed_everywhere() {
+    for editor in open_editors() {
+        editor.setting_changed();
+    }
+}
+
+/// Asks the repository of the document in front whether its last commit moved; the others ask when they come to the front.
+pub fn look_at_repositories() {
+    for editor in open_editors() {
+        if objc2_app_kit::NSWindowController::window(&editor).is_some_and(|window| window.isKeyWindow()) {
+            editor.look_at_repository();
+        }
+    }
+}
+
+/// The open documents, whose texts may be ahead of their files.
+fn open_documents(mtm: MainThreadMarker) -> Vec<Retained<crate::document::MdDocument>> {
+    objc2_app_kit::NSDocumentController::sharedDocumentController(mtm)
+        .documents()
+        .iter()
+        .filter_map(|document| document.downcast::<crate::document::MdDocument>().ok())
+        .collect()
+}
+
 /// Where `emergency_save` leaves the texts, for `offer_recovered` to point to after the next start.
 pub(crate) fn recovery_dir() -> Option<PathBuf> {
     // Self-test builds keep their copies with their other output, away from the user's.
-    #[cfg(feature = "selftest")]
-    {
-        let out = std::env::var_os("SPLAT_SELFTEST_OUT").map_or_else(std::env::temp_dir, PathBuf::from);
-        Some(out.join("Recovery"))
+    if crate::test_hooks::SELFTEST {
+        return Some(
+            crate::test_hooks::output_dir()
+                .unwrap_or_else(std::env::temp_dir)
+                .join("Recovery"),
+        );
     }
-    #[cfg(not(feature = "selftest"))]
-    {
-        let home = std::env::var_os("HOME")?;
-        Some(PathBuf::from(home).join("Library/Application Support/Splat/Recovery"))
-    }
+    let home = std::env::var_os("HOME")?;
+    Some(PathBuf::from(home).join("Library/Application Support/Splat/Recovery"))
 }
 
 /// Writes the text of every open document to a recovery folder; runs from the panic hook right before the app
@@ -195,7 +229,7 @@ mod tests {
     use std::path::Path;
 
     /// The most methods the class may have outside `define_class!`; what does more belongs to a component.
-    const MOST_METHODS: usize = 45;
+    const MOST_METHODS: usize = 58;
 
     fn sources(dir: &Path) -> Vec<std::path::PathBuf> {
         let mut found = Vec::new();

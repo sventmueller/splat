@@ -2,6 +2,7 @@
 //! the key; `<language>.lproj/Localizable.strings` maps it, and a missing entry shows the German text.
 
 #![forbid(unsafe_code)]
+#![warn(missing_docs, unreachable_pub)]
 
 use std::collections::HashMap;
 use std::sync::OnceLock;

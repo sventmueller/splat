@@ -43,6 +43,31 @@ pub struct RenderCtx<'a> {
     pub leaves_the_mac: bool,
     /// What the formulas of the document define for each other.
     pub macros: std::sync::Arc<str>,
+    /// Pictures from the web and what WebKit drew, which the preview shows but does not make.
+    pub drawn: &'a dyn Drawn,
+}
+
+/// What the preview shows but others make: pictures from the web and the formulas and diagrams WebKit drew.
+pub trait Drawn {
+    /// A picture from the web, once it has loaded.
+    fn web_picture(&self, url: &str) -> Option<Rendered>;
+    /// A formula or diagram as WebKit drew it, once it has.
+    fn drawing(&self, key: &js::Key) -> Option<Rendered>;
+}
+
+/// The app's downloads and WebKit's drawings; `requester` hears when a picture it asked for arrives.
+pub struct Live<'a> {
+    pub requester: Option<&'a super::EditorController>,
+}
+
+impl Drawn for Live<'_> {
+    fn web_picture(&self, url: &str) -> Option<Rendered> {
+        remote::get(url, self.requester).flatten()
+    }
+
+    fn drawing(&self, key: &js::Key) -> Option<Rendered> {
+        js::cached(key)
+    }
 }
 
 struct TextBlocks {
@@ -609,8 +634,7 @@ impl RenderCtx<'_> {
                 let (url, alt) = (&image.url, &image.alt);
                 let found = if remote::is_remote(url) {
                     self.remote_images
-                        .then(|| remote::get(url, self.controller))
-                        .flatten()
+                        .then(|| self.drawn.web_picture(url))
                         .flatten()
                         .map(|r| self.images.borrow_mut().for_appearance(url, r, self.dark))
                 } else if self.leaves_the_mac && !may_leave_with_the_document(url, self.doc_dir) {
@@ -628,8 +652,11 @@ impl RenderCtx<'_> {
                     .setAccessibilityDescription(Some(&ns(if alt.is_empty() { url } else { alt })));
                 r
             }
-            Atom::Math { tex, display } => js::cached(&js::Key::math(tex, *display, self.dark, &self.macros))?,
-            Atom::Diagram { source, kind } => js::cached(&js::Key::diagram(source, *kind, self.dark))?,
+            Atom::Math { tex, display } => {
+                self.drawn
+                    .drawing(&js::Key::math(tex, *display, self.dark, &self.macros))?
+            }
+            Atom::Diagram { source, kind } => self.drawn.drawing(&js::Key::diagram(source, *kind, self.dark))?,
             Atom::AlertIcon(kind) => {
                 let r = placeholder(alert_symbol(*kind), font)?;
                 let tint = NSImageSymbolConfiguration::configurationWithHierarchicalColor(&alert_color(*kind));

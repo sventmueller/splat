@@ -185,8 +185,27 @@ impl ScrollSync<'_> {
         if top <= 0.5 {
             y = 0.0;
         }
+        make_room(to, y);
         to.scrollPoint(NSPoint::new(0.0, y.max(0.0)));
     }
+}
+
+/// A TextKit 1 view with non-contiguous layout knows its height only as far as it laid out, so a jump below that ends at
+/// the end it estimates.
+fn make_room(view: &NSTextView, y: f64) {
+    if view.textLayoutManager().is_some() {
+        return;
+    }
+    let visible = view.visibleRect();
+    if y + visible.size.height <= view.bounds().size.height {
+        return;
+    }
+    let (Some(lm), Some(tc)) = (layout_manager(view), crate::util::text_container(view)) else {
+        return;
+    };
+    let origin = view.textContainerOrigin();
+    let wanted = NSRect::new(NSPoint::new(0.0, y - origin.y), visible.size);
+    lm.ensureLayoutForBoundingRect_inTextContainer(wanted, &tc);
 }
 
 pub(super) fn char_rect(view: &NSTextView, index: usize) -> NSRect {

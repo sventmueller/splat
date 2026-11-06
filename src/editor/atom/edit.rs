@@ -13,8 +13,9 @@ use crate::editor::{State, mathfield};
 use crate::i18n::t;
 use crate::markdown::commands::{self, Edit};
 use crate::markdown::doc::{BlockKind, Doc, block_path, figure_at};
-use crate::markdown::text::{Byte, Direction, Shown, TextAt, U16, units};
+use crate::markdown::text::{Byte, Direction, TextAt, U16, units};
 use crate::preview::layout::{Atom, ParaKind, RunMap};
+use crate::preview::map::Shown;
 use crate::util::{contained, ns, perform_later, storage, to_nsrange};
 
 /// What closing a formula or diagram editor does to the document.
@@ -311,7 +312,7 @@ fn atom_at_source(doc: &Doc, at: Byte) -> Option<Range<Byte>> {
 
 /// The editable part of a formula or diagram, the TeX or Mermaid code without delimiters, and what it is.
 pub(super) fn atom_content(st: &State, text: &str, range: &Range<Byte>) -> (Range<Byte>, AtomKind) {
-    let path = block_path(&st.doc().blocks, range.start);
+    let path = block_path(st.doc().blocks(), range.start);
     if let Some(BlockKind::CodeBlock { content, info, .. }) = path.last().map(|b| &b.kind)
         && path.last().is_some_and(|b| b.range == *range)
     {

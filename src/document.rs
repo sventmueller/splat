@@ -14,32 +14,9 @@ use splat_file_state::{
 };
 
 use crate::editor::EditorController;
+use crate::test_hooks;
 use crate::util::constant;
 use crate::util::{BusyVolumes, guarded, lane_of_volume, main_after, main_soon, ns, stamp, volume_of, with_raised};
-
-/// Rounds of looks at the files whose answers have been taken in, for a check that something did not happen to wait for.
-#[cfg(feature = "selftest")]
-pub static LOOKS_TAKEN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
-/// Where the next save or reload panics, which nothing else can bring about on demand.
-#[cfg(feature = "selftest")]
-pub static FAULT_AT: std::sync::Mutex<Option<&'static str>> = std::sync::Mutex::new(None);
-
-#[cfg(feature = "selftest")]
-fn fault_at(place: &str) {
-    let struck = FAULT_AT
-        .lock()
-        .ok()
-        .is_some_and(|mut fault| fault.take_if(|at| *at == place).is_some());
-    assert!(!struck, "a fault for the selftest at {place}");
-}
-
-macro_rules! fault_point {
-    ($place:literal) => {
-        #[cfg(feature = "selftest")]
-        fault_at($place);
-    };
-}
 
 #[derive(Default)]
 pub struct Ivars {
@@ -117,24 +94,21 @@ define_class!(
             handler: &block2::DynBlock<dyn Fn(*mut NSError)>,
         ) {
             guarded((), || {
-                fault_point!("the start of a save");
+                test_hooks::fault_at("the start of a save");
                 self.with_file(FileState::begin_save);
             });
-            #[cfg(feature = "selftest")]
-            {
-                eprintln!("SELFTEST NOTE a save begins, operation {}", operation.0);
-                if operation == NSSaveOperationType::SaveOperation {
-                    SAVES_ASKED_FOR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                }
+            test_hooks::note(|| format!("a save begins, operation {}", operation.0));
+            if operation == NSSaveOperationType::SaveOperation {
+                test_hooks::count(&test_hooks::SAVES_ASKED_FOR);
             }
             let handler = handler.copy();
             let this = self.retain();
             let ended = RcBlock::new(move |error: *mut NSError| {
-                #[cfg(feature = "selftest")]
-                // SAFETY: AppKit passes a valid error or null for the length of the call.
-                eprintln!("SELFTEST NOTE a save ends, error {:?}", unsafe { error.as_ref() }.map(|e| e.code()));
                 guarded((), || {
-                    fault_point!("the end of a save");
+                    // SAFETY: AppKit passes a valid error or null for the length of the call.
+                    let code = unsafe { error.as_ref() }.map(|e| e.code());
+                    test_hooks::note(|| format!("a save ends, error {code:?}"));
+                    test_hooks::fault_at("the end of a save");
                     // SAFETY: AppKit passes a valid error or null for the length of the call.
                     let asks = unsafe { error.as_ref() }.is_some_and(|e| e.localizedRecoveryOptions().is_some());
                     this.with_file(|file| if asks { file.end_save_that_asks() } else { file.end_save() });
@@ -153,7 +127,7 @@ define_class!(
         fn change_count_token(&self, operation: NSSaveOperationType) -> Retained<AnyObject> {
             // After a panic the save finds no text and fails, as it should.
             guarded((), || {
-                fault_point!("the text a save takes");
+                test_hooks::fault_at("the text a save takes");
                 let bytes = self.encoded_text();
                 let text = self.text_print();
                 self.with_file(|file| file.take_text(text, bytes));
@@ -169,7 +143,7 @@ define_class!(
             // SAFETY: NSDocument's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), updateChangeCountWithToken: token, forSaveOperation: operation] };
             guarded((), || {
-                fault_point!("the mark after a save");
+                test_hooks::fault_at("the mark after a save");
                 if writes_the_documents_file(operation) {
                     self.with_file(FileState::written);
                 }
@@ -221,7 +195,7 @@ define_class!(
         #[unsafe(method_id(dataOfType:error:))]
         fn data_of_type(&self, _type_name: &NSString, error: *mut *mut NSError) -> Option<Retained<NSData>> {
             let data = guarded(None, || {
-                fault_point!("the bytes a save writes");
+                test_hooks::fault_at("the bytes a save writes");
                 self.data_to_write()
             });
             if data.is_none() && !error.is_null() {
@@ -279,10 +253,6 @@ impl DocumentController {
     }
 }
 
-/// Saves that began because someone asked for one, unlike an autosave.
-#[cfg(feature = "selftest")]
-pub static SAVES_ASKED_FOR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
 /// Rereads every document whose file another program changed.
 pub fn reload_changed_documents(mtm: MainThreadMarker) {
     look_at_files(mtm);
@@ -295,6 +265,7 @@ pub fn watch_files(mtm: MainThreadMarker) {
         guarded((), || {
             look_at_files(mtm);
             crate::editor::look_at_images(mtm);
+            crate::editor::look_at_repositories();
         });
     });
     // SAFETY: The block only touches main-thread objects, and the timer runs on the main run loop it is scheduled on.
@@ -353,9 +324,8 @@ fn look_at_files(mtm: MainThreadMarker) {
                 ));
         }
     }
-    #[cfg(feature = "selftest")]
     if by_volume.is_empty() {
-        LOOKS_TAKEN.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        test_hooks::count(&test_hooks::LOOKS_TAKEN);
     }
     for (volume, requests) in by_volume {
         let Some(on_volume) = LOOKING.enter(&volume) else {
@@ -384,8 +354,7 @@ fn look_at_files(mtm: MainThreadMarker) {
                         document.take_look(look);
                     }
                 }
-                #[cfg(feature = "selftest")]
-                LOOKS_TAKEN.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                test_hooks::count(&test_hooks::LOOKS_TAKEN);
             });
         });
     }
@@ -468,7 +437,7 @@ impl MdDocument {
         match self.editor() {
             Some(editor) => {
                 with_raised(&self.ivars().loading, || {
-                    fault_point!("a reload");
+                    test_hooks::fault_at("a reload");
                     editor.replace_all_text(text);
                 });
             }

@@ -4,7 +4,7 @@
 
 **Editorul Markdown pentru macOS în care scrieți în sursă sau direct în previzualizare.**
 
-Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în dreapta o previzualizare în direct, complet editabilă. Puteți scrie în oricare dintre ele: tot ce scrieți în previzualizare devine o modificare minimă a sursei, astfel că rândurile pe care nu le-ați atins rămân identice octet cu octet, iar diferențele din Git rămân curate. Splat citește Markdownul pe care îl folosiți deja: CommonMark și GitHub Flavored Markdown, alertele GitHub, linkurile wiki, încorporările și casetele informative din Obsidian, extensiile Pandoc și Typora, HTML încorporat, formule LaTeX și diagrame Mermaid, Graphviz și PlantUML, toate randate offline. Exportați în PDF, HTML sau Word dintr-un singur clic. Este scris în Rust, pe controale AppKit autentice, vorbește 35 de limbi și nu trimite nimic prin rețea decât dacă îi cereți.
+Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în dreapta o previzualizare în direct, complet editabilă. Puteți scrie în oricare dintre ele: tot ce scrieți în previzualizare devine o modificare minimă a sursei, astfel că rândurile pe care nu le-ați atins rămân identice octet cu octet, iar diferențele din Git rămân curate. Splat citește Markdownul pe care îl folosiți deja: CommonMark și GitHub Flavored Markdown, alertele GitHub, linkurile wiki, încorporările și casetele informative din Obsidian, extensiile Pandoc și Typora, HTML încorporat, formule LaTeX și diagrame Mermaid, Graphviz și PlantUML, toate randate offline. Răsfoiți și căutați într-un dosar întreg de note, vedeți ce s-a schimbat de la ultimul commit Git, lipiți din Word sau dintr-o pagină web ca Markdown și exportați în PDF, HTML sau Word dintr-un singur clic. Este scris în Rust, pe controale AppKit autentice, vorbește 35 de limbi și nu trimite nimic prin rețea decât dacă îi cereți.
  
 
 
@@ -81,6 +81,8 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
   - [Comenzi de formatare](#comenzi-de-formatare)
   - [Liste și sarcini](#liste-și-sarcini)
   - [Tabele](#tabele)
+  - [Lipirea textului formatat](#lipirea-textului-formatat)
+  - [Metadate](#metadate)
 - [Markdown acceptat](#markdown-acceptat)
   - [CommonMark și GitHub Flavored Markdown](#commonmark-și-github-flavored-markdown)
   - [Casete informative](#casete-informative)
@@ -94,7 +96,10 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - [Diagrame](#diagrame)
 - [Imagini](#imagini)
 - [Linkuri și navigare](#linkuri-și-navigare)
+- [Note într-un dosar](#note-într-un-dosar)
+- [Modificări de la ultimul commit](#modificări-de-la-ultimul-commit)
 - [Exportul, tipărirea și partajarea](#exportul-tipărirea-și-partajarea)
+- [Importul documentelor Word](#importul-documentelor-word)
 - [Aspect și accesibilitate](#aspect-și-accesibilitate)
 - [Limbi](#limbi)
 - [Scurtături de tastatură](#scurtături-de-tastatură)
@@ -103,14 +108,6 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - [Limitări cunoscute](#limitări-cunoscute)
 - [Depanare](#depanare)
 - [Pentru dezvoltatori](#pentru-dezvoltatori)
-  - [Compilare](#compilare)
-  - [Distribuție](#distribuție)
-  - [Testare](#testare)
-  - [Structura proiectului](#structura-proiectului)
-  - [Fluxul datelor](#fluxul-datelor)
-  - [Reguli în controller](#reguli-în-controller)
-  - [Adăugarea unei comenzi](#adăugarea-unei-comenzi)
-  - [Traduceri](#traduceri)
   - [Componente terțe](#componente-terțe)
 - [Licență](#licență)
 
@@ -120,7 +117,10 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - **Markdownul pe care îl folosiți deja.** CommonMark, GitHub Flavored Markdown, alertele GitHub, extensiile Obsidian, Pandoc și Typora, coduri scurte pentru emoji, spoilere, liste de definiții, ancore pentru titluri și HTML ca în fișierele README de pe GitHub.
 - **Formule și diagrame integrate.** Formule LaTeX prin MathJax, cu un editor vizual de formule. Diagrame Mermaid, Graphviz și PlantUML, randate pe Mac-ul dumneavoastră, fără Java, fără server și fără conexiune la rețea.
 - **Un buton pentru orice.** Fiecare construcție Markdown are un buton în bara de instrumente și un element de meniu, iar cele uzuale au și o scurtătură de tastatură. Tabelele au propriul meniu pentru rânduri, coloane și aliniere.
-- **Export fără pierderi.** PDF, un singur fișier HTML autonom sau un document Word cu titluri, liste, tabele, note de subsol și imagini reale.
+- **Un dosar, nu doar un fișier.** Bara laterală listează notele din jurul unui document și caută în toate. Redenumirea unei note modifică linkurile către ea, iar fiecare octet din jurul lor rămâne neschimbat.
+- **Modificări dintr-o privire.** Într-un depozit Git, bare lângă text marchează ce diferă față de ultimul commit, în ambele panouri.
+- **Din Word și de pe web în Markdown.** Lipiți text formatat ca Markdown, celule dintr-o foaie de calcul ca tabel și importați documente Word întregi cu imaginile lor.
+- **Export fără pierderi.** PDF, un singur fișier HTML autonom sau un document Word cu titluri, liste, tabele, note de subsol și imagini reale. Adăugați numere de pagină, antete și o pagină de titlu sau folosiți șablonul Word al companiei dumneavoastră.
 - **Nativ până în măduva oaselor.** Ferestre, file, meniuri, popovere, Versiuni, Salvare automată, meniul de partajare, modul întunecat, verificarea ortografică, dictarea și VoiceOver autentice AppKit. Fără Electron, fără vizualizare web pentru textul propriu-zis.
 - **Rapid cu fișiere mari.** Randarea unei apăsări de tastă într-un document de 10 MB durează circa 10 ms, înainte de munca proprie a vizualizării.
 - **Privat și atent.** Imaginile de pe web se încarcă doar după ce permiteți, linkurile către alte aplicații cer mai întâi confirmare, iar tot ce decodează date de imagine nesigure rulează în procese ajutătoare izolate într-un sandbox.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Actualizări.** Splat din imaginea de disc sau din Homebrew se actualizează singur prin [Sparkle](https://sparkle-project.org). La a doua pornire întreabă dacă are voie să caute singur actualizări, o dată pe zi. **Splat › Căutați actualizări…** caută imediat; **Căutați automat actualizări** și **Descărcați și instalați automat actualizările** din același meniu vă schimbă ulterior alegerea. Splat instalează o actualizare doar dacă are semnătura dezvoltatorului. O versiune compilată de dumneavoastră nu are mecanism de actualizare.
 
-**Din sursă.** Vedeți [Compilare](#compilare) pentru cerințe, apoi:
+**Din sursă.** Vedeți [Compilare](../../../docs/development.md#building) pentru cerințe, apoi:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Fiecare document se deschide în propria fereastră sau, dacă preferați filele
 
 - **Stânga: sursa.** Markdownul dumneavoastră în SF Mono, cu culori de sintaxă.
 - **Dreapta: previzualizarea.** Documentul randat, gata de editat.
-- **Bară laterală cu structura (opțional).** Toate titlurile sub formă de arbore; un clic pe unul îl afișează în ambele panouri. Comutați-o cu **Vizualizare › Afișați structura** (⌃⌘S).
+- **Bară laterală (opțional).** Toate titlurile sub formă de arbore, un clic pe unul îl afișează în ambele panouri: **Vizualizare › Afișați structura** (⌃⌘S). Alte două file conțin [notele din dosar](#note-într-un-dosar) și o căutare în ele.
 - **Bara de instrumente.** Butoane grupate după ce modifică: caractere, paragrafe și elemente inserate, apoi previzualizare pornită/oprită, Partajare și Document nou. Personalizați-o cu **Vizualizare › Personalizare bară de instrumente…**.
 
 Trageți separatorul pentru a da mai mult loc uneia dintre părți. **Vizualizare › Ascundeți previzualizarea** (⌥⌘P) lasă doar sursa; Splat reține această alegere pentru fiecare fereastră. Cele două panouri defilează împreună, iar o selecție dintr-un panou este evidențiată în celălalt.
+
+Colțul ferestrei arată cuvintele și caracterele textului și cât durează citirea lui, iar cât timp există o selecție, și pe cele ale selecției. Adresele linkurilor, etichetele HTML, metadatele, comentariile, formulele și diagramele nu se numără. **Vizualizare › Ascundeți numărul de cuvinte** înlătură această informație.
 
 ### Documente, file și versiuni
 
@@ -214,7 +216,7 @@ Previzualizarea se comportă ca un procesor de text, dar tot ce faceți în ea a
 - **Formulele și diagramele** apar ca grafice finalizate. Faceți clic pe una, mutați cursorul pe ea sau apăsați Return pe ea pentru a-i deschide editorul (vedeți [Formule](#formule) și [Diagrame](#diagrame)).
 - **HTML-ul încorporat, notele încorporate și front matter** sunt afișate, dar le editați în sursă. Un clic pe ele plasează cursorul în locul corespunzător din sursă.
 
-Tot ce Markdown nu poate exprima este blocat în previzualizare: panourile Font și Culori, rigla, precum și lipirea sau plasarea de text îmbogățit și de imagini. HTML-ul și RTF-ul lipit ajung ca text simplu.
+Tot ce Markdown nu poate exprima este blocat în previzualizare: panourile Font și Culori, rigla, precum și lipirea sau plasarea de text îmbogățit și de imagini. HTML-ul și RTF-ul lipit ajung ca text simplu, în afară de cazul în care alegeți [Lipiți ca Markdown](#lipirea-textului-formatat).
 
 ### Comenzi de formatare
 
@@ -245,6 +247,21 @@ Textul subliniat, evidențierea, exponentul și indicele se scriu `<ins>`, `<mar
 - În previzualizare, **Tab** trece la celula următoare, **⇧Tab** la cea anterioară, iar **Return** la celula de dedesubt. Tab în ultima celulă adaugă un rând.
 - Meniul **Tabel** inserează și șterge rânduri și coloane și stabilește alinierea unei coloane (⌘{, ⌘|, ⌘}).
 - **Tabel › Aliniați coloanele tabelului** completează cu spații sursa, astfel încât coloanele să se alinieze.
+
+### Lipirea textului formatat
+
+**Editare › Lipiți ca Markdown** (⌃⌘V), disponibil și în meniul contextual al ambelor panouri, transformă conținutul din clipboard în Markdown în dreptul selecției, ca un singur pas de infirmare. ⌘V continuă să insereze text simplu.
+
+- **Dintr-un browser, Word, Google Docs, Confluence, Notițe sau Pages:** titlurile, aldinul, cursivul, subliniatul, tăierea cu o linie, exponentul și indicele, linkurile, listele cu imbricarea lor, citatele, codul și tabelele sunt preluate.
+- **Dintr-o foaie de calcul:** celulele devin un tabel cu un rând de antet și coloane de numere aliniate la dreapta. La fel și textul separat prin tabulatori, punct și virgulă sau virgule, dacă fiecare rând are același număr de coloane.
+- **Imaginile** cu o adresă web rămân linkuri. O imagine din HTML-ul lipit devine un fișier lângă document, care pentru aceasta trebuie salvat cel puțin o dată. Fișierele de imagine temporare ale Word nu sunt preluate, iar textul lor alternativ rămâne.
+- **Linkurile** păstrează doar adresele `http`, `https`, `mailto`, relative și `#`; din orice alt link rămâne textul.
+
+### Metadate
+
+**Format › Editați metadatele…** sau un clic pe rândul de metadate din partea de sus a previzualizării deschide un formular cu câmpurile din front matter YAML. Câmpurile pot fi modificate, adăugate și eliminate. Un câmp cu o listă o păstrează ca listă: valorile sale stau una după alta, separate prin virgule, iar o valoare care conține o virgulă stă între ghilimele. Un câmp nou numit `tags`, `aliases`, `keywords`, `categories`, `authors` sau `cssclasses` devine și el o listă. Câmpurile imbricate și textul pe mai multe rânduri pot fi văzute acolo și se editează în sursă.
+
+Ce modifică formularul este un singur pas de infirmare și atinge doar rândurile câmpurilor pe care le-ați modificat: comentariile, ordinea, spațierea neobișnuită, ghilimelele și sfârșiturile de rând ale tuturor celorlalte rămân identice octet cu octet. Un document fără metadate primește un bloc la început.
 
 ## Markdown acceptat
 
@@ -315,7 +332,7 @@ Fără o ancoră proprie, fiecare titlu primește una derivată din text, ca pe 
 - **Linkuri wiki.** `[[Notă]]` trimite la `Notă.md` din același dosar sau dintr-unul mai jos. `[[Notă|Text afișat]]` afișează textul dumneavoastră, iar `[[Notă#Titlu]]` deschide nota. ⌘-clic o deschide în Splat.
 - **Încorporări.** `![[Notă]]` afișează cealaltă notă în interiorul acesteia; notele încorporate în ea apar ca linkuri. `![[diagram.png]]` afișează o imagine. Ca în Obsidian, încorporările numesc note și imagini din dosarul documentului sau de mai jos, niciodată printr-o cale absolută, și doar fișierele Markdown apar ca note.
 - **Comentarii.** `%%Doar în sursă%%` rămâne vizibil în sursă și este omis din previzualizare și din orice export, atât în linie, cât și pe rânduri separate.
-- **Etichete.** `#idee` sau `#proiect/splat` este evidențiat. ⌘-clic caută eticheta în document.
+- **Etichete.** `#idee` sau `#proiect/splat` este evidențiat. ⌘-clic caută eticheta în document și, în bara laterală, în tot dosarul.
 - **Casete informative pliabile.** Vedeți [Casete informative](#casete-informative).
 
 ### Citări și referințe
@@ -439,6 +456,23 @@ Prima diagramă de după pornire durează circa o secundă, pentru că motorul d
 
 **Inserare › Tablă de materii** inserează o listă cu linkuri către toate titlurile. Cu cursorul în ea, aceeași comandă o actualizează. Bara laterală cu structura (⌃⌘S) sare la orice titlu în ambele panouri.
 
+## Note într-un dosar
+
+Butoanele din partea de sus a barei laterale comută între structură, fișiere și o căutare.
+
+- **Fișiere** (**Vizualizare › Afișați fișierele**, ⌃⌘E). Toate fișierele Markdown din dosarul documentului sau, dacă acesta se află într-un depozit Git, din întregul depozit. Un clic sau Return deschide o notă ca filă a acestei ferestre; dacă este deja deschisă, trece în prim-plan. Butonul de lângă numele dosarului afișează alt dosar în această fereastră. Fișierele ascunse, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` și dosarele fără note rămân în afară. Un document aflat direct în dosarul dumneavoastră de reședință afișează doar notele de lângă el, pentru ca Splat să nu parcurgă toate dosarele dumneavoastră și să ceară acces pentru fiecare.
+- **Căutare** (**Editare › Găsiți › Căutați în toate notele…**, ⇧⌘F). Găsește text în toate notele, indiferent de majuscule și de felul în care îi sunt codificate accentele. `#tag` găsește o etichetă, `#project` și `#project/splat`, și nimic din cod. Un clic pe un rezultat deschide nota în acel loc.
+- **Linkuri către o notă.** Meniul contextual al unei note listează notele care duc la ea, prin link wiki, încorporare, link relativ sau definiție de referință pentru link.
+- **Redenumirea unei note.** Același meniu o redenumește și modifică acele linkuri. Splat spune mai întâi despre câte linkuri în câte fișiere este vorba. În fiecare link se schimbă doar numele, iar orice alt octet al fișierului rămâne neschimbat. Documentele deschise preiau modificarea ca pas de infirmare; în alte fișiere doar Git sau Versiuni o pot anula. Un fișier pe care alt program l-a modificat între timp oprește redenumirea tuturor linkurilor, iar Splat îl numește.
+
+Lista urmează dosarul când fereastra trece în prim-plan. Căutarea vede fișierele așa cum sunt pe disc, iar textul pe care nu l-ați salvat încă se ia în calcul de la următoarea Salvare automată.
+
+## Modificări de la ultimul commit
+
+Într-un document dintr-un depozit Git, bare lângă text marchează ce diferă față de ultimul commit, în sursă și în previzualizare: verde pentru rândurile adăugate, albastru pentru rândurile modificate și un semn roșu scurt acolo unde s-a eliminat ceva. Ele urmează pe măsură ce tastați și când ramura se mută. **Vizualizare › Modificări de la ultimul commit** le dezactivează, pentru toate ferestrele.
+
+Rândurile care diferă doar prin sfârșitul de rând nu se numără, așa că un fișier cu CRLF față de un commit cu LF nu arată nicio modificare. Un fișier nou nu are semne până la primul său commit, și nici un document de peste 32 MB.
+
 ## Exportul, tipărirea și partajarea
 
 | Format | Cum | Ce obțineți |
@@ -451,6 +485,19 @@ Prima diagramă de după pornire durează circa o secundă, pentru că motorul d
 
 Meniul **Fișier › Partajați** le oferă pe toate într-un singur loc. Exporturile țin cont de setarea pentru punctuația tipografică și de imaginile de pe web pe care le-ați permis; în HTML, imaginile de pe web rămân linkuri.
 
+**Fișier › Opțiuni de export…** stabilește ce adaugă la text PDF-ul, tipărirea și Word, pentru toate documentele:
+
+- **Numere de pagină** în subsolul PDF-ului și al tipăririi, sub forma `2 / 9`.
+- **Antet și subsol** pentru PDF și tipărire. `{title}`, `{author}`, `{date}`, `{page}` și `{pages}` țin locul valorilor lor, primele trei din metadatele documentului.
+- **O pagină de titlu** pentru PDF, tipărire și Word, cu `title`, `subtitle`, `author` și `date` din metadate sau cu numele documentului ca titlu. Nu are nici antet, nici subsol.
+- **Un șablon Word**, un `.docx` sau `.dotx` al cărui aspect îl preia exportul: stilurile, inclusiv cu nume localizate, tema, dimensiunea paginii, marginile, antetele și subsolurile. Un șablon care nu poate fi citit oprește exportul și spune acest lucru, în loc să vă dea un document fără el.
+
+## Importul documentelor Word
+
+**Fișier › Importați un document Word…** cere un fișier `.docx` sau `.dotx` și locul unde să meargă Markdownul lui, apoi deschide rezultatul. Imaginile ajung într-un dosar alături, numit după document cu `-images`.
+
+Titlurile și listele ajung așa cum le definesc stilurile și numerotarea din Word, și în documentele ale căror stiluri au nume localizate. Aldinul, cursivul, subliniatul, tăierea cu o linie, evidențierea, exponentul și indicele, linkurile, citatele, codul, notele de subsol, notele de final și tabelele sunt preluate, celulele care se întind pe mai multe coloane ca tabel HTML. Formulele devin LaTeX. Modificările urmărite contează ca acceptate, iar o tablă de materii rămâne în afară, deoarece **Inserare › Tablă de materii** creează una nouă. Fișierele `.doc` vechi și documentele protejate cu parolă sunt refuzate.
+
 ## Aspect și accesibilitate
 
 - **Modul întunecat** urmează sistemul. Formulele și diagramele sunt randate pentru fiecare aspect.
@@ -459,7 +506,7 @@ Meniul **Fișier › Partajați** le oferă pe toate într-un singur loc. Export
 - **Ecran complet, file și o bară de instrumente personalizabilă**, ca în orice aplicație Mac.
 - **VoiceOver.** Panourile se numesc „Sursă Markdown” și „Previzualizare”, formulele sunt citite ca cod, iar diagramele prin titlu. Fiecare comandă poate fi atinsă de la tastatură.
 
-Splat nu are fereastră de setări: puținele opțiuni se află acolo unde se aplică, în **Vizualizare** și **Editare › Înlocuiri**.
+Splat nu are fereastră de setări: puținele opțiuni se află acolo unde se aplică, în **Vizualizare**, **Editare › Înlocuiri** și **Fișier › Opțiuni de export…**.
 
 ## Limbi
 
@@ -482,6 +529,9 @@ Textul în ebraică și în arabă se citește de la dreapta la stânga oriunde 
 | Aliniere coloană de tabel la stânga, centrat, la dreapta | ⌘{, ⌘\|, ⌘} |
 | Ascundeți sau afișați previzualizarea | ⌥⌘P |
 | Afișați sau ascundeți structura | ⌃⌘S |
+| Afișați sau ascundeți fișierele | ⌃⌘E |
+| Căutați în toate notele | ⇧⌘F |
+| Lipiți ca Markdown | ⌃⌘V |
 | Zoom înainte, înapoi, dimensiune efectivă | ⌘+, ⌘−, ⌘0 |
 | Document nou, deschidere, salvare, duplicare | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Configurare pagină, tipărire | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 - **Imaginile de pe web** se încarcă doar cu permisiunea dumneavoastră, doar prin `https`, niciodată de la gazde din rețeaua locală, de cel mult 10 MB fiecare și într-o sesiune privată, fără cookie-uri.
 - **Decodare izolată.** Imaginile și graficele formulelor și ale diagramelor sunt decodate în procese ajutătoare care închid toate fișierele moștenite și se blochează într-un sandbox înainte de a citi primul octet: fără acces la fișiere, fără rețea. Ele returnează doar pixeli, a căror dimensiune este verificată, și sunt oprite după 10 secunde. Decodoarele de imagini ale Apple văd doar HEIC, TIFF, AVIF și PDF, și numai când datele sunt într-adevăr în acel format; ele rulează într-un proces ajutător propriu, care poate în plus să citească dosarele de fonturi ale sistemului și să folosească decodorul video al sistemului. SVG-urile, formulele și diagramele trec și ele prin acel proces ajutător, deci în Splat sunt imagini cu rezoluție fixă: patru pixeli pe punct, până la 2560 pe latura mai lungă.
 - **Fișierele locale** ajung într-un document doar prin calea pe care o numește. Încorporările afișează note Markdown din dosarul documentului și de mai jos, iar o imagine lipsă este căutată doar acolo. O cale de imagine în altă parte, absolută sau care începe cu `~`, se încarcă totuși în previzualizare; exporturile HTML și Word, tipărirea și fișierele PDF iau cu ele doar ce se află în dosarul documentului sau în depozitul său Git, cu excepția cazului în care acel depozit conține și dosarul tău de reședință, ca un document de la altcineva să nu poată trage fișierele tale într-un export pe care îl dai mai departe.
+- **Dosarele de note** sunt citite doar cât timp bara laterală le afișează, iar redenumirea unei note modifică alte fișiere doar după ce ați confirmat câte.
+- **Depozitele Git** sunt citite de Splat însuși. Nu rulează niciodată programul `git`, a cărui configurație dintr-un depozit străin poate porni alte programe, și nu citește mai mult decât versiunea documentului deschis din ultimul commit. Nu scrie nimic acolo și nu folosește nicio rețea.
+- **Documentele Word și textul lipit** sunt citite de parserele proprii ale Splat, cu limite pentru dimensiune, imbricare și cât se poate despacheta un fișier. Linkurile din ele păstrează doar adresele pe care Splat le permite și în altă parte, iar numele imaginilor dintr-un fișier Word nu decid niciodată unde sunt scrise acestea.
 - **Copiile textului nesalvat** rămân pe acest Mac, în dosarul Bibliotecă, pentru recuperarea după o închidere forțată. Ele dispar odată cu salvarea sau cu închiderea normală a Splat; copiile lăsate de o închidere forțată rămân în dosarul de recuperare până le ștergeți.
 - **Linkurile** nu pornesc niciodată un program printr-un clic. Linkurile web și de e-mail se deschid ca de obicei; linkurile către alte aplicații întreabă mai întâi.
 - **HTML-ul din documente** este citit de parserul propriu al Splat. Scripturile, stilurile, cadrele și formularele nu rulează niciodată.
@@ -530,7 +583,7 @@ Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă
 ## Limitări cunoscute
 
 - **O singură tildă înseamnă indice.** `~text~` este indice ca în Pandoc; textul tăiat cu o linie cere `~~two~~`. GitHub taie cu o linie și cu o singură tildă.
-- **Doar pentru citire în previzualizare:** HTML-ul încorporat, notele încorporate și front matter se editează în sursă.
+- **Doar pentru citire în previzualizare:** HTML-ul încorporat și notele încorporate se editează în sursă, front matter în formularul său sau în sursă.
 - **Imbricare foarte adâncă:** HTML imbricat mai adânc de 64 de niveluri și HTML în linie mai adânc de 16 cedează locul conținutului său.
 - **Celulele de tabel îmbinate** există doar în tabelele HTML și doar pe mai multe coloane (`colspan`, fără `rowspan`). Sintaxa de tabel MultiMarkdown pentru celule îmbinate nu este acceptată.
 - **Bibliografiile** sunt citite doar din BibTeX, nu din CSL JSON sau YAML.
@@ -538,6 +591,11 @@ Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă
 - **Punctuația tipografică:** ghilimeaua simplă de închidere din germană nu poate fi deosebită de un apostrof și este pusă ca ’.
 - **Formule, nu documente:** fără pachete LaTeX, TikZ sau documente complete.
 - **Editorul vizual de formule** scrie LaTeX în notația MathLive: spațiile dispar (`E = mc^2` devine `E=mc^2`), randarea rămâne aceeași.
+- **Numărul de cuvinte:** thailandeza, laoțiana, khmera și birmaneza se scriu fără spații și se numără pe secvență de text, nu pe cuvânt. `3.14` și `snake_case` sunt câte două cuvinte.
+- **Redenumirea unei note** nu modifică linkurile din HTML-ul încorporat, iar un link wiki rămâne așa cum este dacă noul nume conține `#`, `|`, `^`, `[`, `]` sau `\`.
+- **Semnele de modificare** citesc depozite cu obiecte SHA-1 și referințe simple sau împachetate; unul cu SHA-256 sau reftable nu afișează niciunul. Un fișier sub un filtru Git precum LFS este comparat cu ce a stocat filtrul.
+- **Importul Word** nu preia textul din antete, subsoluri și comentarii, iar imaginile `.emz` sau SVG păstrează doar textul lor alternativ.
+- **Lipiți ca Markdown** citește RTF ca text occidental și preia titlurile de acolo doar din dimensiunile fonturilor. Majoritatea programelor oferă și HTML, pe care îl preferă.
 - **Prin concepție:** fără numere de rând, fără fereastră de setări, fără Help Book, fără App Store.
 - **Testat mai puțin pe Intel.** Autotestele ferestrei rulează doar pe Apple Silicon; pe Intel, CI rulează `cargo test`.
 
@@ -561,190 +619,7 @@ Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă
 
 ## Pentru dezvoltatori
 
-Splat este o aplicație Rust care comunică direct cu AppKit și WebKit prin [objc2](https://github.com/madsmtm/objc2). Nu există Swift, nu există Objective-C, nu există proiect Xcode și nici fișier Interface Builder.
-
-### Compilare
-
-Cerințe:
-
-- macOS cu Command Line Tools (`xcode-select --install`). Xcode nu este necesar; Splat se compilează fără `actool`, `ibtool` și `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) numește versiunea exactă pe care o folosește CI; rustup o instalează singur, Rust din Homebrew ignoră fișierul. Ridicarea versiunii acolo este calea prin care avertismentele noi ale compilatorului și ale clippy ajung în proiect.
-- rustup, pentru `make lint`, `make check` și `make universal`: `cargo xtask check-library` compilează biblioteca pentru Linux, ca să arate că nu are nevoie de macOS, iar Rust din Homebrew nu are alte ținte.
-
-[Makefile](../../../Makefile) conține puncte de intrare scurte; `make help` le listează pe toate:
-
-```sh
-make build                  # target/release/Splat.app, la fel ca cargo xtask bundle --release
-make universal              # target/splat-universal pentru Apple Silicon și Intel, așa cum îl conține imaginea de disc
-make check                  # formatare, clippy fără avertismente, toate testele, biblioteci vendorizate; ce rulează CI
-make test                   # make check, apoi autotestul fără fereastră
-make test-gui               # autoteste cu fereastră; ocupă Mac-ul circa patru minute
-make test-long              # căutare aleatorie mai lungă și verificarea actualizării parțiale la 10 MB
-make fuzz                   # intrare aleatorie pentru analiza parțială și toate ieșirile
-make coverage               # acoperirea liniilor pentru toate testele și autotestele, cu un prag pe modul
-make coverage-library       # aceleași praguri pentru modulele fără fereastră, ca în CI
-make bench FILE=<file.md>   # durate pentru deschiderea, tastarea și derularea unui fișier mare
-make release                # mai întâi make test, apoi imaginea de disc notarizată
-```
-
-Logica de compilare propriu-zisă se află în crate-ul Rust [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, semnat cu "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, o aplicație separată care nu deschide niciodată fișiere Markdown
-cargo xtask dmg                # dist/Splat-<version>.dmg pentru distribuție, Developer ID, notarizat
-cargo xtask icon               # reconstruiește assets/AppIcon.icns și pictograma din README din assets/icon-1024.png
-cargo xtask vendor check       # verifică JavaScriptul inclus față de vendor.lock
-cargo xtask vendor fetch       # îl descarcă din nou după schimbarea unei versiuni în vendor.lock
-```
-
-`bundle` scrie `Info.plist`, copiază resursele și localizările și semnează aplicația cu certificatul „Splat Local Signing”. Prima compilare creează acel certificat în keychain-ul dumneavoastră de autentificare, valabil 20 de ani. Cât timp rămâne acolo, Splat își păstrează documentele recente și permisiunile pentru dosare între recompilări; cu o semnătură ad hoc, fiecare compilare ar fi o aplicație nouă pentru macOS. Versiunile de depanare și de autotest au ID-uri de bundle proprii (`local.splat.debug`, `local.splat.selftest`) și nu se înregistrează pentru fișiere Markdown, astfel că Finder nu deschide niciodată un document într-o versiune veche și ele nu ating setările aplicației normale.
-
-Versiunea se află în [VERSION](../../../VERSION) ca `major.minor.build` și este cea pe care o primește următoarea compilare. Fiecare compilare de lansare reușită (`make build`, `cargo xtask bundle --release`, `make release`) mărește numărul de build cu unu; versiunile de depanare și de autotest îl lasă neatins. Major și minor se măresc manual: setați VERSION, să zicem, la `1.1.0`, iar următoarea compilare primește exact această valoare.
-
-### Distribuție
-
-`cargo xtask dmg` (sau `make release`, care rulează mai întâi `make test`) compilează o versiune de lansare, o semnează cu Developer ID, o notarizează la Apple și atașează tichetul, o împachetează într-o imagine de disc comprimată, doar pentru citire, cu un link către Aplicații, notarizează și atașează tichetul și la imagine, apoi verifică rezultatul cu Gatekeeper. Aplicația poartă propriul tichet, astfel că o copie instalată fără Finder, cum face Homebrew, se deschide offline și la prima pornire; cele două runde cu serviciul de notarizare durează câteva minute fiecare. Doar o imagine care a trecut prin toți pașii devine `dist/Splat-<version>.dmg`, copia care este comisă, iar numărul de build crește. Imaginea anterioară rămâne încă o lansare, deoarece serverul raw al GitHub poate servi vechiul flux de actualizări câteva minute după un push; cele mai vechi sunt mutate în coșul de gunoi. O rulare eșuată lasă `dist/` și VERSION așa cum erau.
-Fiecare lansare adaugă imaginea completă, de circa 16 MB, la istoricul depozitului. Rulează doar când este apelat, niciodată ca parte dintr-o compilare normală, și are nevoie de:
-
-- un certificat „Developer ID Application” în keychain
-- o autentificare salvată pentru serviciul de notarizare Apple, cu o parolă specifică aplicației, creată o singură dată cu `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- cheia privată care semnează actualizările, în keychain-ul de autentificare. A creat-o `generate_keys` de la Sparkle; jumătatea ei publică este `UPDATE_KEY` în [xtask/src/main.rs](../../../xtask/src/main.rs) și în fiecare copie instalată, care acceptă doar actualizări semnate cu ea. Păstrați o copie de rezervă într-un manager de parole: `target/sparkle-2.10.1/bin/generate_keys -x <file>` o exportă, `-f <file>` o importă pe alt Mac. Fără ea, copiile instalate nu mai pot fi actualizate niciodată.
-- rustup (`brew install rustup`, care lasă Rust din Homebrew pe loc)
-- `RELEASE_NOTES.md`, cu ce aduce această lansare. Dialogul de actualizare îl afișează deasupra unui rând despre cum se raportează o problemă, așa că `dmg` se oprește dacă fișierul este gol sau conține încă notele lansării anterioare
-
-Dacă lipsește oricare dintre ele, `dmg` se oprește înainte de compilare. La prima rulare, macOS întreabă dacă Terminal are voie să controleze Finder; fără această permisiune, imaginea de disc nu afișează nici fundalul, nici aranjarea pictogramelor.
-
-Doar imaginea de disc conține mecanismul de actualizare, [Sparkle](https://sparkle-project.org), pe care compilarea îl descarcă o singură dată în `target/` din lansarea sa de pe GitHub și îl verifică față de suma de control din xtask. Hardened runtime încarcă framework-ul doar când acesta poartă Team ID-ul aplicației, pe care îl are semnătura Developer ID și îl lipsește certificatul local; iar o actualizare nu trebuie să înlocuiască o versiune compilată de dumneavoastră. Versiunea de autotest conține și ea Sparkle, pentru a verifica meniul de actualizare cu ajutorul lui: cu un flux care nu există, fără întrebarea Sparkle la a doua pornire și cu un entitlement care permite aplicației semnate local să încarce framework-ul. `dmg` semnează imaginea nouă cu cheia de actualizare și scrie `dist/appcast.xml`, fluxul pe care copiile instalate îl citesc de pe GitHub. Comiteți și trimiteți împreună imaginea și fluxul: din acel moment, copiile instalate oferă actualizarea. Linkurile de descărcare din acest README și din traducerile lui indică `Splat.dmg` din cea mai nouă lansare de pe GitHub, așa că fiecare lansare are o copie cu acest nume: `cp dist/Splat-<version>.dmg target/Splat.dmg`, apoi `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Imaginea de disc este un binar universal pentru Apple Silicon și Intel; celelalte compilări sunt doar pentru procesorul gazdă. Rust din Homebrew livrează biblioteca standard doar pentru procesorul gazdă, așa că `dmg` compilează prin rustup, care instalează la prima utilizare toolchain-ul și țintele din [rust-toolchain.toml](../../../rust-toolchain.toml) și se oprește dacă programul sau Sparkle nu are cod pentru oricare dintre procesoare. `make universal` compilează doar programul.
-Aplicația din ea poartă o semnătură diferită de cea a unei versiuni locale, așa că macOS ține liste separate de documente recente și permisiuni separate pentru dosare pentru cele două.
-
-### Testare
-
-| Comandă | Verifică |
-|---|---|
-| `cargo test --release` | teste unitare, aleatorii și de traducere |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | o căutare aleatorie mai lungă; `SPLAT_FUZZ_SEED` variază datele de intrare |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | o singură limbă, cât timp celelalte sunt incomplete |
-| `cargo clippy --release --all-targets [--features selftest]` | lint-uri, inclusiv justificarea fiecărui bloc `unsafe`, lungimea funcțiilor și, în bibliotecă, conversiile de numere |
-| `cargo xtask check-library` | biblioteca se compilează pentru Linux, deci nimic din ea nu are nevoie de macOS |
-| `cargo xtask vendor check` | bibliotecile JavaScript corespund cu `vendor.lock` octet cu octet |
-| `cargo xtask selftest probe` | fără fereastră, fiecare cu rezultatul așteptat: formule, diagrame, imagini web față de un server din interiorul procesului, adrese blocate, textul pe care îl scrie fiecare comandă, fiecare format de imagine prin ambele exporturi, o pagină care nu mai răspunde și apărările vizualizărilor web față de o pagină fără ele. Durează circa o jumătate de minut. Ce are nevoie de aplicația în față este sărit pe un ecran blocat |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | aplicația în funcțiune, clic cu clic. Deschide o fereastră și scrie în ea; Mac-ul este ocupat circa patru minute. `--scenarios` rulează doar a doua parte, în circa un minut și jumătate. `--only` rulează un singur grup din acea parte, în propriul document, și pe un ecran blocat. `--in-back` lasă deoparte ce are nevoie de aplicație în față; fără el, o astfel de verificare eșuează |
-| `cargo xtask selftest resize` | lărgește fereastra după mutarea separatorului: sursa își reface rândurile cât timp fereastra este redimensionată. Durează circa zece secunde |
-| `cargo xtask selftest typing [--by-hand]` | tastează în timpul salvărilor, cu taste prin coada de evenimente a aplicației sau, cu `--by-hand`, de mână: ce se tastează rămâne și apare ca nesalvat. Durează cam un minut |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | durate pentru deschiderea, tastarea și derularea unui fișier mare; `--keystroke-ms` eșuează când cea mai rapidă apăsare durează mai mult |
-| `cargo test --release -- --ignored partial_updates` | o apăsare de tastă la 10 MB: actualizare parțială față de cea completă, același rezultat în cel mult un sfert din timp |
-| `cargo test --release --test hostile` | documente construite să depășească stiva sau să ia timp pătratic, fiecare la două dimensiuni ale căror durate trebuie să crească odată cu textul, prin analiză, aranjare în pagină, ambele exporturi, apăsări de taste și comenzi |
-| `make mutants` | defecte introduse una câte una în `crates/splat-markdown`, `crates/splat-preview` și `crates/splat-file-state`, prin [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); arată pe care nu le observă niciun test. Durează ore; `FILE=crates/splat-preview/src/bridge/mod.rs` îl restrânge |
-| `make fuzz` | intrare aleatorie prin [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), care are nevoie de nightly din rustup: apăsări de taste care trebuie să se citească la fel ca o analiză completă, toate ieșirile, editările din previzualizare, toate comenzile și un fișier care se salvează așa cum s-a deschis. `SECONDS=600` caută mai mult |
-| `cargo test --release --test fuzz_seeds` | semințele din `fuzz/seeds/` prin verificările acelor ținte de fuzzing, fără fuzzer; parte din fiecare `cargo test` |
-| `cargo test --profile checked --workspace` | testele cu ce mai verifică o compilare de depanare: după fiecare analiză parțială blocurile se potrivesc cu textul, iar ce duce mai departe este ce spune textul. Parte din `make test-long` |
-| `cargo test --release --test entry_points --test structure` | din surse: tot ce apelează sistemul este protejat de panics, iar modulele depind doar în jos |
-| `cargo test --release --test decoder` | procesul decodor decodează imagini și nu ajunge nici la fișiere, nici la rețea |
-| `make coverage` | acoperirea liniilor pentru `cargo test` și toate autotestele, prin [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); eșuează sub praguri. Ocupă Mac-ul circa cinci minute |
-| `make coverage-library` | crate-urile `splat-markdown`, `splat-preview`, `splat-file-state` și `splat-i18n` față de pragurile lor mai ridicate, măsurate numai de `cargo test` |
-
-Testele unitare stau lângă codul pe care îl testează. `crates/splat-testkit/tests/` conține ce ajunge la model și la previzualizare din exterior: testele aleatorii din `robustness.rs`, care împart generatorul din `splat-testkit` cu cele din `sync.rs`, documentele construite să facă rău din `hostile.rs` și semințele țintelor de fuzzing din `fuzz_seeds.rs`. `tests/` conține ce privește întregul program: sursele sale, traducerile sale și testul decodorului, care pornește programul compilat. Deciziile din `src/editor/` care nu au nevoie de fereastră se află în funcții libere cu teste proprii: tot ce știe controllerul și cum se schimbă aceasta în `state.rs`, regulile de randare în `render_queue.rs`, copia textului în `sync.rs`, stilurile de paragraf, fonturile și culorile ca valori în `render.rs`, ce înseamnă identificatorii barei de instrumente în `toolbar.rs`, ce înseamnă un clic pe un link în `navigation.rs`.
-
-Un pas al autotestului ferestrei așteaptă o condiție numită, nu un timp; doar ce nu dă niciun semnal, precum absența a ceva, păstrează o pauză cu motivul ei. A aștepta în zadar este o verificare eșuată care spune ce nu a venit niciodată, iar un pas care intră în panică este de asemenea o verificare eșuată, iar rularea continuă în ambele cazuri. O verificare care nu poate spune nimic în această rulare raportează `SELFTEST SKIP`: xtask o listează, iar ea nu trece și nu eșuează. xtask ține fiecare mod, iar `--scenarios` separat, la circa nouă zecimi din verificările sale. Autotestul ferestrei rulează o a doua parte după parcurgerea principală prin clicuri, în `src/editor/selftest/scenarios.rs`: fiecare comandă de formatare și de tabel, dialogurile, clicurile pe linkuri, lipirea, plasarea, exporturile, un fișier modificat de alt program, o modificare mare, imaginile care se schimbă pe disc, presiunea asupra memoriei, un document uriaș și recuperarea după o închidere forțată. Fiecare grup al ei deschide un document propriu, astfel încât un eșec într-unul să nu ajungă la următorul, și fiecare poate rula singur cu `--only`. Autotestul fără fereastră strică și salvarea intenționat: un dosar care nu acceptă nimic, un fișier doar pentru citire, un dosar care a dispărut, un disc plin și un panic în fiecare callback al unei salvări, și nimic din toate acestea nu are voie să coste text.
-
-Acoperirea are două praguri: fiecare modul cel puțin 84% din rândurile sale, toate modulele împreună cel puțin 96%. `make coverage` măsoară `cargo test` împreună cu autotestele și eșuează sub oricare dintre ele; `make coverage-library` ține ce nu are nevoie de fereastră la 90% și 97%. Pragurile și puținele excepții, precum panic hook-ul din `main.rs`, care rulează doar la o închidere forțată, se află în [xtask](../../../xtask/src/coverage.rs), alături de motivele lor. Versiunile măsurate merg în `target/coverage/`, astfel că măsurarea codului nu ajunge niciodată în `target/release/` sau într-o imagine de disc. Procesul ajutător decodor își deschide fișierul de măsurare înainte de a se bloca, deci este măsurat și el.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) rulează `make check`, `make coverage-library` și compilarea universală pe Apple Silicon și `cargo test` pe Intel la fiecare push în `main` și la fiecare pull request. În fiecare noapte, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) rulează `make test-long` cu date de intrare aleatorii noi. Autotestele și imaginea de disc rămân pe Mac-ul dezvoltatorului: au nevoie de un ecran și de certificatele de semnare din keychain.
-
-Ieșirea autotestelor merge în `target/selftest/`. Autotestul compilează o aplicație separată (`target/release/Splat Selftest.app`, ID de bundle `local.splat.selftest`) și lasă neatinse setările, documentele recente și asocierile de fișiere ale aplicației normale.
-
-### Structura proiectului
-
-Tot ce nu are nevoie de fereastră este un crate propriu în `crates/`, care se compilează fără macOS, astfel încât compilatorul impune felul în care depind unele de altele. Aplicația din `src/` (pachetul `splat-app`, programul `splat`) se bazează pe ele.
-
-- `crates/splat-markdown/`: arborele pe care îl citesc toți consumatorii, `Doc` în `doc/`, care își deține textul, și singura legătură cu parserul în `reader/`: comrak nu este numit nicăieri altundeva, iar `reader/assumptions.rs` conține ce presupune codul despre el. Culorile de sintaxă și toate comenzile ca editări pure de text (`Edit`) în `commands/`. De asemenea reanalizarea după o editare (`incremental.rs`), cititorul pentru HTML-ul încorporat (`markup.rs`), tipografia, etichetele, referințele și citările în textul curent (`typography.rs`), cum arată textul și ce Markdown și HTML îl fac să arate așa (`style.rs`), ce poate fi o adresă (`url.rs`) și exportul HTML și Word (`html.rs`, `docx.rs` cu `docx/html.rs` și `docx/xml.rs`). O poziție are tipul ei: `Byte` în textul sursă, `U16` în vizualizarea sursei, `Shown` în vizualizarea previzualizării (`text.rs`).
-- `crates/splat-preview/`: aranjarea în pagină a previzualizării în `layout/`, cu HTML-ul încorporat în `layout/html.rs`, și corespondența dintre previzualizare și sursă (`Bridge`, `Index`). Un `Bridge` refuză o aranjare a altei versiuni a lui `Doc`.
-- `crates/splat-file-state/`: ce text conține un fișier, în ce format și ce înseamnă o privire asupra lui.
-- `crates/splat-i18n/` cu `resources/*.lproj`: 35 de limbi; cheile sunt textele în germană, iar aplicația instalează la pornire tabelul limbii interfeței.
-- `crates/splat-testkit/`: generatorul testelor aleatorii și verificările țintelor de fuzzing.
-- `src/editor/`: fereastra. Un singur obiect `EditorController` servește AppKit ca delegat al ambelor vizualizări și deleagă către componente, structuri mici peste controller și starea pe care o dețin, ale căror câmpuri celelalte module nu le pot atinge:
-
-| Modul | Responsabilitate |
-|---|---|
-| `controller.rs` | clasa, metodele delegatului care deleagă mai departe, `invalidate` și ce îi spune restul programului unui editor; numai el ajunge la componente |
-| `panes.rs` | `Panes`: vizualizările de text, structura, afișarea și ascunderea panourilor și ce dă acces la vizualizări |
-| `controller/layers.rs` | cine poate ajunge la cine: o componentă primește un acces la controler care oferă ce se află sub ea, iar compilatorul impune asta |
-| `state.rs` | ce știe controllerul despre document și toate modurile în care se schimbă; câmpurile sunt private și nu atinge nicio vizualizare |
-| `model.rs` | împrumută starea și copia textului unor closure-uri care nu pot atinge o vizualizare |
-| `actions.rs` | registrul de comenzi: selector, titlu, scurtătură, simbol, când se aplică comanda |
-| `editing.rs` | `Editing`: rularea și validarea comenzilor, tastarea în previzualizare |
-| `update.rs` | `Updater`: analiza, colorarea, actualizarea previzualizării; după o editare doar paragrafele afectate |
-| `sync.rs` | copia textului și evidența blocurilor, fără AppKit și cu teste aleatorii |
-| `progressive.rs` | `Progressive`: randarea previzualizărilor mari pas cu pas |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selecția și poziția de defilare ale ambelor panouri, în pas una cu alta |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: editorul de formule și de diagrame |
-| `navigation.rs`, `links.rs` | `Links`: linkuri, linkuri wiki, etichete, casete de sarcini, pliere, note de subsol |
-| `env.rs` | ce citește previzualizarea din afara textului: punctuația tipografică, depozitul pentru `@name` și `#12`, fișierul BibTeX, notele încorporate |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | textul previzualizării, imagini locale și la distanță; `Pictures` în `images.rs` |
-| `attributes.rs` | atributele textului; fiecare cheie primește doar o valoare de tipul pe care îl așteaptă |
-| `shadow.rs` | copii ale textului nesalvat pentru recuperarea după o închidere forțată |
-| `decoder.rs` | procese ajutătoare izolate într-un sandbox care decodează imagini și grafice |
-| `export.rs`, `outline.rs` | `Sharing`: exportul HTML și Word; bara laterală cu structura |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit pentru MathJax, Mermaid, Graphviz, PlantUML și editorul vizual de formule; regulile despre ce se randează când, separat de WebKit |
-| `webkit.rs` | apeluri în WebKit; doar durata de viață a delegatului de navigare rămâne la `js.rs` și `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construirea ferestrei, bară de instrumente, vizualizări de text, dialoguri, culori |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: bara de meniuri, delegatul aplicației, documentul (`MDDocument`, o subclasă `NSDocument`).
-- `src/util/`: fire de lucru (`lanes.rs`), volume care pot înceta să răspundă (`volumes.rs`), ajutoare AppKit, fișiere și procese. `src/diag.rs`: ce merge prost fără ca utilizatorul să vadă merge în jurnalul sistemului, fără niciun text dintr-un document.
-- `src/large_alloc.rs`: alocările mari vin direct de la nucleu și se întorc la el când sunt eliberate, astfel că memoria se întoarce după editări mari.
-- `resources/js/`: pagini web și biblioteci; versiunile și sumele de control în [vendor.lock](../../../vendor.lock).
-- `xtask/`: împachetare, semnare, imaginea de disc, pictograma, vendorizare, rulerul de autoteste și pragurile de acoperire.
-
-### Fluxul datelor
-
-Textul sursă din vizualizarea de text din stânga este singura sursă de adevăr.
-
-1. Fiecare modificare de caracter de acolo actualizează pe loc copia textului (`Snapshot`), fără a citi din nou textul.
-2. O actualizare analizează copia, recolorează sursa doar acolo unde s-au schimbat culorile, așază în pagină previzualizarea și înlocuiește doar blocurile al căror conținut s-a schimbat.
-3. După o editare, doar paragrafele afectate sunt analizate, colorate și așezate din nou în pagină, atât timp cât vecinii lor rămân la fel; [docs/partial-parse.md](../../../docs/partial-parse.md) spune de ce asta dă ce dă o analiză completă și la ce să te uiți când se schimbă comrak. Documentele cu blocuri de comentarii `%%`, modificările front matter și, într-un document cu definiții de referințe pentru linkuri, modificările unei părți care conține o paranteză pătrată sunt procesate integral. comrak recunoaște o referință la o notă de subsol doar cu definiția ei în aceeași analiză și mută definițiile după text, așa că partea este analizată cu o definiție de substituție pentru fiecare etichetă și își ia numerele din arborele vechi; o modificare a referințelor sau a definițiilor din parte, sau lângă o notă de subsol în linie, este procesată integral.
-4. Blocurile HTML care deschid `<details>` sau `<div align>` și îl închid mai târziu afectează blocurile Markdown dintre ele; un bloc reutilizat trebuie să aibă aceleași împrejurimi.
-5. Cât timp tastați în sursa unui document de până la 2 MB, actualizarea parțială rulează imediat; când nu se aplică, sau într-un document mai mare, analiza și aranjarea în pagină rulează în fundal. Cât timp tastați în previzualizare, rulează imediat, pentru că cursorul previzualizării depinde de rezultat.
-6. Intrarea din previzualizare este tradusă de `Bridge` într-o editare a sursei și urmează de acolo același drum. Markdown are prea multe moduri de a transforma textul în sintaxă pentru a ajunge doar regulile, așa că `preview/verify.rs` analizează din nou partea modificată și compară ce afișează cu ce s-a tastat; o editare care nu se susține este protejată mai departe prin escape sau refuzată.
-7. Pozițiile în linie din comrak greșesc în câteva locuri, de exemplu după o definiție de referință pentru link. `reader/positions.rs` le verifică față de sursă la citirea unui bloc și le citește din nou din sursă acolo unde nu se potrivesc.
-
-### Reguli în controller
-
-1. Modificările proprii ale controllerului asupra vizualizărilor rulează în `Panes::silently`; apelurile inverse ale delegatului le ignoră. În rest vizualizările pot fi doar citite, deci compilatorul verifică acest lucru. Ce trebuie să audă apelurile inverse, sau ce predă o vizualizare către AppKit, spune acest lucru trecând prin `Panes::for_appkit`.
-2. Starea este împrumutată doar pentru citire și calcul, niciodată peste un apel care modifică, așază în pagină sau derulează o vizualizare: `Model` o împrumută unor closure-uri `Send`, iar nicio vizualizare nu este `Send`, deci compilatorul verifică acest lucru. Se schimbă numai prin metodele sale, ale căror teste nu au nevoie de fereastră.
-3. Mesajele din exterior (o imagine încărcată, o formulă randată) sosesc cu întârziere prin `renders_arrived` și `image_arrived`, niciodată în mijlocul unei actualizări.
-4. Redesenarea fără modificare de text trece doar prin `invalidate(reason)`.
-5. Copia textului nu este ținută peste o modificare a sursei, altfel acea modificare copiază tot textul: `with_text` o împrumută doar pe durata unui closure `Send`.
-6. O comandă nouă are nevoie de o intrare în `actions.rs`, o metodă în `controller.rs` și o ramură în `Editing::perform`.
-7. Fiecare bloc `unsafe` poartă justificarea sub forma unui comentariu `// SAFETY:`. Octeții ajung la decodoarele de imagini ale sistemului doar în procesul ajutător, prin `decoder::decode_native`; un test scanează sursele după alte apeluri.
-8. Nimic pe firul principal nu așteaptă dosarele utilizatorului, deoarece un volum de rețea poate înceta să răspundă: fișierele sunt consultate pe firul `DISK`, iar previzualizarea citește răspunsurile prin `Env::known`. Doar o acțiune pe care utilizatorul o așteaptă, precum un export sau o salvare, poate atinge direct discul.
-9. Ce trebuie să se încheie se încheie și după un panic, deoarece firul principal supraviețuiește unuia: un indicator ridicat trece prin `with_raised`, o editare a stocării de text prin `editing`, iar ce nu trebuie să știe anularea prin `without_undo`. Un test le găsește pe cele scrise de mână.
-10. O adresă dintr-un document are o singură citire, în `splat_markdown::url`; un test găsește schemele comparate de mână.
-
-### Adăugarea unei comenzi
-
-Bara de meniuri, bara de instrumente și meniul contextual își construiesc toate elementele din registrul din [src/editor/actions.rs](../../../src/editor/actions.rs), iar validarea meniurilor citește de acolo când se aplică o comandă și dacă afișează o bifă. O comandă nouă are nevoie de:
-
-1. o variantă de `Action` cu `Spec`-ul ei: selector, titlu, etichetă pentru bara de instrumente, tooltip (care începe cu un verb, cel mult 75 de caractere), scurtătură, SF Symbol și când se aplică
-2. metoda din `src/editor/controller.rs`
-3. o ramură în `Editing::perform`
-4. textele ei în fiecare `Localizable.strings`
-
-Testul `every_command_has_a_method_and_every_method_a_command` verifică dacă registrul și metodele se potrivesc. Scurtăturile standard Apple, precum ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F și ⌘, rămân neatinse.
-
-### Traduceri
-
-Codul folosește textul german drept cheie: `t("Fett")` îl caută la rulare, `n("Fett")` marchează o constantă pentru căutare ulterioară. Fiecare `resources/<language>.lproj/` conține:
-
-- `Localizable.strings`: fiecare text al interfeței, termenii din meniuri după glosarele Apple
-- `InfoPlist.strings`: numele pe care macOS le afișează pentru aplicație și pentru tipul ei de document
-- `QuickReference.md`: referința rapidă Markdown
-
-`cargo xtask bundle` listează fiecare dosar `.lproj` ca localizare, iar `CFBundleDevelopmentRegion` este engleza, astfel că meniurile sistemului și dialogul de salvare urmează aceeași limbă. Testul i18n verifică dacă fiecare limbă are fiecare text și dacă fiecare referință rapidă are structura celei germane.
-
-`assets/readme/<language>/` conține acest README în limba respectivă, captura sa de ecran și documentul demonstrativ pe care îl arată captura. O modificare a acestui README trebuie făcută și în aceste copii.
+Compilarea, testarea, structura codului și regulile pe care le urmează sunt descrise în [docs/development.md](../../../docs/development.md) (în engleză).
 
 ### Componente terțe
 
@@ -757,6 +632,10 @@ Codul folosește textul german drept cheie: `t("Fett")` îl caută la rulare, `n
 | [image](https://github.com/image-rs/image) | 0.25 | decodarea PNG, JPEG, GIF, WebP și BMP | MIT sau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alinierea coloanelor de tabel | MIT sau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | numele referințelor de caractere HTML | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | despachetarea fișierelor Word și a obiectelor Git | MIT, Zlib sau Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | citirea XML-ului din fișierele Word | MIT sau Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nume și căutare peste litere compuse și descompuse | MIT sau Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | păstrarea literală a textului de tip `:shortcode:` în textul importat | MIT sau Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | randarea formulelor | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | editor vizual de formule, cu fonturi KaTeX | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | diagrame Mermaid | MIT |

@@ -1,0 +1,11 @@
+---
+title: Note
+tags: [a, "b, c"]
+list:
+  - x
+  # inner
+  - 'y'
+date: 2026-11-05 # when
+---
+
+Text

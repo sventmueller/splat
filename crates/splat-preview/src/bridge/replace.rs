@@ -201,7 +201,7 @@ impl Bridge<'_> {
             after > 0 && r.end <= dels[after - 1].end
         };
         let mut leaves = Vec::new();
-        walk_blocks(&self.doc.blocks, &mut |b: &Block| {
+        walk_blocks(self.doc.blocks(), &mut |b: &Block| {
             let next = deletions.partition_point(|d| d.end <= b.range.start);
             if b.is_leaf() && deletions.get(next).is_some_and(|d| d.start < b.range.end) {
                 leaves.push(b);

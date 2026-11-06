@@ -14,7 +14,7 @@ use objc2_app_kit::{
 use objc2_foundation::{NSCoder, NSRange, NSRect, NSString, NSUserDefaults};
 
 use super::layers::ForPanes;
-use super::outline::Outline;
+use super::sidebar::{Sidebar, SidebarTab};
 use super::views::{PreviewTextView, SourceTextView};
 use super::{scroll, string_of};
 use crate::util::{ns, perform_later, storage};
@@ -50,7 +50,7 @@ pub(super) struct PaneState {
     source: OnceCell<Retained<SourceTextView>>,
     preview: OnceCell<Retained<PreviewTextView>>,
     preview_item: OnceCell<Retained<NSSplitViewItem>>,
-    outline: OnceCell<Outline>,
+    sidebar: OnceCell<Sidebar>,
     outline_item: OnceCell<Retained<NSSplitViewItem>>,
     /// Raised while the controller changes its own views; the delegate callbacks then ignore the changes.
     busy: Cell<bool>,
@@ -136,6 +136,11 @@ impl<'a> ViewReader<'a> {
         scroll::char_rect(self.0, index)
     }
 
+    /// A rectangle of the view in the coordinates of `other`.
+    pub(super) fn rect_in(self, rect: NSRect, other: &objc2_app_kit::NSView) -> NSRect {
+        self.0.convertRect_toView(rect, Some(other))
+    }
+
     pub(super) fn top_offset(self) -> Option<usize> {
         scroll::top_offset(self.0)
     }
@@ -157,8 +162,8 @@ impl<'a> Panes<'a> {
 }
 
 impl<'a> Panes<'a> {
-    pub(super) fn install_outline(&self, outline: Outline, item: Retained<NSSplitViewItem>) {
-        let _ = self.state.outline.set(outline);
+    pub(super) fn install_sidebar(&self, sidebar: Sidebar, item: Retained<NSSplitViewItem>) {
+        let _ = self.state.sidebar.set(sidebar);
         let _ = self.state.outline_item.set(item);
     }
 
@@ -259,18 +264,64 @@ impl<'a> Panes<'a> {
         self.state.preview_item.get().is_some_and(|i| !i.isCollapsed())
     }
 
-    pub(super) fn outline_visible(&self) -> bool {
+    pub(super) fn sidebar_visible(&self) -> bool {
         self.state.outline_item.get().is_some_and(|i| !i.isCollapsed())
     }
 
+    pub(super) fn sidebar_tab(&self) -> Option<SidebarTab> {
+        self.state.sidebar.get().map(Sidebar::tab)
+    }
+
+    pub(super) fn with_sidebar(&self, f: impl FnOnce(&Sidebar)) {
+        if let Some(sidebar) = self.state.sidebar.get() {
+            f(sidebar);
+        }
+    }
+
+    pub(super) fn outline_visible(&self) -> bool {
+        self.tab_visible(SidebarTab::Outline)
+    }
+
+    /// Whether the sidebar shows, on this tab.
+    pub(super) fn tab_visible(&self, tab: SidebarTab) -> bool {
+        self.sidebar_visible() && self.sidebar_tab() == Some(tab)
+    }
+
     pub(super) fn toggle_outline(&self) {
+        self.toggle_tab(SidebarTab::Outline);
+    }
+
+    /// Shows the sidebar on `tab`; if it shows that already, hides it. Whether it will show.
+    pub(super) fn toggle_tab(&self, tab: SidebarTab) -> bool {
+        let Some(item) = self.state.outline_item.get() else {
+            return false;
+        };
+        let shown_elsewhere = self.sidebar_visible() && self.sidebar_tab() != Some(tab);
+        let shows = shown_elsewhere || self.toggle_pane(item, &self.state.outline_asked);
+        if shows {
+            self.select_tab(tab);
+        }
+        self.host.object().invalidateRestorableState();
+        shows
+    }
+
+    /// Shows the sidebar on `tab`, whatever it showed.
+    pub(super) fn show_tab(&self, tab: SidebarTab) {
         let Some(item) = self.state.outline_item.get() else {
             return;
         };
-        if self.toggle_pane(item, &self.state.outline_asked) {
+        if !self.sidebar_visible() {
+            self.toggle_pane(item, &self.state.outline_asked);
+        }
+        self.select_tab(tab);
+        self.host.object().invalidateRestorableState();
+    }
+
+    fn select_tab(&self, tab: SidebarTab) {
+        self.with_sidebar(|sidebar| sidebar.select(tab));
+        if tab == SidebarTab::Outline {
             self.show_headings();
         }
-        self.host.object().invalidateRestorableState();
     }
 
     /// Whether the preview came back and has to catch up.
@@ -293,7 +344,11 @@ impl<'a> Panes<'a> {
     /// `settle` looks when it should be over.
     fn toggle_pane(&self, item: &NSSplitViewItem, asked: &Asked) -> bool {
         let shows = asked.toggle(item.isCollapsed());
-        objc2_app_kit::NSAnimatablePropertyContainer::animator(item).setCollapsed(!shows);
+        if crate::test_hooks::ANIMATES {
+            objc2_app_kit::NSAnimatablePropertyContainer::animator(item).setCollapsed(!shows);
+        } else {
+            item.setCollapsed(!shows);
+        }
         perform_later(self.host.object(), sel!(settlePanes), PANE_ANIMATION_SECONDS, true);
         shows
     }
@@ -307,7 +362,7 @@ impl<'a> Panes<'a> {
             item.setCollapsed(!shows);
             Some(shows)
         };
-        if corrected(&self.state.outline_item, &self.state.outline_asked) == Some(true) {
+        if corrected(&self.state.outline_item, &self.state.outline_asked) == Some(true) && self.outline_visible() {
             self.show_headings();
         }
         corrected(&self.state.preview_item, &self.state.preview_asked) == Some(true)
@@ -321,7 +376,7 @@ impl<'a> Panes<'a> {
     }
 
     fn show_headings(&self) {
-        let Some(outline) = self.state.outline.get() else {
+        let Some(sidebar) = self.state.sidebar.get() else {
             return;
         };
         let headings: Vec<_> = self.host.model().read(|st| {
@@ -331,7 +386,7 @@ impl<'a> Panes<'a> {
                 .map(|h| (h.level, h.title, h.range))
                 .collect()
         });
-        outline.update(&headings);
+        sidebar.outline.update(&headings);
     }
 
     /// Remembers where the window stands and how large it is, for the next window and the next start.
@@ -349,11 +404,13 @@ impl<'a> Panes<'a> {
 
     pub(super) fn encode_state(&self, coder: &NSCoder) {
         let collapsed = self.state.preview_item.get().is_some_and(|i| i.isCollapsed());
-        let outline = self.outline_visible();
+        let sidebar = self.sidebar_visible();
+        let tab = self.sidebar_tab().unwrap_or_default().segment();
         // SAFETY: Window restoration always passes a keyed coder.
         unsafe {
             coder.encodeBool_forKey(collapsed, &ns("previewCollapsed"));
-            coder.encodeBool_forKey(outline, &ns("outlineShown"));
+            coder.encodeBool_forKey(sidebar, &ns("outlineShown"));
+            coder.encodeInteger_forKey(tab, &ns("sidebarTab"));
             coder.encodeDouble_forKey(self.host.model().read(|st| st.zoom()), &ns("zoom"));
         }
     }
@@ -367,8 +424,10 @@ impl<'a> Panes<'a> {
         // SAFETY: Window restoration always passes a keyed coder.
         let zoom = unsafe { coder.decodeDoubleForKey(&ns("zoom")) };
         // SAFETY: Window restoration always passes a keyed coder.
-        if unsafe { coder.decodeBoolForKey(&ns("outlineShown")) } && !self.outline_visible() {
-            self.toggle_outline();
+        let tab = SidebarTab::of_segment(unsafe { coder.decodeIntegerForKey(&ns("sidebarTab")) });
+        // SAFETY: Window restoration always passes a keyed coder.
+        if unsafe { coder.decodeBoolForKey(&ns("outlineShown")) } && !self.tab_visible(tab) {
+            self.show_tab(tab);
         }
         (zoom > 0.3).then_some(zoom)
     }
@@ -388,13 +447,22 @@ impl Panes<'_> {
         }
     }
 
-    /// A pane was asked to move and `settle` has not looked yet.
-    pub(super) fn is_moving(&self) -> bool {
-        self.state.preview_asked.0.get().is_some() || self.state.outline_asked.0.get().is_some()
+    pub(super) fn with_outline(&self, f: impl FnOnce(&objc2_app_kit::NSOutlineView)) {
+        if let Some(sidebar) = self.state.sidebar.get() {
+            f(&sidebar.outline.view);
+        }
+    }
+
+    pub(super) fn with_files<R: Default>(&self, f: impl FnOnce(&super::sidebar::List) -> R) -> R {
+        self.state
+            .sidebar
+            .get()
+            .map(|sidebar| f(&sidebar.files))
+            .unwrap_or_default()
     }
 
     pub(super) fn outline_rows(&self) -> Option<isize> {
-        self.state.outline.get().map(|o| o.view.numberOfRows())
+        self.state.sidebar.get().map(|s| s.outline.view.numberOfRows())
     }
 }
 

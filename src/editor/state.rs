@@ -13,11 +13,12 @@ use crate::markdown::doc::Doc;
 use crate::markdown::doc::Splice;
 use crate::markdown::highlight::Style;
 use crate::markdown::incremental::{Parsed, parse_and_color, parse_shared_and_color, reparse_part_and_color};
-use crate::markdown::text::{Byte, Shown, U16};
+use crate::markdown::text::{Byte, U16};
 use crate::preview::layout::{
     Layout, Marker, Resolver, TopBlock, caret_shapes_layout, layout, relayout, reusable, reusable_behind_caret,
 };
 use crate::preview::map::Index;
+use crate::preview::map::Shown;
 use crate::util::{contained, free_in_background};
 
 /// Why the editor redraws although the source text did not change.
@@ -418,7 +419,7 @@ impl State {
             None if self.is_current(snap) => (None, None),
             None => (Some(self.parse(&snap.text)), None),
         };
-        self.take_over(snap, views, parsed, layout_done, resolver)
+        self.apply_result(snap, views, parsed, layout_done, resolver)
     }
 
     /// Like `advance`, if a text of moderate size can be parsed around its edit right away; else `None`, and the next
@@ -436,7 +437,7 @@ impl State {
         }
         let parsed = self.parse_part(&snap.text)?;
         self.parse_failed = false;
-        Some(self.take_over(snap, views, Some(parsed), None, resolver))
+        Some(self.apply_result(snap, views, Some(parsed), None, resolver))
     }
 
     /// Parses `new_text` around the edit; `None` when its neighbours would not stay the same. A panic takes the tree
@@ -483,7 +484,7 @@ impl State {
         parsed.unwrap_or_else(|| Parsed::failed(new_text.into()))
     }
 
-    fn take_over<R: Resolver>(
+    fn apply_result<R: Resolver>(
         &mut self,
         snap: &Snapshot,
         views: ViewFacts,
@@ -493,7 +494,7 @@ impl State {
     ) -> Update {
         let text_changed = parsed.is_some();
         let splice = parsed.as_ref().and_then(|p| p.splice.clone());
-        let recolor = self.adopt(snap, parsed);
+        let recolor = self.apply_parse(snap, parsed);
         let appearance_switched = self.rendered_dark != Some(views.dark);
         let caret = views.caret_at.map(|at| snap.byte_at(at));
         let preview = self.lay_out(views, caret, text_changed, layout_done, splice.as_ref(), resolver);
@@ -506,7 +507,7 @@ impl State {
     }
 
     /// Takes over a new parse result for the text of `snap`; what to recolor, unless nothing changed.
-    fn adopt(&mut self, snap: &Snapshot, parsed: Option<Parsed>) -> Option<Recolor> {
+    fn apply_parse(&mut self, snap: &Snapshot, parsed: Option<Parsed>) -> Option<Recolor> {
         self.version = snap.version;
         let all = std::mem::take(&mut self.stale.colors);
         let old = parsed.map(|parsed| {
@@ -953,9 +954,9 @@ mod tests {
     fn a_failed_parse_keeps_the_text_of_the_snapshot() {
         let mut state = shown("Text\n");
         let snap = snapshot("Neu\n", 2);
-        state.adopt(&snap, Some(Parsed::failed("Neu\n".into())));
+        state.apply_parse(&snap, Some(Parsed::failed("Neu\n".into())));
         assert_eq!(state.text(), "Neu\n");
-        assert!(state.doc().blocks.is_empty());
+        assert!(state.doc().blocks().is_empty());
         assert!(state.is_current(&snapshot("Neu\n", 9)));
     }
 
@@ -964,12 +965,12 @@ mod tests {
         let mut state = shown("Text\n");
         let snap = snapshot("Neu\n", 2);
         let parsed = state.parse("Neu\n");
-        let recolor = state.adopt(&snap, Some(parsed)).expect("a change");
+        let recolor = state.apply_parse(&snap, Some(parsed)).expect("a change");
         assert_eq!(&*recolor.old_text, "Text\n");
         assert_eq!(&*recolor.text, "Neu\n");
-        assert!(state.adopt(&snap, None).is_none(), "nothing changed");
+        assert!(state.apply_parse(&snap, None).is_none(), "nothing changed");
         state.invalidate(Invalidate::Zoom);
-        let recolor = state.adopt(&snap, None).expect("all are stale");
+        let recolor = state.apply_parse(&snap, None).expect("all are stale");
         assert_eq!(&*recolor.old_text, "", "from nothing, so every color applies");
     }
 
@@ -1001,7 +1002,7 @@ mod tests {
         let failed = with_panicking_parser(|| update(&mut state, "Neu\n", 2));
         assert_eq!(state.preview_mode(), PreviewMode::Failed);
         assert_eq!(state.text(), "Neu\n", "the text stays");
-        assert!(state.doc().blocks.is_empty());
+        assert!(state.doc().blocks().is_empty());
         let change = failed.preview.expect("the preview says so");
         assert_eq!(change.mode, PreviewMode::Failed);
         belongs_together(&state);
@@ -1018,13 +1019,13 @@ mod tests {
     fn a_panicking_part_leaves_the_state_whole() {
         let old = "Eins\n\nZwei\n\nDrei\n\nVier\n\nFünf\n\nSechs\n\nSieben\n";
         let mut state = shown(old);
-        let blocks = state.doc().blocks.len();
+        let blocks = state.doc().blocks().len();
         let new = old.replace("Vier", "Viertel");
         let facts = views(&state, true);
         let part = with_panicking_parser(|| state.advance_in_part(&snapshot(&new, 2), facts, |_| NoImages));
         assert!(part.is_none());
         assert_eq!(state.text(), old);
-        assert_eq!(state.doc().blocks.len(), blocks, "commands must not find it empty");
+        assert_eq!(state.doc().blocks().len(), blocks, "commands must not find it empty");
         belongs_together(&state);
     }
 

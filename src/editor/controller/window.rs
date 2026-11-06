@@ -90,6 +90,9 @@ impl EditorController {
             edits: Default::default(),
             pictures: Default::default(),
             sharing: Default::default(),
+            counter: Default::default(),
+            changes: Default::default(),
+            notes: Default::default(),
             closed: Default::default(),
         };
         let this = Self::alloc(mtm).set_ivars(ivars);
@@ -115,20 +118,20 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     preview.setAccessibilityLabel(Some(&ns(t("Vorschau"))));
 
     let split = NSSplitViewController::new(mtm);
-    let left = pane(mtm, &source);
+    let left = contained_pane(mtm, &source);
     let right = preview_pane(controller, &preview);
     let left_item = NSSplitViewItem::splitViewItemWithViewController(&left);
     let right_item = NSSplitViewItem::splitViewItemWithViewController(&right);
     left_item.setMinimumThickness(MIN_PANE_WIDTH);
     right_item.setMinimumThickness(MIN_PANE_WIDTH);
     right_item.setCanCollapse(true);
-    let (outline, sidebar) = crate::editor::outline::Outline::new(mtm, controller);
-    let outline_item = NSSplitViewItem::sidebarWithViewController(&sidebar);
+    let (sidebar, sidebar_pane) = crate::editor::sidebar::Sidebar::new(mtm, controller);
+    let outline_item = NSSplitViewItem::sidebarWithViewController(&sidebar_pane);
     outline_item.setMinimumThickness(160.0);
     outline_item.setMaximumThickness(400.0);
     outline_item.setCollapsed(true);
     split.addSplitViewItem(&outline_item);
-    controller.panes().install_outline(outline, outline_item);
+    controller.panes().install_sidebar(sidebar, outline_item);
     split.addSplitViewItem(&left_item);
     split.addSplitViewItem(&right_item);
     split.splitView().setDividerStyle(NSSplitViewDividerStyle::Thin);
@@ -187,7 +190,11 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     if let Some(lm) = layout_manager(&preview) {
         lm.setAllowsNonContiguousLayout(true);
     }
+    if let (Some(left), Some(right)) = (source.enclosingScrollView(), preview.enclosingScrollView()) {
+        controller.change_marks().install(&left, &right);
+    }
     controller.panes().install_views(source.clone(), preview, right_item);
+    controller.word_counter().install();
     controller.updater().set_zoom(1.0);
     controller.updater().replace_all_text(text);
     window.setInitialFirstResponder(Some(&source));
@@ -195,8 +202,18 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
 
 /// The preview with the bar for images from the web above it, hidden until a document has some.
 fn preview_pane(controller: &EditorController, preview: &NSTextView) -> Retained<NSViewController> {
-    let mtm = controller.mtm();
-    let pane = pane(mtm, preview);
+    let pane = contained_pane(controller.mtm(), preview);
+    let container = pane.view();
+    let pictures = controller.pictures();
+    let banner = pictures.build_banner(container.bounds().size);
+    container.addSubview(&banner);
+    pictures.install_banner(banner);
+    pane
+}
+
+/// A scroll view in a view of its own, for what floats above it: a scroll view lays out only what it knows of.
+fn contained_pane(mtm: MainThreadMarker, view: &NSTextView) -> Retained<NSViewController> {
+    let pane = pane(mtm, view);
     let scroll = pane.view();
     let container = NSView::initWithFrame(NSView::alloc(mtm), scroll.frame());
     scroll.setFrame(container.bounds());
@@ -204,11 +221,7 @@ fn preview_pane(controller: &EditorController, preview: &NSTextView) -> Retained
         NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
     container.addSubview(&scroll);
-    let pictures = controller.pictures();
-    let banner = pictures.build_banner(container.bounds().size);
-    container.addSubview(&banner);
     pane.setView(&container);
-    pictures.install_banner(banner);
     pane
 }
 

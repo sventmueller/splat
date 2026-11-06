@@ -46,9 +46,9 @@ pub(super) fn build(
     old_starts.sort_unstable();
     let mut old: Vec<Option<Arc<TopBlock>>> = old.into_iter().map(Some).collect();
     let mut next_old = 0;
-    let mut parts: Vec<Part> = Vec::with_capacity(doc.blocks.len());
-    let wrappers = html_wrappers(&doc.blocks);
-    for (i, block) in doc.blocks.iter().enumerate() {
+    let mut parts: Vec<Part> = Vec::with_capacity(doc.blocks().len());
+    let wrappers = html_wrappers(doc.blocks());
+    for (i, block) in doc.blocks().iter().enumerate() {
         let wrapper = wrappers.get(i).copied().unwrap_or_default();
         if wrapper.hidden {
             continue;
@@ -148,7 +148,7 @@ fn with_empty_lines(text: &str, doc: &Doc, parts: Vec<Part>, caret: Option<Byte>
     let spots = empty_line_spots(text, &ranges);
     let virtual_at = caret.filter(|&c| {
         // Footnote definitions comrak moved behind the text break the source order of the blocks.
-        let inside = doc.blocks.iter().any(|b| b.range.start <= c && c <= b.range.end);
+        let inside = doc.blocks().iter().any(|b| b.range.start <= c && c <= b.range.end);
         let line_begin = line_start(text, c);
         !inside && text.at(line_begin..line_end(text, c)).trim().is_empty() && spots.binary_search(&line_begin).is_err()
     });
@@ -325,19 +325,61 @@ fn html_wrappers(blocks: &[Block]) -> Vec<Wrapper> {
     out
 }
 
-/// Moves every source offset of a laid-out paragraph by `delta`.
+/// Moves every source offset of a laid-out paragraph by `delta`. The patterns name every field and every kind that
+/// holds an offset, so a new one cannot be missed.
 fn shift_para(p: &mut Para, delta: isize) {
     let at = |o: Byte| shifted(o, delta);
-    p.src = at(p.src.start)..at(p.src.end);
-    p.insert_at = at(p.insert_at);
-    if let Some(Marker::Task {
-        symbol: Some(symbol), ..
-    }) = &mut p.style.marker
-    {
-        *symbol = at(*symbol);
+    let Para {
+        style,
+        runs,
+        src,
+        insert_at,
+    } = p;
+    *src = at(src.start)..at(src.end);
+    *insert_at = at(*insert_at);
+    let ParaStyle {
+        kind: _,
+        quote_depth: _,
+        list_depth: _,
+        marker,
+        group: _,
+        tight: _,
+        space_before: _,
+        alert: _,
+        align: _,
+        html: _,
+        rtl: _,
+        mirrored: _,
+    } = style;
+    match marker {
+        Some(Marker::Task {
+            checked: _,
+            symbol: Some(symbol),
+        }) => *symbol = at(*symbol),
+        Some(
+            Marker::Task {
+                checked: _,
+                symbol: None,
+            }
+            | Marker::Bullet(_)
+            | Marker::Number(_)
+            | Marker::Footnote(..),
+        )
+        | None => {}
     }
-    for r in &mut p.runs {
-        match &mut r.map {
+    for Run {
+        text: _,
+        style:
+            RunStyle {
+                text: _,
+                html: _,
+                citation: _,
+                link: _,
+            },
+        map,
+    } in runs
+    {
+        match map {
             RunMap::Text { chars, end } => {
                 *end = at(*end);
                 match chars {
@@ -347,8 +389,21 @@ fn shift_para(p: &mut Para, delta: isize) {
             }
             RunMap::Atom { src, atom } => {
                 *src = at(src.start)..at(src.end);
-                if let Atom::Fold { sign: Some(sign), .. } = atom {
-                    *sign = at(*sign);
+                match atom {
+                    Atom::Fold {
+                        open: _,
+                        sign: Some(sign),
+                    } => *sign = at(*sign),
+                    Atom::Fold { open: _, sign: None }
+                    | Atom::Text
+                    | Atom::Marker
+                    | Atom::Image(_)
+                    | Atom::Math { tex: _, display: _ }
+                    | Atom::Diagram { source: _, kind: _ }
+                    | Atom::FootnoteRef { name: _ }
+                    | Atom::Rule
+                    | Atom::AlertIcon(_)
+                    | Atom::Details { open: _ } => {}
                 }
             }
         }
@@ -380,7 +435,7 @@ fn empty_para(at: Byte) -> Para {
 /// Line starts that the preview shows as empty paragraphs. Markdown merges blank lines, so every second extra blank
 /// line between blocks stands for one empty line; each keeps a blank line above and below, which makes text typed
 /// into it a paragraph of its own.
-pub fn empty_line_spots(text: &str, blocks: &[Range<Byte>]) -> Vec<Byte> {
+pub(crate) fn empty_line_spots(text: &str, blocks: &[Range<Byte>]) -> Vec<Byte> {
     let mut spots = Vec::new();
     let mut run: Vec<Byte> = Vec::new();
     let mut flush = |run: &mut Vec<Byte>, at_start: bool, at_end: bool| {
@@ -512,7 +567,7 @@ fn render_hash(p: &Para, h: &mut impl Hasher) {
     }
 }
 
-pub fn para_len_u16(p: &Para) -> usize {
+pub(crate) fn para_len_u16(p: &Para) -> usize {
     p.runs.iter().map(|r| splat_markdown::text::utf16_len(&r.text)).sum()
 }
 
@@ -536,7 +591,7 @@ mod tests {
     fn every_second_extra_blank_line_is_an_empty_paragraph() {
         let spots = |t: &str| {
             let d = parse(t);
-            let ranges: Vec<Range<Byte>> = d.blocks.iter().map(|b| b.range.clone()).collect();
+            let ranges: Vec<Range<Byte>> = d.blocks().iter().map(|b| b.range.clone()).collect();
             empty_line_spots(t, &ranges)
                 .into_iter()
                 .map(Byte::get)
@@ -705,7 +760,7 @@ mod tests {
     fn blank_lines_are_counted_from_the_end_of_the_line_a_block_ends_on() {
         let spots = |t: &str| {
             let d = parse(t);
-            let ranges: Vec<Range<Byte>> = d.blocks.iter().map(|b| b.range.clone()).collect();
+            let ranges: Vec<Range<Byte>> = d.blocks().iter().map(|b| b.range.clone()).collect();
             empty_line_spots(t, &ranges)
         };
         assert_eq!(
@@ -718,7 +773,7 @@ mod tests {
     #[test]
     fn spaces_behind_a_paragraph_do_not_count_as_a_blank_line() {
         let d = parse("a \n\n\nb\n");
-        let ranges: Vec<Range<Byte>> = d.blocks.iter().map(|b| b.range.clone()).collect();
+        let ranges: Vec<Range<Byte>> = d.blocks().iter().map(|b| b.range.clone()).collect();
         assert_eq!(empty_line_spots("a \n\n\nb\n", &ranges), Vec::<Byte>::new());
     }
 }

@@ -4,7 +4,7 @@
 
 **适用于 macOS 的 Markdown 编辑器，既可在源文本中写作，也可直接在预览中写作。**
 
-Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全可编辑的预览。在哪一侧输入都行：你在预览中写下的内容，会变成对源文本的最小改动，所以你没碰过的行与原来逐字节相同，Git diff 也始终干净。Splat 能读懂你日常使用的 Markdown：CommonMark 和 GitHub Flavored Markdown、GitHub 提示块、Obsidian 的维基链接、嵌入和标注、Pandoc 与 Typora 扩展、嵌入的 HTML、LaTeX 公式，以及 Mermaid、Graphviz 和 PlantUML 图表，全部离线渲染。一键即可导出为 PDF、HTML 或 Word。它用 Rust 编写，基于原生 AppKit 控件，支持 35 种语言，除非你要求，否则不会通过网络发送任何数据。
+Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全可编辑的预览。在哪一侧输入都行：你在预览中写下的内容，会变成对源文本的最小改动，所以你没碰过的行与原来逐字节相同，Git diff 也始终干净。Splat 能读懂你日常使用的 Markdown：CommonMark 和 GitHub Flavored Markdown、GitHub 提示块、Obsidian 的维基链接、嵌入和标注、Pandoc 与 Typora 扩展、嵌入的 HTML、LaTeX 公式，以及 Mermaid、Graphviz 和 PlantUML 图表，全部离线渲染。可以浏览和搜索整个文件夹的笔记，查看自上次 Git 提交以来的更改，把 Word 或网页中的内容粘贴为 Markdown，一键即可导出为 PDF、HTML 或 Word。它用 Rust 编写，基于原生 AppKit 控件，支持 35 种语言，除非你要求，否则不会通过网络发送任何数据。
  
 
 
@@ -81,6 +81,8 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
   - [格式命令](#格式命令)
   - [列表和任务](#列表和任务)
   - [表格](#表格)
+  - [粘贴带格式的文本](#粘贴带格式的文本)
+  - [元数据](#元数据)
 - [支持的 Markdown](#支持的-markdown)
   - [CommonMark 和 GitHub Flavored Markdown](#commonmark-和-github-flavored-markdown)
   - [标注](#标注)
@@ -94,7 +96,10 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 - [图表](#图表)
 - [图像](#图像)
 - [链接和导航](#链接和导航)
+- [文件夹中的笔记](#文件夹中的笔记)
+- [自上次提交以来的更改](#自上次提交以来的更改)
 - [导出、打印和共享](#导出打印和共享)
+- [导入 Word 文稿](#导入-word-文稿)
 - [外观和辅助功能](#外观和辅助功能)
 - [语言](#语言)
 - [键盘快捷键](#键盘快捷键)
@@ -103,14 +108,6 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 - [已知限制](#已知限制)
 - [疑难解答](#疑难解答)
 - [开发者须知](#开发者须知)
-  - [构建](#构建)
-  - [分发](#分发)
-  - [测试](#测试)
-  - [项目结构](#项目结构)
-  - [数据流](#数据流)
-  - [控制器中的规则](#控制器中的规则)
-  - [添加命令](#添加命令)
-  - [翻译](#翻译)
   - [第三方组件](#第三方组件)
 - [许可证](#许可证)
 
@@ -120,7 +117,10 @@ Splat 左侧是带语法着色的 Markdown 源文本，右侧是实时且完全�
 - **你日常使用的 Markdown。** CommonMark、GitHub Flavored Markdown、GitHub 提示块、Obsidian、Pandoc 和 Typora 扩展、表情符号短代码、剧透文本、定义列表、标题锚点，以及 GitHub README 中常见的 HTML。
 - **内置公式和图表。** 通过 MathJax 渲染 LaTeX 公式，并配有可视化公式编辑器。Mermaid、Graphviz 和 PlantUML 图表直接在你的 Mac 上渲染，无需 Java、服务器或网络连接。
 - **样样都有按钮。** 每种 Markdown 元素都有对应的工具栏按钮和菜单项，常用的还有键盘快捷键。表格有专属菜单，用于处理行、列和对齐。
-- **导出不丢内容。** 可导出为 PDF、单个自包含的 HTML 文件，或带有真正的标题、列表、表格、脚注和图像的 Word 文稿。
+- **不止一个文件，而是整个文件夹。** 边栏列出文稿所在文件夹中的笔记，并可搜索其全部内容。重新命名笔记会更改指向它的链接，除此之外的每个字节都保持不变。
+- **更改一目了然。** 在 Git 仓库中，文本旁边的竖条会在两个窗格中标出与上次提交不同的内容。
+- **从 Word 和网页到 Markdown。** 把带格式的文本粘贴为 Markdown，把电子表格的单元格粘贴为表格，还能连同图像导入整份 Word 文稿。
+- **导出不丢内容。** 可导出为 PDF、单个自包含的 HTML 文件，或带有真正的标题、列表、表格、脚注和图像的 Word 文稿。可以添加页码、页眉和标题页，也可以使用公司的 Word 模板。
 - **彻头彻尾的原生。** 真正的 AppKit 窗口、标签页、菜单、弹出窗口、版本、自动存储、共享菜单、深色模式、拼写检查、听写和旁白。没有 Electron，文本本身也不用网页视图。
 - **大文件也很快。** 在 10 MB 的文稿中，渲染一次按键约需 10 毫秒（不含视图自身的工作）。
 - **私密而谨慎。** 来自网络的图像只有在你允许后才会载入，指向其他 App 的链接会先询问，所有解码不受信任的图像数据的操作都在沙盒化的辅助进程中运行。
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **更新。** 通过磁盘映像或 Homebrew 安装的 Splat 会借助 [Sparkle](https://sparkle-project.org) 自行保持最新。第二次启动时，它会询问是否可以每天自动检查一次更新。**Splat › 检查更新…** 会立即检查；之后可在同一菜单中通过 **自动检查更新** 和 **自动下载并安装更新** 更改你的选择。只有带有开发者签名的更新，Splat 才会安装。自行构建的版本没有更新功能。
 
-**从源代码构建。** 先查看[构建](#构建)了解所需的前提条件，然后执行：
+**从源代码构建。** 先查看[构建](../../../docs/development.md#building)了解所需的前提条件，然后执行：
 
 ```sh
 make build
@@ -164,10 +164,12 @@ open /Applications/Splat.app
 
 - **左侧：源文本。** 你的 Markdown，使用 SF Mono 字体并带语法着色。
 - **右侧：预览。** 渲染后的文稿，随时可编辑。
-- **大纲边栏（可选）。** 以树状结构列出所有标题；点按其中一个，即可在两个窗格中同时显示它。用 **显示 › 显示大纲**（⌃⌘S）切换。
+- **边栏（可选）。** 以树状结构列出所有标题，点按其中一个，即可在两个窗格中同时显示它：**显示 › 显示大纲**（⌃⌘S）。另外两个标签页是[文件夹中的笔记](#文件夹中的笔记)和对它们的搜索。
 - **工具栏。** 按用途分组的按钮：字符、段落和插入的元素，然后是预览开关、共享和新建文稿。可通过 **显示 › 自定义工具栏…** 自定义。
 
 拖移分隔线，可以让任一侧获得更多空间。**显示 › 隐藏预览**（⌥⌘P）只留下源文本；Splat 会按窗口记住这一设置。两个窗格同步滚动，在一个窗格中所做的选择会在另一个窗格中高亮显示。
+
+窗口一角显示文本的词数、字符数和阅读所需的时间，有选定内容时还显示选定内容的这些数字。链接地址、HTML 标签、元数据、注释、公式和图表不计入。**显示 › 隐藏字数** 可将其隐藏。
 
 ### 文稿、标签页和版本
 
@@ -214,7 +216,7 @@ Splat 是一款标准的 macOS 文稿 App：
 - **公式和图表**以成品图形显示。点按它、把插入点移到它上面，或在它上面按 Return，即可打开其编辑器（参见[公式](#公式)和[图表](#图表)）。
 - **嵌入的 HTML、嵌入的笔记和前置元数据**会显示出来，但要在源文本中编辑。点按它们，插入点会跳到源文本中对应的位置。
 
-Markdown 无法表达的内容在预览中一律被阻止：“字体”和“颜色”面板、标尺，以及粘贴或拖入富文本和图像。粘贴的 HTML 和 RTF 会以纯文本形式进入。
+Markdown 无法表达的内容在预览中一律被阻止：“字体”和“颜色”面板、标尺，以及粘贴或拖入富文本和图像。粘贴的 HTML 和 RTF 会以纯文本形式进入，除非你选择[粘贴为 Markdown](#粘贴带格式的文本)。
 
 ### 格式命令
 
@@ -245,6 +247,21 @@ Markdown 无法表达的内容在预览中一律被阻止：“字体”和“�
 - 在预览中，**Tab** 跳到下一个单元格，**⇧Tab** 跳到上一个，**Return** 跳到下方的单元格。在最后一个单元格中按 Tab 会添加一行。
 - **表格** 菜单可插入和删除行与列，并设定某一列的对齐方式（⌘{、⌘|、⌘}）。
 - **表格 › 对齐表格列** 会为源文本补齐空格，使各列对齐。
+
+### 粘贴带格式的文本
+
+**编辑 › 粘贴为 Markdown**（⌃⌘V）也位于两个窗格的上下文菜单中，它会把剪贴板上的内容转为 Markdown 并放到所选位置，算作一步撤销。⌘V 仍然插入纯文本。
+
+- **来自浏览器、Word、Google Docs、Confluence、“备忘录”或 Pages：** 标题、粗体、斜体、下划线、删除线、上标和下标、链接、保留嵌套的列表、引用、代码和表格都会带过来。
+- **来自电子表格：** 单元格变成带标题行的表格，数字列右对齐。以制表符、分号或逗号分隔的文本也一样，前提是每行的列数相同。
+- **图片** 如果有网址，就仍保持为链接。粘贴的 HTML 中所含的图片会变成文稿旁边的文件，为此文稿需要先存储一次。Word 的临时图片文件不会带过来，但其替代文本会保留。
+- **链接** 只保留 `http`、`https`、`mailto`、相对地址和 `#` 地址；其他链接只留下文本。
+
+### 元数据
+
+**格式 › 编辑元数据…**，或点按预览顶部的元数据行，会打开一个表单，其中是 YAML 前置元数据的各个字段。字段可以更改、添加和移除。带列表的字段仍保持为列表：各个值用逗号依次隔开，含逗号的值放在引号中。名为 `tags`、`aliases`、`keywords`、`categories`、`authors` 或 `cssclasses` 的新字段也会成为列表。嵌套字段和多行文本可以在表单中查看，并在源文本中编辑。
+
+表单所做的更改算作一步撤销，并且只涉及你更改的字段所在的行：其他所有字段的注释、顺序、不规则的空格、引号和行尾都逐字节保持不变。没有元数据的文稿会在开头新增一个块。
 
 ## 支持的 Markdown
 
@@ -315,7 +332,7 @@ Obsidian 的其他类型会以五种颜色中最接近的一种显示：`success
 - **维基链接。** `[[Note]]` 链接到同一文件夹或其下级文件夹中的 `Note.md`。`[[Note|显示的文本]]` 显示你自己的文本，`[[Note#Heading]]` 打开该笔记。按住 ⌘ 点按会在 Splat 中打开它。
 - **嵌入。** `![[Note]]` 在当前笔记中显示另一篇笔记；其中再嵌入的笔记会显示为链接。`![[diagram.png]]` 显示图像。与 Obsidian 一样，嵌入所指的笔记和图像位于文稿所在的文件夹或其下级文件夹中，从不使用绝对路径，并且只有 Markdown 文件会显示为笔记。
 - **注释。** `%%仅在源文本中%%` 在源文本中保持可见，而在预览和所有导出中会被省略，无论是行内的还是单独成行的。
-- **标签。** `#idea` 或 `#project/splat` 会被高亮。按住 ⌘ 点按可在文稿中搜索该标签。
+- **标签。** `#idea` 或 `#project/splat` 会被高亮。按住 ⌘ 点按可在文稿中搜索该标签，在边栏中还会搜索整个文件夹。
 - **可折叠的标注。** 参见[标注](#标注)。
 
 ### 引文和引用
@@ -439,6 +456,23 @@ flowchart LR
 
 **插入 › 目录** 会插入一份包含所有标题的带链接列表。插入点位于其中时，同一命令会更新它。大纲边栏（⌃⌘S）可在两个窗格中跳到任意标题。
 
+## 文件夹中的笔记
+
+边栏顶部的按钮用于在大纲、文件和搜索之间切换。
+
+- **文件**（**显示 › 显示文件**，⌃⌘E）。文稿所在文件夹中的所有 Markdown 文件；如果文稿位于 Git 仓库中，则是整个仓库中的所有 Markdown 文件。点按或按 Return 会把笔记作为此窗口的标签页打开；如果它已打开，则会移到最前面。文件夹名称旁边的按钮可在此窗口中显示另一个文件夹。隐藏文件、`node_modules`、`target`、`Pods`、`DerivedData`、`__pycache__` 和没有笔记的文件夹都不会列出。直接位于个人文件夹中的文稿只显示它旁边的笔记，这样 Splat 就不会遍历你所有的文件夹并逐个询问。
+- **搜索**（**编辑 › 查找 › 在所有笔记中搜索…**，⇧⌘F）。在所有笔记中查找文本，不区分大小写，也不管重音符号如何编码。`#tag` 查找标签，`#project` 也会找到 `#project/splat`，代码中的内容不会被找到。点按某个结果会在该位置打开笔记。
+- **指向笔记的链接。** 笔记的上下文菜单会列出通过维基链接、嵌入、相对链接或引用定义指向它的笔记。
+- **重新命名笔记。** 同一菜单可重新命名它并更改这些链接。Splat 会先告诉你这涉及多少个文件中的多少个链接。每个链接只更改名称，文件的其他每个字节都保持不变。已打开的文稿把这一更改算作一步撤销；在其他文件中，只有 Git 或版本才能撤回。如果其间有其他程序更改过某个文件，所有链接的重新命名都会停止，Splat 会指出该文件。
+
+窗口移到最前面时，列表会跟随文件夹更新。搜索查看的是磁盘上的文件，尚未存储的文本要到下一次自动存储后才会计入。
+
+## 自上次提交以来的更改
+
+对于位于 Git 仓库中的文稿，文本旁边的竖条会在源文本和预览中标出与上次提交不同的内容：绿色表示新增的行，蓝色表示更改的行，被移除内容的位置有一个红色短标记。这些标记会随你的输入和分支的移动而更新。**显示 › 自上次提交以来的更改** 可以关闭它们，对所有窗口生效。
+
+仅行尾不同的行不计入，所以相对于使用 LF 的提交，使用 CRLF 的文件不显示更改。新文件在首次提交之前没有标记，超过 32 MB 的文稿也没有。
+
 ## 导出、打印和共享
 
 | 格式 | 方式 | 得到什么 |
@@ -451,6 +485,19 @@ flowchart LR
 
 **文件 › 共享** 菜单把这些方式集中在一处。导出会采用排版标点设置，以及你已允许载入的网络图像；在 HTML 中，网络图像仍保持为链接。
 
+**文件 › 导出选项…** 用于设定 PDF、打印和 Word 会向文本添加什么，对所有文稿生效：
+
+- **页码** 位于 PDF 和打印页面的页脚中，形式为 `2 / 9`。
+- **页眉和页脚** 用于 PDF 和打印。`{title}`、`{author}`、`{date}`、`{page}` 和 `{pages}` 代表相应的值，前三个来自文稿的元数据。
+- **标题页** 用于 PDF、打印和 Word，内容为元数据中的 `title`、`subtitle`、`author` 和 `date`，没有标题时以文稿名称作为标题。它没有页眉，也没有页脚。
+- **Word 模板**，即导出时采用其外观的 `.docx` 或 `.dotx` 文件：它的样式（包括本地化的名称）、主题、页面大小、页边距、页眉和页脚。无法读取的模板会停止导出并说明情况，而不是给你一份没有应用模板的文稿。
+
+## 导入 Word 文稿
+
+**文件 › 导入 Word 文稿…** 会询问要导入的 `.docx` 或 `.dotx` 文件以及 Markdown 的存放位置，然后打开结果。图像会放在它旁边的文件夹中，文件夹以文稿名称加 `-images` 命名。
+
+标题和列表按 Word 的样式和编号定义导入，样式名称已本地化的文稿也一样。粗体、斜体、下划线、删除线、高亮、上标和下标、链接、引用、代码、脚注、尾注和表格都会带过来，跨列的单元格变成 HTML 表格。公式变成 LaTeX。修订视为已接受，目录不会带过来，因为 **插入 › 目录** 会生成新的目录。旧的 `.doc` 文件和受密码保护的文稿会被拒绝。
+
 ## 外观和辅助功能
 
 - **深色模式**跟随系统。公式和图表会针对每种外观分别渲染。
@@ -459,7 +506,7 @@ flowchart LR
 - **全屏幕、标签页和可自定义的工具栏**，与每一款 Mac App 一样。
 - **旁白。** 两个窗格分别标记为“Markdown 源文本”和“预览”，公式读作其代码，图表读作其标题。每个命令都可通过键盘访问。
 
-Splat 没有设置窗口：为数不多的选项就放在它们起作用的地方，即 **显示** 和 **编辑 › 替换** 中。
+Splat 没有设置窗口：为数不多的选项就放在它们起作用的地方，即 **显示**、**编辑 › 替换** 和 **文件 › 导出选项…** 中。
 
 ## 语言
 
@@ -482,6 +529,9 @@ Splat 遵循 **系统设置 › 通用 › 语言与地区** 中的语言顺序�
 | 将表格列左对齐、居中、右对齐 | ⌘{、⌘\|、⌘} |
 | 隐藏或显示预览 | ⌥⌘P |
 | 显示或隐藏大纲 | ⌃⌘S |
+| 显示或隐藏文件 | ⌃⌘E |
+| 在所有笔记中搜索 | ⇧⌘F |
+| 粘贴为 Markdown | ⌃⌘V |
 | 放大、缩小、实际大小 | ⌘+、⌘−、⌘0 |
 | 新建文稿、打开、存储、复制 | ⌘N、⌘O、⌘S、⇧⌘S |
 | 页面设置、打印 | ⇧⌘P、⌘P |
@@ -507,6 +557,9 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 - **来自网络的图像**只有在你许可之后才会载入，只通过 `https`，从不来自本地网络中的主机，每张最大 10 MB，并且在不带 Cookie 的隐私会话中进行。
 - **隔离解码。** 图像以及公式和图表的图形，在辅助进程中解码；这些进程会关闭继承的所有文件，并在读取第一个字节之前把自己锁进沙盒：无法访问文件，也无法联网。它们只交回像素，且会检查像素的尺寸，10 秒后即被终止。Apple 自带的图像解码器只处理 HEIC、TIFF、AVIF 和 PDF，而且仅当数据确实是该格式时才处理；它们在专属的辅助进程中运行，该进程另外可以读取系统的字体文件夹，并使用系统的视频解码器。SVG、公式和图表同样要经过这个辅助进程，因此它们在 Splat 中是分辨率固定的图片：每点四个像素，长边最多 2560 像素。
 - **本地文件**只能通过文稿中写明的路径进入文稿。嵌入会显示文稿所在文件夹及其下级文件夹中的 Markdown 笔记，缺失的图片也只在那里查找。其他位置的图像路径，无论是绝对路径还是以 `~` 开头，在预览中仍然会载入；HTML 和 Word 导出、打印和 PDF 只带上文稿所在文件夹或其 Git 仓库中的内容（除非该仓库同时包含你的个人文件夹），因此别人的文稿无法把你的文件拉进你转交的导出文件。
+- **笔记文件夹**只有在边栏显示它们时才会读取，重新命名笔记只有在你确认数量之后才会更改其他文件。
+- **Git 仓库**由 Splat 自己读取。它绝不运行 `git` 程序，因为别人仓库中的相应配置可以启动其他程序；它读取的内容也不超过已打开文稿在上次提交中的版本。它不向仓库写入任何内容，也不联网。
+- **Word 文稿和粘贴的文本**由 Splat 自己的解析器读取，大小、嵌套和文件可解压到的程度都有限制。其中的链接只保留 Splat 在其他地方允许的地址，Word 文件中图像的名称绝不决定图像写到哪里。
 - **未存储文本的拷贝**留在这台 Mac 的“资源库”文件夹中，用于崩溃后的恢复。存储或 Splat 正常结束后，它们就会消失；崩溃遗留的拷贝则会留在恢复文件夹中，直到你将其删除。
 - **链接**绝不会因点按而启动程序。网页和邮件链接照常打开；指向其他 App 的链接会先询问。
 - **文稿中的 HTML** 由 Splat 自己的解析器读取。脚本、样式、框架和表单绝不会运行。
@@ -530,7 +583,7 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 ## 已知限制
 
 - **单个波浪线表示下标。** `~text~` 与 Pandoc 中一样是下标；删除线需要 `~~two~~`。GitHub 用一个波浪线也能显示删除线。
-- **预览中只读：** 嵌入的 HTML、嵌入的笔记和前置元数据需在源文本中编辑。
+- **预览中只读：** 嵌入的 HTML 和嵌入的笔记需在源文本中编辑，前置元数据可在其表单或源文本中编辑。
 - **嵌套过深：** 嵌套超过 64 层的 HTML，以及超过 16 层的行内 HTML，只会保留其内容。
 - **合并的表格单元格**只存在于 HTML 表格中，而且只能跨列（`colspan`，不支持 `rowspan`）。不支持 MultiMarkdown 用于合并单元格的表格语法。
 - **参考文献**只读取 BibTeX，不读取 CSL JSON 或 YAML。
@@ -538,6 +591,11 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 - **排版标点：** 德语的单引号结束符无法与撇号区分，会按 ’ 处理。
 - **只支持公式，不支持文档：** 没有 LaTeX 宏包、TikZ，也不支持完整文档。
 - **可视化公式编辑器**以 MathLive 的写法输出 LaTeX：空格会消失（`E = mc^2` 变成 `E=mc^2`），渲染效果不变。
+- **字数：** 泰语、老挝语、高棉语和缅甸语书写时不用空格，按连续的文本段而不是按词计数。`3.14` 和 `snake_case` 各算两个词。
+- **重新命名笔记** 不会更改嵌入的 HTML 中的链接；如果新名称含有 `#`、`|`、`^`、`[`、`]` 或 `\`，维基链接会保持原样。
+- **更改标记** 读取使用 SHA-1 对象以及普通或打包引用的仓库；使用 SHA-256 或 reftable 的仓库不显示标记。受 Git 过滤器（如 LFS）管理的文件，会与过滤器存储的内容比较。
+- **Word 导入** 会略去页眉、页脚和批注中的文本，`.emz` 或 SVG 格式的图片只保留替代文本。
+- **粘贴为 Markdown** 把 RTF 当作西文文本读取，其中的标题只根据字体大小判断。大多数程序同时提供 HTML，它会优先使用 HTML。
 - **有意如此：** 没有行号、没有设置窗口、没有帮助手册，也不在 App Store 上架。
 - **在 Intel 上测试较少。** 窗口自测只在 Apple 芯片上运行；在 Intel 上，CI 运行 `cargo test`。
 
@@ -561,188 +619,7 @@ Markdown 文件可能来自任何人，因此 Splat 把每份文稿都视为不�
 
 ## 开发者须知
 
-Splat 是一个 Rust 应用，通过 [objc2](https://github.com/madsmtm/objc2) 直接调用 AppKit 和 WebKit。没有 Swift，没有 Objective-C，没有 Xcode 项目，也没有 Interface Builder 文件。
-
-### 构建
-
-前提条件：
-
-- 安装了命令行工具的 macOS（`xcode-select --install`）。不需要 Xcode；Splat 的构建不依赖 `actool`、`ibtool` 和 `metal`。
-- Rust 1.99（`brew install rust`）。[rust-toolchain.toml](../../../rust-toolchain.toml) 写明了 CI 所用的确切版本；rustup 会自动安装它，而 Homebrew 的 Rust 会忽略该文件。在那里提高版本号，新的编译器和 clippy 警告就会由此进入项目。
-- rustup，用于 `make lint`、`make check` 和 `make universal`：`cargo xtask check-library` 为 Linux 构建该库，以证明它不需要 macOS，而 Homebrew 的 Rust 没有其他目标平台。
-
-[Makefile](../../../Makefile) 提供简短的入口；`make help` 会列出全部：
-
-```sh
-make build                  # target/release/Splat.app，与 cargo xtask bundle --release 相同
-make universal              # 面向 Apple 芯片和 Intel 的 target/splat-universal，与磁盘映像所含的一致
-make check                  # 格式、无警告的 clippy、全部测试、内置库；即 CI 所运行的内容
-make test                   # 先执行 make check，再执行无窗口的自测
-make test-gui               # 带窗口的自测；它们会占用 Mac 约四分钟
-make test-long              # 更长的随机搜索，以及 10 MB 的局部更新检查
-make fuzz                   # 针对部分解析和所有输出的随机输入
-make coverage               # 全部测试和自测的行覆盖率，每个模块有下限
-make coverage-library       # 针对无窗口模块的同样下限，与 CI 中一致
-make bench FILE=<file.md>   # 打开、输入和滚动大文件的耗时
-make release                # 先执行 make test，再生成经过公证的磁盘映像
-```
-
-构建逻辑本身位于 Rust crate [xtask](../../../xtask/src/main.rs) 中：
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app，Hardened Runtime，使用“Splat Local Signing”签名
-cargo xtask bundle             # target/debug/Splat Debug.app，一个绝不打开 Markdown 文件的独立 App
-cargo xtask dmg                # 用于分发的 dist/Splat-<version>.dmg，Developer ID，已公证
-cargo xtask icon               # 根据 assets/icon-1024.png 重新生成 assets/AppIcon.icns 和 README 图标
-cargo xtask vendor check       # 对照 vendor.lock 校验内置的 JavaScript
-cargo xtask vendor fetch       # 修改 vendor.lock 中的版本后重新下载
-```
-
-`bundle` 会写入 `Info.plist`，拷贝资源和本地化文件，并用证书“Splat Local Signing”为 App 签名。首次构建会在你的登录钥匙串中创建该证书，有效期 20 年。只要它还在，Splat 在多次重新构建之间就能保留最近使用的文稿和文件夹权限；若使用临时签名，每次构建在 macOS 看来都是一个新 App。调试构建和自测构建带有各自的 bundle ID（`local.splat.debug`、`local.splat.selftest`），并且不注册 Markdown 文件，所以访达绝不会用过时的构建打开文稿，它们也不会动正常 App 的设置。
-
-版本号保存在 [VERSION](../../../VERSION) 中，格式为 `major.minor.build`，它就是下一次构建所得到的版本。每次成功的发布构建（`make build`、`cargo xtask bundle --release`、`make release`）都会把构建号加一；调试构建和自测构建则不会动它。主版本号和次版本号需手动提高：比如把 VERSION 设为 `1.1.0`，下一次构建就会得到恰好这个版本。
-
-### 分发
-
-`cargo xtask dmg`（或先运行 `make test` 的 `make release`）会构建发布版本，用你的 Developer ID 签名，请 Apple 公证该 App 并装订票据，把它打包成带有指向“应用程序”链接的压缩只读磁盘映像，同样对映像进行公证和装订，并用 Gatekeeper 检查结果。App 自带票据，这样不经过访达安装的副本（如 Homebrew 所做的）首次启动时也能离线打开；与公证服务的两轮往返各需几分钟。只有通过了每一步的映像才会成为 `dist/Splat-<version>.dmg`，也就是提交的那一份，构建号也会增加。上一个映像会再保留一个版本，因为推送之后的几分钟内，GitHub 的 raw 服务器可能仍会提供旧的更新订阅源；更旧的映像会被移到废纸篓。失败的运行会让 `dist/` 和 VERSION 保持原样。每次发布都会把完整的映像（约 16 MB）加入仓库历史。它只在被调用时运行，绝不作为普通构建的一部分，并且需要：
-
-- 钥匙串中的“Developer ID Application”证书
-- 已保存的 Apple 公证服务登录信息，使用 App 专用密码，通过 `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>` 创建一次
-- 登录钥匙串中用于签署更新的私钥。它由 Sparkle 的 `generate_keys` 创建；其公钥是 [xtask/src/main.rs](../../../xtask/src/main.rs) 中的 `UPDATE_KEY`，也存在于每一份已安装的副本中，这些副本只接受用它签署的更新。请在密码管理器中保留一份备份：`target/sparkle-2.10.1/bin/generate_keys -x <file>` 导出它，`-f <file>` 在另一台 Mac 上导入它。没有它，已安装的副本就再也无法更新。
-- rustup（`brew install rustup`，它不会动 Homebrew 的 Rust）
-- `RELEASE_NOTES.md`，写明此次发布带来的内容。更新对话框会把它显示在一行报告问题的说明上方，因此如果文件为空或仍是上一次发布的内容，`dmg` 会停止
-
-只要缺少其中任何一项，`dmg` 就会在构建之前停止。首次运行时，macOS 会询问“终端”是否可以控制访达；没有这项权限，磁盘映像既不会显示背景，也不会显示图标排列。
-
-只有磁盘映像带有更新程序 [Sparkle](https://sparkle-project.org)，构建时会从它的 GitHub 发布页面下载一次到 `target/` 中，并对照 xtask 中的校验和进行检查。Hardened Runtime 只会在框架带有 App 的 Team ID 时才加载它，Developer ID 签名带有该 ID，而本地证书没有；而且更新不得替换你自己构建的版本。自测构建同样带有 Sparkle，以便据此检查更新菜单：使用不存在的订阅源，不出现 Sparkle 在第二次启动时的询问，并带有让本地签名的 App 能加载该框架的权限。`dmg` 会用更新密钥为新映像签名，并写出 `dist/appcast.xml`，即已安装的副本从 GitHub 读取的订阅源。请把映像和订阅源一起提交并推送：从那时起，已安装的副本就会收到更新提示。本 README 及其翻译中的下载链接指向 GitHub 最新发布中的 `Splat.dmg`，因此每次发布都带有一份这个名字的副本：先运行 `cp dist/Splat-<version>.dmg target/Splat.dmg`，再运行 `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`。
-
-磁盘映像是同时适用于 Apple 芯片和 Intel 的通用二进制；其他构建只面向主机的处理器。Homebrew 的 Rust 只附带主机处理器的标准库，所以 `dmg` 通过 rustup 构建，它会在首次使用时安装 [rust-toolchain.toml](../../../rust-toolchain.toml) 中的工具链和目标平台，并且在程序或 Sparkle 缺少任一处理器的代码时停止。`make universal` 只构建程序本身。其中的 App 带有与本地构建不同的签名，所以 macOS 会为两者分别保存最近使用的文稿和文件夹权限。
-
-### 测试
-
-| 命令 | 检查内容 |
-|---|---|
-| `cargo test --release` | 单元测试、随机测试和翻译测试 |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | 更长的随机搜索；`SPLAT_FUZZ_SEED` 用于改变输入 |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | 只测一种语言，适用于其他语言尚不完整时 |
-| `cargo clippy --release --all-targets [--features selftest]` | 代码检查，包括每个 `unsafe` 块的理由说明、函数长度，以及在库中的数值转换 |
-| `cargo xtask check-library` | 该库可为 Linux 构建，因此其中没有任何东西需要 macOS |
-| `cargo xtask vendor check` | JavaScript 库与 `vendor.lock` 逐字节一致 |
-| `cargo xtask selftest probe` | 无窗口，各自带有预期结果：公式、图表、对照进程内服务器的网络图像、被阻止的地址、每条命令写出的文本、每种图像格式经过两种导出、一个不再响应的页面，以及网页视图对没有防护的页面的防护。大约需要半分钟。需要 App 位于前台的部分在锁屏时会被跳过 |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | 运行中的 App，逐次点按。它会打开窗口并向其中输入；Mac 会被占用约四分钟。`--scenarios` 只运行第二部分，约一分半钟. `--only` 运行该部分的一个组，使用它自己的文稿，在锁屏时也可运行。`--in-back` 略过需要 App 在前台的内容；没有它，这类检查会失败 |
-| `cargo xtask selftest resize` | 拖移分隔线后加宽窗口：调整窗口大小时，源文本会重新换行。约需十秒 |
-| `cargo xtask selftest typing [--by-hand]` | 在存储过程中持续输入，按键经由 App 的事件队列，或用 `--by-hand` 手动输入：输入的内容保留并显示为未存储。约需一分钟 |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | 打开、输入和滚动大文件的耗时。最快的按键耗时更长时，`--keystroke-ms` 失败 |
-| `cargo test --release -- --ignored partial_updates` | 10 MB 文稿中的一次按键：局部更新与完整更新的对比，结果相同，耗时至多四分之一 |
-| `cargo test --release --test hostile` | 专门构造来溢出栈或耗费二次方时间的文稿，每份有两种大小，其耗时必须随文本同比增长，经过解析、排版、两种导出、按键和命令 |
-| `make mutants` | 通过 [cargo-mutants](https://mutants.rs)（`cargo install cargo-mutants`）逐个向 `crates/splat-markdown`、`crates/splat-preview` 和 `crates/splat-file-state` 植入故障；指出哪些故障没有任何测试察觉。需要数小时；`FILE=crates/splat-preview/src/bridge/mod.rs` 可缩小范围 |
-| `make fuzz` | 通过 [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) 提供随机输入，需要 rustup 的 nightly：按键结果必须与完整解析相同，并覆盖所有输出、预览中的编辑、所有命令，以及按打开时的样子存储的文件。`SECONDS=600` 搜索更久 |
-| `cargo test --release --test fuzz_seeds` | 让 `fuzz/seeds/` 中的种子在没有 fuzzer 的情况下通过这些 fuzz 目标的检查；是每次 `cargo test` 的一部分 |
-| `cargo test --profile checked --workspace` | 测试加上调试构建额外检查的内容：每次部分解析后，块都与文本相符，带下去的内容与文本所说一致。属于 `make test-long` |
-| `cargo test --release --test entry_points --test structure` | 从源代码检查：系统调用的一切都防范了 panic，模块只向下依赖 |
-| `cargo test --release --test decoder` | 解码器进程解码图像，既无法访问文件，也无法访问网络 |
-| `make coverage` | 通过 [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov)（`brew install cargo-llvm-cov llvm`）统计 `cargo test` 和所有自测的行覆盖率；低于下限则失败。会占用 Mac 约五分钟 |
-| `make coverage-library` | crate `splat-markdown`、`splat-preview`、`splat-file-state` 和 `splat-i18n` 对照其更高的下限，仅由 `cargo test` 测得 |
-
-单元测试紧挨着被测代码。`crates/splat-testkit/tests/` 存放从外部访问模型和预览的测试：`robustness.rs` 中的随机测试（与 `sync.rs` 的测试共用 `splat-testkit` 的生成器）、`hostile.rs` 中专门用来刁难程序的文稿，以及 `fuzz_seeds.rs` 中 fuzz 目标的种子。`tests/` 存放检查整个程序的测试：它的源代码、它的翻译，以及启动已构建程序的解码器测试。`src/editor/` 中不需要窗口的决策放在带有各自测试的独立函数里：控制器所知道的一切及其变化方式在 `state.rs`，渲染规则在 `render_queue.rs`，文本拷贝在 `sync.rs`，段落样式、字体和颜色作为值在 `render.rs`，工具栏标识符的含义在 `toolbar.rs`，点按链接的含义在 `navigation.rs`。
-
-窗口自测中的一步等待的是具名条件，而不是时间；只有不给出信号的情形（例如某物不存在）才保留带理由的停顿。白白等待是一项失败的检查，并会指明始终没有出现的东西，某一步 panic 同样是一项失败的检查，两种情况下运行都会继续。在本次运行中无从判断的检查会报告 `SELFTEST SKIP`：xtask 会列出它，它既不通过也不失败。xtask 要求每种模式，以及单独的 `--scenarios`，约达到其检查数的九成。窗口自测在主要的点按流程之后还会运行第二部分，位于 `src/editor/selftest/scenarios.rs`：每个格式命令和表格命令、各种对话框、链接点按、粘贴、拖放、导出、被其他程序更改的文件、大幅更改、磁盘上变化的图像、内存压力、超大文稿，以及崩溃后的恢复。它的每个组都打开自己的文稿，这样一个组的失败不会波及下一个组，并且每个组都可以用 `--only` 单独运行。无窗口的自测还会故意破坏存储：一个什么都不接受的文件夹、一个只读文件、一个已消失的文件夹、一个已满的磁盘，以及存储的每个回调中的 panic，这些都不得造成文本丢失。
-
-覆盖率有两条下限：每个模块至少覆盖 84 % 的行，所有模块合计至少 96 %。`make coverage` 把 `cargo test` 与自测合并测量，低于任一下限都会失败；`make coverage-library` 要求不需要窗口的部分达到 90 % 和 97 %。这些下限以及少数例外（如 `main.rs` 中只在崩溃时运行的 panic 钩子）连同理由都写在 [xtask](../../../xtask/src/coverage.rs) 中。测量用的构建会放进 `target/coverage/`，所以用于测量的代码绝不会进入 `target/release/` 或磁盘映像。解码器辅助进程在把自己锁起来之前就打开了它的测量文件，因此它也被计入。
-
-CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每次推送到 `main` 和每个拉取请求时，在 Apple 芯片上运行 `make check`、`make coverage-library` 和通用构建，在 Intel 上运行 `cargo test`。每天夜里，[.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) 会用新的随机输入运行 `make test-long`。自测和磁盘映像只在开发者自己的 Mac 上进行：它们需要屏幕和钥匙串中的签名证书。
-
-自测的输出放在 `target/selftest/` 中。自测会构建一个独立的 App（`target/release/Splat Selftest.app`，bundle ID 为 `local.splat.selftest`），不会动正常 App 的设置、最近使用的文稿和文件关联。
-
-### 项目结构
-
-所有不需要窗口的部分都是 `crates/` 下各自独立的 crate，其构建不需要 macOS，因此由编译器保证它们之间的依赖方式。`src/` 中的 App（包 `splat-app`，程序 `splat`）构建于其上。
-
-- `crates/splat-markdown/`：所有使用方读取的树，即 `doc/` 中的 `Doc`，它拥有自己的文本，以及 `reader/` 中与解析器唯一的绑定：comrak 在其他地方都不出现，`reader/assumptions.rs` 记录了代码对它的假设。语法着色，以及 `commands/` 中所有作为纯文本编辑（`Edit`）的命令。还包括编辑后的重新解析（`incremental.rs`）、嵌入 HTML 的读取器（`markup.rs`）、排版、正文中的标签、引用和引文（`typography.rs`）、文本的外观以及由哪些 Markdown 和 HTML 实现该外观（`style.rs`）、地址可以是什么（`url.rs`），以及 HTML 和 Word 导出（`html.rs`、`docx.rs`，附带 `docx/html.rs` 和 `docx/xml.rs`）。位置有自己的类型：源文本中是 `Byte`，源视图中是 `U16`，预览视图中是 `Shown`（`text.rs`）。
-- `crates/splat-preview/`：`layout/` 中预览的排版、`layout/html.rs` 中嵌入的 HTML，以及预览与源文本之间的映射（`Bridge`、`Index`）。`Bridge` 会拒绝另一个版本的 `Doc` 的排版。
-- `crates/splat-file-state/`：文件包含什么文本、采用什么格式，以及查看文件的结果意味着什么。
-- `crates/splat-i18n/` 与 `resources/*.lproj`：35 种语言；键是德语文本，App 启动时会安装界面语言的表。
-- `crates/splat-testkit/`：随机测试的生成器和 fuzz 目标的检查。
-- `src/editor/`：窗口。一个 `EditorController` 对象作为两个视图的代理为 AppKit 服务，并转发给各组件；组件是建立在控制器及其所拥有状态之上的小型结构体，其字段其他模块无法触及：
-
-| 模块 | 职责 |
-|---|---|
-| `controller.rs` | 类、转发的代理方法、`invalidate`，以及程序其他部分告知编辑器的内容；只有它能触及各个组件 |
-| `panes.rs` | `Panes`：文本视图、大纲、窗格的显示与隐藏，以及提供视图访问权的部分 |
-| `controller/layers.rs` | 谁能触及谁：组件得到一个控制器句柄，只提供它下面的内容，由编译器保证 |
-| `state.rs` | 控制器对文稿所知道的一切，以及改变它的所有途径；其字段是私有的，并且不接触任何视图 |
-| `model.rs` | 把状态和文本拷贝借给无法触及视图的闭包 |
-| `actions.rs` | 命令注册表：选择器、标题、快捷键、符号、命令何时适用 |
-| `editing.rs` | `Editing`：运行和验证命令，在预览中输入 |
-| `update.rs` | `Updater`：解析、着色、更新预览；编辑之后只处理受影响的段落 |
-| `sync.rs` | 文本拷贝和区块记录，不涉及 AppKit，并带有随机测试 |
-| `progressive.rs` | `Progressive`：分步渲染大型预览 |
-| `selection.rs`、`scroll.rs` | `Selection`, `ScrollSync`：两个窗格的选择和滚动位置保持同步 |
-| `atom.rs`、`atom/edit.rs` | `AtomEditor`：公式和图表编辑器 |
-| `navigation.rs`、`links.rs` | `Links`：链接、维基链接、标签、任务复选框、折叠、脚注 |
-| `env.rs` | 预览从文本之外读取的内容：排版标点、`@name` 和 `#12` 所对应的仓库、BibTeX 文件、嵌入的笔记 |
-| `render.rs`、`images.rs`、`picture.rs`、`remote.rs`、`safe_image.rs` | 预览文本、本地和远程图像；`Pictures` 位于 `images.rs` |
-| `attributes.rs` | 文本属性；每个键只能得到它所期望类型的值 |
-| `shadow.rs` | 用于崩溃后恢复的未存储文本拷贝 |
-| `decoder.rs` | 解码图像和图形的沙盒化辅助进程 |
-| `export.rs`、`outline.rs` | `Sharing`：HTML 和 Word 导出；大纲边栏 |
-| `js.rs`、`mathfield.rs`、`render_queue.rs` | 用于 MathJax、Mermaid、Graphviz、PlantUML 和可视化公式编辑器的 WebKit；与 WebKit 无关的、关于何时渲染什么的规则 |
-| `webkit.rs` | 对 WebKit 的调用；只有导航代理的生命周期仍由 `js.rs` 和 `mathfield.rs` 负责 |
-| `controller/window.rs`、`toolbar.rs`、`views.rs`、`dialogs.rs`、`style.rs` | 构建窗口、工具栏、文本视图、对话框、颜色 |
-
-- `src/menu.rs`、`src/app.rs`、`src/document.rs`：菜单栏、App 代理、文稿（`MDDocument`，一个 `NSDocument` 子类）。
-- `src/util/`：工作线程（`lanes.rs`）、可能停止响应的卷（`volumes.rs`）、AppKit 辅助工具、文件和进程。`src/diag.rs`：用户看不到的出错情况会写入系统日志，且不含任何文稿文本。
-- `src/large_alloc.rs`：大块分配直接来自内核，释放时直接还给内核，因此大幅编辑之后内存会回落。
-- `resources/js/`：网页和库；版本和校验和见 [vendor.lock](../../../vendor.lock)。
-- `xtask/`：打包、签名、磁盘映像、图标、内置库、自测运行器和覆盖率下限。
-
-### 数据流
-
-左侧文本视图中的源文本是唯一的依据。
-
-1. 那里的每次字符更改，都会就地更新文本拷贝（`Snapshot`），而无需再次读取文本。
-2. 一次更新会解析该拷贝，只在颜色有变化的地方为源文本重新着色，并对预览排版，只替换内容有变化的区块。
-3. 编辑之后，只要相邻段落保持不变，就只会重新解析、着色和排版受影响的段落；为什么这样得到的结果与完整解析相同，以及 comrak 变化时要检查什么，请参阅 [docs/partial-parse.md](../../../docs/partial-parse.md)。含有 `%%` 注释块的文稿、对前置元数据的更改以及在含有链接引用定义的文稿中，对含有方括号的部分的更改，会被完整处理。comrak 只有在同一次解析中找到脚注的定义时才会识别脚注引用，并把定义移到文本后面，所以该部分会用每个标签一个替身定义来解析，并从旧的树中取得编号；对该部分中的引用或定义的更改，或对行内脚注旁边的更改，会被完整处理。
-4. 以 `<details>` 或 `<div align>` 开头、之后才闭合的 HTML 块，会影响它们之间的 Markdown 块；被复用的块必须有相同的上下文。
-5. 在最大 2 MB 的文稿的源文本中输入时，局部更新会立即运行；若不适用，或文稿更大，解析和排版会在后台运行。在预览中输入时，它们会立即运行，因为预览的插入点取决于结果。
-6. 预览中的输入由 `Bridge` 转换为对源文本的编辑，此后走同一条路径。Markdown 把文本变成语法的方式太多，仅靠规则应付不了，所以 `preview/verify.rs` 会再次解析更改的部分，并把它显示的内容与输入的内容比较；站不住脚的编辑会被进一步转义或被拒绝。
-7. comrak 的行内位置在少数地方会出错，例如在链接引用定义后面。`reader/positions.rs` 在读取块时会对照源文本检查它们，对不吻合之处再从源文本重新读取。
-
-### 控制器中的规则
-
-1. 控制器自己对视图的更改在 `Panes::silently` 内运行；代理回调会忽略它们。其他地方视图只能读取，因此由编译器来检查这一点。回调应当听到的更改，或把视图交给 AppKit 的操作，要通过 `Panes::for_appkit` 来表明。
-2. 只在读取和计算时借用状态，绝不在会改变、排版或滚动视图的调用期间借用：`Model` 把它借给 `Send` 闭包，而没有任何视图是 `Send`，因此由编译器来检查这一点。它只通过自己的方法改变，这些方法的测试不需要窗口。
-3. 来自外部的消息（图像已载入、公式已渲染）通过 `renders_arrived` 和 `image_arrived` 延迟到达，绝不会在更新进行到一半时到达。
-4. 没有文本更改的重绘只通过 `invalidate(reason)` 进行。
-5. 文本拷贝不会跨越源文本的更改而被持有，否则该更改会复制整个文本：`with_text` 只在一个 `Send` 闭包的存续期间把它借出。
-6. 新命令需要在 `actions.rs` 中添加一项，在 `controller.rs` 中添加一个方法，在 `Editing::perform` 中添加一个分支。
-7. 每个 `unsafe` 块都以 `// SAFETY:` 注释的形式附上它的理由。字节只能在辅助进程中通过 `decoder::decode_native` 进入系统图像解码器；有一项测试会扫描源码中的其他调用。
-8. 主线程上的任何操作都不会等待用户的文件夹，因为网络卷可能停止响应：文件在线程 `DISK` 上查看，预览通过 `Env::known` 读取结果。只有用户正在等待的操作，如导出或存储，才可以直接访问磁盘。
-9. 必须结束的事情在 panic 之后也会结束，因为主线程能挺过 panic：设置的标志经过 `with_raised`，对文本存储的编辑经过 `editing`，不应让撤销知道的内容经过 `without_undo`。有一项测试会找出手写的这类代码。
-10. 文稿中的地址只有一种读法，在 `splat_markdown::url` 中；有一项测试会找出手工比较的 scheme。
-
-### 添加命令
-
-菜单栏、工具栏和上下文菜单都从 [src/editor/actions.rs](../../../src/editor/actions.rs) 中的注册表构建各自的项目，菜单验证也在那里读取命令何时适用以及是否显示勾选标记。新命令需要：
-
-1. `Action` 的一个变体及其 `Spec`：选择器、标题、工具栏标签、提示（以动词开头，最多 75 个字符）、快捷键、SF Symbol 以及适用时机
-2. `src/editor/controller.rs` 中的方法
-3. `Editing::perform` 中的一个分支
-4. 每个 `Localizable.strings` 中它的文本
-
-测试 `every_command_has_a_method_and_every_method_a_command` 会检查注册表与方法是否一一对应。Apple 的标准快捷键，如 ⌘E、⌘J、⌘T、⌘;、⇧⌘C、⌥⌘C、⌥⌘V、⇧⌘P、⌥⌘T、⌃⌘F 和 ⌘,，保持不动。
-
-### 翻译
-
-代码以德语文本作为键：`t("Fett")` 在运行时查找它，`n("Fett")` 则标记一个常量以备日后查找。每个 `resources/<language>.lproj/` 包含：
-
-- `Localizable.strings`：所有界面文本，菜单术语依据 Apple 自己的术语表
-- `InfoPlist.strings`：macOS 为该 App 及其文稿类型显示的名称
-- `QuickReference.md`：Markdown 快速参考
-
-`cargo xtask bundle` 会把每个 `.lproj` 文件夹列为一种本地化，并且 `CFBundleDevelopmentRegion` 是英语，因此系统菜单和存储对话框遵循同一种语言。i18n 测试会检查每种语言是否具备全部文本，以及每份快速参考是否具有德语版的大纲。
-
-`assets/readme/<language>/` 存放该语言的本 README、其屏幕截图以及截图中所示的演示文稿。对本 README 的更改也应同步到这些副本中。
+构建、测试、代码结构及其遵循的规则见 [docs/development.md](../../../docs/development.md)（英文）。
 
 ### 第三方组件
 
@@ -755,6 +632,10 @@ CI（[.github/workflows/ci.yml](../../../.github/workflows/ci.yml)）会在每�
 | [image](https://github.com/image-rs/image) | 0.25 | 解码 PNG、JPEG、GIF、WebP 和 BMP | MIT 或 Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | 对齐表格列 | MIT 或 Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML 字符引用的名称 | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | 解压 Word 文件和 Git 对象 | MIT、Zlib 或 Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | 读取 Word 文件的 XML | MIT 或 Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | 跨合成字母和分解字母的名称与搜索 | MIT 或 Apache-2.0、Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | 让导入文本中类似 `:shortcode:` 的文本保持字面形式 | MIT 或 Apache-2.0、Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | 渲染公式 | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | 可视化公式编辑器，附带 KaTeX 字体 | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid 图表 | MIT |

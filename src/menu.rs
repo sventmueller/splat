@@ -70,6 +70,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
             actions::item(mtm, Action::NewTab),
             // NSDocumentController adds the localized "Open Recent" submenu after this item itself.
             item(mtm, t("Öffnen …"), Some(sel!(openDocument:)), "cmd+o"),
+            item(mtm, t("Word-Dokument importieren …"), Some(sel!(mdImportWord:)), ""),
             separator(mtm),
             item(mtm, t("Schließen"), Some(sel!(performClose:)), "cmd+w"),
             item(mtm, t("Sichern"), Some(sel!(saveDocument:)), "cmd+s"),
@@ -82,6 +83,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
             item(mtm, t("Als PDF exportieren …"), Some(sel!(saveDocumentToPDF:)), ""),
             actions::item(mtm, Action::ExportHtml),
             actions::item(mtm, Action::ExportWord),
+            actions::item(mtm, Action::ExportOptions),
             separator(mtm),
             item(mtm, t("Papierformat …"), Some(sel!(runPageLayout:)), "shift+cmd+p"),
             item(mtm, t("Drucken …"), Some(sel!(printDocument:)), "cmd+p"),
@@ -104,6 +106,8 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
                 Some(sel!(centerSelectionInVisibleArea:)),
                 "cmd+j",
             ),
+            separator(mtm),
+            actions::item(mtm, Action::SearchFolder),
         ],
     );
     let (spelling_item, _) = submenu(
@@ -209,6 +213,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
                 Some(sel!(pasteAsPlainText:)),
                 "alt+shift+cmd+v",
             ),
+            actions::item(mtm, Action::PasteMarkdown),
             item(mtm, t("Löschen"), Some(sel!(delete:)), ""),
             item(mtm, t("Alles auswählen"), Some(sel!(selectAll:)), "cmd+a"),
             separator(mtm),
@@ -257,6 +262,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
             submenu(mtm, t("Hinweisbox"), actions::alert_items(mtm)).0,
             separator(mtm),
             actions::item(mtm, Action::EditAtom),
+            actions::item(mtm, Action::EditMetadata),
             separator(mtm),
             actions::item(mtm, Action::RemoveFormatting),
         ],
@@ -268,6 +274,9 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
         vec![
             actions::item(mtm, Action::TogglePreview),
             actions::item(mtm, Action::ToggleOutline),
+            actions::item(mtm, Action::ToggleFiles),
+            actions::item(mtm, Action::ToggleWordCount),
+            actions::item(mtm, Action::ToggleChanges),
             separator(mtm),
             actions::item(mtm, Action::Typography),
             separator(mtm),

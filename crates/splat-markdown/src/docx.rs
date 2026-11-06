@@ -4,7 +4,7 @@
 mod html;
 mod package;
 mod xml;
-mod zip;
+pub mod zip;
 
 use std::collections::HashMap;
 use std::ops::Range;
@@ -12,7 +12,7 @@ use std::ops::Range;
 use super::doc::output::{BlockOutput, Callout, Code, Note, write_block};
 use super::doc::{Align, Block, BlockKind, Doc, Figure, Inline, InlineKind, ListKind, Piece, code_figure};
 use super::text::{Byte, TextAt, count32, right_to_left};
-use super::typography::{Open, Quotes, TextMark, before_text, citation_shown, marks, smarten};
+use super::typography::{Open, Quotes, Running, Segment, TextMark, Within, citation_shown};
 use super::url::is_web_or_mail;
 use package::{CONTENT_TYPES, FONT_TABLE, NAMESPACES, PACKAGE_RELS, SETTINGS, STYLES, numbering};
 use splat_i18n::t;
@@ -23,15 +23,21 @@ pub use zip::stored_entries;
 
 /// An image for the document, as PNG or JPEG data, with its size in points.
 pub struct Picture {
+    /// The encoded image.
     pub data: Vec<u8>,
+    /// Whether `data` is JPEG rather than PNG.
     pub jpeg: bool,
+    /// Its width in points.
     pub width: f64,
+    /// Its height in points.
     pub height: f64,
 }
 
 /// What the document needs from outside the text.
 pub struct WordExport<'a> {
+    /// The rendered formula or diagram as a picture, if one is ready.
     pub figure: &'a dyn Fn(&Figure) -> Option<Picture>,
+    /// The picture an image address in the document leads to, if it can be read.
     pub image: &'a dyn Fn(&str) -> Option<Picture>,
     /// Quotation marks for straight quotes, when typographic punctuation is on.
     pub quotes: Option<Quotes>,
@@ -39,6 +45,8 @@ pub struct WordExport<'a> {
     pub reference: &'a dyn Fn(&str) -> Option<String>,
     /// How a citation key reads, such as `Doe 2020`.
     pub citation: &'a dyn Fn(&str) -> Option<String>,
+    /// A title page in front of the text, if wanted.
+    pub title: Option<&'a TitlePage>,
 }
 
 /// Width of the text on an A4 page with Word's default margins.
@@ -51,11 +59,46 @@ const GAP: u32 = 160;
 #[derive(Debug, PartialEq)]
 pub struct TooLarge;
 
+/// What a title page in front of the text shows; empty parts are left out.
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub struct TitlePage {
+    /// The document's title, in Word's Title style.
+    pub title: String,
+    /// A line below the title, in Word's Subtitle style.
+    pub subtitle: String,
+    /// The author, as a further subtitle line.
+    pub author: String,
+    /// The date as it should read, as a further subtitle line.
+    pub date: String,
+}
+
+impl TitlePage {
+    fn to_xml(&self) -> String {
+        let line = |style: &str, text: &str| {
+            if text.is_empty() {
+                return String::new();
+            }
+            format!(
+                "<w:p><w:pPr><w:pStyle w:val=\"{style}\"/></w:pPr><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>",
+                escape_xml(text)
+            )
+        };
+        format!(
+            "{}{}{}{}<w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>",
+            line("Title", &self.title),
+            line("Subtitle", &self.subtitle),
+            line("Subtitle", &self.author),
+            line("Subtitle", &self.date),
+        )
+    }
+}
+
+/// The document as the bytes of a Word file.
 pub fn to_docx(doc: &Doc, export: &WordExport) -> Result<Vec<u8>, TooLarge> {
     let mut w = Writer {
         source: doc.text(),
         export,
-        body: String::new(),
+        body: export.title.map(TitlePage::to_xml).unwrap_or_default(),
         last: None,
         paragraphs: 0,
         media: Vec::new(),
@@ -389,49 +432,40 @@ impl<'a> Writer<'a> {
         if literal.is_empty() {
             return;
         }
-        if props.text.code {
-            out.push(literal, props);
-            return;
-        }
-        let before = before_text(self.source, at);
-        let shown = match self.export.quotes {
-            Some(q) => smarten(literal, before, q, &mut self.open),
-            None => literal.to_string(),
-        };
         // Word opens no link inside a link, and a mark in one would be one.
-        if props.link {
-            out.push(&shown, props);
-            return;
-        }
-        let mut done = 0;
-        for (range, mark) in marks(&shown, before, true) {
-            let piece = &shown[range.clone()];
+        let within = Within {
+            code: props.text.code,
+            link: props.link,
+            html: false,
+        };
+        let running = Running::of(
+            self.source,
+            literal,
+            at,
+            within,
+            self.export.quotes,
+            &mut self.open,
+            true,
+        );
+        let segments = running.segments(|piece, mark| {
             let mut marked = Runs::default();
-            match &mark {
+            match mark {
                 TextMark::Tag(_) => marked.push(piece, Props { tag: true, ..props }),
                 TextMark::Reference(r) => {
-                    let Some(url) = (self.export.reference)(r) else {
-                        continue;
-                    };
+                    let url = (self.export.reference)(r)?;
                     let mut linked = Runs::default();
                     linked.push(piece, props.linked());
                     marked.hyperlink(self.link_id(&url), linked);
                 }
-                TextMark::Citation(keys) => {
-                    let Some(shown_as) = citation_shown(keys, self.export.citation) else {
-                        continue;
-                    };
-                    marked.push(&shown_as, props);
-                }
+                TextMark::Citation(keys) => marked.push(&citation_shown(keys, self.export.citation)?, props),
             }
-            if range.start > done {
-                out.push(&shown[done..range.start], props);
+            Some(marked)
+        });
+        for segment in segments {
+            match segment {
+                Segment::Text(text) => out.push(text, props),
+                Segment::Mark(marked) => out.append(marked),
             }
-            out.append(marked);
-            done = range.end;
-        }
-        if done < shown.len() || done == 0 {
-            out.push(&shown[done..], props);
         }
     }
 
@@ -695,6 +729,7 @@ mod tests {
         to_docx(
             &parse(text),
             &WordExport {
+                title: None,
                 quotes: Some(Quotes {
                     open: '„',
                     close: '“',
@@ -1000,6 +1035,7 @@ mod tests {
         to_docx(
             &parse(text),
             &WordExport {
+                title: None,
                 quotes: Some(Quotes {
                     open: '„',
                     close: '“',

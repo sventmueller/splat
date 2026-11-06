@@ -54,7 +54,7 @@ fn stretch(doc: &Doc, edit: &Range<Byte>) -> Option<Range<Byte>> {
     let text = doc.text();
     let (mut start, mut end) = (edit.start, edit.end);
     let (mut before, mut after) = (None::<Byte>, None::<Byte>);
-    for block in &doc.blocks {
+    for block in doc.blocks() {
         let r = &block.range;
         if r.end < edit.start {
             before = Some(before.map_or(r.start, |b| b.max(r.start)));

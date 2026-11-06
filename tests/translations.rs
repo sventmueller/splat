@@ -23,6 +23,7 @@ fn source_keys() -> std::collections::BTreeSet<String> {
     walk(&root.join("crates"), &mut files);
     files.retain(|file| {
         !file.components().any(|part| part.as_os_str() == "tests")
+            && file.file_name().is_none_or(|name| name != "tests.rs")
             && !file.starts_with(root.join("crates/splat-testkit"))
     });
     let mut keys = std::collections::BTreeSet::new();
@@ -115,7 +116,7 @@ fn every_quick_reference_keeps_the_structure_of_the_german_one() {
     let read = |lang: &str| std::fs::read_to_string(resources.join(format!("{lang}.lproj/QuickReference.md"))).unwrap();
     let german = read("de");
     let mut expected = Vec::new();
-    shape(&parse_markdown(&german).blocks, &mut expected);
+    shape(parse_markdown(&german).blocks(), &mut expected);
     let kept: Vec<&str> = german
         .lines()
         .filter(|l| {
@@ -132,7 +133,7 @@ fn every_quick_reference_keeps_the_structure_of_the_german_one() {
         }
         let text = read(lang);
         let mut found = Vec::new();
-        shape(&parse_markdown(&text).blocks, &mut found);
+        shape(parse_markdown(&text).blocks(), &mut found);
         assert_eq!(found, expected, "{lang}: block structure");
         for line in &kept {
             assert!(text.lines().any(|l| l == *line), "{lang}: lost {line:?}");

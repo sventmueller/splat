@@ -12,8 +12,13 @@ workspace = true
 [dependencies]
 roxmltree = "0.21"
 splat-file-state = { path = "../splat-file-state" }
+splat-git = { path = "../splat-git" }
+splat-import = { path = "../splat-import" }
 splat-markdown = { path = "../splat-markdown", features = ["selftest"] }
+splat-notes = { path = "../splat-notes" }
 splat-preview = { path = "../splat-preview" }
+unicode-normalization = "0.1"
 
 [dev-dependencies]
+miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
 splat-i18n = { path = "../splat-i18n" }

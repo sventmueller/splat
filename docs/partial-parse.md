@@ -2,7 +2,7 @@
 
 After an edit, `crates/splat-markdown/src/incremental.rs` parses only the top-level blocks around the change and keeps the
 others. A keystroke in a large document would otherwise take a full parse. It must give the tree, the colours and the facts
-a full parse gives; the keystroke chains in `crates/splat-testkit/tests/robustness.rs` and `fuzz/fuzz_targets/reparse.rs`
+a full parse gives; the keystroke chains in `crates/splat-testkit/tests/robustness/` and `fuzz/fuzz_targets/reparse.rs`
 compare exactly that, and `cargo test --profile checked` also looks after every partial parse in a debug build.
 
 ## Why that can hold
@@ -32,7 +32,7 @@ So nothing here relies on blank lines ending anything. It relies on two argument
 | 8 | Formulas and inline notes so many that the reader switches them off in the whole text | `read_as_a_whole` | `SwitchedOff` |
 | 9 | A part so large that a full parse costs no more, or a text too large to parse | `part_between`, `reparse_or_why_not` | `TooMuch` |
 
-Positions: blocks of a part count from its own start until `PartBlocks::placed_at`, and `Stretch` pairs a part with where it
+Positions: blocks of a part count from its own start until `PartBlocks::placed_at`, and `TextPart` pairs a part with where it
 starts, so that neither kind can be mistaken for positions in the whole text.
 
 ## When comrak changes

@@ -1,17 +1,29 @@
 HTML export proposes the document's name
+RTF arrives as Markdown too, inside the line
 Word export proposes the document's name
 a Gantt chart is undone in one step
 a Gantt chart writes exactly its text
+a Word document becomes a Markdown file
+a Word export takes the look of a template
+a broken template says so instead of exporting without it
 a bulleted list is undone in one step
 a bulleted list writes exactly its text
 a cancelled image dialog leaves the text
+a change, a removal and an addition each get their mark
+a changed line's bar ends above the line behind it in the preview
+a click on a folder opens and closes it
 a click on a footnote reference shows the footnote
+a click on a note in the list opens it
 a click on the Dock icon opens a document
+a click on the metadata line opens the form
 a code block is undone in one step
 a code block writes exactly its text
 a crash leaves a copy of every document with unsaved text
+a document without metadata gets a block at its start
 a drop is undone in one step
 a failed export says so
+a failed import says so
+a field can be added
 a file in UTF-16 opens with its umlauts
 a flowchart is undone in one step
 a flowchart writes exactly its text
@@ -22,37 +34,54 @@ a heading writes exactly its text
 a huge document says why it has no preview
 a key right after a save marks the document as edited
 a large change renders the part around the view first
+a link in a closed file follows the rename, and nothing else in it changes
+a link in an open document follows the rename
 a link to another app asks first
 a missing image counts as failed
+a missing template says so
+a name that is taken is refused
+a new commit is the new base
+a note opens as a tab of the window
+a note that is open moves with its document
+a note's context menu has its three commands
 a numbered list is undone in one step
 a numbered list writes exactly its text
 a pasted TIFF picture is stored as PNG
 a pasted TIFF picture is taken without waiting for it
 a pasted picture becomes a file beside the document and an image link
 a pasted picture is taken without waiting for it
+a picture inside pasted HTML becomes a file beside the document
 a picture pasted into an unsaved document is taken
 a plain click on a web link only places the caret
 a quote is undone in one step
 a quote writes exactly its text
 a reload closes the formula's editor
+a rename that reaches other files asks first
+a rename that stopped says what stayed
 a rule is undone in one step
 a rule writes exactly its text
 a running app keeps its own copies
 a save over the file of another program asks first and leaves file and text alone
 a saved document needs no copy
 a saved file holds exactly the text of the source
+a search finds every case and only notes
+a selection is counted without its marks, beside the count of the whole text
 a sequence diagram is undone in one step
 a sequence diagram writes exactly its text
 a table of contents is undone in one step
 a table of contents writes exactly its text
+a tag is found where it is one
 a task list is undone in one step
 a task list writes exactly its text
+a template can be taken away
+a text as it was committed has no marks
 a toolbar command is undone in one step
 a toolbar group runs the command of its segment
 aligning the table is undone in one step
 aligning the table writes exactly its text
 an alert box is undone in one step
 an alert box writes exactly its text
+an empty pasteboard changes nothing
 an export to a place without write access fails
 an image replaced on disk shows without reopening
 an image that appears later shows
@@ -61,6 +90,9 @@ backtab in a table moves between its cells
 blocks scrolled into view are rendered
 bold is undone in one step
 bold writes exactly its text
+both panes mark the same changes
+cancelling the form leaves the text
+cells from a spreadsheet become a table
 centred alignment is undone in one step
 centred alignment writes exactly its text
 column left is undone in one step
@@ -75,6 +107,7 @@ deleting a row writes exactly its text
 document loaded
 dropped files and addresses become images and links
 every item the toolbar offers can be made
+formatted text arrives as Markdown
 highlight is undone in one step
 highlight writes exactly its text
 inline code is undone in one step
@@ -83,6 +116,7 @@ inserting a link is undone in one step
 inserting a table is undone in one step
 italic is undone in one step
 italic writes exactly its text
+its headings, marks, lists and footnotes come along
 keys right after a save are either marked or written
 keys right after a save can be undone
 keys right after a save outlive the look at the file
@@ -92,8 +126,11 @@ links to other apps are links
 links to other documents are links
 nothing of a closed editor reaches the reloaded text
 once memory is back, images decode at full size again
+only the changed field changes, and the new one stands behind the others
+pasting Markdown is one undo step
 pasting a TIFF picture is undone in one step
 pasting a picture is undone in one step
+pdf export
 preview rendered
 printing does not leave out an image that is still loading
 removing formatting is undone in one step
@@ -124,6 +161,9 @@ the HTML export embeds the png image as image/png
 the HTML export embeds the svg image as image/svg+xml
 the HTML export embeds the tif image as image/png
 the HTML export is written
+the Markdown file is proposed under the name of the Word document
+the View menu hides the count
+the View menu switches the marks off
 the Word export carries the jpg image as jpeg
 the Word export carries the pdf image as png
 the Word export carries the png image as png
@@ -133,7 +173,13 @@ the Word export has a file for each image
 the Word export is written
 the actual size comes back
 the bold button sits in a toolbar group
+the count leaves out the metadata and the link's address
+the count stands in the rightmost pane
+the files show the notes of the folder and no other file
 the footnote reference is a link
+the form commits
+the form shows the fields it can change
+the form's change is one undo step
 the formula's editor opens for the reload check
 the helpers start again after they were ended for memory
 the huge text is undone in one step
@@ -142,30 +188,47 @@ the image line is undone in one step
 the large change is undone in one step
 the link dialog asks for address and text
 the link dialog links the selection
+the links to a note are found by wiki link and by address
 the menu checks bold where the caret is in bold text
 the menu offers to hide the shown preview
 the menu zooms in with command plus
+the metadata line is a link
+the new name can be taken
+the new text is committed
+the next page has the header, the text and its number
 the next start says once where the copies are
 the next start takes over the copies of a crashed run
+the options can be taken over
 the outline check leaves the text
 the outline closes
+the outline comes back as a tab
+the outline command switches to the outline
 the outline follows the text while the preview is hidden
 the outline opens
 the patched text copy matches the source view
 the preview can be captured
 the preview can be captured
 the preview comes back with the smaller text
+the preview draws each mark, from the top down
 the preview of a huge document takes no input
 the preview takes input again with the smaller text
 the question offers to save anyway, to take the last version or to save elsewhere
 the quick reference is in the interface language
 the quick reference opens as a document
+the rename can be confirmed
+the search command shows the search
+the sheet proposes the name without its extension
+the sheet shows what is set
 the shown image survives
+the sidebar takes its room beside the source
+the source draws each mark, from the top down
 the table dialog inserts a table of three by three
 the table dialog opens
 the text typed for the crash goes again
+the title page stands alone, with the metadata and without a header
 the typing is undone
 the unsaved text can be taken back
+the word count stands in the corner of its smaller pane
 typing in the preview while the source is parsed shows the source again
 typographic punctuation switches
 underline is undone in one step
@@ -174,8 +237,12 @@ undoing leaves the text of before
 undoing reaches back across the save
 unsaved text has a copy that outlives a crash
 unsaved text outlives a change of its file by another program
+what is no Word file leaves nothing behind
 what is selected in the source gets marked on screen in the preview
+what is selected is not lost
+what the sheet holds is kept
 while memory is short, images decode smaller
+without the preview the count stands in the source
 zooming in enlarges
 zooming out shrinks
 ⌘-click on a link to a Markdown file opens it in Splat

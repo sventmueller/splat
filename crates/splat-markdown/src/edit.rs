@@ -1,3 +1,5 @@
+//! A change to the Markdown source, with the selection that follows it.
+
 use std::ops::Range;
 
 use super::text::{Byte, TextAt, offsets};
@@ -5,16 +7,21 @@ use super::text::{Byte, TextAt, offsets};
 /// A single replacement in the Markdown source; `selection` is expressed in the edited text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Edit {
+    /// The bytes of the source it replaces.
     pub range: Range<Byte>,
+    /// The text that takes their place.
     pub replacement: String,
+    /// The selection afterwards, in the edited text.
     pub selection: Range<Byte>,
 }
 
 impl Edit {
+    /// Makes the change in `text`.
     pub fn apply_to(&self, text: &mut String) {
         text.replace_range(offsets(&self.range), &self.replacement);
     }
 
+    /// `text` with the change made, as a new string.
     pub fn applied_to(&self, text: &str) -> String {
         format!(
             "{}{}{}",

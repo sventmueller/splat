@@ -1,0 +1,15 @@
+[package]
+name = "splat-notes"
+version = "0.0.0"
+description = "The folder of notes around a document of Splat: its tree, searching it, where links lead and what a rename changes"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+caseless = "0.2"
+splat-markdown = { path = "../splat-markdown" }
+unicode-normalization = "0.1"

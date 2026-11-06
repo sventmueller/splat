@@ -95,7 +95,7 @@ impl Bridge<'_> {
 }
 
 /// Container prefix a continuation line needs: quote markers and list-item indentation.
-pub fn continuation_prefix(text: &str, at: Byte) -> String {
+pub(crate) fn continuation_prefix(text: &str, at: Byte) -> String {
     let line_begin = line_start(text, at);
     let line = text.from(line_begin);
     let p = LinePrefix::parse(line);

@@ -11,9 +11,9 @@ use objc2_foundation::{NSMutableAttributedString, NSRange};
 use super::State;
 use super::layers::ForProgressive;
 use super::panes::Side;
-use super::render::RenderCtx;
-use crate::markdown::text::Shown;
+use super::render::{Live, RenderCtx};
 use crate::preview::layout::TopBlock;
+use crate::preview::map::Shown;
 use crate::util::{perform_later, storage};
 
 /// Placeholders this many blocks before and after the visible one get rendered while idle.
@@ -70,7 +70,7 @@ impl Progressive<'_> {
     pub(super) fn render_visible_blocks(&self) {
         // Rendered blocks change height and can pull further placeholders into view.
         for _ in 0..3 {
-            if self.host.under_way().holds_back_what_can_wait() {
+            if self.host.under_way().defers_background_results() {
                 return;
             }
             let view = self.host.panes().preview();
@@ -102,7 +102,7 @@ impl Progressive<'_> {
     /// Blocks further away wait until scrolled near: in a large document, TextKit takes longer for every edit the
     /// further the rendered part reaches beyond the visible one.
     pub(super) fn render_pending_blocks(&self) {
-        if self.host.under_way().holds_back_what_can_wait() {
+        if self.host.under_way().defers_background_results() {
             self.schedule_pending_blocks();
             return;
         }
@@ -131,6 +131,9 @@ impl Progressive<'_> {
         let Some((zoom, waiting)) = self.host.model().read(move |st| waiting_blocks(st, wanted, from)) else {
             return false;
         };
+        let live = Live {
+            requester: Some(self.host.object()),
+        };
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
             zoom,
@@ -142,6 +145,7 @@ impl Progressive<'_> {
             remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: false,
             macros: self.host.model().read(|st| st.macros()),
+            drawn: &live,
         };
         // Consecutive blocks go in as one replacement: every single edit of a large text storage has a fixed cost.
         let mut chunks = Vec::new();

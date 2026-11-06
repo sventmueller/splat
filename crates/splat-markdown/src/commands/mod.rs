@@ -1,3 +1,6 @@
+//! The editing commands as pure text edits on the Markdown source: formatting, list, quote and heading lines, blocks to
+//! insert, and the anchors of headings.
+
 mod anchors;
 mod inline;
 mod insert;

@@ -8,9 +8,13 @@ use super::text::Byte;
 /// Quotation marks of a language: double opening and closing, single opening and closing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Quotes {
+    /// The opening double quote, `„` in German.
     pub open: char,
+    /// The closing double quote, `“` in German.
     pub close: char,
+    /// The opening single quote, `‚` in German.
     pub open_single: char,
+    /// The closing single quote, `‘` in German.
     pub close_single: char,
 }
 
@@ -223,6 +227,88 @@ pub fn marks(text: &str, before: Option<char>, references: bool) -> Vec<(Range<u
     out
 }
 
+/// What running text stands in, which decides how much of it is shown as typed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Within {
+    /// Code, inline or a block, which shows every character as typed.
+    pub code: bool,
+    /// The text of a link, which can hold no other link and so no mark.
+    pub link: bool,
+    /// Text inside raw HTML, which the page shows as written.
+    pub html: bool,
+}
+
+/// Running text as the preview and the exports show it: typographic punctuation applied, and where its marks stand.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Running {
+    /// The text to show.
+    pub shown: String,
+    /// The marks in `shown`, in text order.
+    pub marks: Vec<(Range<usize>, TextMark)>,
+}
+
+/// A stretch of [`Running`] text: plain text, or what a writer made of a mark.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Segment<'a, T> {
+    /// Text between the marks, and every mark the writer declined.
+    Text(&'a str),
+    /// A mark the writer took.
+    Mark(T),
+}
+
+impl Running {
+    /// `literal`, which stands at `at` in `source`. Code and raw HTML keep their quotes, and code, raw HTML and link
+    /// text hold no marks; `open` carries the open quotes from the earlier text of the same paragraph.
+    pub fn of(
+        source: &str,
+        literal: &str,
+        at: Byte,
+        within: Within,
+        quotes: Option<Quotes>,
+        open: &mut Open,
+        references: bool,
+    ) -> Running {
+        if within.code {
+            return Running {
+                shown: literal.to_string(),
+                marks: Vec::new(),
+            };
+        }
+        let before = before_text(source, at);
+        let shown = match quotes {
+            Some(quotes) if !within.html => smarten(literal, before, quotes, open),
+            _ => literal.to_string(),
+        };
+        let marks = if within.link || within.html {
+            Vec::new()
+        } else {
+            marks(&shown, before, references)
+        };
+        Running { shown, marks }
+    }
+
+    /// The text in order, with each mark `take` makes something of in its place; a mark it declines stays text, joined
+    /// to the text around it.
+    pub fn segments<T>(&self, mut take: impl FnMut(&str, &TextMark) -> Option<T>) -> Vec<Segment<'_, T>> {
+        let mut out = Vec::new();
+        let mut done = 0;
+        for (range, mark) in &self.marks {
+            let Some(made) = take(&self.shown[range.clone()], mark) else {
+                continue;
+            };
+            if range.start > done {
+                out.push(Segment::Text(&self.shown[done..range.start]));
+            }
+            out.push(Segment::Mark(made));
+            done = range.end;
+        }
+        if done < self.shown.len() {
+            out.push(Segment::Text(&self.shown[done..]));
+        }
+        out
+    }
+}
+
 /// What citation marks with these keys show: the names the bibliography knows for them, or `None` if it misses one, which
 /// leaves the text as written.
 pub fn citation_shown(keys: &[String], name_of: impl Fn(&str) -> Option<String>) -> Option<String> {
@@ -379,5 +465,71 @@ mod tests {
             assert!(marks(text, None, false).is_empty(), "{text}");
         }
         assert_eq!(marks("[@a; @b]", None, false).len(), 1);
+    }
+
+    #[test]
+    fn running_text_follows_what_it_stands_in() {
+        let of = |within: Within| {
+            Running::of(
+                "\"a\" #tag",
+                "\"a\" #tag",
+                Byte::new(0),
+                within,
+                Some(GERMAN),
+                &mut Open::default(),
+                true,
+            )
+        };
+        let plain = of(Within::default());
+        assert_eq!(plain.shown, "„a“ #tag");
+        assert_eq!(plain.marks, [(8..12, TextMark::Tag("tag".into()))]);
+        let code = of(Within {
+            code: true,
+            ..Within::default()
+        });
+        assert_eq!((code.shown.as_str(), code.marks.len()), ("\"a\" #tag", 0));
+        let link = of(Within {
+            link: true,
+            ..Within::default()
+        });
+        assert_eq!(
+            (link.shown.as_str(), link.marks.len()),
+            ("„a“ #tag", 0),
+            "a link smartens but holds no mark"
+        );
+        let html = of(Within {
+            html: true,
+            ..Within::default()
+        });
+        assert_eq!((html.shown.as_str(), html.marks.len()), ("\"a\" #tag", 0));
+    }
+
+    #[test]
+    fn a_declined_mark_stays_part_of_the_text_around_it() {
+        let running = Running::of(
+            "a #x b #y c",
+            "a #x b #y c",
+            Byte::new(0),
+            Within::default(),
+            None,
+            &mut Open::default(),
+            true,
+        );
+        let segments = running.segments(|piece, _| (piece == "#y").then_some(piece.len()));
+        assert_eq!(
+            segments,
+            [Segment::Text("a #x b "), Segment::Mark(2), Segment::Text(" c")]
+        );
+        assert_eq!(running.segments(|_, _| None::<()>), [Segment::Text("a #x b #y c")]);
+        let at_the_ends = Running::of(
+            "#x",
+            "#x",
+            Byte::new(0),
+            Within::default(),
+            None,
+            &mut Open::default(),
+            true,
+        );
+        assert_eq!(at_the_ends.segments(|_, _| Some(())), [Segment::Mark(())]);
     }
 }

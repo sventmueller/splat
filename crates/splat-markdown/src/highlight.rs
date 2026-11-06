@@ -1,3 +1,5 @@
+//! The colors and font traits of the source view, as byte ranges of the Markdown text.
+
 use std::ops::Range;
 
 use super::code::{self, CodeToken};
@@ -7,20 +9,34 @@ use super::text::{
     shifted,
 };
 
+/// What a stretch of the source is to the colors of the source view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Token {
+    /// A heading, its marks and its text.
     Heading,
+    /// Markup characters: emphasis delimiters, fences, rules, pipes, brackets and the like.
     Punctuation,
+    /// A code span, or the code of a block whose language has no colors of its own.
     Code,
+    /// The text of a link or wiki link, or a footnote reference or label.
     LinkText,
+    /// A link address, or an autolink.
     Url,
+    /// A list marker or checkbox, or the `:` in front of definition details.
     ListMarker,
+    /// The `>` marks of a quote, and the marker of an alert.
     Quote,
+    /// Raw HTML, and the tags of HTML elements.
     Html,
+    /// A formula, inline or as a block.
     Math,
+    /// A keyword in code.
     Keyword,
+    /// A string in code.
     String,
+    /// A comment in code, a Markdown comment, front matter, or the attribute list of a heading.
     Comment,
+    /// A number in code.
     Number,
 }
 
@@ -35,11 +51,16 @@ impl From<CodeToken> for Token {
     }
 }
 
+/// How a span of the source view looks: its color and its font traits.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Style {
+    /// What gives it its color; `None` for text in the color of plain text.
     pub token: Option<Token>,
+    /// Bold, as headings, strong text and header rows are.
     pub bold: bool,
+    /// Italic, as emphasis is.
     pub italic: bool,
+    /// Struck through, as `~~text~~` is.
     pub strike: bool,
 }
 
@@ -77,7 +98,7 @@ pub(super) fn highlight_blocks(text: &str, blocks: &[Block]) -> Vec<(Range<Byte>
 
 /// The colors of `doc` after `splice` changed it: those of the re-parsed blocks are computed anew, the others taken
 /// from `old`.
-pub fn rehighlight(old: &[(Range<Byte>, Style)], doc: &Doc, splice: &Splice) -> Vec<(Range<Byte>, Style)> {
+pub(crate) fn rehighlight(old: &[(Range<Byte>, Style)], doc: &Doc, splice: &Splice) -> Vec<(Range<Byte>, Style)> {
     let text = doc.text();
     let window = &splice.window;
     let old_end = shifted(window.end, -splice.delta);
@@ -255,7 +276,7 @@ pub fn right_to_left_behind_markers(line: &str) -> bool {
 
 /// Byte offsets of `|` characters that delimit table cells. GFM splits cells on every unescaped pipe,
 /// including pipes inside code spans.
-pub fn unescaped_pipes(line: &str) -> Vec<usize> {
+pub(crate) fn unescaped_pipes(line: &str) -> Vec<usize> {
     let bytes = line.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;

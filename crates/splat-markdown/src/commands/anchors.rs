@@ -6,9 +6,13 @@ use crate::text::Byte;
 /// A heading, what it says and what a link to it is called.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadingAnchor {
+    /// 1 to 6, as `#` to `######` give it.
     pub level: u8,
+    /// Its text as a screen reader reads it.
     pub title: String,
+    /// The name a link to it uses behind `#`: the `{#id}` given, or what GitHub makes of the title.
     pub anchor: String,
+    /// Where the heading stands in the source.
     pub range: Range<Byte>,
 }
 

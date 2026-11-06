@@ -999,8 +999,11 @@ dependencies = [
  "objc2-uniform-type-identifiers",
  "objc2-web-kit",
  "splat-file-state",
+ "splat-git",
  "splat-i18n",
+ "splat-import",
  "splat-markdown",
+ "splat-notes",
  "splat-preview",
  "splat-testkit",
  "svg2pdf",
@@ -1011,8 +1014,27 @@ name = "splat-file-state"
 version = "0.0.0"
 
 [[package]]
+name = "splat-git"
+version = "0.0.0"
+dependencies = [
+ "miniz_oxide 0.9.1",
+ "unicode-normalization",
+]
+
+[[package]]
 name = "splat-i18n"
 version = "0.0.0"
+
+[[package]]
+name = "splat-import"
+version = "0.0.0"
+dependencies = [
+ "emojis",
+ "miniz_oxide 0.9.1",
+ "roxmltree 0.21.2",
+ "splat-markdown",
+ "splat-testkit",
+]
 
 [[package]]
 name = "splat-markdown"
@@ -1023,7 +1045,17 @@ dependencies = [
  "entities",
  "roxmltree 0.21.2",
  "splat-i18n",
+ "unicode-normalization",
  "unicode-width",
+]
+
+[[package]]
+name = "splat-notes"
+version = "0.0.0"
+dependencies = [
+ "caseless",
+ "splat-markdown",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -1038,11 +1070,16 @@ dependencies = [
 name = "splat-testkit"
 version = "0.0.0"
 dependencies = [
+ "miniz_oxide 0.9.1",
  "roxmltree 0.21.2",
  "splat-file-state",
+ "splat-git",
  "splat-i18n",
+ "splat-import",
  "splat-markdown",
+ "splat-notes",
  "splat-preview",
+ "unicode-normalization",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@
 
 **Penyunting Markdown untuk macOS yang membolehkan anda menulis dalam sumber atau terus dalam pratonton.**
 
-Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan pratonton langsung yang boleh diedit sepenuhnya di sebelah kanan. Taip di mana-mana: apa-apa yang anda tulis dalam pratonton menjadi perubahan minimum pada sumber, jadi baris yang tidak anda sentuh kekal sama bait demi bait dan diff Git anda kekal bersih. Splat membaca Markdown yang sudah anda gunakan: CommonMark dan GitHub Flavored Markdown, GitHub alerts, pautan wiki, benam dan kotak maklumat Obsidian, sambungan Pandoc dan Typora, HTML terbenam, formula LaTeX serta rajah Mermaid, Graphviz dan PlantUML, semuanya dipaparkan luar talian. Eksport ke PDF, HTML atau Word dengan satu klik. Ia ditulis dalam Rust di atas kawalan AppKit tulen, menyokong 35 bahasa dan tidak menghantar apa-apa melalui rangkaian melainkan anda memintanya.
+Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan pratonton langsung yang boleh diedit sepenuhnya di sebelah kanan. Taip di mana-mana: apa-apa yang anda tulis dalam pratonton menjadi perubahan minimum pada sumber, jadi baris yang tidak anda sentuh kekal sama bait demi bait dan diff Git anda kekal bersih. Splat membaca Markdown yang sudah anda gunakan: CommonMark dan GitHub Flavored Markdown, GitHub alerts, pautan wiki, benam dan kotak maklumat Obsidian, sambungan Pandoc dan Typora, HTML terbenam, formula LaTeX serta rajah Mermaid, Graphviz dan PlantUML, semuanya dipaparkan luar talian. Layari dan cari seluruh folder nota, lihat apa yang berubah sejak commit Git terakhir, tampal dari Word atau halaman web sebagai Markdown, dan eksport ke PDF, HTML atau Word dengan satu klik. Ia ditulis dalam Rust di atas kawalan AppKit tulen, menyokong 35 bahasa dan tidak menghantar apa-apa melalui rangkaian melainkan anda memintanya.
  
 
 
@@ -81,6 +81,8 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
   - [Arahan pemformatan](#arahan-pemformatan)
   - [Senarai dan tugas](#senarai-dan-tugas)
   - [Jadual](#jadual)
+  - [Menampal teks berformat](#menampal-teks-berformat)
+  - [Metadata](#metadata)
 - [Markdown yang disokong](#markdown-yang-disokong)
   - [CommonMark dan GitHub Flavored Markdown](#commonmark-dan-github-flavored-markdown)
   - [Kotak maklumat](#kotak-maklumat)
@@ -94,7 +96,10 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - [Rajah](#rajah)
 - [Imej](#imej)
 - [Pautan dan navigasi](#pautan-dan-navigasi)
+- [Nota dalam folder](#nota-dalam-folder)
+- [Perubahan sejak commit terakhir](#perubahan-sejak-commit-terakhir)
 - [Mengeksport, mencetak dan berkongsi](#mengeksport-mencetak-dan-berkongsi)
+- [Mengimport dokumen Word](#mengimport-dokumen-word)
 - [Penampilan dan kebolehcapaian](#penampilan-dan-kebolehcapaian)
 - [Bahasa](#bahasa)
 - [Pintasan papan kekunci](#pintasan-papan-kekunci)
@@ -103,14 +108,6 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - [Had yang diketahui](#had-yang-diketahui)
 - [Penyelesaian masalah](#penyelesaian-masalah)
 - [Untuk pembangun](#untuk-pembangun)
-  - [Membina](#membina)
-  - [Pengedaran](#pengedaran)
-  - [Pengujian](#pengujian)
-  - [Susun atur projek](#susun-atur-projek)
-  - [Aliran data](#aliran-data)
-  - [Peraturan dalam pengawal](#peraturan-dalam-pengawal)
-  - [Menambah arahan](#menambah-arahan)
-  - [Terjemahan](#terjemahan)
   - [Komponen pihak ketiga](#komponen-pihak-ketiga)
 - [Lesen](#lesen)
 
@@ -120,7 +117,10 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - **Markdown yang sudah anda gunakan.** CommonMark, GitHub Flavored Markdown, GitHub alerts, Obsidian, sambungan Pandoc dan Typora, kod pendek emoji, spoiler, senarai definisi, sauh tajuk dan HTML seperti dalam README GitHub.
 - **Formula dan rajah terbina dalam.** Formula LaTeX melalui MathJax, dengan penyunting formula visual. Rajah dalam Mermaid, Graphviz dan PlantUML, dipaparkan pada Mac anda tanpa Java, pelayan atau sambungan rangkaian.
 - **Butang untuk setiap perkara.** Setiap binaan Markdown mempunyai butang bar alat dan item menu, dan yang biasa digunakan juga mempunyai pintasan papan kekunci. Jadual mendapat menunya sendiri untuk baris, lajur dan penjajaran.
-- **Eksport tanpa kehilangan apa-apa.** PDF, satu fail HTML yang berdiri sendiri, atau dokumen Word dengan tajuk, senarai, jadual, nota kaki dan imej yang sebenar.
+- **Folder, bukan sekadar fail.** Bar sisi menyenaraikan nota di sebelah dokumen dan mencari dalam semuanya. Menamakan semula nota mengubah pautan kepadanya, dan setiap bait di sekelilingnya kekal.
+- **Perubahan sepintas lalu.** Dalam repositori Git, bar di sebelah teks menandakan apa yang berbeza daripada commit terakhir, dalam kedua-dua anak tetingkap.
+- **Daripada Word dan web ke Markdown.** Tampal teks berformat sebagai Markdown, sel daripada hamparan sebagai jadual, dan import keseluruhan dokumen Word bersama imejnya.
+- **Eksport tanpa kehilangan apa-apa.** PDF, satu fail HTML yang berdiri sendiri, atau dokumen Word dengan tajuk, senarai, jadual, nota kaki dan imej yang sebenar. Tambah nombor halaman, pengepala dan halaman tajuk, atau gunakan templat Word syarikat anda.
 - **Natif sepenuhnya.** Tetingkap, tab, menu, popover, Versi, Simpan Auto, menu kongsi, mod gelap, semakan ejaan, dikte dan VoiceOver yang sebenar daripada AppKit. Tiada Electron, tiada paparan web untuk teks itu sendiri.
 - **Pantas dengan fail besar.** Merender satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 10 ms, sebelum kerja paparan itu sendiri.
 - **Peribadi dan berhati-hati.** Imej dari web dimuatkan hanya selepas anda membenarkannya, pautan ke app lain bertanya dahulu, dan semua yang menyahkod data imej yang tidak dipercayai berjalan dalam proses pembantu berkotak pasir.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Kemas kini.** Splat daripada imej cakera atau Homebrew mengemas kini dirinya sendiri melalui [Sparkle](https://sparkle-project.org). Pada pelancaran kali kedua, ia bertanya sama ada ia boleh mencari kemas kini sendiri, sekali sehari. **Splat › Semak Kemas Kini…** menyemak serta-merta; **Semak Kemas Kini Secara Automatik** dan **Muat Turun dan Pasang Kemas Kini Secara Automatik** dalam menu yang sama mengubah pilihan anda kemudian. Splat memasang kemas kini hanya jika ia membawa tandatangan pembangun. Binaan anda sendiri tidak mempunyai pengemas kini.
 
-**Daripada kod sumber.** Lihat [Building](#membina) untuk prasyarat, kemudian:
+**Daripada kod sumber.** Lihat [Building](../../../docs/development.md#building) untuk prasyarat, kemudian:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Setiap dokumen dibuka dalam tetingkapnya sendiri, atau sebagai tab jika anda leb
 
 - **Kiri: sumber.** Markdown anda dalam SF Mono dengan warna sintaks.
 - **Kanan: pratonton.** Dokumen yang telah dipaparkan, sedia untuk diedit.
-- **Bar sisi rangka (pilihan).** Semua tajuk sebagai pepohon; satu klik pada tajuk menunjukkannya dalam kedua-dua anak tetingkap. Togolkannya dengan **Paparan › Tunjukkan Rangka** (⌃⌘S).
+- **Bar sisi (pilihan).** Semua tajuk sebagai pepohon, satu klik pada tajuk menunjukkannya dalam kedua-dua anak tetingkap: **Paparan › Tunjukkan Rangka** (⌃⌘S). Dua lagi tab memuatkan [nota dalam folder](#nota-dalam-folder) dan carian melaluinya.
 - **Bar alat.** Butang yang dikumpulkan mengikut apa yang diubahnya: aksara, perenggan dan elemen yang dimasukkan, kemudian pratonton hidup/mati, Kongsi dan Dokumen Baharu. Sesuaikannya dengan **Paparan › Sesuaikan Bar Alat…**.
 
 Seret pembahagi untuk memberi lebih ruang kepada mana-mana sebelah. **Paparan › Sembunyikan Pratonton** (⌥⌘P) meninggalkan sumber sahaja; Splat mengingatinya bagi setiap tetingkap. Kedua-dua anak tetingkap tergulung bersama, dan pilihan dalam satu anak tetingkap diserlahkan dalam yang satu lagi.
+
+Penjuru tetingkap menunjukkan bilangan perkataan dan aksara teks serta berapa lama masa untuk membacanya, dan selagi ada pilihan, yang sama bagi pilihan itu. Alamat pautan, teg HTML, metadata, ulasan, formula dan rajah tidak dikira. **Paparan › Sembunyikan Bilangan Perkataan** membuangnya.
 
 ### Dokumen, tab dan versi
 
@@ -213,7 +215,7 @@ Pratonton berfungsi seperti pemproses kata, tetapi segala yang anda lakukan di d
 - **Formula dan rajah** muncul sebagai grafik siap. Klik pada satu, gerakkan kursor ke atasnya atau tekan Return padanya untuk membuka penyuntingnya (lihat [Formulas](#formula) dan [Diagrams](#rajah)).
 - **HTML terbenam, nota terbenam dan front matter** ditunjukkan, tetapi anda mengeditnya dalam sumber. Satu klik padanya meletakkan kursor di tempat yang sepadan di sana.
 
-Apa-apa yang tidak dapat diungkapkan oleh Markdown disekat dalam pratonton: panel Fon dan Warna, pembaris, serta menampal atau melepaskan teks kaya dan imej. HTML dan RTF yang ditampal tiba sebagai teks biasa.
+Apa-apa yang tidak dapat diungkapkan oleh Markdown disekat dalam pratonton: panel Fon dan Warna, pembaris, serta menampal atau melepaskan teks kaya dan imej. HTML dan RTF yang ditampal tiba sebagai teks biasa, melainkan anda memilih [Tampal sebagai Markdown](#menampal-teks-berformat).
 
 ### Arahan pemformatan
 
@@ -244,6 +246,21 @@ Garis bawah, serlahan, superskrip dan subskrip ditulis sebagai `<ins>`, `<mark>`
 - Dalam pratonton, **Tab** beralih ke sel seterusnya, **⇧Tab** ke sel sebelumnya dan **Return** ke sel di bawah. Tab dalam sel terakhir menambah baris.
 - Menu **Jadual** memasukkan dan memadam baris serta lajur dan menetapkan penjajaran lajur (⌘{, ⌘|, ⌘}).
 - **Jadual › Jajarkan Lajur Jadual** mengisi sumber dengan ruang supaya lajur sejajar.
+
+### Menampal teks berformat
+
+**Edit › Tampal sebagai Markdown** (⌃⌘V), juga dalam menu konteks kedua-dua anak tetingkap, menukar apa yang ada pada papan keratan kepada Markdown di tempat pilihan, sebagai satu langkah buat asal. ⌘V terus memasukkan teks biasa.
+
+- **Daripada pelayar, Word, Google Docs, Confluence, Nota atau Pages:** tajuk, tebal, italik, garis bawah, garis potong, superskrip dan subskrip, pautan, senarai bersama penyarangannya, petikan, kod dan jadual turut dibawa.
+- **Daripada hamparan:** sel menjadi jadual dengan baris pengepala dan lajur nombor yang dijajarkan ke kanan. Begitu juga teks yang dipisahkan oleh tab, koma bertitik atau koma, jika setiap baris mempunyai bilangan lajur yang sama.
+- **Imej** dengan alamat web kekal sebagai pautan. Imej di dalam HTML yang ditampal menjadi fail di sebelah dokumen, yang perlu disimpan sekali untuk ini. Fail imej sementara Word ditinggalkan, dan teks alternatifnya kekal.
+- **Pautan** hanya mengekalkan alamat `http`, `https`, `mailto`, relatif dan `#`; daripada pautan lain hanya teksnya yang kekal.
+
+### Metadata
+
+**Format › Edit Metadata…**, atau satu klik pada baris metadata di bahagian atas pratonton, membuka borang dengan medan front matter YAML. Medan boleh diubah, ditambah dan dibuang. Medan dengan senarai mengekalkannya sebagai senarai: nilainya berderet dengan koma, dan nilai yang mengandungi koma berada dalam tanda petikan. Medan baharu bernama `tags`, `aliases`, `keywords`, `categories`, `authors` atau `cssclasses` juga menjadi senarai. Medan bersarang dan teks berbilang baris boleh dilihat di sana dan diedit dalam sumber.
+
+Apa yang diubah oleh borang ialah satu langkah buat asal dan hanya mencapai baris medan yang anda ubah: ulasan, susunan, jarak yang ganjil, tanda petikan dan hujung baris semua baris lain kekal sama bait demi bait. Dokumen tanpa metadata mendapat blok pada permulaannya.
 
 ## Markdown yang disokong
 
@@ -314,7 +331,7 @@ Tanpa sauh tersuai, setiap tajuk mendapat satu yang diterbitkan daripada teksnya
 - **Pautan wiki.** `[[Nota]]` memaut ke `Nota.md` dalam folder yang sama atau folder di bawahnya. `[[Nota|Teks paparan]]` menunjukkan teks anda sendiri, dan `[[Nota#Tajuk]]` membuka nota itu. ⌘-klik membukanya dalam Splat.
 - **Benam.** `![[Nota]]` menunjukkan nota lain di dalam yang ini; nota yang dibenam di dalamnya muncul sebagai pautan. `![[diagram.png]]` menunjukkan imej. Seperti dalam Obsidian, benam menamakan nota dan imej dalam folder dokumen atau di bawahnya, tidak pernah dengan laluan mutlak, dan hanya fail Markdown ditunjukkan sebagai nota.
 - **Ulasan.** `%%Hanya dalam sumber%%` kekal kelihatan dalam sumber dan ditinggalkan daripada pratonton dan setiap eksport, sama ada sebaris atau pada barisnya sendiri.
-- **Teg.** `#idea` atau `#project/splat` diserlahkan. ⌘-klik mencari teg itu dalam dokumen.
+- **Teg.** `#idea` atau `#project/splat` diserlahkan. ⌘-klik mencari teg itu dalam dokumen dan, dalam bar sisi, dalam seluruh folder.
 - **Kotak maklumat boleh lipat.** Lihat [Callouts](#kotak-maklumat).
 
 ### Petikan dan rujukan
@@ -438,6 +455,23 @@ Dalam pratonton, satu klik meletakkan kursor supaya anda boleh mengedit teks pau
 
 **Masukkan › Senarai Kandungan** memasukkan senarai berpaut bagi semua tajuk. Dengan kursor di dalamnya, arahan yang sama mengemas kininya. Bar sisi rangka (⌃⌘S) melompat ke mana-mana tajuk dalam kedua-dua anak tetingkap.
 
+## Nota dalam folder
+
+Butang di bahagian atas bar sisi menukar paparan antara rangka, fail dan carian.
+
+- **Fail** (**Paparan › Tunjukkan Fail**, ⌃⌘E). Semua fail Markdown dalam folder dokumen atau, jika folder itu terletak dalam repositori Git, dalam keseluruhan repositori itu. Satu klik atau Return membuka nota sebagai tab tetingkap ini; jika ia sudah dibuka, ia dibawa ke hadapan. Butang di sebelah nama folder menunjukkan folder lain dalam tetingkap ini. Fail tersembunyi, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` dan folder tanpa nota dikecualikan. Dokumen yang terletak terus dalam folder Utama anda hanya menunjukkan nota di sebelahnya, supaya Splat tidak merentasi semua folder anda dan bertanya bagi setiap satu.
+- **Carian** (**Edit › Cari › Cari dalam Semua Nota…**, ⇧⌘F). Mencari teks dalam semua nota, tanpa mengira huruf besar atau kecil dan bagaimana aksennya dikodkan. `#tag` mencari teg, `#project` juga `#project/splat`, dan tiada apa-apa di dalam kod. Satu klik pada hasil membuka nota di tempat itu.
+- **Pautan ke nota.** Menu konteks nota menyenaraikan nota yang memaut kepadanya, melalui pautan wiki, benam, pautan relatif atau takrifan rujukan pautan.
+- **Menamakan semula nota.** Menu yang sama menamakannya semula dan mengubah pautan itu. Splat terlebih dahulu memberitahu berapa pautan dalam berapa fail yang terlibat. Hanya nama yang berubah dalam setiap pautan, dan setiap bait lain dalam fail kekal. Dokumen yang dibuka menerima perubahan sebagai langkah buat asal; dalam fail lain hanya Git atau Versi yang boleh membuat asal perubahan itu. Fail yang diubah oleh program lain sementara itu menghentikan penamaan semula semua pautan, dan Splat menyebut nama fail itu.
+
+Senarai mengikut folder apabila tetingkap dibawa ke hadapan. Carian melihat fail sebagaimana ia berada pada cakera, dan teks yang belum anda simpan dikira mulai Simpan Auto seterusnya.
+
+## Perubahan sejak commit terakhir
+
+Dalam dokumen di dalam repositori Git, bar di sebelah teks menandakan apa yang berbeza daripada commit terakhir, dalam sumber dan dalam pratonton: hijau untuk baris yang ditambah, biru untuk baris yang diubah, dan tanda merah pendek di tempat sesuatu telah dibuang. Ia dikemas kini semasa anda menaip dan apabila cabang bergerak. **Paparan › Perubahan Sejak Commit Terakhir** mematikannya, untuk semua tetingkap.
+
+Baris yang berbeza hanya pada hujung barisnya tidak dikira, jadi fail dengan CRLF berbanding commit dengan LF tidak menunjukkan perubahan. Fail baharu tiada tanda sehingga commit pertamanya, begitu juga dokumen melebihi 32 MB.
+
 ## Mengeksport, mencetak dan berkongsi
 
 | Format | Cara | Apa yang anda dapat |
@@ -450,6 +484,19 @@ Dalam pratonton, satu klik meletakkan kursor supaya anda boleh mengedit teks pau
 
 Menu **Fail › Kongsi** menawarkan semua ini di satu tempat. Eksport menggunakan tetapan tanda baca tipografi dan imej dari web yang anda benarkan; imej dari web kekal sebagai pautan dalam HTML.
 
+**Fail › Pilihan Eksport…** menetapkan apa yang ditambah oleh PDF, pencetakan dan Word pada teks, untuk semua dokumen:
+
+- **Nombor halaman** dalam pengaki PDF dan cetakan, sebagai `2 / 9`.
+- **Pengepala dan pengaki** untuk PDF dan cetakan. `{title}`, `{author}`, `{date}`, `{page}` dan `{pages}` mewakili nilainya, tiga yang pertama daripada metadata dokumen.
+- **Halaman tajuk** untuk PDF, cetakan dan Word, dengan `title`, `subtitle`, `author` dan `date` daripada metadata, atau nama dokumen sebagai tajuknya. Ia tiada pengepala mahupun pengaki.
+- **Templat Word**, iaitu `.docx` atau `.dotx` yang rupanya diambil oleh eksport: gayanya, termasuk nama yang disetempatkan, temanya, saiz halaman, jidar, pengepala dan pengaki. Templat yang tidak dapat dibaca menghentikan eksport dan menyatakannya, dan bukannya memberi anda dokumen tanpanya.
+
+## Mengimport dokumen Word
+
+**Fail › Import Dokumen Word…** meminta fail `.docx` atau `.dotx` dan ke mana Markdownnya pergi, kemudian membuka hasilnya. Imej diletakkan dalam folder di sebelahnya, dinamakan mengikut dokumen dengan `-images`.
+
+Tajuk dan senarai dibawa seperti yang ditakrifkan oleh gaya dan penomboran Word, juga dalam dokumen yang gayanya mempunyai nama yang disetempatkan. Tebal, italik, garis bawah, garis potong, serlahan, superskrip dan subskrip, pautan, petikan, kod, nota kaki, nota hujung dan jadual turut dibawa, sel yang merentangi lajur sebagai jadual HTML. Formula menjadi LaTeX. Perubahan yang dijejak dikira sebagai diterima, dan senarai kandungan ditinggalkan, kerana **Masukkan › Senarai Kandungan** membuat yang baharu. Fail `.doc` lama dan dokumen yang dilindungi kata laluan ditolak.
+
 ## Penampilan dan kebolehcapaian
 
 - **Mod gelap** mengikut sistem. Formula dan rajah dipaparkan untuk setiap penampilan.
@@ -458,7 +505,7 @@ Menu **Fail › Kongsi** menawarkan semua ini di satu tempat. Eksport menggunaka
 - **Skrin penuh, tab dan bar alat yang boleh disesuaikan**, seperti dalam setiap app Mac.
 - **VoiceOver.** Anak tetingkap berlabel “Sumber Markdown” dan “Pratonton”, formula dibaca sebagai kodnya dan rajah sebagai tajuknya. Setiap arahan boleh dicapai daripada papan kekunci.
 
-Splat tidak mempunyai tetingkap tetapan: beberapa pilihan itu terletak di tempat ia digunakan, dalam **Paparan** dan **Edit › Penggantian**.
+Splat tidak mempunyai tetingkap tetapan: beberapa pilihan itu terletak di tempat ia digunakan, dalam **Paparan**, **Edit › Penggantian** dan **Fail › Pilihan Eksport…**.
 
 ## Bahasa
 
@@ -481,6 +528,9 @@ Teks Ibrani dan Arab dibaca dari kanan ke kiri di mana-mana ia muncul, apa pun b
 | Jajarkan lajur jadual ke kiri, tengah, kanan | ⌘{, ⌘\|, ⌘} |
 | Sembunyikan atau tunjukkan pratonton | ⌥⌘P |
 | Tunjukkan atau sembunyikan rangka | ⌃⌘S |
+| Tunjukkan atau sembunyikan fail | ⌃⌘E |
+| Cari dalam semua nota | ⇧⌘F |
+| Tampal sebagai Markdown | ⌃⌘V |
 | Zum masuk, keluar, saiz sebenar | ⌘+, ⌘−, ⌘0 |
 | Dokumen baharu, buka, simpan, duplikasi | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Persediaan halaman, cetak | ⇧⌘P, ⌘P |
@@ -506,6 +556,9 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 - **Imej dari web** dimuatkan hanya selepas kebenaran anda, hanya melalui `https`, tidak pernah daripada hos dalam rangkaian setempat anda, paling banyak 10 MB setiap satu, dan dalam sesi persendirian tanpa kuki.
 - **Penyahkodan terasing.** Imej dan grafik formula serta rajah dinyahkod dalam proses pembantu yang menutup setiap fail yang diwarisinya dan mengunci dirinya dalam kotak pasir sebelum membaca bait pertama: tiada akses fail, tiada rangkaian. Ia hanya menyerahkan semula piksel, yang saiznya disemak, dan dihentikan selepas 10 saat. Penyahkod imej Apple sendiri hanya melihat HEIC, TIFF, AVIF dan PDF, dan hanya apabila data itu benar-benar format tersebut; ia berjalan dalam pembantu tersendiri, yang di samping itu boleh membaca folder fon sistem dan menggunakan penyahkod video sistem. SVG, formula dan rajah turut melalui pembantu itu, jadi ia ialah gambar dengan resolusi tetap dalam Splat: empat piksel setiap titik, sehingga 2560 pada sisi yang lebih panjang.
 - **Fail setempat** sampai kepada dokumen hanya melalui laluan yang dinamakannya. Benam menunjukkan nota Markdown daripada folder dokumen dan ke bawah, dan gambar yang tiada dicari di situ sahaja. Laluan imej di tempat lain, mutlak atau bermula dengan `~`, tetap dimuatkan dalam pratonton; eksport HTML dan Word, pencetakan dan PDF hanya membawa apa yang ada dalam folder dokumen atau repositori Gitnya, melainkan repositori itu juga menyimpan folder Utama anda, supaya dokumen daripada orang lain tidak dapat menarik fail anda ke dalam eksport yang anda hantar.
+- **Folder nota** dibaca hanya semasa bar sisi menunjukkannya, dan menamakan semula nota mengubah fail lain hanya selepas anda mengesahkan berapa banyak.
+- **Repositori Git** dibaca oleh Splat sendiri. Ia tidak pernah menjalankan program `git`, yang konfigurasinya dalam repositori daripada orang lain boleh memulakan program lain, dan ia tidak membaca lebih daripada versi dokumen yang dibuka dalam commit terakhir. Ia tidak menulis apa-apa di situ dan tidak menggunakan rangkaian.
+- **Dokumen Word dan teks yang ditampal** dibaca oleh penghurai Splat sendiri, dengan had pada saiz, penyarangan dan sejauh mana fail boleh dinyahpadat. Pautan di dalamnya hanya mengekalkan alamat yang dibenarkan Splat di tempat lain, dan nama imej dalam fail Word tidak pernah menentukan di mana ia ditulis.
 - **Salinan teks yang belum disimpan** kekal pada Mac ini, dalam folder Library anda, untuk pemulihan selepas ranap. Ia hilang dengan penyimpanan atau penamatan biasa Splat; salinan yang ditinggalkan ranap kekal dalam folder pemulihan sehingga anda memadamnya.
 - **Pautan** tidak pernah memulakan program dengan satu klik. Pautan web dan mel dibuka seperti biasa; pautan ke app lain bertanya dahulu.
 - **HTML dalam dokumen** dibaca oleh penghurai Splat sendiri. Skrip, gaya, bingkai dan borang tidak pernah dijalankan.
@@ -529,7 +582,7 @@ Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan k
 ## Had yang diketahui
 
 - **Tilde tunggal bermaksud subskrip.** `~text~` ialah subskrip seperti dalam Pandoc; garis potong memerlukan `~~two~~`. GitHub juga menggaris potong dengan satu tilde.
-- **Baca sahaja dalam pratonton:** HTML terbenam, nota terbenam dan front matter diedit dalam sumber.
+- **Baca sahaja dalam pratonton:** HTML terbenam dan nota terbenam diedit dalam sumber, front matter dalam borangnya atau dalam sumber.
 - **Sarang yang sangat dalam:** HTML yang bersarang lebih daripada 64 peringkat, dan HTML sebaris lebih daripada 16, mengalah kepada kandungannya.
 - **Sel jadual yang digabungkan** hanya wujud dalam jadual HTML, dan hanya merentangi lajur (`colspan`, tiada `rowspan`). Sintaks jadual MultiMarkdown untuk sel yang digabungkan tidak disokong.
 - **Bibliografi** dibaca daripada BibTeX sahaja, bukan daripada CSL JSON atau YAML.
@@ -537,6 +590,11 @@ Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan k
 - **Tanda baca tipografi:** petikan tunggal penutup bahasa Jerman tidak dapat dibezakan daripada apostrof dan ditetapkan sebagai ’.
 - **Formula, bukan dokumen:** tiada pakej LaTeX, TikZ atau dokumen penuh.
 - **Penyunting formula visual** menulis LaTeX dalam tatatanda MathLive: ruang hilang (`E = mc^2` menjadi `E=mc^2`), paparannya kekal sama.
+- **Bilangan perkataan:** Thai, Lao, Khmer dan Myanmar ditulis tanpa ruang dan dikira mengikut rentetan teks, bukan mengikut perkataan. `3.14` dan `snake_case` masing-masing dua perkataan.
+- **Menamakan semula nota** tidak mengubah pautan dalam HTML terbenam, dan pautan wiki kekal seperti sedia ada jika nama baharu mengandungi `#`, `|`, `^`, `[`, `]` atau `\`.
+- **Tanda perubahan** membaca repositori dengan objek SHA-1 dan ref biasa atau ref terpadat; repositori dengan SHA-256 atau reftable tidak menunjukkan apa-apa. Fail di bawah penapis Git seperti LFS dibandingkan dengan apa yang disimpan oleh penapis.
+- **Import Word** meninggalkan teks dalam pengepala, pengaki dan ulasan, dan imej sebagai `.emz` atau SVG hanya mengekalkan teks alternatifnya.
+- **Tampal sebagai Markdown** membaca RTF sebagai teks Barat, dan di situ mengambil tajuk hanya daripada saiz fon. Kebanyakan program juga menawarkan HTML, yang diutamakannya.
 - **Dengan reka bentuk:** tiada nombor baris, tiada tetingkap tetapan, tiada Help Book, tiada dalam App Store.
 - **Kurang diuji pada Intel.** Ujian kendiri tetingkap berjalan pada Apple Silicon sahaja; pada Intel, CI menjalankan `cargo test`.
 
@@ -560,190 +618,7 @@ Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan k
 
 ## Untuk pembangun
 
-Splat ialah aplikasi Rust yang berhubung terus dengan AppKit dan WebKit melalui [objc2](https://github.com/madsmtm/objc2). Tiada Swift, tiada Objective-C, tiada projek Xcode dan tiada fail Interface Builder.
-
-### Membina
-
-Prasyarat:
-
-- macOS dengan Command Line Tools (`xcode-select --install`). Xcode tidak diperlukan; Splat dibina tanpa `actool`, `ibtool` dan `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) menamakan versi tepat yang digunakan CI; rustup memasangnya sendiri, Rust Homebrew mengabaikan fail itu. Menaikkannya di sana ialah cara amaran pengkompil dan clippy baharu sampai ke projek.
-- rustup, untuk `make lint`, `make check` dan `make universal`: `cargo xtask check-library` membina pustaka untuk Linux bagi menunjukkan bahawa ia tidak memerlukan macOS, dan Rust Homebrew tidak mempunyai sasaran lain.
-
-[Makefile](../../../Makefile) menyimpan titik masuk ringkas; `make help` menyenaraikan kesemuanya:
-
-```sh
-make build                  # target/release/Splat.app, sama seperti cargo xtask bundle --release
-make universal              # target/splat-universal untuk Apple Silicon dan Intel, seperti yang dibawa imej cakera
-make check                  # pemformatan, clippy tanpa amaran, semua ujian, pustaka vendor; apa yang CI jalankan
-make test                   # make check, kemudian ujian kendiri tanpa tetingkap
-make test-gui               # ujian kendiri dengan tetingkap; ia menduduki Mac selama kira-kira empat minit
-make test-long              # carian rawak yang lebih panjang dan semakan kemas kini separa 10 MB
-make fuzz                   # input rawak untuk hurai separa dan semua output
-make coverage               # liputan baris semua ujian dan ujian kendiri, dengan paras minimum bagi setiap modul
-make coverage-library       # paras minimum yang sama untuk modul tanpa tetingkap, seperti dalam CI
-make bench FILE=<file.md>   # masa untuk membuka, menaip dan menggulung fail besar
-make release                # make test dahulu, kemudian imej cakera yang dinotarisasi
-```
-
-Logik pembinaan itu sendiri terletak dalam crate Rust [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, ditandatangani dengan "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, app berasingan yang tidak pernah membuka fail Markdown
-cargo xtask dmg                # dist/Splat-<version>.dmg untuk pengedaran, Developer ID, dinotarisasi
-cargo xtask icon               # bina semula assets/AppIcon.icns dan ikon README daripada assets/icon-1024.png
-cargo xtask vendor check       # sahkan JavaScript terbundel terhadap vendor.lock
-cargo xtask vendor fetch       # muat turun semula selepas mengubah versi dalam vendor.lock
-```
-
-`bundle` menulis `Info.plist`, menyalin sumber dan penyetempatan, dan menandatangani app dengan sijil “Splat Local Signing”. Binaan pertama mencipta sijil itu dalam keychain log masuk anda, sah selama 20 tahun. Selagi ia kekal, Splat mengekalkan dokumen terkini dan kebenaran folder merentasi pembinaan semula; dengan tandatangan ad hoc, setiap binaan akan menjadi app baharu bagi macOS. Binaan nyahpepijat dan ujian kendiri membawa ID bundle sendiri (`local.splat.debug`, `local.splat.selftest`) dan tidak mendaftar untuk fail Markdown, jadi Finder tidak pernah membuka dokumen dalam binaan yang lapuk dan ia membiarkan tetapan app biasa.
-
-Versi terletak dalam [VERSION](../../../VERSION) sebagai `major.minor.build` dan ialah versi yang akan diterima oleh binaan seterusnya. Setiap binaan keluaran yang berjaya (`make build`, `cargo xtask bundle --release`, `make release`) menaikkan nombor binaan sebanyak satu; binaan nyahpepijat dan ujian kendiri membiarkannya. Major dan minor dinaikkan dengan tangan: tetapkan VERSION kepada, katakan, `1.1.0`, dan binaan seterusnya mendapat betul-betul itu.
-
-### Pengedaran
-
-`cargo xtask dmg` (atau `make release`, yang menjalankan `make test` dahulu) membina keluaran, menandatanganinya dengan Developer ID anda, menotarisasi app dengan Apple dan melekatkan tiket, membungkusnya ke dalam imej cakera baca sahaja yang dimampatkan dengan pautan ke Aplikasi, menotarisasi dan melekatkan tiket pada imej itu juga dan menyemak hasilnya dengan Gatekeeper. App membawa tiketnya sendiri supaya salinan yang dipasang tanpa Finder, seperti yang dilakukan Homebrew, dibuka luar talian pada pelancaran pertama juga; dua pusingan dengan perkhidmatan notari mengambil masa beberapa minit setiap satu. Hanya imej yang lulus setiap langkah menjadi `dist/Splat-<version>.dmg`, salinan yang di-commit, dan nombor binaan naik. Imej sebelumnya kekal untuk satu keluaran lagi, kerana pelayan mentah GitHub mungkin menyerahkan suapan kemas kini lama beberapa minit selepas push; yang lebih lama dialihkan ke tong sampah. Larian yang gagal membiarkan `dist/` dan VERSION seperti sedia ada.
-Setiap keluaran menambah imej penuh, kira-kira 16 MB, kepada sejarah repositori. Ia hanya berjalan apabila dipanggil, tidak pernah sebagai sebahagian daripada binaan biasa, dan memerlukan:
-
-- sijil “Developer ID Application” dalam keychain
-- log masuk yang disimpan untuk perkhidmatan notari Apple dengan kata laluan khusus app, dicipta sekali dengan `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- kunci persendirian yang menandatangani kemas kini, dalam keychain log masuk. `generate_keys` Sparkle mencipta kunci itu; separuh awamnya ialah `UPDATE_KEY` dalam [xtask/src/main.rs](../../../xtask/src/main.rs) dan di dalam setiap salinan yang dipasang, yang hanya menerima kemas kini yang ditandatangani dengannya. Simpan sandaran dalam pengurus kata laluan: `target/sparkle-2.10.1/bin/generate_keys -x <file>` mengeksportnya, `-f <file>` mengimportnya pada Mac lain. Tanpanya, salinan yang dipasang tidak dapat dikemas kini lagi.
-- rustup (`brew install rustup`, yang membiarkan Rust Homebrew di tempatnya)
-- `RELEASE_NOTES.md`, mengandungi perkara yang dibawa oleh keluaran ini. Dialog kemas kini memaparkannya di atas baris tentang cara melaporkan masalah, jadi `dmg` berhenti jika fail itu kosong atau masih mengandungi nota keluaran sebelumnya
-
-Jika mana-mana daripadanya tiada, `dmg` berhenti sebelum membina. Pada larian pertama, macOS bertanya sama ada Terminal boleh mengawal Finder; tanpa kebenaran itu, imej cakera tidak menunjukkan latar belakang mahupun susunan ikonnya.
-
-Hanya imej cakera yang membawa pengemas kini, [Sparkle](https://sparkle-project.org), yang dimuat turun oleh binaan sekali ke dalam `target/` daripada keluaran GitHub-nya dan disemak terhadap checksum dalam xtask. Hardened runtime memuatkan rangka kerja itu hanya apabila ia membawa Team ID app, yang dimiliki tandatangan Developer ID dan tiada pada sijil setempat; dan kemas kini tidak boleh menggantikan binaan anda sendiri. Binaan ujian kendiri turut membawa Sparkle, untuk menyemak menu kemas kini terhadapnya: dengan suapan yang tidak wujud, tanpa soalan Sparkle pada pelancaran kali kedua, dan dengan entitlement yang membolehkan app yang ditandatangani secara setempat memuatkan rangka kerja itu. `dmg` menandatangani imej baharu dengan kunci kemas kini dan menulis `dist/appcast.xml`, suapan yang dibaca salinan yang dipasang daripada GitHub. Commit dan push imej dan suapan bersama-sama: sejak itu, salinan yang dipasang menawarkan kemas kini. Pautan muat turun dalam README ini dan terjemahannya menghala ke `Splat.dmg` dalam keluaran GitHub terbaharu, jadi setiap keluaran membawa salinan dengan nama itu: `cp dist/Splat-<version>.dmg target/Splat.dmg`, kemudian `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Imej cakera ialah binari universal untuk Apple Silicon dan Intel; binaan lain hanya untuk pemproses hos. Rust Homebrew hanya menyertakan pustaka standard untuk pemproses hos, jadi `dmg` membina melalui rustup, yang memasang toolchain dan sasaran [rust-toolchain.toml](../../../rust-toolchain.toml) pada penggunaan pertama, dan berhenti jika program atau Sparkle tidak mempunyai kod untuk salah satu pemproses. `make universal` hanya membina programnya.
-App di dalamnya membawa tandatangan yang berbeza daripada binaan setempat, jadi macOS menyimpan dokumen terkini dan kebenaran folder yang berasingan untuk kedua-duanya.
-
-### Pengujian
-
-| Arahan | Menyemak |
-|---|---|
-| `cargo test --release` | ujian unit, rawak dan terjemahan |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | carian rawak yang lebih panjang; `SPLAT_FUZZ_SEED` mengubah input |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | satu bahasa, semasa yang lain belum lengkap |
-| `cargo clippy --release --all-targets [--features selftest]` | lint, termasuk justifikasi setiap blok `unsafe`, panjang fungsi dan, dalam pustaka, penukaran nombor |
-| `cargo xtask check-library` | pustaka boleh dibina untuk Linux, jadi tiada apa-apa di dalamnya memerlukan macOS |
-| `cargo xtask vendor check` | pustaka JavaScript sepadan dengan `vendor.lock` bait demi bait |
-| `cargo xtask selftest probe` | tanpa tetingkap, masing-masing dengan keputusan yang dijangka: formula, rajah, imej web terhadap pelayan di dalam proses, alamat yang disekat, teks yang ditulis oleh setiap arahan, setiap format imej melalui kedua-dua eksport, halaman yang berhenti menjawab, dan pertahanan paparan web terhadap halaman tanpanya. Mengambil masa kira-kira setengah minit. Apa yang memerlukan app di hadapan skrin dilangkau pada skrin yang dikunci |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | app yang berjalan, klik demi klik. Membuka tetingkap dan menaip di dalamnya; Mac sibuk selama kira-kira empat minit. `--scenarios` hanya menjalankan bahagian kedua, dalam kira-kira satu setengah minit. `--only` menjalankan satu kumpulan bahagian itu, dalam dokumennya sendiri, juga pada skrin yang dikunci. `--in-back` meninggalkan apa yang memerlukan apl di hadapan; tanpanya semakan begitu gagal |
-| `cargo xtask selftest resize` | melebarkan tetingkap selepas menggerakkan pembahagi: sumber dibungkus semula semasa tetingkap diubah saiz. Mengambil masa kira-kira sepuluh saat |
-| `cargo xtask selftest typing [--by-hand]` | menaip merentasi simpanan, dengan kekunci melalui baris gilir acara apl atau, dengan `--by-hand`, secara manual: apa yang ditaip kekal dan dikira belum disimpan. Mengambil kira-kira seminit |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | masa untuk membuka, menaip dan menggulung fail besar; `--keystroke-ms` gagal apabila ketukan terpantas mengambil masa lebih lama |
-| `cargo test --release -- --ignored partial_updates` | satu ketukan kekunci dalam 10 MB: kemas kini separa berbanding penuh, keputusan yang sama dalam suku masa paling lama |
-| `cargo test --release --test hostile` | dokumen yang dibina untuk melimpahkan tindanan atau mengambil masa kuadratik, masing-masing dalam dua saiz yang masanya mesti bertambah seperti teks, melalui penghuraian, susun atur, kedua-dua eksport, ketukan kekunci dan arahan |
-| `make mutants` | kesalahan dibina ke dalam `crates/splat-markdown`, `crates/splat-preview` dan `crates/splat-file-state` satu demi satu, melalui [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); menyatakan yang mana tiada ujian menyedarinya. Mengambil masa berjam-jam; `FILE=crates/splat-preview/src/bridge/mod.rs` mengecilkan skop |
-| `make fuzz` | input rawak melalui [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), yang memerlukan nightly rustup: ketukan kekunci yang mesti terbaca seperti hurai penuh, semua output, suntingan dalam pratonton, semua arahan dan fail yang disimpan seperti ia dibuka. `SECONDS=600` mencari lebih lama |
-| `cargo test --release --test fuzz_seeds` | benih dalam `fuzz/seeds/` melalui semakan sasaran fuzz itu, tanpa fuzzer; sebahagian daripada setiap `cargo test` |
-| `cargo test --profile checked --workspace` | ujian dengan apa yang diperiksa binaan nyahpepijat sebagai tambahan: selepas setiap hurai separa, blok sepadan dengan teksnya, dan apa yang dibawanya ialah apa yang dikatakan teks. Sebahagian daripada `make test-long` |
-| `cargo test --release --test entry_points --test structure` | daripada sumber: semua yang dipanggil sistem dilindungi daripada panic, dan modul hanya bergantung ke bawah |
-| `cargo test --release --test decoder` | proses penyahkod menyahkod imej dan tidak mencapai fail mahupun rangkaian |
-| `make coverage` | liputan baris `cargo test` dan semua ujian kendiri, melalui [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); gagal di bawah paras minimum. Menduduki Mac selama kira-kira lima minit |
-| `make coverage-library` | crate `splat-markdown`, `splat-preview`, `splat-file-state` dan `splat-i18n` terhadap paras minimum yang lebih tinggi, diukur oleh `cargo test` sahaja |
-
-Ujian unit terletak di sebelah kod yang diujinya. `crates/splat-testkit/tests/` menyimpan apa yang mencapai model dan pratonton dari luar: ujian rawak dalam `robustness.rs`, yang berkongsi penjana `splat-testkit` dengan ujian `sync.rs`, dokumen yang dibina untuk mencederakan dalam `hostile.rs`, dan benih sasaran fuzz dalam `fuzz_seeds.rs`. `tests/` menyimpan apa yang melihat keseluruhan program: sumbernya, terjemahannya dan ujian penyahkod, yang memulakan program yang dibina. Keputusan dalam `src/editor/` yang tidak memerlukan tetingkap terletak dalam fungsi bebas dengan ujian tersendiri: segala yang diketahui pengawal dan cara ia berubah dalam `state.rs`, peraturan pemaparan dalam `render_queue.rs`, salinan teks dalam `sync.rs`, gaya perenggan, fon dan warna sebagai nilai dalam `render.rs`, maksud pengecam bar alat dalam `toolbar.rs`, maksud klik pada pautan dalam `navigation.rs`.
-
-Langkah ujian kendiri tetingkap menunggu syarat yang bernama, bukan masa; hanya yang tidak memberi isyarat, seperti ketiadaan sesuatu, mengekalkan jeda beserta sebabnya. Menunggu dengan sia-sia ialah semakan yang gagal dan menamakan apa yang tidak pernah tiba, langkah yang panik juga semakan yang gagal, dan larian diteruskan dalam kedua-dua kes. Semakan yang tidak dapat menyatakan apa-apa dalam larian ini melaporkan `SELFTEST SKIP`: xtask menyenaraikannya, dan ia tidak lulus mahupun gagal. xtask mengikat setiap mod, dan `--scenarios` secara tersendiri, kepada kira-kira sembilan persepuluh daripada semakannya. Ujian kendiri tetingkap menjalankan bahagian kedua selepas klik-lalu utamanya, dalam `src/editor/selftest/scenarios.rs`: setiap arahan pemformatan dan jadual, dialog, klik pautan, menampal, melepas, eksport, fail yang diubah oleh program lain, perubahan besar, imej yang berubah pada cakera, tekanan memori, dokumen yang sangat besar dan pemulihan selepas ranap. Setiap kumpulannya membuka dokumen sendiri, supaya kegagalan dalam satu kumpulan tidak sampai ke kumpulan seterusnya, dan setiap satu boleh dijalankan bersendirian dengan `--only`. Ujian kendiri tanpa tetingkap juga merosakkan penyimpanan dengan sengaja: folder yang tidak menerima apa-apa, fail baca sahaja, folder yang telah hilang, cakera penuh dan panic dalam setiap callback penyimpanan, dan tiada satu pun boleh menghilangkan teks.
-
-Liputan mempunyai dua paras minimum: setiap modul sekurang-kurangnya 84 % barisnya, semua modul bersama sekurang-kurangnya 96 %. `make coverage` mengukur `cargo test` bersama ujian kendiri dan gagal di bawah mana-mana satu; `make coverage-library` mengekalkan apa yang tidak memerlukan tetingkap pada 90 % dan 97 %. Paras minimum dan beberapa pengecualian, seperti cangkuk panik dalam `main.rs` yang hanya berjalan semasa ranap, terdapat dalam [xtask](../../../xtask/src/coverage.rs) di sebelah sebabnya. Binaan yang diukur masuk ke `target/coverage/`, jadi kod pengukuran tidak pernah sampai ke `target/release/` atau imej cakera. Pembantu penyahkod membuka fail pengukurannya sebelum ia mengunci dirinya, jadi ia diukur juga.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) menjalankan `make check`, `make coverage-library` dan binaan universal pada Apple Silicon serta `cargo test` pada Intel untuk setiap push ke `main` dan setiap pull request. Setiap malam, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) menjalankan `make test-long` dengan input rawak baharu. Ujian kendiri dan imej cakera kekal pada Mac pembangun: ia memerlukan skrin dan sijil penandatanganan dalam keychain.
-
-Output ujian kendiri masuk ke `target/selftest/`. Ujian kendiri membina app berasingan (`target/release/Splat Selftest.app`, ID bundle `local.splat.selftest`) dan membiarkan tetapan, dokumen terkini dan perkaitan fail app biasa tidak disentuh.
-
-### Susun atur projek
-
-Segala yang tidak memerlukan tetingkap ialah crate tersendiri di bawah `crates/`, yang dibina tanpa macOS, jadi pengkompil menguatkuasakan cara ia bergantung antara satu sama lain. App dalam `src/` (pakej `splat-app`, program `splat`) dibina di atasnya.
-
-- `crates/splat-markdown/`: pepohon yang dibaca setiap pengguna, `Doc` dalam `doc/`, yang memiliki teksnya sendiri, dan satu-satunya pengikatan kepada penghurai dalam `reader/`: comrak tidak dinamakan di tempat lain, dan `reader/assumptions.rs` memuatkan apa yang diandaikan kod tentangnya. Warna sintaks, dan semua arahan sebagai suntingan teks tulen (`Edit`) dalam `commands/`. Juga penghuraian semula selepas suntingan (`incremental.rs`), pembaca untuk HTML terbenam (`markup.rs`), tipografi, teg, rujukan dan petikan dalam teks berjalan (`typography.rs`), rupa teks dan Markdown serta HTML yang menjadikannya begitu (`style.rs`), apa yang boleh menjadi alamat (`url.rs`), serta eksport HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Kedudukan mempunyai jenisnya sendiri: `Byte` dalam teks sumber, `U16` dalam paparan sumber, `Shown` dalam paparan pratonton (`text.rs`).
-- `crates/splat-preview/`: susun atur pratonton dalam `layout/`, dengan HTML terbenam dalam `layout/html.rs`, dan pemetaan antara pratonton dan sumber (`Bridge`, `Index`). `Bridge` menolak susun atur daripada versi `Doc` yang lain.
-- `crates/splat-file-state/`: teks apa yang disimpan oleh fail, dalam format apa, dan apa maksud melihatnya.
-- `crates/splat-i18n/` dengan `resources/*.lproj`: 35 bahasa; kuncinya ialah teks bahasa Jerman, dan app memasang jadual bahasa antara muka semasa bermula.
-- `crates/splat-testkit/`: penjana ujian rawak dan semakan sasaran fuzz.
-- `src/editor/`: tetingkap. Satu objek `EditorController` melayani AppKit sebagai delegasi kedua-dua paparan dan meneruskan kepada komponen, struct kecil di atas pengawal dan keadaan yang dimilikinya, yang medannya tidak dapat dicapai modul lain:
-
-| Modul | Tanggungjawab |
-|---|---|
-| `controller.rs` | kelas, kaedah delegasi yang meneruskan, `invalidate`, dan apa yang bahagian lain program beritahu editor; hanya ia yang mencapai komponen |
-| `panes.rs` | `Panes`: paparan teks, rangka, memaparkan dan menyembunyikan anak tetingkap, dan apa yang memberi akses kepada paparan |
-| `controller/layers.rs` | siapa boleh mencapai siapa: komponen mendapat pemegang pengawal yang menawarkan apa yang di bawahnya, dan pengkompil menguatkuasakannya |
-| `state.rs` | apa yang diketahui pengawal tentang dokumen dan setiap cara ia berubah; medannya persendirian, dan ia tidak menyentuh paparan |
-| `model.rs` | meminjamkan keadaan dan salinan teks kepada closure yang tidak dapat mencapai paparan |
-| `actions.rs` | daftar arahan: pemilih, tajuk, pintasan, simbol, bila arahan terpakai |
-| `editing.rs` | `Editing`: menjalankan dan mengesahkan arahan, menaip dalam pratonton |
-| `update.rs` | `Updater`: menghurai, mewarnakan, mengemas kini pratonton; selepas suntingan hanya perenggan yang terjejas |
-| `sync.rs` | salinan teks dan pengurusan blok, tanpa AppKit dan dengan ujian rawak |
-| `progressive.rs` | `Progressive`: memaparkan pratonton besar langkah demi langkah |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: pilihan dan kedudukan skrol kedua-dua anak tetingkap selaras |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: penyunting formula dan rajah |
-| `navigation.rs`, `links.rs` | `Links`: pautan, pautan wiki, teg, kotak semak tugas, pelipatan, nota kaki |
-| `env.rs` | apa yang dibaca pratonton dari luar teks: tanda baca tipografi, repositori untuk `@name` dan `#12`, fail BibTeX, nota terbenam |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | teks pratonton, imej setempat dan jauh; `Pictures` dalam `images.rs` |
-| `attributes.rs` | atribut teks; setiap kunci hanya mendapat nilai jenis yang dijangkanya |
-| `shadow.rs` | salinan teks yang belum disimpan untuk pemulihan selepas ranap |
-| `decoder.rs` | proses pembantu berkotak pasir yang menyahkod imej dan grafik |
-| `export.rs`, `outline.rs` | `Sharing`: eksport HTML dan Word, fail kongsi, pencetakan; bar sisi rangka |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit untuk MathJax, Mermaid, Graphviz, PlantUML dan penyunting formula visual; peraturan apa yang dipaparkan bila, selain WebKit |
-| `webkit.rs` | panggilan ke dalam WebKit; hanya hayat delegasi navigasi kekal pada `js.rs` dan `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | membina tetingkap, bar alat, paparan teks, dialog, warna |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: bar menu, delegasi app, dokumen (`MDDocument`, subkelas `NSDocument`).
-- `src/util/`: thread pekerja (`lanes.rs`), volum yang boleh berhenti menjawab (`volumes.rs`), pembantu AppKit, fail dan proses. `src/diag.rs`: apa yang tersilap di luar penglihatan pengguna pergi ke log sistem, tanpa sebarang teks dokumen.
-- `src/large_alloc.rs`: peruntukan besar datang terus daripada kernel dan dikembalikan kepadanya apabila dibebaskan, supaya memori kembali selepas suntingan besar.
-- `resources/js/`: halaman web dan pustaka; versi dan checksum dalam [vendor.lock](../../../vendor.lock).
-- `xtask/`: pembundelan, penandatanganan, imej cakera, ikon, vendor, penjalan ujian kendiri dan paras minimum liputan.
-
-### Aliran data
-
-Teks sumber dalam paparan teks kiri ialah satu-satunya sumber kebenaran.
-
-1. Setiap perubahan aksara di sana mengemas kini salinan teks (`Snapshot`) di tempatnya, tanpa membaca teks itu semula.
-2. Satu kemas kini menghuraikan salinan, mewarnakan semula sumber hanya di tempat warna berubah, menyusun atur pratonton dan menggantikan hanya blok yang kandungannya berubah.
-3. Selepas suntingan, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula, selagi jirannya kekal sama; [docs/partial-parse.md](../../../docs/partial-parse.md) menyatakan mengapa itu memberikan hasil yang sama dengan hurai penuh, dan apa yang perlu dilihat apabila comrak berubah. Dokumen dengan blok ulasan `%%`, perubahan pada front matter dan, dalam dokumen yang mempunyai takrifan rujukan pautan, perubahan pada bahagian yang mengandungi kurungan siku diproses sepenuhnya. comrak mengenali rujukan nota kaki hanya dengan takrifannya dalam penghuraian yang sama dan mengalihkan takrifan ke belakang teks, jadi bahagian itu dihuraikan dengan takrifan gantian bagi setiap label dan mengambil nombornya daripada pepohon lama; perubahan pada rujukan atau takrifan dalam bahagian itu, atau di sebelah nota kaki sebaris, diproses sepenuhnya.
-4. Blok HTML yang membuka `<details>` atau `<div align>` dan menutupnya kemudian menjejaskan blok Markdown di antaranya; blok yang digunakan semula mesti mempunyai persekitaran yang sama.
-5. Semasa anda menaip dalam sumber dokumen sehingga 2 MB, kemas kini separa berjalan serta-merta; apabila ia tidak terpakai, atau dalam dokumen yang lebih besar, penghuraian dan susun atur berjalan di latar belakang. Semasa anda menaip dalam pratonton, ia berjalan serta-merta, kerana kursor pratonton bergantung pada hasilnya.
-6. Input dalam pratonton diterjemahkan oleh `Bridge` menjadi suntingan sumber dan mengambil laluan yang sama selepas itu. Markdown mempunyai terlalu banyak cara untuk menukar teks menjadi sintaks bagi peraturan sahaja, jadi `preview/verify.rs` menghuraikan bahagian yang berubah sekali lagi dan membandingkan apa yang ditunjukkannya dengan apa yang ditaip; suntingan yang tidak bertahan di-escape lebih jauh atau ditolak.
-7. Kedudukan sebaris comrak tersasar di beberapa tempat, contohnya di belakang takrifan rujukan pautan. `reader/positions.rs` menyemaknya terhadap sumber semasa membaca blok dan membacanya semula daripada sumber di tempat ia tidak sepadan.
-
-### Peraturan dalam pengawal
-
-1. Perubahan pengawal sendiri pada paparan berjalan di dalam `Panes::silently`; panggil balik delegasi mengabaikannya. Di tempat lain paparan hanya boleh dibaca, jadi pengkompil yang menyemaknya. Apa yang memang patut didengar oleh panggil balik, atau apa yang menyerahkan paparan kepada AppKit, menyatakannya dengan melalui `Panes::for_appkit`.
-2. Keadaan dipinjam hanya untuk membaca dan mengira, tidak pernah merentasi panggilan yang mengubah, menyusun atur atau menggulung paparan: `Model` meminjamkannya kepada closure `Send`, dan tiada paparan yang `Send`, jadi pengkompil yang menyemaknya. Ia berubah melalui kaedahnya sendiri sahaja, yang ujiannya tidak memerlukan tetingkap.
-3. Mesej dari luar (imej dimuatkan, formula dipaparkan) tiba tertunda melalui `renders_arrived` dan `image_arrived`, tidak pernah di tengah-tengah kemas kini.
-4. Lukisan semula tanpa perubahan teks hanya melalui `invalidate(reason)`.
-5. Salinan teks tidak dipegang merentasi perubahan sumber, atau perubahan itu menyalin seluruh teks: `with_text` meminjamkannya hanya selama satu closure `Send`.
-6. Arahan baharu memerlukan entri dalam `actions.rs`, kaedah dalam `controller.rs` dan cabang dalam `Editing::perform`.
-7. Setiap blok `unsafe` membawa justifikasinya sebagai ulasan `// SAFETY:`. Bait sampai ke penyahkod imej sistem dalam proses pembantu sahaja, melalui `decoder::decode_native`; satu ujian mengimbas sumber untuk panggilan lain.
-8. Tiada apa-apa pada urutan utama menunggu folder pengguna, kerana volum rangkaian boleh berhenti menjawab: fail dilihat pada urutan `DISK`, dan pratonton membaca jawapannya melalui `Env::known`. Hanya tindakan yang ditunggu pengguna, seperti eksport atau menyimpan, boleh menyentuh cakera secara langsung.
-9. Apa yang mesti berakhir juga berakhir selepas panic, kerana urutan utama terselamat daripadanya: bendera yang dinaikkan melalui `with_raised`, suntingan storan teks melalui `editing`, dan apa yang tidak patut diketahui oleh buat asal melalui `without_undo`. Satu ujian mencari yang ditulis dengan tangan.
-10. Alamat dalam dokumen mempunyai satu bacaan, dalam `splat_markdown::url`; satu ujian mencari skema yang dibandingkan dengan tangan.
-
-### Menambah arahan
-
-Bar menu, bar alat dan menu konteks semuanya membina itemnya daripada daftar dalam [src/editor/actions.rs](../../../src/editor/actions.rs), dan pengesahan menu membaca di sana bila arahan terpakai dan sama ada ia menunjukkan tanda semak. Arahan baharu memerlukan:
-
-1. varian `Action` dengan `Spec`-nya: pemilih, tajuk, label bar alat, tip alat (bermula dengan kata kerja, paling banyak 75 aksara), pintasan, SF Symbol dan bila ia terpakai
-2. kaedah dalam `src/editor/controller.rs`
-3. cabang dalam `Editing::perform`
-4. teksnya dalam setiap `Localizable.strings`
-
-Ujian `every_command_has_a_method_and_every_method_a_command` menyemak bahawa daftar dan kaedah sepadan. Pintasan standard Apple seperti ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F dan ⌘, tidak disentuh.
-
-### Terjemahan
-
-Kod menggunakan teks bahasa Jerman sebagai kunci: `t("Fett")` mencarinya semasa larian, `n("Fett")` menandakan pemalar untuk pencarian kemudian. Setiap `resources/<language>.lproj/` menyimpan:
-
-- `Localizable.strings`: setiap teks antara muka, istilah menu mengikut glosari Apple sendiri
-- `InfoPlist.strings`: nama yang ditunjukkan macOS untuk app dan jenis dokumennya
-- `QuickReference.md`: rujukan pantas Markdown
-
-`cargo xtask bundle` menyenaraikan setiap folder `.lproj` sebagai penyetempatan, dan `CFBundleDevelopmentRegion` ialah bahasa Inggeris, jadi menu sistem dan dialog simpan mengikut bahasa yang sama. Ujian i18n menyemak bahawa setiap bahasa mempunyai setiap teks dan bahawa setiap rujukan pantas mempunyai rangka yang sama seperti yang bahasa Jerman.
-
-`assets/readme/<language>/` menyimpan README ini dalam bahasa itu, tangkapan skrinnya dan dokumen demo yang ditunjukkan tangkapan skrin itu. Perubahan pada README ini juga patut dibuat dalam salinan tersebut.
+Cara membina, menguji, struktur kod dan peraturan yang dipatuhinya diterangkan dalam [docs/development.md](../../../docs/development.md) (dalam bahasa Inggeris).
 
 ### Komponen pihak ketiga
 
@@ -756,6 +631,10 @@ Kod menggunakan teks bahasa Jerman sebagai kunci: `t("Fett")` mencarinya semasa 
 | [image](https://github.com/image-rs/image) | 0.25 | menyahkod PNG, JPEG, GIF, WebP dan BMP | MIT atau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | menjajarkan lajur jadual | MIT atau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | nama rujukan aksara HTML | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | menyahpadat fail Word dan objek Git | MIT, Zlib atau Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | membaca XML fail Word | MIT atau Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nama dan carian merentasi huruf tergubah dan terurai | MIT atau Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | mengekalkan teks seperti `:shortcode:` secara literal dalam teks yang diimport | MIT atau Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | memaparkan formula | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | penyunting formula visual, dengan fon KaTeX | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | rajah Mermaid | MIT |

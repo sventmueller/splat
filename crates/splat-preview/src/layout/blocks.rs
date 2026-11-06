@@ -453,7 +453,10 @@ impl Builder<'_> {
         };
         let run = Run {
             text: summary,
-            style: RunStyle::default(),
+            style: RunStyle {
+                link: Some(Link::Metadata),
+                ..RunStyle::default()
+            },
             map: RunMap::Atom {
                 atom: Atom::Text,
                 src: block.range.clone(),

@@ -4,7 +4,7 @@ set -euo pipefail
 seconds="${1:-60}"
 cd "$(dirname "$0")/.."
 nightly="$(rustup which --toolchain nightly rustc)"
-for target in reparse outputs bridge commands encoding; do
+for target in reparse outputs bridge commands encoding git import notes; do
     RUSTC="$nightly" RUSTUP_TOOLCHAIN=nightly "$(dirname "$nightly")/cargo" fuzz run "$target" --jobs 3 -- \
         -dict=fuzz/markdown.dict -max_len=2048 -max_total_time="$seconds" -print_final_stats=0
 done

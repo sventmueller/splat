@@ -7,15 +7,24 @@ use crate::doc::{
 };
 use crate::text::{Byte, TextAt, line_end, line_start, lines_with_ends, units};
 
+/// A look the formatting commands put on text, each with the markers they write for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InlineStyle {
+    /// `**bold**`.
     Bold,
+    /// `*italic*`.
     Italic,
+    /// `~~struck~~`.
     Strikethrough,
+    /// A code span between backticks.
     Code,
+    /// `<ins>underlined</ins>`, for which Markdown has no syntax.
     Underline,
+    /// `<mark>marked</mark>`.
     Highlight,
+    /// `<sup>raised</sup>`.
     Superscript,
+    /// `<sub>lowered</sub>`.
     Subscript,
 }
 
@@ -63,7 +72,9 @@ const NESTING: [InlineStyle; 8] = [
 /// Inline styles chosen at a caret outside a word: the text typed next at `at` gets exactly these.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pending {
+    /// The caret the styles were chosen at.
     pub at: Byte,
+    /// The styles the text typed there gets, in nesting order.
     pub styles: Vec<InlineStyle>,
 }
 
@@ -71,14 +82,20 @@ pub struct Pending {
 /// unwanted spans but before joining an adjacent one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Typing {
+    /// Where the typed text goes: inside an adjacent span it joins, or at `outside`.
     pub at: Byte,
+    /// The caret moved out of the spans the typed text must not continue.
     pub outside: Byte,
+    /// The markers in front of the typed text; empty when it joins a span.
     pub open: String,
+    /// The markers behind the typed text, in the reverse order of `open`.
     pub close: String,
+    /// The styles the typed text ends up with.
     pub styles: Vec<InlineStyle>,
 }
 
 impl Typing {
+    /// Whether the typed text ends up in a code span.
     pub fn code(&self) -> bool {
         self.styles.contains(&InlineStyle::Code)
     }
@@ -87,36 +104,58 @@ impl Typing {
 /// Typed text ready to insert per a [`Typing`]; `caret` counts bytes into `text`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Placed {
+    /// Where the text goes, in the text before the typing.
     pub at: Byte,
+    /// The typed text with any new markers around it.
     pub text: String,
+    /// Where the caret stands afterwards, in bytes into `text`.
     pub caret: usize,
     /// Only whitespace was typed; it stays unformatted and the styles wait for the next word.
     pub keep_pending: bool,
 }
 
+/// What toggling a style at a caret or a selection comes to.
 pub enum Toggle {
+    /// A change to the source that puts the style on or takes it off.
     Edit(Edit),
+    /// The styles kept for the text typed next; `None` when they are those at the caret again.
     Pending(Option<Pending>),
 }
 
+/// The formatting at the caret, as the menus show it with checkmarks.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Active {
+    /// Inside strong text.
     pub bold: bool,
+    /// Inside emphasis.
     pub italic: bool,
+    /// Inside struck text.
     pub strikethrough: bool,
+    /// Inside a code span.
     pub code: bool,
+    /// Inside `<u>` or `<ins>`.
     pub underline: bool,
+    /// Inside `==marked==` text or `<mark>`.
     pub highlight: bool,
+    /// Inside raised text.
     pub superscript: bool,
+    /// Inside lowered text.
     pub subscript: bool,
+    /// Inside the text of a link.
     pub link: bool,
+    /// The level of the heading at the caret; 0 outside one.
     pub heading: u8,
+    /// The kind of list item at the caret, the innermost deciding.
     pub list: Option<ListStyle>,
+    /// Inside a block quote, an alert or a callout.
     pub quote: bool,
+    /// Inside a table.
     pub table: bool,
+    /// Inside a code block.
     pub code_block: bool,
     /// Info string of the fenced code block at the caret.
     pub code_lang: Option<String>,
+    /// The kind of the alert or callout at the caret.
     pub alert: Option<AlertKind>,
 }
 
@@ -144,6 +183,7 @@ impl Active {
     }
 }
 
+/// The innermost block at `offset` that holds running text.
 pub fn leaf_at(doc: &Doc, offset: Byte) -> Option<&Block> {
     block_path(&doc.blocks, offset).into_iter().rev().find(|b| b.is_leaf())
 }
@@ -164,6 +204,7 @@ fn inlines_around(doc: &Doc, offset: Byte) -> Vec<&Inline> {
     path
 }
 
+/// The formatting at `offset`, from the inlines and blocks around it.
 pub fn active_at(doc: &Doc, offset: Byte) -> Active {
     let mut a = Active::default();
     for i in inlines_around(doc, offset) {
@@ -451,6 +492,8 @@ pub fn typed_at_pending(base: &Doc, text: &str, pending: &Pending) -> Option<(Ed
     Some((move_typed(text, at, len, &placed), placed.keep_pending))
 }
 
+/// Takes `style` off the span of it that holds the selection, or else puts it on the selection, or on the word around
+/// an empty one; over several lines, line by line.
 pub fn toggle_inline(doc: &Doc, sel: Range<Byte>, style: InlineStyle) -> Edit {
     let text = doc.text();
     let around_start = inlines_around(doc, sel.start);
@@ -640,6 +683,8 @@ fn wrap_lines(doc: &Doc, sel: Range<Byte>, style: InlineStyle) -> Edit {
     }
 }
 
+/// Takes the formatting off what the selection touches: inline styles and code spans, and the marks of headings on its
+/// lines; links and pictures stay.
 pub fn remove_formatting(doc: &Doc, sel: Range<Byte>) -> Edit {
     let text = doc.text();
     let span = line_span(text, &sel);

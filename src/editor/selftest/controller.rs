@@ -27,7 +27,7 @@ thread_local! {
 }
 
 /// A popover cannot show without a window on screen; these checks are about what its editor does to the text.
-pub(in crate::editor) fn keeps_unshown_editor() -> bool {
+pub(crate) fn keeps_unshown_editor() -> bool {
     KEEP_EDITOR.get()
 }
 

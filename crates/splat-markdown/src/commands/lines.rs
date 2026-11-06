@@ -7,10 +7,14 @@ use crate::text::{
     lines_with_ends, next_quote_mark, shifted,
 };
 
+/// The kinds of list the list commands write and the menus check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ListStyle {
+    /// `- item`.
     Bullet,
+    /// `1. item`.
     Numbered,
+    /// `- [ ] item`, a task list.
     Task,
 }
 
@@ -32,9 +36,14 @@ pub fn line_span(text: &str, sel: &Range<Byte>) -> Range<Byte> {
 /// Container and block prefixes at the start of a source line.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LinePrefix {
+    /// Byte offset in the line behind its quote marks and the space after each; 0 without one.
     pub quote_end: usize,
+    /// The byte range of the list marker, with any checkbox and the spaces behind them, and the kind of list it makes.
     pub list: Option<(Range<usize>, ListStyle)>,
+    /// The byte range of the heading's `#` marks, with the indentation in front and the space behind, and the level
+    /// they give.
     pub heading: Option<(Range<usize>, u8)>,
+    /// Byte offset in the line where its text starts, behind all of these.
     pub content: usize,
 }
 
@@ -51,6 +60,7 @@ impl LinePrefix {
         end
     }
 
+    /// The prefixes `line` starts with.
     pub fn parse(line: &str) -> LinePrefix {
         let b = line.as_bytes();
         let quote_end = LinePrefix::quote_end_of(line, usize::MAX);
@@ -131,6 +141,8 @@ fn map_lines(text: &str, sel: &Range<Byte>, mut f: impl FnMut(usize, &str, &Line
     }
 }
 
+/// Makes the lines of the selection headings of `level`, or plain text for level 0, replacing the underline of a setext
+/// title.
 pub fn set_heading(doc: &Doc, sel: Range<Byte>, level: u8) -> Edit {
     let text = doc.text();
     let span = line_span(text, &sel);
@@ -176,6 +188,8 @@ pub(super) fn setext_underline_behind(text: &str, span: &Range<Byte>) -> Option<
     rule.then_some(end)
 }
 
+/// Makes the lines of the selection items of a `style` list, or takes their markers off when all of them are such items
+/// already; blank lines stay as they are.
 pub fn toggle_list(text: &str, sel: Range<Byte>, style: ListStyle) -> Edit {
     let span = line_span(text, &sel);
     let all_same = lines_with_ends(text.at(span.clone()))
@@ -204,6 +218,7 @@ pub fn toggle_list(text: &str, sel: Range<Byte>, style: ListStyle) -> Edit {
     })
 }
 
+/// Puts `> ` in front of the lines of the selection, or takes one quote level off when all of them are quoted.
 pub fn toggle_quote(text: &str, sel: Range<Byte>) -> Edit {
     let span = line_span(text, &sel);
     let all_quoted = lines_with_ends(text.at(span.clone())).all(|(l, _)| LinePrefix::parse(l).quote_end > 0);

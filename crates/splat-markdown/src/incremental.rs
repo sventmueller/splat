@@ -14,12 +14,14 @@ use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, shift_block,
 use super::highlight::{Style, highlight, highlight_blocks, rehighlight};
 use super::reader::{UNCLOSED_MARKS, parse_part, parse_shared};
 use super::text::{
-    Byte, Stretch, TextAt, changed, growth, label_key, line_start, next_line_start, previous_line_start, shifted,
+    Byte, TextAt, TextPart, changed, growth, label_key, line_start, next_line_start, previous_line_start, shifted,
 };
 
 /// The parsed document and its source colors.
 pub struct Parsed {
+    /// The tree of the text.
     pub doc: Doc,
+    /// The styled byte ranges of the source view.
     pub spans: Vec<(Range<Byte>, Style)>,
     /// Which top-level blocks changed, when only those were parsed again.
     pub splice: Option<Splice>,
@@ -47,10 +49,12 @@ impl Parsed {
     }
 }
 
+/// `text` parsed in full, with its source colors; plain when it would take too much memory.
 pub fn parse_and_color(text: &str) -> Parsed {
     parse_shared_and_color(text.into())
 }
 
+/// [`parse_and_color`] for a text that is shared already, which the tree keeps without a copy.
 pub fn parse_shared_and_color(text: Arc<str>) -> Parsed {
     if stays_plain(&text) {
         return Parsed::plain(text);
@@ -255,7 +259,7 @@ fn number_references(blocks: &mut [Block], known: &HashMap<&str, u32>) -> bool {
 /// Whether a reference may hide in plain text, as comrak still counts it where the reader gave up its positions, or in the
 /// title of a callout, which is plain text to the tree. `text` is what the positions of `blocks` point into, as a stand-in
 /// takes the reference out of the title.
-fn may_hide_reference<'a>(blocks: impl IntoIterator<Item = &'a Block>, part: Stretch) -> bool {
+fn may_hide_reference<'a>(blocks: impl IntoIterator<Item = &'a Block>, part: TextPart) -> bool {
     let mut found = false;
     for block in blocks {
         walk_blocks(std::slice::from_ref(block), &mut |b| {
@@ -352,7 +356,7 @@ fn replace_blocks(doc: &mut Doc, old: Range<usize>, part: Vec<Block>, old_change
 
 /// Why a change takes parsing all of the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WholeParse {
+pub(crate) enum WholeParse {
     /// So many unclosed inline notes or formulas that the reader switches them off, which only the whole text can tell.
     SwitchedOff,
     /// A `%%` that nothing closes yet, which another one anywhere would.
@@ -411,7 +415,7 @@ struct Replacement {
 
 /// Where the text of a block starts that begins at `at`, with the lines right above it that belong to no block, which go no
 /// further up than `limit`: definitions of links, read out of the paragraph they head, which a line below can undo.
-fn lines_it_was_written_with(text: &str, at: Byte, limit: Byte) -> Byte {
+fn block_start_with_definitions(text: &str, at: Byte, limit: Byte) -> Byte {
     let mut start = line_start(text, at);
     while let Some(above) = previous_line_start(text, start) {
         if above < limit || text.at(above..start).trim().is_empty() {
@@ -436,8 +440,8 @@ struct Part<'a> {
 }
 
 impl Part<'_> {
-    fn old_stretch(&self) -> Stretch<'_> {
-        Stretch {
+    fn old_stretch(&self) -> TextPart<'_> {
+        TextPart {
             text: self.old,
             start: self.start,
         }
@@ -452,7 +456,7 @@ impl<'c> Change<'c> {
             let block_above = b
                 .checked_sub(1)
                 .map_or(Byte::default(), |above| blocks[order[above]].range.end);
-            lines_it_was_written_with(self.old_text, blocks[order[b]].range.start, block_above)
+            block_start_with_definitions(self.old_text, blocks[order[b]].range.start, block_above)
         });
         let old_end = match after {
             Some(a) if a + 1 < n => line_start(self.old_text, blocks[order[a + 1]].range.start),
@@ -506,7 +510,7 @@ impl<'c> Change<'c> {
         read: &mut PartBlocks,
         known: &HashMap<&str, u32>,
     ) -> Result<(), WholeParse> {
-        if !number_references(&mut read.0, known) || may_hide_reference(&read.0, Stretch::whole(part.new)) {
+        if !number_references(&mut read.0, known) || may_hide_reference(&read.0, TextPart::whole(part.new)) {
             return Err(WholeParse::Footnotes);
         }
         Ok(())
@@ -527,7 +531,7 @@ impl<'c> Change<'c> {
         let old_blocks = BlocksByPosition::new(self.old_blocks(part));
         let old_definitions = link_definitions(&old_blocks, part.old_stretch()).ok_or(WholeParse::LinkDefinitions)?;
         let new_definitions =
-            link_definitions(&new_blocks, Stretch::whole(part.new)).ok_or(WholeParse::LinkDefinitions)?;
+            link_definitions(&new_blocks, TextPart::whole(part.new)).ok_or(WholeParse::LinkDefinitions)?;
         if old_definitions != new_definitions {
             return Err(WholeParse::LinkDefinitions);
         }
@@ -545,7 +549,7 @@ impl<'c> Change<'c> {
             .iter()
             .map(|&i| reference_expansions(std::slice::from_ref(&self.blocks[i]), part.old_stretch()))
             .sum();
-        let come = reference_expansions(&read.0, Stretch::whole(part.new));
+        let come = reference_expansions(&read.0, TextPart::whole(part.new));
         let after = self.reference_expansions - gone + come;
         // A part read alone may expand to less than all of the text it belongs to.
         if !expansions_fit(after, self.links, self.new_text.len()) || !expansions_fit(come, self.links, part.new.len())
@@ -631,7 +635,7 @@ pub fn reparse(doc: &mut Doc, new_text: &str) -> Option<Splice> {
 }
 
 /// `reparse`, with the reason if all of `new_text` has to be parsed.
-pub fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice, WholeParse> {
+pub(crate) fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice, WholeParse> {
     let shared = doc.shared_text();
     let old_text: &str = &shared;
     let facts = doc.facts().clone();

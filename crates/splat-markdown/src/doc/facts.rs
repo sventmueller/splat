@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use super::{Block, BlockKind, Doc, Inline, InlineKind, block_path, walk_blocks, walk_inlines};
 use crate::text::{
-    Byte, Stretch, TextAt, block_indent, indent_len, is_quote_prefix, label_key, line_end, line_start, next_line_start,
-    previous_line_start,
+    Byte, TextAt, TextPart, block_indent, indent_len, is_quote_prefix, label_key, line_end, line_start,
+    next_line_start, previous_line_start,
 };
 
 /// The longest label a footnote can have, in bytes.
@@ -17,7 +17,7 @@ pub const LONGEST_LABEL: usize = 1000;
 const MOST_LINK_DEFINITIONS: usize = 64 << 10;
 
 /// The estimated memory from which a document stays plain text in the editor.
-pub const MOST_MEMORY: u64 = 4 << 30;
+pub(crate) const MOST_MEMORY: u64 = 4 << 30;
 
 pub(crate) const HEAVIEST_BYTE: u64 = 800;
 
@@ -70,7 +70,8 @@ pub struct MarkCounts {
 }
 
 impl MarkCounts {
-    pub fn of(text: &[u8]) -> MarkCounts {
+    /// The counts for all of `text`.
+    pub(crate) fn of(text: &[u8]) -> MarkCounts {
         let mut marks = MarkCounts {
             memory: text.last().map_or(0, |&b| u64::from(MEMORY_OF[usize::from(b)])),
             ..MarkCounts::default()
@@ -110,7 +111,7 @@ impl MarkCounts {
 
 /// Walks `text` from its end, resetting at every blank line: comrak looks for a closing mark within a paragraph, so a closer
 /// in the next one closes nothing, however many there are.
-pub fn from_the_end_by_paragraph(text: &str, mut at_byte: impl FnMut(usize), mut paragraph_ends: impl FnMut()) {
+pub(crate) fn from_the_end_by_paragraph(text: &str, mut at_byte: impl FnMut(usize), mut paragraph_ends: impl FnMut()) {
     let bytes = text.as_bytes();
     let mut line_is_blank = true;
     for at in (0..bytes.len()).rev() {
@@ -139,7 +140,7 @@ pub struct Unclosed {
     pub code: usize,
 }
 
-pub fn unclosed_formulas(text: &str) -> Unclosed {
+pub(crate) fn unclosed_formulas(text: &str) -> Unclosed {
     let bytes = text.as_bytes();
     let closers = std::cell::Cell::new((0usize, 0usize, 0usize));
     let (mut latex, mut code) = (0usize, 0usize);
@@ -197,7 +198,7 @@ fn paragraph_around(text: &str, change: &Range<Byte>) -> Range<Byte> {
 
 /// `unclosed_formulas` of `new` when it said `unclosed` of `old` and only the given ranges differ: what a paragraph holds
 /// stays within it.
-pub fn unclosed_after_change(
+pub(crate) fn unclosed_after_change(
     unclosed: Unclosed,
     old: &str,
     new: &str,
@@ -215,6 +216,7 @@ pub fn unclosed_after_change(
 /// What a document knows about all of its text.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TextFacts {
+    /// How often the marks stand in the text, and what it takes in memory.
     pub marks: MarkCounts,
     /// What `unclosed_formulas` says.
     pub unclosed_formulas: Unclosed,
@@ -229,11 +231,12 @@ pub struct TextFacts {
 }
 
 impl TextFacts {
+    /// What `doc` knows about its text, read from the text and its blocks.
     pub fn of(doc: &Doc) -> TextFacts {
         let text = doc.text();
         let marks = MarkCounts::of(text.as_bytes());
         let by_position = BlocksByPosition::new(&doc.blocks);
-        let reference_expansions = reference_expansions(&doc.blocks, Stretch::whole(text));
+        let reference_expansions = reference_expansions(&doc.blocks, TextPart::whole(text));
         TextFacts {
             marks,
             unclosed_formulas: unclosed_formulas(text),
@@ -251,12 +254,12 @@ impl TextFacts {
 }
 
 /// Whether `text` may hold a link reference definition; `[^label]:` defines a footnote instead.
-pub fn may_define_links(text: &str) -> bool {
+pub(crate) fn may_define_links(text: &str) -> bool {
     text.match_indices("]:").any(|(at, _)| !ends_footnote_label(text, at))
 }
 
 /// The label of the `[^label]` at the start of `text`, if it is one that a definition can have.
-pub fn footnote_label(text: &str) -> Option<&str> {
+pub(crate) fn footnote_label(text: &str) -> Option<&str> {
     let rest = text.strip_prefix("[^")?;
     let end = rest.bytes().take(LONGEST_LABEL + 1).position(|c| c == b']')?;
     let label = &rest[..end];
@@ -276,7 +279,7 @@ pub fn ends_footnote_label(text: &str, at: usize) -> bool {
 
 /// The top-level blocks of a part of a text in source order, to find the block at a position without going through all of
 /// them.
-pub struct BlocksByPosition<'a> {
+pub(crate) struct BlocksByPosition<'a> {
     blocks: Vec<&'a Block>,
     /// How far the blocks up to each one reach: an inline note lies inside the block with its reference, which comes behind
     /// it here, so their ends do not sort as their starts do.
@@ -284,7 +287,7 @@ pub struct BlocksByPosition<'a> {
 }
 
 impl<'a> BlocksByPosition<'a> {
-    pub fn new(blocks: impl IntoIterator<Item = &'a Block>) -> BlocksByPosition<'a> {
+    pub(crate) fn new(blocks: impl IntoIterator<Item = &'a Block>) -> BlocksByPosition<'a> {
         let mut sorted: Vec<&Block> = blocks.into_iter().collect();
         sorted.sort_by_key(|b| b.range.start);
         let mut furthest = Byte::default();
@@ -358,7 +361,7 @@ fn reference_budget(len: usize) -> usize {
 
 /// How much of `reference_budget` the blocks of `part` take: a link with its address in place takes none, and all that refer
 /// to a definition end in a bracket.
-pub fn reference_expansions(blocks: &[Block], part: Stretch) -> usize {
+pub(crate) fn reference_expansions(blocks: &[Block], part: TextPart) -> usize {
     let mut taken = 0;
     walk_blocks(blocks, &mut |b| {
         walk_inlines(b.inlines(), &mut |i| {
@@ -375,7 +378,7 @@ pub fn reference_expansions(blocks: &[Block], part: Stretch) -> usize {
 
 /// Whether no link has run out of `reference_budget`, which the tree does not tell: comrak also spends it on a link inside a
 /// link's text, which is why some is held back.
-pub fn expansions_fit(taken: usize, definitions: &str, len: usize) -> bool {
+pub(crate) fn expansions_fit(taken: usize, definitions: &str, len: usize) -> bool {
     let longest = definitions.split("\n\n").map(str::len).max().unwrap_or(0);
     taken + taken / 8 + longest <= reference_budget(len)
 }
@@ -390,8 +393,8 @@ fn opens_its_line(text: &str, at: Byte) -> bool {
 /// may stand on the next. `None` if the tree cannot tell, or a definition is not of the plain kind that means the same copied
 /// elsewhere: one inside a list needs its indent to stay, and a label over two lines cannot be told from text by looking at
 /// its line.
-pub fn link_definitions(blocks: &BlocksByPosition, part: Stretch) -> Option<String> {
-    let Stretch { text, start: offset } = part;
+pub(crate) fn link_definitions(blocks: &BlocksByPosition, part: TextPart) -> Option<String> {
+    let TextPart { text, start: offset } = part;
     let holds_definition = |line: Byte| {
         let rest = text.from(line);
         let prefix = rest.len() - rest.trim_start_matches([' ', '\t', '>']).len();
@@ -441,7 +444,7 @@ pub fn link_definitions(blocks: &BlocksByPosition, part: Stretch) -> Option<Stri
 /// The definitions to read a part of `text` with. comrak goes by the first definition of a label, which reading them behind
 /// the part would change if the part holds a later one, so a text with a label defined twice stays out of this.
 fn link_definitions_of(blocks: &BlocksByPosition, text: &str) -> Option<Arc<str>> {
-    let definitions = link_definitions(blocks, Stretch::whole(text))?;
+    let definitions = link_definitions(blocks, TextPart::whole(text))?;
     if definitions.len() > MOST_LINK_DEFINITIONS {
         return None;
     }
@@ -459,7 +462,7 @@ fn link_definitions_of(blocks: &BlocksByPosition, text: &str) -> Option<Arc<str>
 
 /// Whether a line of `text`, the text of `blocks`, starts with a `%%` outside of code: a comment that runs on to the next
 /// one anywhere, or text that the next one would turn into it.
-pub fn holds_loose_comment(blocks: &BlocksByPosition, text: &str) -> bool {
+pub(crate) fn holds_loose_comment(blocks: &BlocksByPosition, text: &str) -> bool {
     text.match_indices("%%").any(|(at, _)| {
         let at = Byte::new(at);
         let line = line_start(text, at);
@@ -472,7 +475,7 @@ pub fn holds_loose_comment(blocks: &BlocksByPosition, text: &str) -> bool {
 
 /// Whether the blocks hold nothing but what reads the same with the definitions of a text behind it as within the text:
 /// embedded HTML, comments and notes have rules of their own that reach across blocks.
-pub fn reads_alone(blocks: &[Block]) -> bool {
+pub(crate) fn reads_alone(blocks: &[Block]) -> bool {
     fn plain_inlines(inlines: &[Inline]) -> bool {
         inlines.iter().all(|i| {
             !matches!(

@@ -71,8 +71,11 @@ const BY_HAND_TICKS: usize = KEYS;
 
 struct Run {
     e: Retained<EditorController>,
+    window: Retained<NSWindow>,
     path: String,
     by_hand: bool,
+    /// On a locked screen no app is in front, so the keys go straight to the window, past the app's event queue and its monitor.
+    straight_to_the_window: bool,
     /// The text so far: what it was, and every key the app saw since.
     expected: Rc<RefCell<String>>,
     other_keys: Rc<Cell<usize>>,
@@ -129,7 +132,9 @@ impl Run {
             self.ended();
             return;
         }
-        if !self.by_hand {
+        if self.straight_to_the_window {
+            self.type_straight(n);
+        } else if !self.by_hand {
             let letter = u16::from(b'a') + u16::try_from(n % 26).unwrap_or(0);
             if n >= SAVE_AT_KEY && !self.save_posted.get() && in_front(self.e.mtm()) {
                 self.save_posted.set(true);
@@ -147,6 +152,22 @@ impl Run {
             );
         }
         after(SECONDS_PER_KEY, move || self.clone().tick(n + 1));
+    }
+
+    fn type_straight(&self, n: usize) {
+        let letter = char::from(b'a' + u8::try_from(n % 26).unwrap_or(0));
+        let press = |letter: char| {
+            super::press_key(&self.window, &letter.to_string());
+            self.expected.borrow_mut().push(letter);
+        };
+        if n == SAVE_AT_KEY {
+            press(letter);
+            if let Some(document) = self.e.document() {
+                // SAFETY: NSDocument's action method, called on the main thread without a sender.
+                unsafe { document.saveDocument(None) };
+            }
+        }
+        press(letter);
     }
 
     fn ended(self: Rc<Self>) {
@@ -169,12 +190,13 @@ impl Run {
                 lost.is_empty(),
                 &lost.join("; "),
             );
-            check(
+            check_in_front(
+                self.e.mtm(),
                 "text no file holds shows as unsaved after every key",
                 self.unmarked.get() == 0,
                 &format!("{} times not", self.unmarked.get()),
             );
-            let saves_begun = crate::document::SAVES_ASKED_FOR.load(std::sync::atomic::Ordering::Relaxed);
+            let saves_begun = crate::test_hooks::SAVES_ASKED_FOR.load(std::sync::atomic::Ordering::Relaxed);
             check_in_front(
                 self.e.mtm(),
                 "every Command-S on unsaved text starts a save",
@@ -310,8 +332,10 @@ fn start(e: Retained<EditorController>, window: Retained<NSWindow>) {
     }
     let run = Rc::new(Run {
         e,
+        window,
         path,
         by_hand,
+        straight_to_the_window: super::screen_is_locked(),
         expected,
         other_keys,
         saves_asked,
@@ -344,6 +368,15 @@ fn run_when_in_front(mtm: MainThreadMarker, tries: u32) {
         // What only the app in front does.
         super::controller::a_cancelled_composition_ends_the_edit_it_announced(mtm);
         window.makeKeyAndOrderFront(None);
+        start(e, window);
+    } else if super::screen_is_locked() {
+        for name in [
+            "the app is in front for the keys",
+            "a cancelled composition does not leave the preview waiting for its edit",
+            "the caret mirrors to the source after a cancelled composition",
+        ] {
+            super::skip(name, "the screen is locked");
+        }
         start(e, window);
     } else if tries < 200 {
         after(0.1, move || run_when_in_front(mtm, tries + 1));

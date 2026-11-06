@@ -196,11 +196,56 @@ pub(crate) fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Release builds raise the build number; debug and selftest builds leave it.
-pub(crate) fn bundle(release: bool, selftest: bool) -> Result<PathBuf, String> {
+/// Which app a bundle holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Build {
+    /// Built for this Mac without optimisation.
+    Debug,
+    /// Built for this Mac as it ships, signed with the local certificate.
+    Release,
+    /// The app with its self-test, optimised or not.
+    Selftest { release: bool },
+    /// The universal release signed with the Developer ID, the only one that goes out.
+    Distribution,
+}
+
+impl Build {
+    pub(crate) fn release(self) -> bool {
+        match self {
+            Build::Debug => false,
+            Build::Release | Build::Distribution => true,
+            Build::Selftest { release } => release,
+        }
+    }
+
+    pub(crate) fn selftest(self) -> bool {
+        matches!(self, Build::Selftest { .. })
+    }
+
+    /// The word behind the app's name, which keeps the builds apart in the Finder and in Launch Services.
+    pub(crate) fn variant(self) -> Option<&'static str> {
+        match self {
+            Build::Selftest { .. } => Some("Selftest"),
+            Build::Debug => Some("Debug"),
+            Build::Release | Build::Distribution => None,
+        }
+    }
+
+    /// The distribution and the self-test carry Sparkle, see `Updates`.
+    pub(crate) fn updates(self) -> Updates {
+        match self {
+            Build::Distribution => Updates::Published,
+            Build::Selftest { .. } => Updates::Selftest,
+            Build::Debug | Build::Release => Updates::Off,
+        }
+    }
+}
+
+/// Builds and signs a bundle for this Mac. A release build raises the build number; debug and selftest builds leave it.
+pub(crate) fn bundle(build: Build) -> Result<PathBuf, String> {
     let version = version()?;
-    let app = assemble(release, selftest, &version, false)?;
-    let entitlements = if selftest {
+    let app = assemble(build, &version)?;
+    let entitlements = if build.selftest() {
         let path = target_dir().join("selftest.entitlements");
         files::write(&path, SELFTEST_ENTITLEMENTS)?;
         Some(path)
@@ -208,42 +253,33 @@ pub(crate) fn bundle(release: bool, selftest: bool) -> Result<PathBuf, String> {
         None
     };
     sign(&app, signing_identity()?, false, entitlements.as_deref())?;
-    if release && !selftest {
+    if build == Build::Release {
         next_build(&version)?;
     }
     Ok(app)
 }
 
-/// Builds the app bundle, unsigned. `distribution` is the build signed with the Developer ID, the only universal one;
-/// it and the self-test carry Sparkle, see `Updates`.
-pub(crate) fn assemble(release: bool, selftest: bool, version: &str, distribution: bool) -> Result<PathBuf, String> {
+/// Builds the app bundle, unsigned.
+pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     let root = root();
-    let profile = if release { "release" } else { "debug" };
+    let profile = if build.release() { "release" } else { "debug" };
     let target = target_dir().join(profile);
-    let program = if distribution {
+    let program = if build == Build::Distribution {
         universal_program()?
     } else {
-        let mut build = Command::new(env!("CARGO"));
-        build.current_dir(&root).args(["build", "--package", PACKAGE]);
-        if release {
-            build.arg("--release");
+        let mut cargo = Command::new(env!("CARGO"));
+        cargo.current_dir(&root).args(["build", "--package", PACKAGE]);
+        if build.release() {
+            cargo.arg("--release");
         }
-        if selftest {
-            build.args(["--features", "selftest"]);
+        if build.selftest() {
+            cargo.args(["--features", "selftest"]);
         }
-        run(&mut build)?;
+        run(&mut cargo)?;
         target.join(PROGRAM)
     };
-    let variant = if selftest {
-        Some("Selftest")
-    } else {
-        (!release).then_some("Debug")
-    };
-    let updates = match (distribution, selftest) {
-        (true, _) => Updates::Published,
-        (false, true) => Updates::Selftest,
-        (false, false) => Updates::Off,
-    };
+    let variant = build.variant();
+    let updates = build.updates();
     let app = target.join(match variant {
         Some(variant) => format!("{APP} {variant}.app"),
         None => format!("{APP}.app"),
@@ -313,7 +349,13 @@ pub(crate) fn check_library() -> Result<(), String> {
         "--package",
         "splat-file-state",
         "--package",
+        "splat-git",
+        "--package",
         "splat-markdown",
+        "--package",
+        "splat-notes",
+        "--package",
+        "splat-import",
         "--package",
         "splat-preview",
         "--target",

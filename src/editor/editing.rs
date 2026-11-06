@@ -14,6 +14,7 @@ use objc2_foundation::{NSArray, NSString, NSValue};
 use super::actions::{self, Action, Applies, code_language, diagram_template};
 use super::atom::atom_at_preview;
 use super::layers::ForEditing;
+use super::sidebar::SidebarTab;
 use super::state::PreviewMode;
 use super::sync::utf16_diff;
 use super::views::{offers_text, pasteboard_urls};
@@ -21,11 +22,14 @@ use super::{Invalidate, State, tag_of};
 use crate::i18n::{t, tf};
 use crate::markdown::commands::{self, Active, Edit, InlineStyle, ListStyle, Pending, Toggle};
 use crate::markdown::doc::{AlertKind, Align, Doc};
+use crate::markdown::front_matter;
 use crate::markdown::table::{self, TableOp};
-use crate::markdown::text::{Byte, Direction, Shown, TextAt, U16, units, utf16_len};
+use crate::markdown::text::{Byte, Direction, TextAt, U16, units, utf16_len};
 use crate::preview::bridge::Bridge;
 use crate::preview::layout::Layout;
+use crate::preview::map::Shown;
 use crate::util::{answer_from, constant, contained, ns, perform_later, shown_from_ns, to_nsrange};
+use splat_import::{Converted, ImageSource, Pasted, paste_as_markdown};
 
 /// How long a paste waits for the picture to reach the document's folder, which may lie on a volume that hangs.
 const PASTE_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
@@ -131,6 +135,7 @@ impl Editing<'_> {
                 selection.mark_source_selection_in_preview();
             }
         }
+        self.host.word_counter().selection_changed();
     }
 
     pub(super) fn do_command(&self, view: &NSTextView, command: Sel) -> bool {
@@ -262,6 +267,19 @@ impl Editing<'_> {
                 self.host.atom_editor().mode_changed(segment);
             }
             ToolbarSegment => super::toolbar::segment_clicked(self.host.object(), sender),
+            PasteMarkdown => self.paste_as_markdown(&NSPasteboard::generalPasteboard()),
+            EditMetadata => self.edit_metadata(),
+            ExportOptions => self.host.sharing().ask_for_options(),
+            ToggleFiles => self.host.toggle_files(),
+            SearchFolder => self.host.search_notes(),
+            ToggleWordCount => {
+                super::counter::set_on(!super::counter::is_on());
+                super::setting_changed_everywhere();
+            }
+            ToggleChanges => {
+                super::changes::set_on(!super::changes::is_on());
+                super::setting_changed_everywhere();
+            }
         }
     }
 
@@ -446,8 +464,25 @@ impl Editing<'_> {
                 t("Gliederung einblenden")
             }));
         }
+        if action == Action::ToggleFiles
+            && let Some(i) = item
+        {
+            i.setTitle(&ns(if self.host.panes().tab_visible(SidebarTab::Files) {
+                t("Dateien ausblenden")
+            } else {
+                t("Dateien einblenden")
+            }));
+        }
+        if action == Action::ToggleWordCount
+            && let Some(i) = item
+        {
+            i.setTitle(&ns(super::counter::menu_title()));
+        }
         if action == Action::Typography {
             set_state(super::env::typography_on());
+        }
+        if action == Action::ToggleChanges {
+            set_state(super::changes::is_on());
         }
         let applies = action.spec().applies;
         match applies {
@@ -692,6 +727,7 @@ impl Editing<'_> {
             menu.insertItem_atIndex(&item, crate::util::to_isize(position));
             position += 1;
         };
+        insert(actions::context_item(mtm, Action::PasteMarkdown));
         insert(NSMenuItem::separatorItem(mtm));
         for action in [
             Action::Bold,
@@ -859,6 +895,97 @@ impl Editing<'_> {
         self.apply_edit(edit, Some(t("Bild einfügen")), false);
     }
 
+    /// Formatted text on the pasteboard becomes Markdown at the selection, as one undo step. ⌘V goes on inserting plain text.
+    pub(super) fn paste_as_markdown(&self, pasteboard: &NSPasteboard) {
+        let read = |kind: &objc2_app_kit::NSPasteboardType| pasteboard.dataForType(kind).map(|d| d.to_vec());
+        let html =
+            read(constant!(objc2_app_kit::NSPasteboardTypeHTML)).map(|d| String::from_utf8_lossy(&d).into_owned());
+        let rtf = read(constant!(objc2_app_kit::NSPasteboardTypeRTF));
+        let plain = pasteboard
+            .stringForType(constant!(objc2_app_kit::NSPasteboardTypeString))
+            .map(|s| s.to_string());
+        let pasted = Pasted {
+            html: html.as_deref(),
+            rtf: rtf.as_deref(),
+            plain: plain.as_deref(),
+        };
+        let dir = self.host.doc_dir();
+        let needs_a_folder = std::cell::Cell::new(false);
+        let converted = contained(|| {
+            paste_as_markdown(&pasted, &mut |image| match image {
+                ImageSource::Address(address) => Some((*address).to_string()),
+                ImageSource::Data { mime, bytes } => match &dir {
+                    Some(dir) => write_pasted_picture(dir, mime, bytes),
+                    None => {
+                        needs_a_folder.set(true);
+                        None
+                    }
+                },
+            })
+        });
+        let Some(Some(converted)) = converted else {
+            NSBeep();
+            return;
+        };
+        if needs_a_folder.get() {
+            self.ask_to_save_before_pasting();
+            return;
+        }
+        let Converted { markdown, blocks } = converted;
+        self.command(t("Als Markdown einsetzen"), move |d, sel| {
+            Some(if blocks {
+                commands::insert_block(d.text(), sel, &markdown, markdown.len())
+            } else {
+                let end = sel.start + markdown.len();
+                Edit {
+                    range: sel,
+                    replacement: markdown.clone(),
+                    selection: end..end,
+                }
+            })
+        });
+    }
+
+    /// The form for the metadata; what it comes to is one undo step, which leaves the lines of unchanged fields alone.
+    fn edit_metadata(&self) {
+        let Some(window) = self.host.window() else { return };
+        self.host.updater().update_now();
+        let fields: Vec<(String, front_matter::Value)> = self.host.model().read(|st| {
+            contained(|| front_matter::read(st.doc()))
+                .flatten()
+                .map(|found| found.fields.into_iter().map(|field| (field.key, field.value)).collect())
+                .unwrap_or_default()
+        });
+        let this = self.host.object().retain();
+        super::metadata::show(&window, &fields, move |wanted| {
+            this.metadata_chosen(wanted);
+        });
+    }
+
+    pub(super) fn metadata_chosen(&self, wanted: Vec<(String, front_matter::Value)>) {
+        self.command(t("Metadaten bearbeiten"), move |d, sel| {
+            front_matter::edit(d, &wanted, &sel)
+        });
+    }
+
+    /// Changes the text by the replacements of a rename, if it is still the text they were computed from.
+    pub(super) fn replace_in_text(&self, before: &str, replacements: &[splat_notes::Replacement]) -> bool {
+        let before = before.to_string();
+        let edit = self.host.on_source_text(move |text| {
+            if text != before {
+                return None;
+            }
+            super::notes::single_edit(text, replacements)
+        });
+        match edit {
+            Some(edit) => {
+                self.apply_edit(edit, Some(t("Verweise anpassen")), false);
+                true
+            }
+            None => false,
+        }
+    }
+
     fn ask_to_save_before_pasting(&self) {
         let Some(window) = self.host.window() else { return };
         let alert = objc2_app_kit::NSAlert::new(self.host.mtm());
@@ -931,6 +1058,32 @@ enum PreviewCommand {
     Edit(Edit, &'static str),
     /// Whether the view is spared its own handling.
     Handled(bool),
+}
+
+/// Writes a picture from pasted HTML next to the document, under a name no file has, and says how Markdown names it.
+fn write_pasted_picture(dir: &Path, mime: &str, bytes: &[u8]) -> Option<String> {
+    let extension = match mime {
+        "image/png" => "png",
+        "image/jpeg" => "jpeg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => return None,
+    };
+    let stem = format!("{} {}", t("Bild"), crate::util::now("yyyy-MM-dd HH.mm.ss"));
+    let bytes = bytes.to_vec();
+    let folder = dir.to_path_buf();
+    let written = answer_from(dir, PASTE_WAIT, move || {
+        let mut path = folder.join(format!("{stem}.{extension}"));
+        for n in 2.. {
+            if !path.exists() {
+                break;
+            }
+            path = folder.join(format!("{stem} {n}.{extension}"));
+        }
+        std::fs::write(&path, &bytes).ok().map(|()| path)
+    })
+    .flatten()?;
+    Some(super::links::relative_path(Some(dir), &written))
 }
 
 /// `None` while the preview has not caught up with the document, or shows a notice instead of it.

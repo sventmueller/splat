@@ -1,30 +1,35 @@
 //! What needs the app but no visible window: rendering, remote images, exports, the sharing menu and what injected
 //! content can do in the formula editor. Every result is a check, so a broken one fails the run.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::Bool;
-use objc2::{MainThreadMarker, MainThreadOnly};
+use objc2::{AnyThread, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSAttachmentAttributeName, NSBitmapImageFileType, NSBitmapImageRep, NSDocument,
-    NSDocumentChangeType, NSDocumentController, NSPasteboard, NSPasteboardTypePNG, NSTextAttachment,
+    NSDocumentChangeType, NSDocumentController, NSImage, NSPasteboard, NSPasteboardTypePNG, NSTextAttachment,
 };
 use objc2_foundation::{NSData, NSDictionary, NSError, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL};
 use objc2_web_kit::WKWebView;
 
 use super::super::EditorController;
 use super::super::decoder;
+use super::super::images::ImageStore;
 use super::super::js::{self, Key, PageAnswer};
 use super::super::mathfield::{self, MathField};
+use super::super::picture::{Rendered, Sizing};
+use super::super::render::{Drawn, RenderCtx};
 use super::super::safe_image::Decoded;
 use super::super::webkit;
 use super::mock_web::{HOST, requests_of};
 use super::{after, check, finish, guarded, once};
 use crate::document::MdDocument;
 use crate::markdown::doc::DiagramKind;
+use crate::markdown::reader::parse;
+use crate::preview::layout::{Resolver, layout};
 use crate::util::{constant, ns};
 
 /// How long rendering, the reload and the downloads may take together.
@@ -61,7 +66,84 @@ struct Probe {
     field: std::rc::Rc<MathField>,
 }
 
+/// What the preview shows but does not make comes only from what rendering is given.
+fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
+    struct Given {
+        picture: Rendered,
+        asked_for_web: Cell<usize>,
+    }
+    impl Drawn for Given {
+        fn web_picture(&self, _: &str) -> Option<Rendered> {
+            self.asked_for_web.set(self.asked_for_web.get() + 1);
+            Some(self.picture.clone())
+        }
+        fn drawing(&self, _: &Key) -> Option<Rendered> {
+            Some(self.picture.clone())
+        }
+    }
+    struct Ready;
+    impl Resolver for Ready {
+        fn math_ready(&self, _: &str, _: bool) -> bool {
+            true
+        }
+        fn diagram_ready(&self, _: &str, _: DiagramKind) -> bool {
+            true
+        }
+    }
+    let size = NSSize::new(4.0, 4.0);
+    let given = Given {
+        picture: Rendered {
+            image: NSImage::initWithSize(NSImage::alloc(), size),
+            sizing: Sizing::Points { size, descent: 0.0 },
+        },
+        asked_for_web: Cell::new(0),
+    };
+    let shown = layout(&parse("$x$ ![a](https://example.com/a.png)\n"), &Ready, None);
+    let images = RefCell::new(ImageStore::default());
+    let pictures_given = |remote_images: bool| {
+        let ctx = RenderCtx {
+            mtm,
+            zoom: 1.0,
+            doc_dir: None,
+            images: &images,
+            max_image_width: 400.0,
+            dark: false,
+            controller: None,
+            remote_images,
+            leaves_the_mac: false,
+            macros: std::sync::Arc::from(""),
+            drawn: &given,
+        };
+        let text = ctx.render_block(&shown.blocks[0]);
+        let mut found = 0;
+        let mut at = 0;
+        while at < text.length() {
+            let mut range = NSRange::new(0, 0);
+            // SAFETY: `at` lies inside the text and `range` outlives the call.
+            let value = unsafe { text.attribute_atIndex_effectiveRange(NSAttachmentAttributeName, at, &mut range) };
+            if let Some(attachment) = value.and_then(|v| v.downcast::<NSTextAttachment>().ok())
+                && attachment
+                    .image()
+                    .is_some_and(|image| std::ptr::eq(&*image, &*given.picture.image))
+            {
+                found += 1;
+            }
+            at = (range.location + range.length).max(at + 1);
+        }
+        found
+    };
+    let without_web = pictures_given(false);
+    let asked_without = given.asked_for_web.get();
+    let with_web = pictures_given(true);
+    check(
+        "the preview shows formulas and web pictures from what it is given, and asks for web pictures only when allowed",
+        (without_web, asked_without, with_web, given.asked_for_web.get()) == (1, 0, 2, 1),
+        &format!("without web {without_web} pictures, {asked_without} asked; with web {with_web}"),
+    );
+}
+
 pub(super) fn run(mtm: MainThreadMarker) {
+    rendering_takes_what_it_is_given(mtm);
     let name = "a document without formulas or diagrams starts no web view";
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
     let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
@@ -493,7 +575,7 @@ fn exports(e: &EditorController) {
     let word = e
         .export_source()
         .beside(std::env::temp_dir())
-        .word()
+        .word("Probe")
         .expect("a small document");
     let listing = String::from_utf8_lossy(&word);
     check(
@@ -593,6 +675,20 @@ fn sharing(e: &EditorController, mtm: MainThreadMarker) {
         "the problem form names the version of Splat and of macOS",
         !form.contains("version=&") && !form.contains("macos=0."),
         &form,
+    );
+    let opened = |open: fn()| {
+        open();
+        crate::test_hooks::LAST_OPENED
+            .lock()
+            .map(|address| address.clone())
+            .unwrap_or_default()
+    };
+    check(
+        "the help menu's commands lead where they say",
+        opened(crate::feedback::report_problem) == form
+            && opened(crate::feedback::suggest_feature).ends_with("/discussions/new?category=ideas")
+            && opened(crate::feedback::show_repository).ends_with("/sventmueller/splat"),
+        "",
     );
 }
 
@@ -980,13 +1076,16 @@ fn a_page_that_stops_answering(mtm: MainThreadMarker) {
         );
         attack_the_renderer(mtm);
     };
-    super::poll_once(
-        "the renderer to give up on a page that stopped answering",
-        limit + super::UNTIL_TIMEOUT,
-        std::rc::Rc::new(answered),
-        std::rc::Rc::new(then),
-        started,
-    );
+    super::wait(0.0, limit + super::UNTIL_TIMEOUT, 1, answered, move |held| {
+        if !held {
+            check(
+                "the renderer to give up on a page that stopped answering",
+                false,
+                "waited for it",
+            );
+        }
+        then();
+    });
 }
 
 /// The renderer's page gets formulas and diagrams from the document, so whatever slips through its libraries runs here.

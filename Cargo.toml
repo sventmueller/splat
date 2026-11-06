@@ -45,8 +45,11 @@ workspace = true
 
 [dependencies]
 splat-file-state = { path = "crates/splat-file-state" }
+splat-git = { path = "crates/splat-git" }
 splat-i18n = { path = "crates/splat-i18n" }
+splat-import = { path = "crates/splat-import" }
 splat-markdown = { path = "crates/splat-markdown" }
+splat-notes = { path = "crates/splat-notes" }
 splat-preview = { path = "crates/splat-preview" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -77,3 +80,14 @@ debug-assertions = true
 [profile.release]
 lto = "thin"
 overflow-checks = true
+
+# Parsing and layout otherwise change by a fifth with how the compiler happens to split these crates, which an unrelated new
+# module can move; measured 228 and 146 ms against up to 295 and 155 ms at 10 MB.
+[profile.release.package.splat-markdown]
+codegen-units = 1
+
+[profile.release.package.splat-preview]
+codegen-units = 1
+
+[profile.release.package.comrak]
+codegen-units = 1

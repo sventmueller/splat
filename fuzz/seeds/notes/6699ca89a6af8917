@@ -1,0 +1,16 @@
+---
+block: |
+  text
+
+  # kept
+map:
+  a: 1
+  b: [c]
+flow: {d: e}
+anchor: &x y
+alias: *x
+multi: "a
+  b"
+open: [c,
+  d]
+---

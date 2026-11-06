@@ -11,23 +11,32 @@ use objc2_app_kit::{
     NSDeviceRGBColorSpace, NSGraphicsContext, NSImage, NSPrintInfo, NSPrintOperation, NSPrintingPaginationMode,
     NSSavePanel, NSSharingService,
 };
-use objc2_foundation::{NSArray, NSDictionary, NSError, NSMutableAttributedString, NSPoint, NSRect, NSSize, NSURL};
+use objc2_foundation::{
+    NSArray, NSDictionary, NSError, NSMutableAttributedString, NSNumber, NSPoint, NSRect, NSSize, NSURL,
+};
 use objc2_uniform_type_identifiers::UTType;
 
+use super::attributes::{Attribute, Attributes, attributed};
+use super::export_options::{ExportOptions, TitleFacts};
 use super::images::{native_only, resolve_path};
 use super::layers::ForSharing;
 use super::picture::Sizing;
-use super::render::RenderCtx;
+use super::render::{Live, RenderCtx};
 use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
 use super::{decoder, js, links, remote, views};
 use crate::i18n::t;
 use crate::markdown::doc::Figure;
-use crate::markdown::docx::{Picture, TooLarge, WordExport, to_docx};
+use crate::markdown::docx::{Picture, TitlePage, TooLarge, WordExport, to_docx};
 use crate::markdown::html::{Export, data_url, escape, to_html, web_image_type};
 use crate::markdown::reader::parse;
-use crate::preview::layout::layout;
+use crate::preview::layout::{ParaKind, layout};
 use crate::util::{constant, contained, ns, on_main, storage};
+
+/// Where a title stands on its page, from the top of the page.
+const TITLE_HEIGHT: f64 = 0.28;
+/// A template larger than this holds more than a look.
+const MAX_TEMPLATE_BYTES: u64 = 256 << 20;
 
 /// Paper shows the preview the way browsers print a page: a screen point, and so an image pixel, becomes 0.75 pt.
 const PRINT_SCALE: f64 = 0.75;
@@ -121,6 +130,7 @@ impl Sharing<'_> {
         let Some(print_layout) = print_layout else {
             return NSMutableAttributedString::from_nsstring(&ns(&self.host.source_text()));
         };
+        let live = Live { requester: None };
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
             zoom: PRINT_SCALE,
@@ -132,9 +142,17 @@ impl Sharing<'_> {
             remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: true,
             macros,
+            drawn: &live,
         };
         let out = NSMutableAttributedString::new();
-        for block in &print_layout.blocks {
+        // The summary of the metadata is there to open its form, and neither the HTML nor the Word export has it.
+        let on_paper = print_layout.blocks.iter().filter(|block| {
+            !block
+                .paras
+                .iter()
+                .all(|para| matches!(para.style.kind, ParaKind::FrontMatter))
+        });
+        for block in on_paper {
             out.appendAttributedString(&ctx.render_block(block));
         }
         out
@@ -188,6 +206,14 @@ impl Sharing<'_> {
             doc_dir: self.host.doc_dir(),
             macros: self.host.model().read(|st| st.macros()),
             remote: self.host.pictures().remote_allowed(),
+            options: ExportOptions::load(),
+        }
+    }
+
+    /// The sheet for what exports add to the text; it holds for all documents from then on.
+    pub(super) fn ask_for_options(&self) {
+        if let Some(window) = self.host.window() {
+            super::dialogs::export_options(&window, ExportOptions::load(), |options| options.save());
         }
     }
 
@@ -288,9 +314,50 @@ impl Sharing<'_> {
             view.setAppearance(Some(&aqua));
         }
         let out = self.printable(width);
-        storage(&view).setAttributedString(&out);
+        let options = ExportOptions::load();
+        let name = self.document_name();
+        let facts = self
+            .host
+            .model()
+            .read(|st| contained(|| TitleFacts::of(st.doc(), &name)).unwrap_or_default());
+        let title_length = options.title_page.then(|| {
+            let page = title_page_text(&facts, info.paperSize().height);
+            let length = page.length();
+            page.appendAttributedString(&out);
+            storage(&view).setAttributedString(&page);
+            length
+        });
+        if title_length.is_none() {
+            storage(&view).setAttributedString(&out);
+        }
         views::fit_height(&view);
+        let title_end = title_length.map(|length| views::line_bottom(&view, length.saturating_sub(1)));
+        let key = constant!(objc2_app_kit::NSPrintHeaderAndFooter);
+        // SAFETY: The key belongs to NSPrintInfo's dictionary and takes a number holding a boolean.
+        unsafe {
+            info.dictionary().setObject_forKey(
+                &*crate::util::obj(NSNumber::new_bool(options.decorates_pages())),
+                objc2::runtime::ProtocolObject::from_ref(key),
+            );
+        }
+        view.set_pages(views::PageLook {
+            options,
+            facts,
+            title_end,
+        });
         NSPrintOperation::printOperationWithView_printInfo(&view, info)
+    }
+
+    /// The name the document shows, without its extension.
+    fn document_name(&self) -> String {
+        let name = self
+            .host
+            .document()
+            .map(|doc| doc.displayName().to_string())
+            .unwrap_or_default();
+        name.rsplit_once('.')
+            .map_or(name.as_str(), |(stem, _)| stem)
+            .to_string()
     }
 }
 
@@ -300,6 +367,8 @@ pub(super) enum ExportFailure {
     /// A bug in making the export, which the panic hook has reported.
     NotConverted,
     TooLargeForWord,
+    TemplateNotRead,
+    TemplateNotUsable,
     NotWritten(std::io::Error),
 }
 
@@ -308,6 +377,8 @@ impl ExportFailure {
         match self {
             ExportFailure::NotConverted => t("Das Dokument ließ sich nicht umwandeln.").to_string(),
             ExportFailure::TooLargeForWord => t("Das Dokument ist zu groß für eine Word-Datei.").to_string(),
+            ExportFailure::TemplateNotRead => t("Die Word-Vorlage ließ sich nicht lesen.").to_string(),
+            ExportFailure::TemplateNotUsable => t("Die Word-Vorlage ist kein gültiges Word-Dokument.").to_string(),
             ExportFailure::NotWritten(error) => described(error),
         }
     }
@@ -319,6 +390,7 @@ pub(super) struct ExportSource {
     doc_dir: Option<PathBuf>,
     remote: bool,
     macros: Arc<str>,
+    options: ExportOptions,
 }
 
 impl ExportSource {
@@ -335,9 +407,7 @@ impl ExportSource {
             ExportKind::Html => contained(|| self.html(title, path))
                 .ok_or(ExportFailure::NotConverted)?
                 .into_bytes(),
-            ExportKind::Word => contained(|| self.word())
-                .ok_or(ExportFailure::NotConverted)?
-                .map_err(|TooLarge| ExportFailure::TooLargeForWord)?,
+            ExportKind::Word => contained(|| self.word_file(title)).ok_or(ExportFailure::NotConverted)??,
         };
         std::fs::write(path, data).map_err(ExportFailure::NotWritten)
     }
@@ -365,7 +435,21 @@ impl ExportSource {
         )
     }
 
-    pub(super) fn word(&self) -> Result<Vec<u8>, TooLarge> {
+    /// The Word file with the options applied, in the look of the template if one is set.
+    pub(super) fn word_file(&self, title: &str) -> Result<Vec<u8>, ExportFailure> {
+        let generated = self.word(title).map_err(|TooLarge| ExportFailure::TooLargeForWord)?;
+        let Some(template) = &self.options.word_template else {
+            return Ok(generated);
+        };
+        let template =
+            crate::util::read_regular_file(template, MAX_TEMPLATE_BYTES).ok_or(ExportFailure::TemplateNotRead)?;
+        splat_import::template::apply_template(&generated, &template).map_err(|error| match error {
+            splat_import::template::TemplateError::TooLarge => ExportFailure::TooLargeForWord,
+            _ => ExportFailure::TemplateNotUsable,
+        })
+    }
+
+    pub(super) fn word(&self, title: &str) -> Result<Vec<u8>, TooLarge> {
         let doc_dir = self.doc_dir.as_deref();
         let figure = |f: &Figure| {
             on_main(|| {
@@ -398,9 +482,20 @@ impl ExportSource {
         let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
+        let doc = parse(&self.text);
+        let page = self.options.title_page.then(|| {
+            let facts = TitleFacts::of(&doc, title);
+            TitlePage {
+                title: facts.title,
+                subtitle: facts.subtitle,
+                author: facts.author,
+                date: facts.date,
+            }
+        });
         to_docx(
-            &parse(&self.text),
+            &doc,
             &WordExport {
+                title: page.as_ref(),
                 figure: &figure,
                 image: &image,
                 quotes: env.quotes,
@@ -409,6 +504,41 @@ impl ExportSource {
             },
         )
     }
+}
+
+/// The title page for paper of `height` points, which ends with the first page: what follows starts the next one.
+fn title_page_text(facts: &TitleFacts, height: f64) -> Retained<NSMutableAttributedString> {
+    let page = NSMutableAttributedString::new();
+    let centered = |top: f64| {
+        let style = objc2_app_kit::NSMutableParagraphStyle::new();
+        style.setAlignment(objc2_app_kit::NSTextAlignment::Center);
+        style.setParagraphSpacingBefore(top);
+        style.setParagraphSpacing(8.0);
+        style
+    };
+    let line = |text: &str, size: f64, bold: bool, top: f64| {
+        let font = if bold {
+            objc2_app_kit::NSFont::boldSystemFontOfSize(size)
+        } else {
+            objc2_app_kit::NSFont::systemFontOfSize(size)
+        };
+        let attributes = Attributes::new(&[Attribute::font(&font), Attribute::paragraph(&centered(top))]);
+        attributed(&format!("{text}\n"), Some(&attributes))
+    };
+    // A first paragraph's spacing before counts for nothing at the top of a page, so an empty line holds the title down.
+    let spacer = objc2_app_kit::NSMutableParagraphStyle::new();
+    spacer.setMinimumLineHeight(height * TITLE_HEIGHT);
+    page.appendAttributedString(&attributed(
+        "\n",
+        Some(&Attributes::new(&[Attribute::paragraph(&spacer)])),
+    ));
+    page.appendAttributedString(&line(&facts.title, 28.0, true, 0.0));
+    for (text, size) in [(&facts.subtitle, 16.0), (&facts.author, 13.0), (&facts.date, 12.0)] {
+        if !text.is_empty() {
+            page.appendAttributedString(&line(text, size, false, 6.0));
+        }
+    }
+    page
 }
 
 /// The system's wording of a failure, in the language of the app.

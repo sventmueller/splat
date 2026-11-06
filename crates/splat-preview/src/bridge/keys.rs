@@ -3,8 +3,8 @@
 
 use std::ops::Range;
 
+use crate::Shown;
 use crate::layout::{Atom, Marker, ParaKind, RunMap};
-use crate::map::Shown;
 use splat_markdown::commands::{Edit, LinePrefix, leaf_at, line_span};
 use splat_markdown::doc::{BlockKind, Inline, InlineKind, ListKind, block_path, inline_path, walk_inlines};
 use splat_markdown::table;
@@ -23,7 +23,7 @@ impl Bridge<'_> {
                 ParaKind::Rule | ParaKind::MathBlock | ParaKind::Diagram | ParaKind::FrontMatter
             )
         {
-            let block = block_path(&self.doc.blocks, at).into_iter().last()?;
+            let block = block_path(self.doc.blocks(), at).into_iter().last()?;
             return Some(compose(self.text, &[], block.range.end, "\n\n"));
         }
         if let ParaKind::TableCell { .. } = point.para_kind {
@@ -33,7 +33,7 @@ impl Bridge<'_> {
         if let ParaKind::Code { .. } = point.para_kind {
             return Some(compose(self.text, &[], at, &format!("\n{prefix}")));
         }
-        let path = block_path(&self.doc.blocks, at);
+        let path = block_path(self.doc.blocks(), at);
         let para_empty = self.para_is_empty(p);
         if let Some(item) = path.iter().rev().find(|b| matches!(b.kind, BlockKind::Item { .. })) {
             let BlockKind::Item { marker, task } = &item.kind else {
@@ -172,7 +172,7 @@ impl Bridge<'_> {
         if let ParaKind::TableCell { .. } = point.para_kind {
             return table::navigate(self.doc, point.src, way);
         }
-        let path = block_path(&self.doc.blocks, point.src);
+        let path = block_path(self.doc.blocks(), point.src);
         let item_pos = path.iter().rposition(|b| matches!(b.kind, BlockKind::Item { .. }))?;
         let BlockKind::Item { marker, .. } = &path[item_pos].kind else {
             return None;
@@ -310,7 +310,7 @@ impl Bridge<'_> {
             });
         }
         if para.style.marker.is_some() {
-            let path = block_path(&self.doc.blocks, point.src);
+            let path = block_path(self.doc.blocks(), point.src);
             if let Some(BlockKind::Item { marker, task }) = path
                 .iter()
                 .rev()

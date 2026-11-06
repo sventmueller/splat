@@ -8,7 +8,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::markdown::text::{Byte, Shown, TextAt, U16, byte_at_u16, byte_at_u16_exact, offsets, units, utf16_len};
+use crate::markdown::text::{Byte, TextAt, U16, byte_at_u16, byte_at_u16_exact, offsets, units, utf16_len};
+use crate::preview::map::Shown;
 
 /// The source text as the source view holds it.
 #[derive(Clone)]

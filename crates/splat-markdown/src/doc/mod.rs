@@ -1,3 +1,6 @@
+//! The tree a Markdown text is read into: blocks and inlines with their source ranges in bytes, and the document that
+//! holds them with its text.
+
 use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::Arc;
@@ -18,23 +21,37 @@ pub use figures::{
 };
 pub use shift::{Splice, shift_block};
 
+/// How the items of a list are marked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListKind {
+    /// Items marked with `-`, `*` or `+`, the character the first item uses.
     Bullet(char),
-    Ordered { start: usize, delim: char },
+    /// Numbered items, `1.` or `1)`.
+    Ordered {
+        /// The number of the first item.
+        start: usize,
+        /// The `.` or `)` behind each number.
+        delim: char,
+    },
 }
 
 /// GitHub alert types, written `> [!NOTE]` and so on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AlertKind {
+    /// `> [!NOTE]`, and Obsidian callouts of a type GitHub has no alert for.
     Note,
+    /// `> [!TIP]`, and Obsidian's `hint`, `success`, `check` and `done`.
     Tip,
+    /// `> [!IMPORTANT]`, and Obsidian's `question`, `help` and `faq`.
     Important,
+    /// `> [!WARNING]`, and Obsidian's `attention`.
     Warning,
+    /// `> [!CAUTION]`, and Obsidian's `danger`, `error`, `bug`, `failure` and the like.
     Caution,
 }
 
 impl AlertKind {
+    /// Every kind, in the order GitHub lists them.
     pub const ALL: [AlertKind; 5] = [
         AlertKind::Note,
         AlertKind::Tip,
@@ -43,6 +60,7 @@ impl AlertKind {
         AlertKind::Caution,
     ];
 
+    /// The word between `[!` and `]` that writes this kind.
     pub fn keyword(self) -> &'static str {
         match self {
             AlertKind::Note => "NOTE",
@@ -53,6 +71,7 @@ impl AlertKind {
         }
     }
 
+    /// The title the alert shows when it has none of its own, as the German key of the interface texts.
     pub fn label(self) -> &'static str {
         match self {
             AlertKind::Note => n("Hinweis"),
@@ -67,13 +86,16 @@ impl AlertKind {
 /// An Obsidian callout written `> [!note]-` starts folded, `+` open; a click on its title flips the sign.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Fold {
+    /// Whether the body shows, `+`, rather than the title alone, `-`.
     pub open: bool,
     /// Where the `-` or `+` stands.
     pub sign: Byte,
 }
 
+/// The checkbox of a task list item, `- [ ]` or `- [x]`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
+    /// Whether the box is ticked, `[x]`.
     pub checked: bool,
     /// Where the character between the brackets stands.
     pub symbol: Byte,
@@ -85,8 +107,11 @@ pub enum Align {
     /// As the direction of the text has it.
     #[default]
     None,
+    /// Against the left edge, `:---` in a table's delimiter row.
     Left,
+    /// In the middle, `:---:` in a table's delimiter row.
     Center,
+    /// Against the right edge, `---:` in a table's delimiter row.
     Right,
 }
 
@@ -102,101 +127,164 @@ impl Align {
     }
 }
 
+/// What a block is, with what its source says beyond the text it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockKind {
+    /// Running text, ended by a blank line or the start of another block.
     Paragraph,
+    /// A heading, `# Title`, or a title underlined with `=` or `-`.
     Heading {
+        /// 1 to 6: the number of `#`, or 1 under `=` and 2 under `-`.
         level: u8,
+        /// Whether it is underlined rather than opened with `#`.
         setext: bool,
         /// Anchor given as `{#id}` after the title.
         id: Option<Box<str>>,
         /// The `{…}` attribute list after the title, which the preview leaves out.
         attrs: Option<Range<Byte>>,
     },
+    /// Lines opened with `>` that make no alert or callout.
     BlockQuote,
     /// A GitHub alert or an Obsidian callout.
     Alert {
+        /// Which of the five alert kinds it shows as; an Obsidian callout's type maps onto one.
         kind: AlertKind,
+        /// The title shown instead of the kind's label: one written behind the marker, or the type of an Obsidian
+        /// callout that GitHub has no alert for.
         title: Option<Box<str>>,
         /// `[!NOTE]` and an optional custom title on the first line.
         marker: Range<Byte>,
+        /// The `-` or `+` behind an Obsidian callout's marker; `None` for one that cannot fold.
         fold: Option<Fold>,
     },
+    /// A bullet or ordered list, holding its items.
     List {
+        /// How its items are marked.
         kind: ListKind,
+        /// Whether no blank line parts its items, which then show without the spacing of paragraphs.
         tight: bool,
     },
+    /// An item of a list, holding its blocks.
     Item {
+        /// The checkbox of a task list item.
         task: Option<Task>,
+        /// Where the bullet, or the number with its `.` or `)`, stands.
         marker: Range<Byte>,
     },
+    /// Code indented by four spaces or between fences of three backticks or tildes.
     CodeBlock {
+        /// The info string behind the opening fence, such as `rust`; empty for indented code.
         info: Box<str>,
+        /// The code without its fences and without the indentation of the block.
         literal: Box<str>,
+        /// Whether it stands between fences rather than being indented.
         fenced: bool,
+        /// Where the code stands in the source: between the fence lines, or all of an indented block.
         content: Range<Byte>,
     },
+    /// Raw HTML at the start of a line, such as a `<div>` or `<details>`, up to its end.
     HtmlBlock {
+        /// The HTML as it stands in the source.
         literal: Box<str>,
     },
+    /// A horizontal rule, `---`, `***` or `___`.
     ThematicBreak,
+    /// A GitHub table, holding its rows.
     Table {
+        /// The alignment of each column, from the colons in the delimiter row.
         alignments: Box<[Align]>,
     },
+    /// A row of a table, holding its cells.
     TableRow {
+        /// Whether it is the header row above the delimiter row.
         header: bool,
     },
+    /// A cell of a table row, holding running text.
     TableCell,
+    /// The text a footnote reference points to: `[^label]: text`, or the note of an inline `^[note]`.
     FootnoteDefinition {
+        /// The label between `[^` and `]`, or comrak's `__inline_` name for an inline note.
         name: Box<str>,
+        /// Where `[^label]:` stands; empty, at the reference, for an inline note.
         label: Range<Byte>,
         /// The number an inline `^[note]` shows, which has no name of its own.
         number: Option<u32>,
     },
+    /// A display formula, `$$…$$` or `\[…\]`, that fills a paragraph on its own.
     MathBlock {
+        /// The TeX without its delimiters.
         literal: Box<str>,
     },
     /// YAML metadata between `---` lines at the very start, as static site generators and Obsidian use it.
     FrontMatter {
+        /// The lines between the two `---` delimiters.
         content: Range<Byte>,
     },
     /// Terms followed by `: details` paragraphs, as Pandoc and PHP Markdown Extra write them.
     DefinitionList,
+    /// A term with its details, inside a definition list.
     DefinitionItem,
+    /// The term an item explains, the line before the `:`.
     DefinitionTerm,
+    /// What follows the `: ` and explains the term.
     DefinitionDetails,
     /// Lines between `%%` marks, Obsidian's notes to self, which the preview leaves out.
     Comment,
 }
 
+/// What an inline is, with what its source says beyond the inlines it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InlineKind {
+    /// Running text as it reads, with backslash escapes and character references resolved.
     Text(Box<str>),
+    /// A line ending inside running text, which reads as a space.
     SoftBreak,
+    /// A hard line break: two spaces or a backslash at the end of a line, or `<br>`.
     LineBreak,
+    /// A code span between backticks, with the text comrak reads in it.
     Code(Box<str>),
+    /// Inline HTML that no other kind stands for, as written.
     Html(Box<str>),
+    /// `*emphasis*` or `_emphasis_`, or `<em>`, `<i>` and the like.
     Emph,
+    /// `**strong**` or `__strong__`, or `<strong>` and `<b>`.
     Strong,
+    /// `~~struck~~` text, or `<del>`, `<s>` and `<strike>`.
     Strikethrough,
+    /// `<u>` or `<ins>`, for which Markdown has no syntax.
     Underline,
+    /// `==marked==` text, or `<mark>`.
     Highlight,
+    /// `^raised^` text, or `<sup>`.
     Superscript,
+    /// `~lowered~` text, or `<sub>`.
     Subscript,
+    /// A link, `[text](url)`, a reference link, an autolink or `<a href>`, with its text as children.
     Link {
+        /// Where it leads, with escapes and link references resolved.
         url: Box<str>,
+        /// The title in quotes behind the address; empty without one.
         title: Box<str>,
     },
+    /// A picture, `![alt](url)`, with its alternative text as children.
     Image {
+        /// Where the picture is, with escapes and link references resolved.
         url: Box<str>,
+        /// The title in quotes behind the address; empty without one.
         title: Box<str>,
     },
+    /// A footnote reference, `[^label]`, or an inline note, `^[note]`.
     FootnoteRef {
+        /// The label of the footnote it points to, or comrak's `__inline_` name for an inline note.
         name: Box<str>,
+        /// The number it shows, which comrak gives each footnote in the order of its first reference.
         ix: u32,
     },
+    /// A formula: `$…$`, `$$…$$`, `` $`…`$ ``, `\(…\)` or `\[…\]`.
     Math {
+        /// Whether it is display math, `$$…$$` or `\[…\]`, set apart from the line.
         display: bool,
+        /// The TeX without its delimiters.
         literal: Box<str>,
     },
     /// A `:shortcode:` and the emoji it stands for.
@@ -205,7 +293,9 @@ pub enum InlineKind {
     Spoiler,
     /// `[[Note]]`, `[[Note|Title]]` or, embedding the target, `![[picture.png]]`.
     WikiLink {
+        /// The note or file it names, without a title behind `|`.
         target: Box<str>,
+        /// Whether it is written `![[…]]` and shows its target in place.
         embed: bool,
     },
     /// `%%text%%` or `<!-- text -->`, left out of the preview.
@@ -216,17 +306,25 @@ pub enum InlineKind {
     Span,
     /// `<img>` written as HTML, with the size it asks for.
     HtmlImage {
+        /// The `src` attribute, kept only when its scheme is harmless.
         url: Box<str>,
+        /// The `alt` attribute; empty without one.
         alt: Box<str>,
+        /// The `width` attribute in pixels; `None` without one or for a percentage.
         width: Option<u32>,
+        /// The `height` attribute in pixels; `None` without one or for a percentage.
         height: Option<u32>,
     },
 }
 
+/// A piece of running text in the tree, with where it stands and the inlines it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Inline {
+    /// The construct it is and what the source says about it.
     pub kind: InlineKind,
+    /// Where it stands in the source, its delimiters included.
     pub range: Range<Byte>,
+    /// The inlines inside it, for a kind that holds some; empty for any other.
     pub children: Box<[Inline]>,
 }
 
@@ -291,27 +389,43 @@ impl InlineKind {
 /// and `style::html_element` say about them is all that a new look needs.
 #[derive(Debug)]
 pub enum Piece<'a> {
+    /// Running text as it reads.
     Text(&'a str),
+    /// The text of a code span.
     Code(&'a str),
+    /// A line ending that reads as a space.
     SoftBreak,
+    /// A hard line break.
     LineBreak,
+    /// Raw inline HTML, as written.
     Html(&'a str),
+    /// The emoji a `:shortcode:` stands for.
     Emoji(&'a str),
     /// Its children, looking different.
     Styled,
+    /// A link, with its text as children.
     Link {
+        /// Where it leads.
         url: &'a str,
+        /// The title in quotes behind the address; empty without one.
         title: &'a str,
     },
     /// `[[Note]]` with its title as children.
     WikiPage(&'a str),
+    /// A picture, from `![alt](url)`, `<img>` or an embedded `![[picture.png]]`.
     Picture(Picture<'a>),
+    /// A footnote reference.
     FootnoteRef {
+        /// The label of the footnote it points to.
         name: &'a str,
+        /// The number it shows.
         ix: u32,
     },
+    /// A formula.
     Math {
+        /// The TeX without its delimiters.
         literal: &'a str,
+        /// Whether it is display math, set apart from the line.
         display: bool,
     },
     /// Nothing anyone sees.
@@ -321,10 +435,15 @@ pub enum Piece<'a> {
 /// A picture, however the document spells it.
 #[derive(Debug)]
 pub struct Picture<'a> {
+    /// Where the picture is, as written; the file name for an embedded `![[picture.png]]`.
     pub url: &'a str,
+    /// The alternative text: the text of `![alt]`, the `alt` attribute, or the file name of an embed.
     pub alt: Cow<'a, str>,
+    /// The title in quotes behind the address; empty for `<img>` and embeds.
     pub title: &'a str,
+    /// The width an `<img>` asks for, in pixels.
     pub width: Option<u32>,
+    /// The height an `<img>` asks for, in pixels.
     pub height: Option<u32>,
 }
 
@@ -332,7 +451,9 @@ pub struct Picture<'a> {
 /// blocks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
+    /// The construct it is and what the source says about it.
     pub kind: BlockKind,
+    /// Where it stands in the source, from its first character to its last, the final line ending left out.
     pub range: Range<Byte>,
     content: Content,
 }
@@ -347,7 +468,8 @@ enum Content {
 /// A text and what it was parsed into. A text that stays plain or could not be parsed has no blocks.
 #[derive(Debug, Default)]
 pub struct Doc {
-    pub blocks: Vec<Block>,
+    /// Changed only by the reader and the partial parse, which keep it fitting `text`.
+    pub(crate) blocks: Vec<Block>,
     text: Arc<str>,
     version: u64,
     too_large: bool,
@@ -360,6 +482,7 @@ fn next_version() -> u64 {
 }
 
 impl Doc {
+    /// The tree `blocks` read from `text`, with a version no other parse has.
     pub fn new(text: Arc<str>, blocks: Vec<Block>) -> Doc {
         Doc {
             blocks,
@@ -383,8 +506,14 @@ impl Doc {
         self.too_large
     }
 
+    /// The source text the blocks were read from.
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    /// The top-level blocks, in the order of the text.
+    pub fn blocks(&self) -> &[Block] {
+        &self.blocks
     }
 
     /// The text for what outlives this tree, without a copy.
@@ -446,6 +575,7 @@ impl Inline {
         self.range.start + opening..self.range.end - closing
     }
 
+    /// Whether other inlines stand inside it.
     pub fn is_container(&self) -> bool {
         self.kind.holds_inlines()
     }
@@ -525,6 +655,7 @@ impl Inline {
 }
 
 impl Block {
+    /// A block of `kind` that holds the running text `inlines`.
     pub fn leaf(kind: BlockKind, range: Range<Byte>, inlines: impl Into<Box<[Inline]>>) -> Block {
         Block {
             kind,
@@ -543,6 +674,7 @@ impl Block {
         Block { kind, range, content }
     }
 
+    /// The running text it holds; empty for a block that holds blocks.
     pub fn inlines(&self) -> &[Inline] {
         match &self.content {
             Content::Inlines(inlines) => inlines,
@@ -550,6 +682,7 @@ impl Block {
         }
     }
 
+    /// The blocks it holds; empty for a leaf.
     pub fn children(&self) -> &[Block] {
         match &self.content {
             Content::Blocks(children) => children,
@@ -565,6 +698,7 @@ impl Block {
         }
     }
 
+    /// Whether it holds running text rather than blocks.
     pub fn is_leaf(&self) -> bool {
         !self.kind.holds_blocks()
     }
@@ -617,6 +751,7 @@ pub fn inline_path(inlines: &[Inline], offset: Byte) -> Vec<&Inline> {
     }
 }
 
+/// Visits every inline in source order, each before those inside it.
 pub fn walk_inlines<'a>(inlines: &'a [Inline], f: &mut impl FnMut(&'a Inline)) {
     for i in inlines {
         f(i);
@@ -624,6 +759,7 @@ pub fn walk_inlines<'a>(inlines: &'a [Inline], f: &mut impl FnMut(&'a Inline)) {
     }
 }
 
+/// Visits every block in source order, each before those inside it; inlines are not visited.
 pub fn walk_blocks<'a>(blocks: &'a [Block], f: &mut impl FnMut(&'a Block)) {
     for b in blocks {
         f(b);

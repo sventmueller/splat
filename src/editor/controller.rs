@@ -20,15 +20,19 @@ use objc2_foundation::{NSArray, NSCoder, NSNotification, NSObjectProtocol, NSRan
 
 use super::actions::Action;
 use super::atom::{self, AtomEditor};
+use super::changes::{self, ChangeMarks, ChangesAnswer};
+use super::counter::{self, WordCounter};
 use super::editing::{self, Editing};
 use super::export::{self, Sharing};
 use super::images::{self, ImageFile, Pictures};
 use super::model::Model;
 use super::navigation::Links;
-use super::panes::{self, Panes};
+use super::notes::{self, Inherited, NoteAnswer, Notes, RenameRequest};
+use super::panes::{self, Panes, Side};
 use super::progressive::Progressive;
 use super::scroll::{self, ScrollSync};
 use super::selection::{self, Selection};
+use super::sidebar::NoteEvent;
 use super::state::{Invalidate, State};
 use super::sync::Snapshot;
 use super::update::{self, Updater};
@@ -36,8 +40,8 @@ use super::{js, remote, string_of, style, toolbar};
 use crate::document::MdDocument;
 use crate::util::guarded;
 use layers::{
-    ForAtoms, ForEditing, ForLinks, ForPanes, ForPictures, ForProgressive, ForScroll, ForSelection, ForSharing,
-    ForUpdater,
+    ForAtoms, ForChanges, ForCounter, ForEditing, ForLinks, ForNotes, ForPanes, ForPictures, ForProgressive, ForScroll,
+    ForSelection, ForSharing, ForUpdater,
 };
 
 pub struct Ivars {
@@ -51,6 +55,9 @@ pub struct Ivars {
     scroll: scroll::ScrollState,
     edits: editing::EditState,
     sharing: export::ShareState,
+    counter: counter::CounterState,
+    changes: changes::ChangeState,
+    notes: notes::NotesState,
     /// The window has closed, while what is under way can still hold on to the controller for a moment.
     closed: std::cell::Cell<bool>,
 }
@@ -72,7 +79,11 @@ define_class!(
 
         #[unsafe(method(windowDidBecomeKey:))]
         fn window_did_become_key(&self, _notification: &NSNotification) {
-            guarded((), || self.selection().recolor_marks());
+            guarded((), || {
+                self.selection().recolor_marks();
+                self.notes().refresh();
+                self.change_marks().look();
+            });
         }
 
         #[unsafe(method(windowDidResignKey:))]
@@ -279,12 +290,29 @@ define_class!(
 
         #[unsafe(method(panesResized:))]
         fn panes_resized(&self, _notification: &NSNotification) {
-            guarded((), || self.updater().panes_resized());
+            guarded((), || {
+                self.updater().panes_resized();
+                self.word_counter().place();
+                self.change_marks().redraw();
+            });
         }
 
         #[unsafe(method(clipBoundsChanged:))]
         fn clip_bounds_changed(&self, notification: &NSNotification) {
-            guarded((), || self.scroll_sync().view_scrolled(notification));
+            guarded((), || {
+                self.scroll_sync().view_scrolled(notification);
+                self.change_marks().redraw();
+            });
+        }
+
+        #[unsafe(method(countWords))]
+        fn count_words(&self) {
+            guarded((), || self.word_counter().count_now());
+        }
+
+        #[unsafe(method(compareWithCommit))]
+        fn compare_with_commit(&self) {
+            guarded((), || self.change_marks().compare_now());
         }
 
         #[unsafe(method(undoDidChange:))]
@@ -406,6 +434,20 @@ define_class!(
         fn md_atom_mode(&self, s: Option<&AnyObject>) { self.editing().perform(Action::AtomMode, s) }
         #[unsafe(method(mdToolbarSegment:))]
         fn md_toolbar_segment(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToolbarSegment, s) }
+        #[unsafe(method(mdPasteMarkdown:))]
+        fn md_paste_markdown(&self, s: Option<&AnyObject>) { self.editing().perform(Action::PasteMarkdown, s) }
+        #[unsafe(method(mdEditMetadata:))]
+        fn md_edit_metadata(&self, s: Option<&AnyObject>) { self.editing().perform(Action::EditMetadata, s) }
+        #[unsafe(method(mdExportOptions:))]
+        fn md_export_options(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ExportOptions, s) }
+        #[unsafe(method(mdToggleFiles:))]
+        fn md_toggle_files(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleFiles, s) }
+        #[unsafe(method(mdSearchFolder:))]
+        fn md_search_folder(&self, s: Option<&AnyObject>) { self.editing().perform(Action::SearchFolder, s) }
+        #[unsafe(method(mdToggleWordCount:))]
+        fn md_toggle_word_count(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleWordCount, s) }
+        #[unsafe(method(mdToggleChanges:))]
+        fn md_toggle_changes(&self, s: Option<&AnyObject>) { self.editing().perform(Action::ToggleChanges, s) }
     }
 );
 
@@ -437,6 +479,9 @@ within_the_controller! {
     fn atom_editor(self) -> AtomEditor<'_> { AtomEditor::new(ForAtoms::of(self), &self.ivars().atoms) }
     fn editing(self) -> Editing<'_> { Editing::new(ForEditing::of(self), &self.ivars().edits) }
     fn links(self) -> Links<'_> { Links::new(ForLinks::of(self)) }
+    fn word_counter(self) -> WordCounter<'_> { WordCounter::new(ForCounter::of(self), &self.ivars().counter) }
+    fn change_marks(self) -> ChangeMarks<'_> { ChangeMarks::new(ForChanges::of(self), &self.ivars().changes) }
+    fn notes(self) -> Notes<'_> { Notes::new(ForNotes::of(self), &self.ivars().notes) }
 
     fn toggle_preview(self) {
         if self.panes().toggle_preview() {
@@ -560,6 +605,60 @@ impl EditorController {
 
     pub(in crate::editor) fn perform(&self, action: Action) {
         self.editing().perform(action, None);
+    }
+
+    pub(in crate::editor) fn setting_changed(&self) {
+        self.word_counter().setting_changed();
+        self.change_marks().look();
+    }
+
+    pub(in crate::editor) fn look_at_repository(&self) {
+        self.change_marks().look();
+    }
+
+    pub(in crate::editor) fn changes_answer(&self, answer: ChangesAnswer) {
+        self.change_marks().answer(answer);
+    }
+
+    pub(in crate::editor) fn draw_change_bars(&self, side: Side, bars: &objc2_app_kit::NSView) {
+        self.change_marks().draw(side, bars);
+    }
+
+    pub(in crate::editor) fn metadata_chosen(&self, wanted: Vec<(String, crate::markdown::front_matter::Value)>) {
+        self.editing().metadata_chosen(wanted);
+    }
+
+    pub(in crate::editor) fn note_event(&self, event: NoteEvent) {
+        self.notes().event(event);
+    }
+
+    pub(in crate::editor) fn note_answer(&self, answer: NoteAnswer) {
+        self.notes().answer(answer);
+    }
+
+    pub(in crate::editor) fn use_notes_folder(&self, folder: PathBuf) {
+        self.notes().use_folder(folder);
+    }
+
+    pub(in crate::editor) fn inherit_notes(&self, inherited: Inherited) {
+        self.notes().inherit(inherited);
+    }
+
+    pub(in crate::editor) fn notes_may_have_changed(&self) {
+        self.notes().refresh();
+    }
+
+    pub(in crate::editor) fn note_rename_chosen(&self, from: PathBuf, to: PathBuf) {
+        self.notes().rename_chosen(from, to);
+    }
+
+    pub(in crate::editor) fn note_rename_confirmed(&self, request: RenameRequest, rewrites: Vec<splat_notes::Rewrite>) {
+        self.notes().rename(request, rewrites);
+    }
+
+    /// Changes this document's text by `replacements`, if it still is `before`.
+    pub(in crate::editor) fn replace_in_text(&self, before: &str, replacements: &[splat_notes::Replacement]) -> bool {
+        self.editing().replace_in_text(before, replacements)
     }
 
     pub(in crate::editor) fn document(&self) -> Option<Retained<MdDocument>> {

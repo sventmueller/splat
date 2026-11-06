@@ -7,8 +7,8 @@ use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
-    NSAutoresizingMaskOptions, NSControlTextEditingDelegate, NSLineBreakMode, NSOutlineView, NSOutlineViewDataSource,
-    NSOutlineViewDelegate, NSScrollView, NSTableColumn, NSTableViewStyle, NSTextField, NSView, NSViewController,
+    NSControlTextEditingDelegate, NSLineBreakMode, NSOutlineView, NSOutlineViewDataSource, NSOutlineViewDelegate,
+    NSScrollView, NSTableColumn, NSTableViewStyle, NSTextField, NSView,
 };
 use objc2_foundation::{NSNotification, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize};
 
@@ -161,7 +161,7 @@ pub struct Outline {
 }
 
 impl Outline {
-    pub fn new(mtm: MainThreadMarker, controller: &EditorController) -> (Outline, Retained<NSViewController>) {
+    pub fn new(mtm: MainThreadMarker, controller: &EditorController) -> (Outline, Retained<NSScrollView>) {
         let source: Retained<OutlineSource> =
             // SAFETY: NSObject's initializer, called once on the newly allocated object.
             unsafe { msg_send![super(OutlineSource::alloc(mtm).set_ivars(SourceIvars::default())), init] };
@@ -190,12 +190,7 @@ impl Outline {
         scroll.setAutohidesScrollers(true);
         scroll.setDrawsBackground(false);
         scroll.setDocumentView(Some(&view));
-        scroll.setAutoresizingMask(
-            NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
-        );
-        let pane = NSViewController::new(mtm);
-        pane.setView(&scroll);
-        (Outline { view, source }, pane)
+        (Outline { view, source }, scroll)
     }
 
     /// Shows the headings; the tree is only rebuilt when headings were added, removed or renamed, so typing does

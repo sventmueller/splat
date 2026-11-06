@@ -1,10 +1,18 @@
+//! Keywords, strings, comments and numbers in the code of a code block, for the common languages its info string can
+//! name.
+
 use std::ops::Range;
 
+/// What a stretch of code is to its color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CodeToken {
+    /// A keyword of the language, a tag name in markup, or a key in front of `:` at the start of a YAML line.
     Keyword,
+    /// A quoted string, or a label in a diagram's node shape such as `A[Start]`.
     String,
+    /// A line or block comment.
     Comment,
+    /// A number literal.
     Number,
 }
 
@@ -781,7 +789,7 @@ fn find(info: &str) -> Option<&'static Lang> {
     LANGS.iter().find(|l| l.names.contains(&name.as_str()))
 }
 
-pub fn known(info: &str) -> bool {
+pub(crate) fn known(info: &str) -> bool {
     find(info).is_some()
 }
 
@@ -789,11 +797,13 @@ fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// Keywords, strings, comments and numbers in `code`, for the language named by a code block's info string.
+/// One info string for each language [`tokens`] knows, the first name it goes by.
 pub fn language_names() -> impl Iterator<Item = &'static str> {
     LANGS.iter().map(|lang| lang.names[0])
 }
 
+/// Keywords, strings, comments and numbers in `code`, as byte ranges in it, for the language named by a code block's
+/// info string; nothing for a language it does not know.
 #[expect(clippy::too_many_lines, reason = "one tokenizer loop with a case per kind of token")]
 pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
     let Some(lang) = find(info) else {

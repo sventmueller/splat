@@ -9,11 +9,22 @@ use objc2_app_kit::{
     NSTextLayoutManager, NSTextStorage, NSTextView, NSView,
 };
 use objc2_foundation::{
-    NSArray, NSDictionary, NSObject, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL, NSUnionRect,
+    NSArray, NSAttributedString, NSDictionary, NSObject, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize, NSString,
+    NSURL, NSUnionRect,
 };
 
 use super::EditorController;
+use super::attributes::{Attribute, Attributes, attributed};
+use super::export_options::{ExportOptions, TitleFacts, filled_in, footer_text};
 use crate::util::{constant, guarded};
+
+/// What printed pages show beside the text.
+pub struct PageLook {
+    pub(super) options: ExportOptions,
+    pub(super) facts: TitleFacts,
+    /// Where the title page ends in the view; nothing else stands on that page, and it carries neither header nor footer.
+    pub(super) title_end: Option<f64>,
+}
 
 #[derive(Default)]
 pub struct ViewIvars {
@@ -21,6 +32,8 @@ pub struct ViewIvars {
     /// Owns the text system; NSTextView itself does not retain it.
     #[expect(dead_code, reason = "holding it keeps the owner alive")]
     owner: RefCell<Option<Retained<NSObject>>>,
+    /// Only for the view that prints.
+    pages: RefCell<Option<PageLook>>,
 }
 
 fn controller(ivars: &ViewIvars) -> Option<Retained<EditorController>> {
@@ -161,6 +174,33 @@ define_class!(
             }
         }
 
+        #[unsafe(method_id(pageHeader))]
+        fn page_header(&self) -> Retained<NSAttributedString> {
+            guarded(None, || self.page_line(true)).unwrap_or_else(NSAttributedString::new)
+        }
+
+        #[unsafe(method_id(pageFooter))]
+        fn page_footer(&self) -> Retained<NSAttributedString> {
+            guarded(None, || self.page_line(false)).unwrap_or_else(NSAttributedString::new)
+        }
+
+        // A title page ends where its text ends, however much of the paper is left.
+        #[unsafe(method(adjustPageHeightNew:top:bottom:limit:))]
+        fn adjust_page_height(&self, new: *mut f64, top: f64, proposed: f64, limit: f64) {
+            // SAFETY: The superclass's implementation, with this method's signature.
+            let _: () = unsafe { msg_send![super(self), adjustPageHeightNew: new, top: top, bottom: proposed, limit: limit] };
+            guarded((), || {
+                let pages = self.ivars().pages.borrow();
+                let Some(end) = pages.as_ref().and_then(|look| look.title_end) else {
+                    return;
+                };
+                if top < end && !new.is_null() {
+                    // SAFETY: AppKit passes a valid pointer for the new height, checked for null above.
+                    unsafe { *new = end.min(proposed) };
+                }
+            });
+        }
+
         #[unsafe(method(changeFont:))]
         fn change_font(&self, _sender: Option<&AnyObject>) {}
 
@@ -253,11 +293,43 @@ where
     let ivars = ViewIvars {
         controller: RefCell::new(Some(Weak::from_retained(&controller.retain()))),
         owner: RefCell::new(Some(owner)),
+        pages: RefCell::new(None),
     };
     let this = T::alloc(mtm).set_ivars(ivars);
     let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(400.0, 400.0));
     // SAFETY: NSTextView's designated initializer with a container of its own.
     unsafe { msg_send![super(this), initWithFrame: frame, textContainer: &*container] }
+}
+
+impl PreviewTextView {
+    pub fn set_pages(&self, look: PageLook) {
+        *self.ivars().pages.borrow_mut() = Some(look);
+    }
+
+    /// The header or footer of the page being printed.
+    fn page_line(&self, header: bool) -> Option<Retained<NSAttributedString>> {
+        let pages = self.ivars().pages.borrow();
+        let look = pages.as_ref()?;
+        let operation = objc2_app_kit::NSPrintOperation::currentOperation(self.mtm())?;
+        let page = crate::util::to_usize(operation.currentPage());
+        let count = operation.pageRange().length;
+        if page <= 1 && look.title_end.is_some() {
+            return None;
+        }
+        let text = if header {
+            filled_in(&look.options.header, &look.facts, page, count)
+        } else {
+            footer_text(&look.options, &look.facts, page, count)
+        };
+        let style = objc2_app_kit::NSMutableParagraphStyle::new();
+        style.setAlignment(objc2_app_kit::NSTextAlignment::Center);
+        let attributes = Attributes::new(&[
+            Attribute::font(&objc2_app_kit::NSFont::systemFontOfSize(9.0)),
+            Attribute::foreground(&objc2_app_kit::NSColor::colorWithWhite_alpha(0.35, 1.0)),
+            Attribute::paragraph(&style),
+        ]);
+        Some(attributed(&text, Some(&attributes)))
+    }
 }
 
 impl SourceTextView {
@@ -300,6 +372,7 @@ pub fn print_view(mtm: MainThreadMarker, width: f64) -> Retained<PreviewTextView
     let ivars = ViewIvars {
         controller: RefCell::new(None),
         owner: RefCell::new(Some(owner)),
+        pages: RefCell::new(None),
     };
     let this = PreviewTextView::alloc(mtm).set_ivars(ivars);
     let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(width, 100.0));
@@ -311,6 +384,17 @@ pub fn print_view(mtm: MainThreadMarker, width: f64) -> Retained<PreviewTextView
     view.setTextContainerInset(NSSize::new(0.0, 0.0));
     view.setDrawsBackground(false);
     view
+}
+
+/// Where the line of a character ends, in a view with its whole text laid out.
+pub fn line_bottom(view: &NSTextView, index: usize) -> f64 {
+    let Some(lm) = crate::util::layout_manager(view) else {
+        return 0.0;
+    };
+    let glyph = lm.glyphIndexForCharacterAtIndex(index);
+    // SAFETY: A null range pointer is allowed when the effective range is not wanted.
+    let line = unsafe { lm.lineFragmentRectForGlyphAtIndex_effectiveRange(glyph, std::ptr::null_mut()) };
+    line.origin.y + line.size.height + view.textContainerOrigin().y
 }
 
 pub fn fit_height(view: &NSTextView) {

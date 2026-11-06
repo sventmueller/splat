@@ -94,10 +94,12 @@ fn inline_notes_may_be_limited(text: &str) -> bool {
     text.matches("^[").count() > UNCLOSED_MARKS
 }
 
+/// `text` read into a tree.
 pub fn parse(text: &str) -> Doc {
     parse_shared(text.into())
 }
 
+/// [`parse`] for a text that is shared already, which the tree keeps without a copy.
 pub fn parse_shared(text: Arc<str>) -> Doc {
     let blocks = parse_part(&text, true);
     Doc::new(text, blocks)

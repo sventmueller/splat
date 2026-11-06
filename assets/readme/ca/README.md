@@ -4,7 +4,7 @@
 
 **L’editor de Markdown per a macOS que et deixa escriure al codi font o directament a la previsualització.**
 
-El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i una previsualització en directe, totalment editable, a la dreta. Escriu en qualsevol dels dos: tot el que escriguis a la previsualització esdevé un canvi mínim al codi font, de manera que les línies que no has tocat es mantenen idèntiques byte a byte i els teus diffs de Git queden nets. El Splat entén el Markdown que ja fas servir: CommonMark i GitHub Flavored Markdown, alertes de GitHub, enllaços wiki, incrustacions i requadres d’Obsidian, extensions de Pandoc i de Typora, HTML incrustat, fórmules LaTeX i diagrames de Mermaid, Graphviz i PlantUML, tot renderitzat sense connexió. Exporta a PDF, HTML o Word amb un sol clic. Està escrit en Rust amb controls AppKit autèntics, parla 35 idiomes i no envia res per la xarxa si no li ho demanes.
+El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i una previsualització en directe, totalment editable, a la dreta. Escriu en qualsevol dels dos: tot el que escriguis a la previsualització esdevé un canvi mínim al codi font, de manera que les línies que no has tocat es mantenen idèntiques byte a byte i els teus diffs de Git queden nets. El Splat entén el Markdown que ja fas servir: CommonMark i GitHub Flavored Markdown, alertes de GitHub, enllaços wiki, incrustacions i requadres d’Obsidian, extensions de Pandoc i de Typora, HTML incrustat, fórmules LaTeX i diagrames de Mermaid, Graphviz i PlantUML, tot renderitzat sense connexió. Navega per tota una carpeta de notes i cerca-hi, mira què ha canviat des de l’últim commit de Git, enganxa des del Word o d’una pàgina web com a Markdown i exporta a PDF, HTML o Word amb un sol clic. Està escrit en Rust amb controls AppKit autèntics, parla 35 idiomes i no envia res per la xarxa si no li ho demanes.
  
 
 
@@ -81,6 +81,8 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
   - [Ordres de format](#ordres-de-format)
   - [Llistes i tasques](#llistes-i-tasques)
   - [Taules](#taules)
+  - [Enganxar text amb format](#enganxar-text-amb-format)
+  - [Metadades](#metadades)
 - [Markdown compatible](#markdown-compatible)
   - [CommonMark i GitHub Flavored Markdown](#commonmark-i-github-flavored-markdown)
   - [Requadres](#requadres)
@@ -94,7 +96,10 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - [Diagrames](#diagrames)
 - [Imatges](#imatges)
 - [Enllaços i navegació](#enllaços-i-navegació)
+- [Notes en una carpeta](#notes-en-una-carpeta)
+- [Canvis des de l’últim commit](#canvis-des-de-lúltim-commit)
 - [Exportar, imprimir i compartir](#exportar-imprimir-i-compartir)
+- [Importar documents del Word](#importar-documents-del-word)
 - [Aparença i accessibilitat](#aparença-i-accessibilitat)
 - [Idiomes](#idiomes)
 - [Dreceres de teclat](#dreceres-de-teclat)
@@ -103,14 +108,6 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - [Limitacions conegudes](#limitacions-conegudes)
 - [Resolució de problemes](#resolució-de-problemes)
 - [Per a desenvolupadors](#per-a-desenvolupadors)
-  - [Compilació](#compilació)
-  - [Distribució](#distribució)
-  - [Tests](#tests)
-  - [Estructura del projecte](#estructura-del-projecte)
-  - [Flux de dades](#flux-de-dades)
-  - [Regles al controlador](#regles-al-controlador)
-  - [Afegir una ordre](#afegir-una-ordre)
-  - [Traduccions](#traduccions)
   - [Components de tercers](#components-de-tercers)
 - [Llicència](#llicència)
 
@@ -120,7 +117,10 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - **El Markdown que ja fas servir.** CommonMark, GitHub Flavored Markdown, alertes de GitHub, extensions d’Obsidian, de Pandoc i de Typora, codis curts d’emojis, spoilers, llistes de definicions, àncores de capçalera i HTML com als README de GitHub.
 - **Fórmules i diagrames integrats.** Fórmules LaTeX amb MathJax i un editor visual de fórmules. Diagrames en Mermaid, Graphviz i PlantUML, renderitzats al teu Mac sense Java, sense servidor i sense connexió a la xarxa.
 - **Un botó per a tot.** Cada construcció de Markdown té un botó a la barra d’eines i un element de menú, i les més habituals també una drecera de teclat. Les taules tenen el seu propi menú per a files, columnes i alineació.
-- **Exporta sense perdre res.** PDF, un únic fitxer HTML autònom o un document de Word amb capçaleres, llistes, taules, notes a peu de pàgina i imatges de debò.
+- **Una carpeta, no només un fitxer.** La barra lateral llista les notes que envolten un document i les cerca totes. Canviar el nom d’una nota canvia els enllaços que hi apunten, i tots els bytes del voltant es mantenen.
+- **Els canvis d’un cop d’ull.** En un repositori Git, unes barres al costat del text marquen què difereix de l’últim commit, als dos panells.
+- **Del Word i del web a Markdown.** Enganxa text amb format com a Markdown, cel·les d’un full de càlcul com a taula, i importa documents del Word sencers amb les seves imatges.
+- **Exporta sense perdre res.** PDF, un únic fitxer HTML autònom o un document de Word amb capçaleres, llistes, taules, notes a peu de pàgina i imatges de debò. Afegeix números de pàgina, capçaleres i una portada, o fes servir la plantilla del Word de la teva empresa.
 - **Natiu fins al moll de l’os.** Finestres, pestanyes, menús, finestres emergents, Versions, desament automàtic, el menú de compartir, mode fosc, correcció ortogràfica, dictat i VoiceOver autèntics d’AppKit. Sense Electron, i sense vista web per al text mateix.
 - **Àgil amb fitxers grans.** Renderitzar una pulsació de tecla en un document de 10 MB triga uns 10 ms, abans de la feina pròpia de la vista.
 - **Privat i prudent.** Les imatges d’internet només es carreguen quan ho permets, els enllaços a altres apps demanen confirmació, i tot el que descodifica dades d’imatge no fiables s’executa en processos auxiliars aïllats en una caixa de proves.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Actualitzacions.** El Splat de la imatge de disc o de Homebrew s’actualitza sol amb [Sparkle](https://sparkle-project.org). A la segona obertura pregunta si pot cercar actualitzacions pel seu compte, un cop al dia. **Splat › Cerca actualitzacions…** les cerca a l’instant; **Cerca actualitzacions automàticament** i **Descarrega i instal·la actualitzacions automàticament**, al mateix menú, et permeten canviar l’elecció més endavant. El Splat només instal·la una actualització si porta la signatura del desenvolupador. Una compilació pròpia no té actualitzador.
 
-**Des del codi font.** Mira [Compilació](#compilació) per als requisits previs i després:
+**Des del codi font.** Mira [Compilació](../../../docs/development.md#building) per als requisits previs i després:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Cada document s’obre en una finestra pròpia, o en una pestanya si prefereixes
 
 - **Esquerra: el codi font.** El teu Markdown en SF Mono amb colors de sintaxi.
 - **Dreta: la previsualització.** El document renderitzat, a punt per editar.
-- **Barra lateral d’esquema (opcional).** Totes les capçaleres en forma d’arbre; un clic en una la mostra als dos panells. Mostra-la o amaga-la amb **Mostra › Mostra l’esquema** (⌃⌘S).
+- **Barra lateral (opcional).** Totes les capçaleres en forma d’arbre, un clic en una la mostra als dos panells: **Mostra › Mostra l’esquema** (⌃⌘S). Dues pestanyes més contenen les [notes de la carpeta](#notes-en-una-carpeta) i una cerca entre elles.
 - **Barra d’eines.** Botons agrupats segons el que canvien: caràcters, paràgrafs i elements inserits, i després previsualització activada o desactivada, Comparteix i Nou document. Personalitza-la amb **Mostra › Personalitza la barra d’eines…**.
 
 Arrossega el separador per donar més espai a un costat o a l’altre. **Mostra › Oculta la previsualització** (⌥⌘P) deixa només el codi font; el Splat ho recorda per a cada finestra. Els dos panells es desplacen alhora, i una selecció en un es ressalta a l’altre.
+
+La cantonada de la finestra mostra les paraules i els caràcters del text i quant es triga a llegir-lo, i els de la selecció mentre n’hi hagi una. Les adreces d’enllaços, les etiquetes HTML, les metadades, els comentaris, les fórmules i els diagrames no compten. **Mostra › Oculta el recompte de paraules** el treu.
 
 ### Documents, pestanyes i versions
 
@@ -213,7 +215,7 @@ La previsualització es comporta com un processador de textos, però tot el que 
 - **Les fórmules i els diagrames** apareixen com a gràfics acabats. Fes-hi clic, posa-hi el cursor a sobre o prem Retorn per obrir-ne l’editor (mira [Fórmules](#fórmules) i [Diagrames](#diagrames)).
 - **L’HTML incrustat, les notes incrustades i el front matter** es mostren, però s’editen al codi font. Un clic en ells posa el cursor al lloc corresponent del codi font.
 
-A la previsualització es bloqueja tot el que Markdown no pot expressar: els plafons Tipus de lletra i Color, la regla, i enganxar o deixar anar text enriquit i imatges. L’HTML i l’RTF enganxats arriben com a text pla.
+A la previsualització es bloqueja tot el que Markdown no pot expressar: els plafons Tipus de lletra i Color, la regla, i enganxar o deixar anar text enriquit i imatges. L’HTML i l’RTF enganxats arriben com a text pla, tret que triïs [Enganxa com a Markdown](#enganxar-text-amb-format).
 
 ### Ordres de format
 
@@ -244,6 +246,21 @@ El subratllat, el ressaltat, el superíndex i el subíndex s’escriuen com `<in
 - A la previsualització, **Tab** passa a la cel·la següent, **⇧Tab** a l’anterior i **Retorn** a la cel·la de sota. Tab a l’última cel·la afegeix una fila.
 - El menú **Taula** insereix i elimina files i columnes i defineix l’alineació d’una columna (⌘{, ⌘|, ⌘}).
 - **Taula › Alinea les columnes de la taula** omple el codi font amb espais perquè les columnes quedin alineades.
+
+### Enganxar text amb format
+
+**Edita › Enganxa com a Markdown** (⌃⌘V), també al menú contextual dels dos panells, converteix el que hi ha al porta-retalls en Markdown a la selecció, com un sol pas de desfer. ⌘V continua inserint text pla.
+
+- **D’un navegador, el Word, Google Docs, Confluence, Notes o Pages:** es conserven les capçaleres, la negreta, la cursiva, el subratllat, el ratllat, el superíndex i el subíndex, els enllaços, les llistes amb la seva imbricació, les citacions, el codi i les taules.
+- **D’un full de càlcul:** les cel·les esdevenen una taula amb fila de capçalera i columnes de números alineades a la dreta. El mateix passa amb el text separat per tabulacions, punts i comes o comes, si totes les línies tenen el mateix nombre de columnes.
+- **Les imatges** amb una adreça web continuen sent enllaços. Una imatge dins de l’HTML enganxat esdevé un fitxer al costat del document, que per a això s’ha d’haver desat una vegada. Els fitxers d’imatge temporals del Word no s’incorporen, i el seu text alternatiu es manté.
+- **Els enllaços** només conserven adreces `http`, `https`, `mailto`, relatives i `#`; de qualsevol altre enllaç en queda el text.
+
+### Metadades
+
+**Format › Edita les metadades…**, o un clic a la línia de metadades de la part superior de la previsualització, obre un formulari amb els camps del front matter YAML. Els camps es poden canviar, afegir i eliminar. Un camp amb una llista la manté com a llista: els seus valors van un darrere l’altre separats per comes, i un valor que conté una coma va entre cometes. Un camp nou anomenat `tags`, `aliases`, `keywords`, `categories`, `authors` o `cssclasses` també esdevé una llista. Els camps imbricats i el text de diverses línies s’hi poden veure i s’editen al codi font.
+
+El que canvia el formulari és un sol pas de desfer i només afecta les línies dels camps que has canviat: els comentaris, l’ordre, els espais inusuals, les cometes i els finals de línia de tots els altres es mantenen idèntics byte a byte. Un document sense metadades rep un bloc al principi.
 
 ## Markdown compatible
 
@@ -314,7 +331,7 @@ Sense una àncora pròpia, cada capçalera en rep una derivada del seu text, com
 - **Enllaços wiki.** `[[Nota]]` enllaça amb `Nota.md` a la mateixa carpeta o en una carpeta de sota. `[[Nota|Text mostrat]]` mostra el teu propi text, i `[[Nota#Capçalera]]` obre la nota. ⌘-clic l’obre al Splat.
 - **Incrustacions.** `![[Nota]]` mostra l’altra nota dins d’aquesta; les notes que hi estan incrustades apareixen com a enllaços. `![[diagram.png]]` mostra una imatge. Com a Obsidian, les incrustacions anomenen notes i imatges de la carpeta del document o de sota, mai amb una ruta absoluta, i només els fitxers Markdown es mostren com a notes.
 - **Comentaris.** `%%Només al codi font%%` continua visible al codi font i s’omet de la previsualització i de totes les exportacions, tant en línia com en línies pròpies.
-- **Etiquetes.** `#idea` o `#project/splat` es ressalta. ⌘-clic cerca l’etiqueta al document.
+- **Etiquetes.** `#idea` o `#project/splat` es ressalta. ⌘-clic cerca l’etiqueta al document i, a la barra lateral, a tota la carpeta.
 - **Requadres plegables.** Mira [Requadres](#requadres).
 
 ### Cites i referències
@@ -438,6 +455,23 @@ A la previsualització, un clic situa el cursor perquè puguis editar el text de
 
 **Insereix › Taula de contingut** insereix una llista enllaçada de totes les capçaleres. Amb el cursor a dins, la mateixa ordre l’actualitza. La barra lateral d’esquema (⌃⌘S) salta a qualsevol capçalera als dos panells.
 
+## Notes en una carpeta
+
+Els botons de la part superior de la barra lateral alternen entre l’esquema, els fitxers i una cerca.
+
+- **Fitxers** (**Mostra › Mostra els fitxers**, ⌃⌘E). Tots els fitxers Markdown de la carpeta del document o, si és en un repositori Git, de tot el repositori. Un clic o Retorn obre una nota com a pestanya d’aquesta finestra; si ja està oberta, passa al davant. El botó al costat del nom de la carpeta mostra una altra carpeta en aquesta finestra. Els fitxers ocults, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` i les carpetes sense notes queden fora. Un document directament a la teva carpeta d’inici només mostra les notes que té al costat, perquè el Splat no recorri totes les teves carpetes demanant permís per a cadascuna.
+- **Cerca** (**Edita › Cerca › Cerca a totes les notes…**, ⇧⌘F). Troba text a totes les notes, sigui quina sigui la combinació de majúscules i minúscules i la codificació dels accents. `#tag` troba una etiqueta, `#project` també `#project/splat`, i res dins de codi. Un clic en un resultat obre la nota en aquell punt.
+- **Enllaços a una nota.** El menú contextual d’una nota llista les notes que hi enllacen, per enllaç wiki, incrustació, enllaç relatiu o definició de referència d’enllaç.
+- **Canviar el nom d’una nota.** El mateix menú li canvia el nom i canvia aquests enllaços. El Splat primer diu de quants enllaços en quants fitxers es tracta. A cada enllaç només canvia el nom, i tots els altres bytes del fitxer es mantenen. Els documents oberts reben el canvi com un pas de desfer; en altres fitxers, només Git o Versions el poden desfer. Un fitxer que un altre programa hagi canviat mentrestant atura el canvi de nom de tots els enllaços, i el Splat l’anomena.
+
+La llista segueix la carpeta quan la finestra passa al davant. La cerca veu els fitxers tal com són al disc, i el text que encara no has desat compta a partir del següent desament automàtic.
+
+## Canvis des de l’últim commit
+
+En un document d’un repositori Git, unes barres al costat del text marquen què difereix de l’últim commit, al codi font i a la previsualització: verd per a les línies afegides, blau per a les línies canviades i una marca vermella curta on s’ha eliminat alguna cosa. Segueixen mentre escrius i quan la branca es mou. **Mostra › Canvis des de l’últim commit** les desactiva, per a totes les finestres.
+
+Les línies que només difereixen en el final de línia no compten, de manera que un fitxer amb CRLF davant d’un commit amb LF no mostra cap canvi. Un fitxer nou no té marques fins al seu primer commit, ni tampoc un document de més de 32 MB.
+
 ## Exportar, imprimir i compartir
 
 | Format | Com | Què obtens |
@@ -450,6 +484,19 @@ A la previsualització, un clic situa el cursor perquè puguis editar el text de
 
 El menú **Arxiu › Comparteix** ofereix tot això en un sol lloc. Les exportacions fan servir l’ajust de puntuació tipogràfica i les imatges d’internet que has permès; en HTML, les imatges d’internet continuen sent enllaços.
 
+**Arxiu › Opcions d’exportació…** defineix què afegeixen al text el PDF, la impressió i el Word, per a tots els documents:
+
+- **Números de pàgina** al peu de pàgina del PDF i de la impressió, com a `2 / 9`.
+- **Capçalera i peu de pàgina** per al PDF i la impressió. `{title}`, `{author}`, `{date}`, `{page}` i `{pages}` representen els seus valors, els tres primers a partir de les metadades del document.
+- **Una portada** per al PDF, la impressió i el Word, amb `title`, `subtitle`, `author` i `date` de les metadades, o el nom del document com a títol. No té capçalera ni peu de pàgina.
+- **Una plantilla del Word**, un `.docx` o `.dotx` l’aspecte del qual adopta l’exportació: els seus estils, també amb noms localitzats, el seu tema, la mida de pàgina, els marges, les capçaleres i els peus de pàgina. Una plantilla que no es pot llegir atura l’exportació i ho diu, en lloc de donar-te un document sense ella.
+
+## Importar documents del Word
+
+**Arxiu › Importa un document del Word…** demana un fitxer `.docx` o `.dotx` i on ha d’anar el seu Markdown, i després obre el resultat. Les imatges van a una carpeta al costat, amb el nom del document seguit de `-images`.
+
+Les capçaleres i les llistes arriben tal com les defineixen els estils i la numeració del Word, també en documents amb estils de noms localitzats. Es conserven la negreta, la cursiva, el subratllat, el ratllat, el ressaltat, el superíndex i el subíndex, els enllaços, les citacions, el codi, les notes a peu de pàgina, les notes finals i les taules, amb les cel·les que ocupen diverses columnes com a taula HTML. Les fórmules esdevenen LaTeX. Els canvis registrats compten com a acceptats, i una taula de contingut queda fora, ja que **Insereix › Taula de contingut** en crea una de nova. Els fitxers `.doc` antics i els documents protegits amb contrasenya es rebutgen.
+
 ## Aparença i accessibilitat
 
 - **El mode fosc** segueix el sistema. Les fórmules i els diagrames es renderitzen per a cada aparença.
@@ -458,7 +505,7 @@ El menú **Arxiu › Comparteix** ofereix tot això en un sol lloc. Les exportac
 - **Pantalla completa, pestanyes i una barra d’eines personalitzable**, com en qualsevol app del Mac.
 - **VoiceOver.** Els panells s’anomenen «Codi font Markdown» i «Previsualització», les fórmules es llegeixen com el seu codi i els diagrames com el seu títol. Totes les ordres es poden fer amb el teclat.
 
-El Splat no té finestra d’ajustos: les poques opcions són on s’apliquen, a **Mostra** i a **Edita › Substitucions**.
+El Splat no té finestra d’ajustos: les poques opcions són on s’apliquen, a **Mostra**, a **Edita › Substitucions** i a **Arxiu › Opcions d’exportació…**.
 
 ## Idiomes
 
@@ -481,6 +528,9 @@ El text en hebreu i en àrab es llegeix de dreta a esquerra allà on aparegui, s
 | Alinea la columna de la taula a l’esquerra, centrada, a la dreta | ⌘{, ⌘\|, ⌘} |
 | Oculta o mostra la previsualització | ⌥⌘P |
 | Mostra o oculta l’esquema | ⌃⌘S |
+| Mostra o oculta els fitxers | ⌃⌘E |
+| Cerca a totes les notes | ⇧⌘F |
+| Enganxa com a Markdown | ⌃⌘V |
 | Apropa, allunya, mida real | ⌘+, ⌘−, ⌘0 |
 | Nou document, obre, desa, duplica | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Configuració de pàgina, imprimeix | ⇧⌘P, ⌘P |
@@ -506,6 +556,9 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 - **Les imatges d’internet** només es carreguen amb el teu permís, només per `https`, mai des de servidors de la teva xarxa local, com a màxim de 10 MB cadascuna i en una sessió privada sense galetes.
 - **Descodificació aïllada.** Les imatges i els gràfics de fórmules i diagrames es descodifiquen en processos auxiliars que tanquen tots els fitxers que han heretat i es tanquen ells mateixos en una caixa de proves abans de llegir el primer byte: sense accés a fitxers ni a la xarxa. Només retornen píxels, la mida dels quals es comprova, i s’aturen als 10 segons. Els descodificadors d’imatge d’Apple només veuen HEIC, TIFF, AVIF i PDF, i només quan les dades són realment d’aquest format; s’executen en un procés auxiliar propi, que a més pot llegir les carpetes de tipus de lletra del sistema i fer servir el descodificador de vídeo del sistema. Els SVG, les fórmules i els diagrames també passen per aquest procés, de manera que al Splat són imatges amb una resolució fixa: quatre píxels per punt, fins a 2560 al costat més llarg.
 - **Els fitxers locals** només arriben a un document per la ruta que aquest anomena. Les incrustacions mostren notes Markdown de la carpeta del document i de sota, i una imatge que falta només es busca allà. Una ruta d’imatge a un altre lloc, absoluta o que comença per `~`, es carrega igualment a la previsualització; les exportacions HTML i Word, la impressió i els PDF només s’emporten el que hi ha a la carpeta del document o al seu repositori Git, tret que aquest repositori també contingui la teva carpeta d’inici, de manera que un document d’una altra persona no pot arrossegar els teus fitxers a una exportació que passis a algú.
+- **Les carpetes de notes** només es llegeixen mentre la barra lateral les mostra, i canviar el nom d’una nota només canvia altres fitxers després que hagis confirmat quants.
+- **Els repositoris Git** els llegeix el mateix Splat. Mai no executa el programa `git`, la configuració del qual en un repositori d’algú altre pot iniciar altres programes, i no llegeix més que la versió del document obert de l’últim commit. No hi escriu res i no fa servir cap xarxa.
+- **Els documents del Word i el text enganxat** els llegeixen els analitzadors propis del Splat, amb límits de mida, d’imbricació i de quant es pot descomprimir un fitxer. Els seus enllaços només conserven les adreces que el Splat permet en altres llocs, i els noms de les imatges d’un fitxer del Word mai no decideixen on s’escriuen.
 - **Les còpies del text sense desar** es queden en aquest Mac, a la carpeta Library, per a la recuperació després d’una fallada. Desapareixen amb el desament o amb el tancament normal del Splat; les còpies que una fallada ha deixat es queden a la carpeta de recuperació fins que les eliminis.
 - **Els enllaços** mai inicien un programa amb un clic. Els enllaços web i de correu s’obren com sempre; els enllaços a altres apps demanen confirmació.
 - **L’HTML als documents** el llegeix l’analitzador propi del Splat. Els scripts, els estils, els marcs i els formularis no s’executen mai.
@@ -529,7 +582,7 @@ Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 M
 ## Limitacions conegudes
 
 - **Les tildes soltes volen dir subíndex.** `~text~` és subíndex com a Pandoc; el ratllat necessita `~~dues~~`. GitHub també ratlla amb una sola tilde.
-- **Només de lectura a la previsualització:** l’HTML incrustat, les notes incrustades i el front matter s’editen al codi font.
+- **Només de lectura a la previsualització:** l’HTML incrustat i les notes incrustades s’editen al codi font, el front matter al seu formulari o al codi font.
 - **Imbricació molt profunda:** l’HTML imbricat a més de 64 nivells, i l’HTML en línia a més de 16, cedeix el pas al seu contingut.
 - **Les cel·les combinades de taula** només existeixen en taules HTML, i només entre columnes (`colspan`, no `rowspan`). La sintaxi de taules de MultiMarkdown per a cel·les combinades no és compatible.
 - **Les bibliografies** només es llegeixen de BibTeX, no de CSL JSON ni de YAML.
@@ -537,6 +590,11 @@ Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 M
 - **Puntuació tipogràfica:** una cometa simple de tancament alemanya no es pot distingir d’un apòstrof i es posa com a ’.
 - **Fórmules, no documents:** sense paquets LaTeX, TikZ ni documents complets.
 - **L’editor visual de fórmules** escriu LaTeX amb la notació de MathLive: els espais desapareixen (`E = mc^2` esdevé `E=mc^2`), la renderització continua igual.
+- **Recompte de paraules:** el tai, el lao, el khmer i el birmà s’escriuen sense espais i es compten per tram de text, no per paraula. `3.14` i `snake_case` són dues paraules cadascun.
+- **Canviar el nom d’una nota** no canvia els enllaços en HTML incrustat, i un enllaç wiki queda tal com està si el nom nou conté `#`, `|`, `^`, `[`, `]` o `\`.
+- **Les marques de canvis** llegeixen repositoris amb objectes SHA-1 i refs simples o empaquetades; un amb SHA-256 o reftable no en mostra cap. Un fitxer sota un filtre de Git com LFS es compara amb el que el filtre ha desat.
+- **La importació del Word** no incorpora el text de capçaleres, peus de pàgina i comentaris, i les imatges en `.emz` o SVG només conserven el text alternatiu.
+- **Enganxa com a Markdown** llegeix l’RTF com a text occidental, i només en pren les capçaleres a partir de les mides de lletra. La majoria de programes també ofereixen HTML, que és el que prefereix.
 - **Per disseny:** sense números de línia, sense finestra d’ajustos, sense Help Book, no és a l’App Store.
 - **Provat menys en Intel.** Els autotests de finestra només s’executen en Apple Silicon; en Intel, la CI executa `cargo test`.
 
@@ -560,188 +618,7 @@ Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 M
 
 ## Per a desenvolupadors
 
-El Splat és una aplicació en Rust que parla directament amb AppKit i WebKit mitjançant [objc2](https://github.com/madsmtm/objc2). No hi ha Swift, ni Objective-C, ni projecte d’Xcode, ni fitxer d’Interface Builder.
-
-### Compilació
-
-Requisits previs:
-
-- macOS amb les Command Line Tools (`xcode-select --install`). No cal Xcode; el Splat es compila sense `actool`, `ibtool` ni `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) indica la versió exacta que fa servir la CI; rustup l’instal·la sol, el Rust de Homebrew ignora el fitxer. Pujar-la allà és com arriben al projecte els nous avisos del compilador i de clippy.
-- rustup, per a `make lint`, `make check` i `make universal`: `cargo xtask check-library` compila la biblioteca per a Linux per demostrar que no necessita macOS, i el Rust de Homebrew no té cap altre objectiu de compilació.
-
-El [Makefile](../../../Makefile) conté punts d’entrada curts; `make help` els llista tots:
-
-```sh
-make build                  # target/release/Splat.app, igual que cargo xtask bundle --release
-make universal              # target/splat-universal per a Apple Silicon i Intel, tal com el porta la imatge de disc
-make check                  # format, clippy sense avisos, tots els tests, biblioteques incorporades; el que executa la CI
-make test                   # make check, i després l’autotest sense finestra
-make test-gui               # autotests amb finestra; ocupen el Mac durant uns quatre minuts
-make test-long              # cerca aleatòria més llarga i la comprovació de l’actualització parcial a 10 MB
-make fuzz                   # entrada aleatòria per a l’anàlisi parcial i totes les sortides
-make coverage               # cobertura de línies de tots els tests i autotests, amb un mínim per mòdul
-make coverage-library       # els mateixos mínims per als mòduls sense finestra, com a la CI
-make bench FILE=<file.md>   # temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran
-make release                # primer make test, després la imatge de disc notaritzada
-```
-
-La lògica de compilació mateixa viu al crate de Rust [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signat amb "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, una app separada que mai obre fitxers Markdown
-cargo xtask dmg                # dist/Splat-<version>.dmg per a la distribució, Developer ID, notaritzat
-cargo xtask icon               # reconstrueix assets/AppIcon.icns i la icona del README a partir d'assets/icon-1024.png
-cargo xtask vendor check       # verifica el JavaScript inclòs amb vendor.lock
-cargo xtask vendor fetch       # el descarrega de nou després de canviar una versió a vendor.lock
-```
-
-`bundle` escriu l’`Info.plist`, copia els recursos i les localitzacions, i signa l’app amb el certificat "Splat Local Signing". La primera compilació crea aquest certificat al teu clauer d’inici de sessió, vàlid durant 20 anys. Mentre hi sigui, el Splat conserva els seus documents recents i els permisos de carpeta entre recompilacions; amb una signatura ad hoc, cada compilació seria una app nova per a macOS. Les compilacions de depuració i d’autotest porten identificadors de paquet propis (`local.splat.debug`, `local.splat.selftest`) i no es registren per als fitxers Markdown, de manera que el Finder mai obre un document en una compilació antiga i no toquen els ajustos de l’app normal.
-
-La versió viu a [VERSION](../../../VERSION) com a `major.minor.build` i és la que rebrà la propera compilació. Cada compilació de llançament que té èxit (`make build`, `cargo xtask bundle --release`, `make release`) puja el número de compilació en una unitat; les compilacions de depuració i d’autotest no el toquen. El major i el minor es pugen a mà: posa VERSION a, per exemple, `1.1.0`, i la propera compilació rebrà exactament això.
-
-### Distribució
-
-`cargo xtask dmg` (o `make release`, que executa primer `make test`) compila una versió de llançament, la signa amb el teu Developer ID, notaritza l’app amb Apple i hi grapa el tiquet, l’empaqueta en una imatge de disc comprimida i de només lectura amb un enllaç a Aplicacions, notaritza i grapa també la imatge i comprova el resultat amb Gatekeeper. L’app porta el seu propi tiquet perquè una còpia instal·lada sense el Finder, com fa Homebrew, també s’obri sense connexió la primera vegada; les dues rondes amb el servei de notarització triguen uns minuts cadascuna. Només una imatge que ha superat tots els passos esdevé `dist/Splat-<version>.dmg`, la còpia que es confirma, i el número de compilació puja. La imatge anterior es manté una versió més, ja que el servidor raw de GitHub pot servir el canal d’actualitzacions antic durant uns minuts després d’un push; les més antigues es porten a la paperera. Una execució fallida deixa `dist/` i VERSION tal com eren. Cada versió afegeix la imatge completa, d’uns 16 MB, a l’historial del dipòsit. S’executa només quan es crida, mai com a part d’una compilació normal, i necessita:
-
-- un certificat "Developer ID Application" al clauer
-- un inici de sessió desat per al servei de notarització d’Apple amb una contrasenya específica d’app, creat una vegada amb `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- la clau privada que signa les actualitzacions, al clauer d’inici de sessió. La va crear `generate_keys` de Sparkle; la seva meitat pública és `UPDATE_KEY` a [xtask/src/main.rs](../../../xtask/src/main.rs) i dins de cada còpia instal·lada, que només accepta actualitzacions signades amb ella. Guarda’n una còpia de seguretat en un gestor de contrasenyes: `target/sparkle-2.10.1/bin/generate_keys -x <file>` l’exporta, `-f <file>` la importa en un altre Mac. Sense ella, les còpies instal·lades no es poden tornar a actualitzar mai més.
-- rustup (`brew install rustup`, que deixa el Rust de Homebrew al seu lloc)
-- `RELEASE_NOTES.md`, amb el que aporta aquesta versió. El diàleg d’actualització el mostra sobre una línia que explica com informar d’un problema, de manera que `dmg` s’atura si el fitxer és buit o encara conté les notes de la versió anterior
-
-Si en falta qualsevol, `dmg` s’atura abans de compilar. La primera vegada, macOS pregunta si el Terminal pot controlar el Finder; sense aquest permís, la imatge de disc no mostra ni el fons ni la disposició de les icones.
-
-Només la imatge de disc porta l’actualitzador, [Sparkle](https://sparkle-project.org), que la compilació descarrega una vegada a `target/` des de la seva versió de GitHub i comprova amb la suma de verificació d’xtask. El hardened runtime només carrega el framework quan porta el Team ID de l’app, cosa que la signatura Developer ID té i el certificat local no; i una actualització no ha de substituir una compilació pròpia. La compilació d’autotest també porta Sparkle, per comprovar-hi el menú d’actualització: amb un canal que no existeix, sense la pregunta de Sparkle a la segona obertura, i amb un entitlement que deixa que l’app signada localment carregui el framework. `dmg` signa la imatge nova amb la clau d’actualització i escriu `dist/appcast.xml`, el canal que llegeixen des de GitHub les còpies instal·lades. Confirma i puja la imatge i el canal junts: a partir d’aleshores, les còpies instal·lades ofereixen l’actualització. Els enllaços de descàrrega d’aquest README i de les seves traduccions apunten a `Splat.dmg` de la darrera versió de GitHub, de manera que cada versió porta una còpia amb aquest nom: `cp dist/Splat-<version>.dmg target/Splat.dmg` i després `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-La imatge de disc és un binari universal per a Apple Silicon i Intel; les altres compilacions són només per al processador amfitrió. El Rust de Homebrew només inclou la biblioteca estàndard per al processador amfitrió, de manera que `dmg` compila mitjançant rustup, que instal·la la cadena d’eines i els destins de [rust-toolchain.toml](../../../rust-toolchain.toml) en el primer ús, i s’atura si el programa o Sparkle no tenen el codi per a algun dels dos processadors. `make universal` només compila el programa. L’app que hi ha dins porta una signatura diferent de la d’una compilació local, de manera que macOS manté documents recents i permisos de carpeta separats per a les dues.
-
-### Tests
-
-| Ordre | Comprova |
-|---|---|
-| `cargo test --release` | tests unitaris, aleatoris i de traducció |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | una cerca aleatòria més llarga; `SPLAT_FUZZ_SEED` varia les entrades |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | un sol idioma, mentre els altres són incomplets |
-| `cargo clippy --release --all-targets [--features selftest]` | lints, inclosa la justificació de cada bloc `unsafe`, la longitud de les funcions i, a la biblioteca, les conversions de nombres |
-| `cargo xtask check-library` | la biblioteca es compila per a Linux, així que res no necessita macOS |
-| `cargo xtask vendor check` | les biblioteques de JavaScript coincideixen amb `vendor.lock` byte per byte |
-| `cargo xtask selftest probe` | sense finestra, cadascun amb el seu resultat esperat: fórmules, diagrames, imatges web contra un servidor dins del procés, adreces bloquejades, el text que escriu cada ordre, cada format d’imatge a través de les dues exportacions, una pàgina que deixa de respondre i les defenses de les vistes web contra una pàgina sense elles. Triga uns trenta segons. El que necessita l’app al davant se salta amb la pantalla bloquejada |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | l’app en execució, clic a clic. Obre una finestra i hi escriu; el Mac queda ocupat durant uns quatre minuts. `--scenarios` només executa la segona part, en aproximadament un minut i mig. `--only` executa un grup d’aquesta part, en el seu propi document, també amb la pantalla bloquejada. `--in-back` deixa de banda el que necessita l’app al davant; sense això, aquesta comprovació falla |
-| `cargo xtask selftest resize` | eixampla la finestra després de moure el separador: el codi font es torna a ajustar mentre es canvia la mida de la finestra. Triga uns deu segons |
-| `cargo xtask selftest typing [--by-hand]` | escriu travessant els desaments, amb tecles a través de la cua d’esdeveniments de l’app o, amb `--by-hand`, a mà: el que s’escriu es conserva i consta com a no desat. Triga aproximadament un minut |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | temps d’obertura, d’escriptura i de desplaçament d’un fitxer gran; `--keystroke-ms` falla quan la pulsació més ràpida triga més |
-| `cargo test --release -- --ignored partial_updates` | una pulsació de tecla en 10 MB: actualització parcial contra completa, el mateix resultat en una quarta part del temps com a màxim |
-| `cargo test --release --test hostile` | documents fets per desbordar la pila o trigar un temps quadràtic, cadascun en dues mides els temps de les quals han de créixer com el text, a través de l’anàlisi, la disposició, les dues exportacions, les pulsacions de tecla i les ordres |
-| `make mutants` | errors introduïts un per un a `crates/splat-markdown`, `crates/splat-preview` i `crates/splat-file-state`, mitjançant [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); diu quins no els detecta cap test. Triga hores; `FILE=crates/splat-preview/src/bridge/mod.rs` l’acota |
-| `make fuzz` | entrada aleatòria amb [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), que necessita la versió nightly de rustup: pulsacions que s’han de llegir com una anàlisi completa, totes les sortides, les edicions a la previsualització, totes les ordres i un fitxer que es desa tal com s’ha obert. `SECONDS=600` cerca més temps |
-| `cargo test --release --test fuzz_seeds` | les llavors de `fuzz/seeds/` a través de les comprovacions d’aquests objectius de fuzzing, sense fuzzer; part de cada `cargo test` |
-| `cargo test --profile checked --workspace` | les proves amb el que una compilació de depuració comprova a més: després de cada anàlisi parcial els blocs encaixen amb el text, i el que arrossega és el que diu el text. Forma part de `make test-long` |
-| `cargo test --release --test entry_points --test structure` | a partir del codi font: tot el que crida el sistema està protegit contra panics, i els mòduls només depenen cap avall |
-| `cargo test --release --test decoder` | el procés descodificador descodifica imatges i no arriba ni als fitxers ni a la xarxa |
-| `make coverage` | cobertura de línies de `cargo test` i de tots els autotests, mitjançant [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); falla per sota dels mínims. Ocupa el Mac durant uns cinc minuts |
-| `make coverage-library` | els crates `splat-markdown`, `splat-preview`, `splat-file-state` i `splat-i18n` contra els seus mínims més alts, mesurats només per `cargo test` |
-
-Els tests unitaris són al costat del codi que proven. `crates/splat-testkit/tests/` conté el que arriba al model i a la previsualització des de fora: els tests aleatoris a `robustness.rs`, que comparteixen el generador de `splat-testkit` amb els de `sync.rs`, els documents fets per fer mal a `hostile.rs`, i les llavors dels objectius de fuzzing a `fuzz_seeds.rs`. `tests/` conté el que examina tot el programa: el seu codi font, les seves traduccions i el test del descodificador, que inicia el programa compilat. Les decisions de `src/editor/` que no necessiten finestra viuen en funcions lliures amb tests propis: tot el que sap el controlador i com canvia a `state.rs`, les regles de renderització a `render_queue.rs`, la còpia del text a `sync.rs`, els estils de paràgraf, els tipus de lletra i els colors com a valors a `render.rs`, què signifiquen els identificadors de la barra d’eines a `toolbar.rs`, què vol dir un clic en un enllaç a `navigation.rs`.
-
-Un pas de l’autotest de finestra espera una condició amb nom, no un temps; només el que no dóna cap senyal, com l’absència d’alguna cosa, conserva una pausa amb el seu motiu. Esperar en va és una comprovació fallida que diu què no va arribar mai, un pas que entra en pànic també és una comprovació fallida, i l’execució continua en tots dos casos. Una comprovació que en aquesta execució no pot dir res informa `SELFTEST SKIP`: xtask la llista, i ni passa ni falla. xtask exigeix a cada mode, i a `--scenarios` pel seu compte, uns nou dècims de les seves comprovacions. L’autotest de finestra executa una segona part després del seu recorregut principal de clics, a `src/editor/selftest/scenarios.rs`: totes les ordres de format i de taula, els diàlegs, els clics en enllaços, enganxar, deixar anar, les exportacions, un fitxer que ha canviat un altre programa, un canvi gran, imatges que canvien al disc, la pressió de memòria, un document enorme i la recuperació després d’una fallada. Cada grup obre un document propi, de manera que una fallada en un no arriba al següent, i cadascun es pot executar sol amb `--only`. L’autotest sense finestra també trenca el desament a propòsit: una carpeta que no accepta res, un fitxer de només lectura, una carpeta que ha desaparegut, un disc ple i un panic a cada callback d’un desament, i res d’això pot costar text.
-
-La cobertura té dos mínims: cada mòdul almenys el 84 % de les seves línies, tots els mòduls junts almenys el 96 %. `make coverage` mesura `cargo test` juntament amb els autotests i falla per sota de qualsevol dels dos; `make coverage-library` exigeix el 90 % i el 97 % al que no necessita finestra. Els mínims i les poques excepcions, com el panic hook de `main.rs` que només s’executa en una fallada, són a [xtask](../../../xtask/src/coverage.rs) al costat dels seus motius. Les compilacions mesurades van a `target/coverage/`, de manera que el codi de mesura no arriba mai a `target/release/` ni a una imatge de disc. El procés auxiliar descodificador obre el seu fitxer de mesura abans d’aïllar-se, així que també es mesura.
-
-La CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) executa `make check`, `make coverage-library` i la compilació universal en Apple Silicon i `cargo test` en Intel a cada push a `main` i a cada pull request. Cada nit, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) executa `make test-long` amb entrades aleatòries noves. Els autotests i la imatge de disc es queden al Mac del desenvolupador: necessiten una pantalla i els certificats de signatura al clauer.
-
-La sortida dels autotests va a `target/selftest/`. L’autotest compila una app separada (`target/release/Splat Selftest.app`, identificador de paquet `local.splat.selftest`) i deixa intactes els ajustos, els documents recents i les associacions de fitxers de l’app normal.
-
-### Estructura del projecte
-
-Tot el que no necessita finestra és un crate propi a `crates/`, que es compila sense macOS, de manera que el compilador fa complir com depenen els uns dels altres. L’app de `src/` (paquet `splat-app`, programa `splat`) s’hi recolza.
-
-- `crates/splat-markdown/`: l’arbre que llegeix tothom, `Doc` a `doc/`, que és propietari del seu text, i l’única connexió amb l’analitzador a `reader/`: comrak no es nomena enlloc més, i `reader/assumptions.rs` recull el que el codi suposa d’ell. Els colors de sintaxi, i totes les ordres com a edicions de text pures (`Edit`) a `commands/`. També la reanàlisi després d’una edició (`incremental.rs`), el lector de l’HTML incrustat (`markup.rs`), la tipografia, les etiquetes, les referències i les cites dins del text corregut (`typography.rs`), com es veu el text i quin Markdown i HTML el fan així (`style.rs`), què pot ser una adreça (`url.rs`), i l’exportació a HTML i a Word (`html.rs`, `docx.rs` amb `docx/html.rs` i `docx/xml.rs`). Una posició té el seu tipus: `Byte` al text font, `U16` a la vista del codi font, `Shown` a la vista de previsualització (`text.rs`).
-- `crates/splat-preview/`: la disposició de la previsualització a `layout/`, amb l’HTML incrustat a `layout/html.rs`, i la correspondència entre previsualització i codi font (`Bridge`, `Index`). Un `Bridge` rebutja una disposició d’una altra versió del `Doc`.
-- `crates/splat-file-state/`: quin text conté un fitxer, en quin format i què significa mirar-lo.
-- `crates/splat-i18n/` amb `resources/*.lproj`: 35 idiomes; les claus són els textos en alemany, i l’app instal·la la taula de l’idioma de la interfície en iniciar-se.
-- `crates/splat-testkit/`: el generador dels tests aleatoris i les comprovacions dels objectius de fuzzing.
-- `src/editor/`: la finestra. Un únic objecte `EditorController` serveix AppKit com a delegat de totes dues vistes i reenvia a components, estructures petites sobre el controlador i l’estat que posseeixen, els camps de les quals els altres mòduls no poden tocar:
-
-| Mòdul | Responsabilitat |
-|---|---|
-| `controller.rs` | classe, mètodes del delegat que reenvien, `invalidate`, i el que la resta del programa diu a un editor; només ell arriba als components |
-| `panes.rs` | `Panes`: les vistes de text, l’esquema, mostrar i amagar panells, i el que dóna accés a les vistes |
-| `controller/layers.rs` | qui pot arribar a qui: un component rep un accés al controlador que ofereix el que té a sota, i el compilador ho fa complir |
-| `state.rs` | el que el controlador sap del document i totes les maneres com canvia; els seus camps són privats i no toca cap vista |
-| `model.rs` | presta l’estat i la còpia del text a closures que no poden arribar a cap vista |
-| `actions.rs` | registre d’ordres: selector, títol, drecera, símbol, quan s’aplica l’ordre |
-| `editing.rs` | `Editing`: execució i validació d’ordres, escriptura a la previsualització |
-| `update.rs` | `Updater`: anàlisi, coloració, actualització de la previsualització; després d’una edició, només els paràgrafs afectats |
-| `sync.rs` | còpia del text i comptabilitat de blocs, sense AppKit i amb tests aleatoris |
-| `progressive.rs` | `Progressive`: renderització de previsualitzacions grans pas a pas |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selecció i posició de desplaçament dels dos panells, sincronitzades |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: l’editor de fórmules i de diagrames |
-| `navigation.rs`, `links.rs` | `Links`: enllaços, enllaços wiki, etiquetes, caselles de tasca, plegat, notes a peu de pàgina |
-| `env.rs` | el que la previsualització llegeix de fora del text: la puntuació tipogràfica, el dipòsit per a `@name` i `#12`, el fitxer BibTeX, les notes incrustades |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | text de la previsualització, imatges locals i remotes; `Pictures` a `images.rs` |
-| `attributes.rs` | atributs de text; cada clau només rep un valor del tipus que espera |
-| `shadow.rs` | còpies del text sense desar per a la recuperació després d’una fallada |
-| `decoder.rs` | processos auxiliars aïllats que descodifiquen imatges i gràfics |
-| `export.rs`, `outline.rs` | `Sharing`: exportació a HTML i a Word, el fitxer de compartició, la impressió; la barra lateral d’esquema |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit per a MathJax, Mermaid, Graphviz, PlantUML i l’editor visual de fórmules; les regles de què es renderitza quan, al marge de WebKit |
-| `webkit.rs` | crides a WebKit; només la vida del delegat de navegació es queda amb `js.rs` i `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | construcció de la finestra, barra d’eines, vistes de text, diàlegs, colors |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: barra de menús, delegat de l’app, document (`MDDocument`, una subclasse de `NSDocument`).
-- `src/util/`: fils de treball (`lanes.rs`), volums que poden deixar de respondre (`volumes.rs`), ajudes d’AppKit, fitxers i processos. `src/diag.rs`: el que va malament fora de la vista de l’usuari va al registre del sistema, sense cap text d’un document.
-- `src/large_alloc.rs`: les assignacions grans vénen directament del nucli i hi tornen quan s’alliberen, de manera que la memòria torna després de grans edicions.
-- `resources/js/`: pàgines web i biblioteques; versions i sumes de verificació a [vendor.lock](../../../vendor.lock).
-- `xtask/`: empaquetat, signatura, la imatge de disc, la icona, la incorporació de biblioteques, l’executor d’autotests i els mínims de cobertura.
-
-### Flux de dades
-
-El text del codi font a la vista de text de l’esquerra és l’única font de veritat.
-
-1. Cada canvi de caràcter hi actualitza al mateix lloc la còpia del text (`Snapshot`), sense tornar a llegir el text.
-2. Una actualització analitza la còpia, torna a acolorir el codi font només on els colors han canviat, disposa la previsualització i substitueix només els blocs el contingut dels quals ha canviat.
-3. Després d’una edició, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats, mentre els veïns es mantinguin iguals; [docs/partial-parse.md](../../../docs/partial-parse.md) explica per què això dona el mateix que una anàlisi completa i què cal mirar quan canvia comrak. Els documents amb blocs de comentaris `%%`, els canvis al front matter i, en un document amb definicions de referències d’enllaços, els canvis en una part que conté un claudàtor es processen sencers. comrak només reconeix una referència de nota a peu de pàgina amb la seva definició en la mateixa anàlisi i mou les definicions darrere del text, de manera que la part s’analitza amb una definició substituta per etiqueta i pren els seus números de l’arbre antic; un canvi a les referències o a les definicions de la part, o al costat d’una nota en línia, es processa sencer.
-4. Els blocs HTML que obren `<details>` o `<div align>` i el tanquen més tard afecten els blocs Markdown d’entremig; un bloc reutilitzat ha de tenir el mateix entorn.
-5. Mentre escrius al codi font d’un document de fins a 2 MB, l’actualització parcial s’executa a l’instant; quan no es pot aplicar, o en un document més gran, l’anàlisi i la disposició s’executen en segon pla. Mentre escrius a la previsualització, s’executen a l’instant, perquè el cursor de la previsualització depèn del resultat.
-6. L’entrada a la previsualització la tradueix `Bridge` en una edició del codi font i d’allà segueix el mateix camí. Markdown té massa maneres de convertir text en sintaxi per bastar-hi només regles, així que `preview/verify.rs` torna a analitzar la part canviada i compara el que mostra amb el que s’ha escrit; una edició que no se sosté s’escapa més o es rebutja.
-7. Les posicions en línia de comrak fallen en uns pocs llocs, per exemple darrere d’una definició de referència d’enllaç. `reader/positions.rs` les comprova amb el codi font en llegir un bloc i les torna a llegir del codi font on no encaixen.
-
-### Regles al controlador
-
-1. Els canvis propis del controlador a les vistes s’executen dins de `Panes::silently`; les crides de retorn del delegat els ignoren. A tota la resta les vistes només es poden llegir, de manera que el compilador ho comprova. El que les crides de retorn han d’escoltar, o el que lliura una vista a AppKit, ho diu passant per `Panes::for_appkit`.
-2. L’estat només es pren prestat per llegir i calcular, mai durant una crida que canvia, disposa o desplaça una vista: `Model` el presta a closures `Send`, i cap vista no és `Send`, de manera que el compilador ho comprova. Només canvia amb els seus propis mètodes, els tests dels quals no necessiten finestra.
-3. Els missatges de fora (una imatge carregada, una fórmula renderitzada) arriben diferits mitjançant `renders_arrived` i `image_arrived`, mai enmig d’una actualització.
-4. Tornar a dibuixar sense un canvi de text passa només per `invalidate(reason)`.
-5. La còpia del text no es reté durant un canvi del codi font, o aquest canvi copia el text sencer: `with_text` la presta només mentre dura un closure `Send`.
-6. Una ordre nova necessita una entrada a `actions.rs`, un mètode a `controller.rs` i una branca a `Editing::perform`.
-7. Cada bloc `unsafe` porta la seva justificació com a comentari `// SAFETY:`. Els bytes arriben als descodificadors d’imatge del sistema només al procés auxiliar, mitjançant `decoder::decode_native`; un test escaneja les fonts a la cerca d’altres crides.
-8. Res al fil principal espera les carpetes de l’usuari, ja que un volum de xarxa pot deixar de respondre: els fitxers es consulten al fil `DISK`, i la previsualització llegeix les respostes mitjançant `Env::known`. Només una acció que l’usuari espera, com una exportació o desar, pot tocar el disc directament.
-9. El que ha d’acabar també acaba després d’un panic, ja que el fil principal en sobreviu: una marca activada passa per `with_raised`, una edició de l’emmagatzematge de text per `editing`, i el que el desfer no ha de saber per `without_undo`. Un test troba els casos escrits a mà.
-10. Una adreça en un document té una sola lectura, a `splat_markdown::url`; un test troba els esquemes comparats a mà.
-
-### Afegir una ordre
-
-La barra de menús, la barra d’eines i el menú contextual construeixen els seus elements a partir del registre de [src/editor/actions.rs](../../../src/editor/actions.rs), i la validació de menús hi llegeix quan s’aplica una ordre i si mostra una marca de selecció. Una ordre nova necessita:
-
-1. una variant d’`Action` amb el seu `Spec`: selector, títol, etiqueta de la barra d’eines, indicador (que comenci amb un verb, de 75 caràcters com a màxim), drecera, SF Symbol i quan s’aplica
-2. el mètode a `src/editor/controller.rs`
-3. una branca a `Editing::perform`
-4. els seus textos a cada `Localizable.strings`
-
-El test `every_command_has_a_method_and_every_method_a_command` comprova que el registre i els mètodes coincideixin. Les dreceres estàndard d’Apple com ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F i ⌘, es deixen intactes.
-
-### Traduccions
-
-El codi fa servir el text en alemany com a clau: `t("Fett")` el cerca en temps d’execució, `n("Fett")` marca una constant per a una cerca posterior. Cada `resources/<language>.lproj/` conté:
-
-- `Localizable.strings`: tots els textos de la interfície, termes de menú segons els glossaris d’Apple
-- `InfoPlist.strings`: els noms que macOS mostra per a l’app i el seu tipus de document
-- `QuickReference.md`: la referència ràpida de Markdown
-
-`cargo xtask bundle` llista cada carpeta `.lproj` com a localització, i `CFBundleDevelopmentRegion` és l’anglès, de manera que els menús del sistema i el diàleg de desar segueixen el mateix idioma. El test d’i18n comprova que cada idioma té cada text i que cada referència ràpida té l’esquema de l’alemanya.
-
-`assets/readme/<language>/` conté aquest README en aquell idioma, la seva captura de pantalla i el document de demostració que mostra la captura. Un canvi en aquest README també s’ha de fer en aquestes còpies.
+La compilació, les proves, l’estructura del codi i les regles que segueix es descriuen a [docs/development.md](../../../docs/development.md) (en anglès).
 
 ### Components de tercers
 
@@ -754,6 +631,10 @@ El codi fa servir el text en alemany com a clau: `t("Fett")` el cerca en temps d
 | [image](https://github.com/image-rs/image) | 0.25 | descodificació de PNG, JPEG, GIF, WebP i BMP | MIT o Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | alineació de les columnes de les taules | MIT o Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | els noms de les referències de caràcters HTML | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | descomprimir fitxers del Word i objectes de Git | MIT, Zlib o Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | llegir l’XML dels fitxers del Word | MIT o Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | noms i cerca entre lletres compostes i descompostes | MIT o Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | mantenir literal el text semblant a `:shortcode:` en text importat | MIT o Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | renderització de fórmules | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | editor visual de fórmules, amb tipus de lletra KaTeX | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | diagrames de Mermaid | MIT |

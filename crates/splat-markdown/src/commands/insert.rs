@@ -46,6 +46,8 @@ pub fn insert_block(text: &str, sel: Range<Byte>, block: &str, cursor: usize) ->
     }
 }
 
+/// A code block fenced for `lang` at the caret, or around the lines of the selection with a fence longer than any run
+/// of backticks in them.
 pub fn insert_code_block(text: &str, sel: Range<Byte>, lang: &str) -> Edit {
     if sel.is_empty() {
         let block = format!("```{lang}\n\n```");
@@ -246,10 +248,13 @@ fn is_toc(list: &Block) -> bool {
     links > 0 && !foreign
 }
 
+/// A horizontal rule, `---`, as a block of its own at the caret.
 pub fn insert_rule(text: &str, sel: Range<Byte>) -> Edit {
     insert_block(text, sel, "---", 3)
 }
 
+/// A table at the caret of `rows` rows, the header row among them, and `cols` columns, with the name of the first
+/// column selected.
 pub fn insert_table(text: &str, sel: Range<Byte>, rows: usize, cols: usize) -> Edit {
     let table = crate::table::new_table(rows, cols);
     let mut e = insert_block(text, sel, &table, 2);
@@ -258,6 +263,7 @@ pub fn insert_table(text: &str, sel: Range<Byte>, rows: usize, cols: usize) -> E
     e
 }
 
+/// `[label](url)` in place of the selection; a blank label takes the address.
 pub fn insert_link(sel: Range<Byte>, url: &str, label: &str) -> Edit {
     let label = if label.trim().is_empty() { url } else { label };
     let replacement = format!("[{}]({})", escape_label(label), link_destination(url));
@@ -269,6 +275,7 @@ pub fn insert_link(sel: Range<Byte>, url: &str, label: &str) -> Edit {
     }
 }
 
+/// `![alt](path)` in place of the selection.
 pub fn insert_image(sel: Range<Byte>, alt: &str, path: &str) -> Edit {
     let replacement = format!("![{}]({})", escape_label(alt), link_destination(path));
     let end = sel.start + replacement.len();
@@ -283,6 +290,7 @@ fn escape_label(s: &str) -> String {
     s.replace('\\', "\\\\").replace('[', "\\[").replace(']', "\\]")
 }
 
+/// `url` as a link destination: in angle brackets when it holds a space or a parenthesis, which would end it otherwise.
 pub fn link_destination(url: &str) -> String {
     if url.contains([' ', '(', ')']) {
         format!("<{}>", url.replace('>', "%3E"))
@@ -291,6 +299,7 @@ pub fn link_destination(url: &str) -> String {
     }
 }
 
+/// `$…$` around a selection inside a line, or a `$$` block at the caret or around a selection over several lines.
 pub fn insert_formula(text: &str, sel: Range<Byte>) -> Edit {
     let selected = text.at(sel.clone());
     if !selected.trim().is_empty() && !selected.contains('\n') {
@@ -316,11 +325,14 @@ pub fn insert_formula(text: &str, sel: Range<Byte>) -> Edit {
     }
 }
 
+/// A ` ```mermaid ` block holding `template`, as a block of its own at the caret.
 pub fn insert_diagram(text: &str, sel: Range<Byte>, template: &str) -> Edit {
     let block = format!("```mermaid\n{template}\n```");
     insert_block(text, sel, &block, "```mermaid\n".len())
 }
 
+/// A reference `[^n]` behind the selection, with the lowest number not in the text yet, and its definition at the end
+/// of the text, where the caret goes.
 pub fn insert_footnote(text: &str, sel: Range<Byte>) -> Edit {
     let mut n = 1;
     while text.contains(&format!("[^{n}]")) {

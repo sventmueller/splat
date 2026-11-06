@@ -57,6 +57,13 @@ pub enum Action {
     LoadRemoteImages,
     ExportHtml,
     ExportWord,
+    PasteMarkdown,
+    EditMetadata,
+    ExportOptions,
+    ToggleFiles,
+    SearchFolder,
+    ToggleWordCount,
+    ToggleChanges,
     /// Targets of controls in the editor window rather than menu items of their own.
     EditAtomAt,
     AtomSnippet,
@@ -90,7 +97,7 @@ pub struct Spec {
 }
 
 impl Action {
-    pub const ALL: [Action; 47] = {
+    pub const ALL: [Action; 54] = {
         use Action::*;
         [
             Bold,
@@ -136,6 +143,13 @@ impl Action {
             LoadRemoteImages,
             ExportHtml,
             ExportWord,
+            PasteMarkdown,
+            EditMetadata,
+            ExportOptions,
+            ToggleFiles,
+            SearchFolder,
+            ToggleWordCount,
+            ToggleChanges,
             EditAtomAt,
             AtomSnippet,
             AtomMode,
@@ -191,6 +205,13 @@ impl Action {
             LoadRemoteImages => (sel!(mdLoadRemoteImages:), n("Bilder laden"), "", "", "", "", Always),
             ExportHtml => (sel!(mdExportHTML:), n("Als HTML exportieren …"), "", "", "", "", Always),
             ExportWord => (sel!(mdExportWord:), n("Als Word-Dokument exportieren …"), "", "", "", "", Always),
+            PasteMarkdown => (sel!(mdPasteMarkdown:), n("Als Markdown einsetzen"), "", n("Formatierten Text als Markdown einsetzen"), "ctrl+cmd+v", "doc.on.clipboard", InText),
+            EditMetadata => (sel!(mdEditMetadata:), n("Metadaten bearbeiten …"), n("Metadaten"), n("Metadaten des Dokuments in einem Formular bearbeiten"), "", "tag", Always),
+            ExportOptions => (sel!(mdExportOptions:), n("Exportoptionen …"), "", "", "", "", Always),
+            ToggleFiles => (sel!(mdToggleFiles:), n("Dateien einblenden"), "", "", "ctrl+cmd+e", "folder", Always),
+            SearchFolder => (sel!(mdSearchFolder:), n("In allen Notizen suchen …"), "", "", "shift+cmd+f", "magnifyingglass", Always),
+            ToggleWordCount => (sel!(mdToggleWordCount:), n("Wortanzahl ausblenden"), "", "", "", "", Always),
+            ToggleChanges => (sel!(mdToggleChanges:), n("Änderungen seit dem letzten Commit"), "", "", "", "", Always),
             EditAtomAt => (sel!(mdEditAtomAt:), "", "", "", "", "", Always),
             AtomSnippet => (sel!(mdAtomSnippet:), "", "", "", "", "", Always),
             AtomMode => (sel!(mdAtomMode:), "", "", "", "", "", Always),

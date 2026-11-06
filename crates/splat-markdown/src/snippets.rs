@@ -1,3 +1,6 @@
+//! The building blocks of the formula and diagram editors: TeX templates with placeholders, and the Mermaid code each
+//! diagram action adds.
+
 use crate::text::Direction;
 use crate::text::{Byte, line_start};
 use std::ops::Range;
@@ -5,14 +8,20 @@ use std::ops::Range;
 use splat_i18n::{n, t};
 
 /// Spot to fill in a formula template; the Tab key moves between them.
-pub const PLACEHOLDER: char = '□';
+pub(crate) const PLACEHOLDER: char = '□';
 
+/// A TeX template behind a button of the formula editor.
 pub struct Snippet {
+    /// What the button shows.
     pub label: &'static str,
+    /// The tooltip, as the German key of the interface texts.
     pub tip: &'static str,
+    /// The TeX it inserts, with `□` placeholders to fill.
     pub text: &'static str,
 }
 
+/// The templates of the formula editor's buttons: fraction, root, powers, sums, integrals, limits, brackets and a
+/// matrix.
 pub const FORMULA_BUTTONS: &[Snippet] = &[
     Snippet {
         label: "a⁄b",
@@ -61,6 +70,7 @@ pub const FORMULA_BUTTONS: &[Snippet] = &[
     },
 ];
 
+/// Greek letters, each with the TeX command that writes it.
 pub const GREEK: &[(&str, &str)] = &[
     ("α", "\\alpha "),
     ("β", "\\beta "),
@@ -86,6 +96,7 @@ pub const GREEK: &[(&str, &str)] = &[
     ("Ω", "\\Omega "),
 ];
 
+/// Relations, operators and other symbols, each with the TeX command that writes it.
 pub const RELATIONS: &[(&str, &str)] = &[
     ("≤", "\\le "),
     ("≥", "\\ge "),
@@ -139,14 +150,20 @@ pub fn next_placeholder(text: &str, caret: usize, way: Direction) -> Option<Rang
     pick.map(|&i| i..i + PLACEHOLDER.len_utf8())
 }
 
+/// The kinds of Mermaid diagram the diagram editor has actions for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MermaidKind {
+    /// `flowchart` or `graph`.
     Flowchart,
+    /// `sequenceDiagram`.
     Sequence,
+    /// `gantt`.
     Gantt,
+    /// Any other kind, or none named.
     Other,
 }
 
+/// The kind of Mermaid diagram `code` is, from the first word that is no `%%` comment.
 pub fn diagram_kind(code: &str) -> MermaidKind {
     let first = code
         .lines()
@@ -162,16 +179,23 @@ pub fn diagram_kind(code: &str) -> MermaidKind {
     }
 }
 
+/// The shapes of a flowchart node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
+    /// `A[Text]`.
     Rectangle,
+    /// `A(Text)`.
     Rounded,
+    /// `A{Text}`, a decision.
     Diamond,
+    /// `A((Text))`.
     Circle,
+    /// `A[(Text)]`, a cylinder.
     Database,
 }
 
 impl Shape {
+    /// Every shape with its name in the interface, as a German key.
     pub const ALL: [(Shape, &'static str); 5] = [
         (Shape::Rectangle, n("Rechteck")),
         (Shape::Rounded, n("Abgerundet")),
@@ -193,24 +217,40 @@ impl Shape {
     }
 }
 
+/// What a button of the diagram editor adds to the Mermaid code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagramAction {
+    /// A flowchart node of the shape, with an id not taken yet.
     Node(Shape),
+    /// An arrow from the last node to a new one.
     Edge,
+    /// An arrow with a label from the last node to a new one.
     LabeledEdge,
+    /// The direction of a flowchart, `TD`, `LR`, `BT` or `RL`, written into its first line.
     Direction(&'static str),
+    /// A `subgraph` holding a new node.
     Group,
+    /// A participant of a sequence diagram, with a name not taken yet.
     Participant,
+    /// A message from the first participant to the second.
     Message,
+    /// A dashed reply from the second participant to the first.
     Reply,
+    /// A note right of the first participant.
     Note,
+    /// A `loop` around a message.
     Loop,
+    /// An `alt` block with two cases.
     Alternative,
+    /// A section of a Gantt chart.
     Section,
+    /// A Gantt task of three days, after the last task or from today.
     Task,
+    /// A Gantt milestone, after the last task or on today.
     Milestone,
 }
 
+/// The directions of a flowchart, each with its name in the interface as a German key.
 pub const DIRECTIONS: [(&str, &str); 4] = [
     ("TD", n("Oben nach unten")),
     ("LR", n("Links nach rechts")),
@@ -221,7 +261,9 @@ pub const DIRECTIONS: [(&str, &str); 4] = [
 /// A change to the diagram code: lines inserted after the caret's line, or a replaced range.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagramEdit {
+    /// The byte range of the code it replaces; empty for an insertion.
     pub range: Range<usize>,
+    /// The code that goes there.
     pub text: String,
     /// Part of `text` to select afterwards, usually the first label to rename.
     pub select: Range<usize>,

@@ -9,7 +9,8 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSRange, NSString, NSUndoManager};
 
-use crate::markdown::text::{Byte, Shown, U16, Utf16Map};
+use crate::markdown::text::{Byte, U16, Utf16Map};
+use crate::preview::map::Shown;
 
 /// Reads a constant that AppKit, Foundation or WebKit exports.
 macro_rules! constant {

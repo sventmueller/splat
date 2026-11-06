@@ -1,32 +1,41 @@
+//! Positions in the preview text, counted in [`Shown`] units, and how they map to byte offsets in the source and back.
+
 use std::ops::Range;
 
 use splat_markdown::commands::leaf_at;
 use splat_markdown::doc::Doc;
-pub use splat_markdown::text::Shown;
 use splat_markdown::text::{Byte, TextAt, is_quote_prefix, line_start, lines_with_ends, utf16_len};
+
+pub use crate::Shown;
 
 use super::layout::{CharMap, Layout, Para, ParaKind, Run, RunMap, RunStyle};
 
 /// Position of a paragraph in the preview text.
 #[derive(Debug, Clone, Copy)]
 pub struct ParaPos {
+    /// The index of its top-level block in the layout.
     pub block: usize,
+    /// The index of the paragraph in its block.
     pub para: usize,
+    /// Where it starts in the preview text.
     pub start: Shown,
     /// In UTF-16 units.
     pub len: usize,
 }
 
+/// Where each paragraph of a layout starts in the preview text.
 #[derive(Debug, Default)]
 pub struct Index {
+    /// The place of every paragraph, in the order of the preview text.
     pub paras: Vec<ParaPos>,
+    /// Where each top-level block starts in the preview text.
     pub block_starts: Vec<Shown>,
     /// Blocks in source order; comrak moves footnote definitions written earlier in the text behind them.
     pub in_order: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InsertPoint {
+pub(crate) struct InsertPoint {
     pub src: Byte,
     pub code: bool,
     pub at_para_start: bool,
@@ -36,6 +45,7 @@ pub struct InsertPoint {
 }
 
 impl Index {
+    /// The index of `layout`, with a separator behind each paragraph.
     pub fn new(layout: &Layout) -> Index {
         let mut paras = Vec::new();
         let mut block_starts = Vec::new();
@@ -80,6 +90,7 @@ impl Index {
             && self.paras.is_sorted_by_key(|p| p.start)
     }
 
+    /// The paragraph `i` of the index, looked up in `layout`.
     pub fn para<'a>(&self, layout: &'a Layout, i: usize) -> &'a Para {
         let place = self.paras[i];
         &layout.blocks[place.block].paras[place.para]
@@ -87,7 +98,7 @@ impl Index {
 }
 
 /// UTF-16 length of the list or footnote marker at the start of a paragraph.
-pub fn marker_len(para: &Para) -> usize {
+pub(crate) fn marker_len(para: &Para) -> usize {
     match para.runs.first() {
         Some(r)
             if matches!(
@@ -135,7 +146,7 @@ fn behind_line_prefix(text: &str, next: Option<&Run>, from: Byte) -> Option<Byte
 }
 
 /// Source position of the start of a paragraph's content.
-pub fn content_start(para: &Para) -> Byte {
+pub(crate) fn content_start(para: &Para) -> Byte {
     match para.runs.first() {
         Some(r) => match &r.map {
             RunMap::Text { chars, end } => text_source(chars, &r.text, *end, 0),
@@ -158,7 +169,7 @@ fn behind_atom(run: &Run, next: Option<&Run>) -> Option<Byte> {
 }
 
 /// Where text typed at preview offset `p` goes. The character left of the caret decides, like typing attributes.
-pub fn insert_point(layout: &Layout, index: &Index, p: Shown) -> Option<InsertPoint> {
+pub(crate) fn insert_point(layout: &Layout, index: &Index, p: Shown) -> Option<InsertPoint> {
     let para_index = index.para_at(p)?;
     let place = index.paras[para_index];
     let para = index.para(layout, para_index);
@@ -262,7 +273,7 @@ pub fn preview_offset(layout: &Layout, index: &Index, src: Byte) -> Shown {
 }
 
 /// Kinds whose paragraphs can be joined by deleting the break between them.
-pub fn mergeable(kind: &ParaKind) -> bool {
+pub(crate) fn mergeable(kind: &ParaKind) -> bool {
     matches!(kind, ParaKind::Body | ParaKind::Heading(_) | ParaKind::FootnoteDef)
 }
 
@@ -297,7 +308,7 @@ fn first_shown(para: &Para) -> Byte {
 
 /// What the break between two paragraphs holds that the preview does not show.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Hidden {
+pub(crate) struct Hidden {
     /// From behind the first paragraph up to the end of the last line that is not blank.
     pub lines: Range<Byte>,
     /// The end of the second paragraph, behind which it goes when the two become one.
@@ -346,7 +357,7 @@ fn joins(index: &Index, layout: &Layout, range: &Range<Shown>, first: usize, las
 
 /// What a deletion of `range` would carry away unseen if it only joined the paragraphs on either side of it. A selection
 /// over a whole paragraph between them takes along what lies between, like any other stretch of the text.
-pub fn hidden_in_join(doc: &Doc, layout: &Layout, index: &Index, range: &Range<Shown>) -> Option<Hidden> {
+pub(crate) fn hidden_in_join(doc: &Doc, layout: &Layout, index: &Index, range: &Range<Shown>) -> Option<Hidden> {
     let (first, last) = (index.para_at(range.start)?, index.para_at(range.end)?);
     if last != first + 1 || !joins(index, layout, range, first, last) {
         return None;
@@ -356,7 +367,7 @@ pub fn hidden_in_join(doc: &Doc, layout: &Layout, index: &Index, range: &Range<S
 
 /// Where the break between two joined paragraphs ends up.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Join {
+pub(crate) enum Join {
     /// Outside of the markup of both.
     AroundMarkup,
     /// Between their text, which runs them into one span where their markup is the same: `*a*` and `*b*` make `*ab*`.
@@ -365,7 +376,13 @@ pub enum Join {
 
 /// Source ranges to delete for a preview range. Markup between rendered characters stays,
 /// unless the range joins two paragraphs.
-pub fn deletion_ranges(doc: &Doc, layout: &Layout, index: &Index, range: Range<Shown>, join: Join) -> Vec<Range<Byte>> {
+pub(crate) fn deletion_ranges(
+    doc: &Doc,
+    layout: &Layout,
+    index: &Index,
+    range: Range<Shown>,
+    join: Join,
+) -> Vec<Range<Byte>> {
     let text = doc.text();
     let mut out = Vec::new();
     let (Some(first), Some(last)) = (index.para_at(range.start), index.para_at(range.end)) else {
@@ -414,7 +431,7 @@ pub fn deletion_ranges(doc: &Doc, layout: &Layout, index: &Index, range: Range<S
     normalize(out)
 }
 
-pub fn normalize(mut ranges: Vec<Range<Byte>>) -> Vec<Range<Byte>> {
+pub(crate) fn normalize(mut ranges: Vec<Range<Byte>>) -> Vec<Range<Byte>> {
     ranges.retain(|r| r.start < r.end);
     ranges.sort_by_key(|r| r.start);
     let mut out: Vec<Range<Byte>> = Vec::new();

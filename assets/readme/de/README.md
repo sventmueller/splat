@@ -4,7 +4,7 @@
 
 **Der Markdown-Editor für macOS, in dem du im Quelltext oder direkt in der Vorschau schreibst.**
 
-Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine live aktualisierte, voll bearbeitbare Vorschau. Du kannst in beiden tippen: Was du in der Vorschau schreibst, wird zu einer minimalen Änderung am Quelltext, sodass unberührte Zeilen Byte für Byte identisch bleiben und deine Git-Diffs sauber bleiben. Splat liest das Markdown, das du ohnehin benutzt: CommonMark und GitHub Flavored Markdown, GitHub-Alerts, Wiki-Links, Einbettungen und Hinweisboxen aus Obsidian, Erweiterungen von Pandoc und Typora, eingebettetes HTML, LaTeX-Formeln sowie Diagramme in Mermaid, Graphviz und PlantUML, alles offline dargestellt. Der Export als PDF, HTML oder Word geht mit einem Klick. Splat ist in Rust auf echten AppKit-Steuerelementen geschrieben, spricht 35 Sprachen und sendet nichts über das Netzwerk, solange du es nicht willst.
+Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine live aktualisierte, voll bearbeitbare Vorschau. Du kannst in beiden tippen: Was du in der Vorschau schreibst, wird zu einer minimalen Änderung am Quelltext, sodass unberührte Zeilen Byte für Byte identisch bleiben und deine Git-Diffs sauber bleiben. Splat liest das Markdown, das du ohnehin benutzt: CommonMark und GitHub Flavored Markdown, GitHub-Alerts, Wiki-Links, Einbettungen und Hinweisboxen aus Obsidian, Erweiterungen von Pandoc und Typora, eingebettetes HTML, LaTeX-Formeln sowie Diagramme in Mermaid, Graphviz und PlantUML, alles offline dargestellt. Blättere durch einen ganzen Ordner voller Notizen und durchsuche ihn, sieh, was sich seit dem letzten Git-Commit geändert hat, setze Text aus Word oder von einer Webseite als Markdown ein und exportiere mit einem Klick als PDF, HTML oder Word. Splat ist in Rust auf echten AppKit-Steuerelementen geschrieben, spricht 35 Sprachen und sendet nichts über das Netzwerk, solange du es nicht willst.
  
 
 
@@ -81,6 +81,8 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
   - [Formatierungsbefehle](#formatierungsbefehle)
   - [Listen und Aufgaben](#listen-und-aufgaben)
   - [Tabellen](#tabellen)
+  - [Formatierten Text einsetzen](#formatierten-text-einsetzen)
+  - [Metadaten](#metadaten)
 - [Unterstütztes Markdown](#unterstütztes-markdown)
   - [CommonMark und GitHub Flavored Markdown](#commonmark-und-github-flavored-markdown)
   - [Hinweisboxen](#hinweisboxen)
@@ -94,7 +96,10 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
 - [Diagramme](#diagramme)
 - [Bilder](#bilder)
 - [Links und Navigation](#links-und-navigation)
+- [Notizen in einem Ordner](#notizen-in-einem-ordner)
+- [Änderungen seit dem letzten Commit](#änderungen-seit-dem-letzten-commit)
 - [Exportieren, Drucken und Teilen](#exportieren-drucken-und-teilen)
+- [Word-Dokumente importieren](#word-dokumente-importieren)
 - [Darstellung und Bedienungshilfen](#darstellung-und-bedienungshilfen)
 - [Sprachen](#sprachen)
 - [Kurzbefehle](#kurzbefehle)
@@ -103,14 +108,6 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
 - [Fehlerbehebung](#fehlerbehebung)
 - [Für Entwickler](#für-entwickler)
-  - [Bauen](#bauen)
-  - [Verteilung](#verteilung)
-  - [Testen](#testen)
-  - [Projektaufbau](#projektaufbau)
-  - [Datenfluss](#datenfluss)
-  - [Regeln im Controller](#regeln-im-controller)
-  - [Einen Befehl hinzufügen](#einen-befehl-hinzufügen)
-  - [Übersetzungen](#übersetzungen)
   - [Komponenten von Drittanbietern](#komponenten-von-drittanbietern)
 - [Lizenz](#lizenz)
 
@@ -120,7 +117,10 @@ Splat zeigt links deinen Markdown-Quelltext mit Syntaxfarben und rechts eine liv
 - **Das Markdown, das du ohnehin benutzt.** CommonMark, GitHub Flavored Markdown, GitHub-Alerts, Erweiterungen von Obsidian, Pandoc und Typora, Emoji-Kürzel, Spoiler, Definitionslisten, Überschriftenanker und HTML wie in GitHub-READMEs.
 - **Formeln und Diagramme eingebaut.** LaTeX-Formeln über MathJax, mit einem visuellen Formeleditor. Diagramme in Mermaid, Graphviz und PlantUML, auf deinem Mac dargestellt, ohne Java, Server oder Netzwerkverbindung.
 - **Für alles eine Schaltfläche.** Jedes Markdown-Element hat eine Schaltfläche in der Symbolleiste und einen Menübefehl, die gängigen auch einen Kurzbefehl. Tabellen haben ein eigenes Menü für Zeilen, Spalten und Ausrichtung.
-- **Export ohne Verluste.** PDF, eine einzelne, in sich geschlossene HTML-Datei oder ein Word-Dokument mit echten Überschriften, Listen, Tabellen, Fußnoten und Bildern.
+- **Ein Ordner, nicht nur eine Datei.** Die Seitenleiste listet die Notizen rund um ein Dokument auf und durchsucht sie alle. Wird eine Notiz umbenannt, ändern sich die Links auf sie, und jedes Byte um sie herum bleibt.
+- **Änderungen auf einen Blick.** In einem Git-Repository markieren Balken neben dem Text, was sich vom letzten Commit unterscheidet, in beiden Bereichen.
+- **Von Word und aus dem Web zu Markdown.** Setze formatierten Text als Markdown ein, Zellen aus einer Tabellenkalkulation als Tabelle, und importiere ganze Word-Dokumente mit ihren Bildern.
+- **Export ohne Verluste.** PDF, eine einzelne, in sich geschlossene HTML-Datei oder ein Word-Dokument mit echten Überschriften, Listen, Tabellen, Fußnoten und Bildern. Füge Seitenzahlen, Kopfzeilen und ein Titelblatt hinzu, oder verwende die Word-Vorlage deiner Firma.
 - **Durch und durch nativ.** Echte AppKit-Fenster, Tabs, Menüs, Popover, Versionen, automatisches Sichern, das Teilen-Menü, Dark Mode, Rechtschreibprüfung, Diktierfunktion und VoiceOver. Kein Electron, keine Web-Ansicht für den Text selbst.
 - **Schnell mit großen Dateien.** Das Rendern eines Tastendrucks in einem 10-MB-Dokument dauert etwa 10 ms, vor der eigenen Arbeit der Ansicht.
 - **Privat und sorgfältig.** Bilder aus dem Web laden erst, wenn du es erlaubst, Links zu anderen Apps fragen vorher nach, und alles, was nicht vertrauenswürdige Bilddaten dekodiert, läuft in Hilfsprozessen in einer Sandbox.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Updates.** Splat aus dem Disk-Image oder von Homebrew hält sich mit [Sparkle](https://sparkle-project.org) selbst aktuell. Beim zweiten Start fragt es, ob es einmal täglich selbstständig nach Updates suchen darf. **Splat › Nach Updates suchen …** sucht sofort; **Automatisch nach Updates suchen** und **Updates automatisch laden und installieren** im selben Menü ändern deine Wahl später. Splat installiert ein Update nur, wenn es die Signatur des Entwicklers trägt. Ein selbst gebautes Splat hat keinen Updater.
 
-**Aus dem Quellcode.** Die Voraussetzungen stehen unter [Bauen](#bauen), dann:
+**Aus dem Quellcode.** Die Voraussetzungen stehen unter [Bauen](../../../docs/development.md#building), dann:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Jedes Dokument öffnet in einem eigenen Fenster oder, wenn du Tabs bevorzugst, i
 
 - **Links: der Quelltext.** Dein Markdown in SF Mono mit Syntaxfarben.
 - **Rechts: die Vorschau.** Das dargestellte Dokument, bereit zum Bearbeiten.
-- **Gliederung in der Seitenleiste (optional).** Alle Überschriften als Baum; ein Klick auf eine zeigt sie in beiden Bereichen. Ein- und ausblenden mit **Darstellung › Gliederung einblenden** (⌃⌘S).
+- **Seitenleiste (optional).** Alle Überschriften als Baum, ein Klick auf eine zeigt sie in beiden Bereichen: **Darstellung › Gliederung einblenden** (⌃⌘S). Zwei weitere Tabs enthalten die [Notizen im Ordner](#notizen-in-einem-ordner) und eine Suche darin.
 - **Symbolleiste.** Schaltflächen, gruppiert danach, was sie ändern: Zeichen, Absätze und eingefügte Elemente, dann Vorschau ein/aus, Teilen und Neues Dokument. Anpassen mit **Darstellung › Symbolleiste anpassen …**.
 
 Ziehe die Trennlinie, um einer Seite mehr Platz zu geben. **Darstellung › Vorschau ausblenden** (⌥⌘P) lässt nur den Quelltext stehen; Splat merkt sich das pro Fenster. Beide Bereiche scrollen gemeinsam, und eine Auswahl in einem Bereich wird im anderen hervorgehoben.
+
+Die Fensterecke zeigt die Wörter und Zeichen des Textes und wie lange das Lesen dauert, und solange es eine Auswahl gibt, auch die der Auswahl. Linkadressen, HTML-Tags, Metadaten, Kommentare, Formeln und Diagramme zählen nicht. **Darstellung › Wortanzahl ausblenden** blendet die Anzeige aus.
 
 ### Dokumente, Tabs und Versionen
 
@@ -214,7 +216,7 @@ Die Vorschau verhält sich wie eine Textverarbeitung, aber alles, was du darin t
 - **Formeln und Diagramme** erscheinen als fertige Grafiken. Klicke eine an, bewege den Cursor darauf oder drücke Return darauf, um den Editor zu öffnen (siehe [Formulas](#formeln) und [Diagrams](#diagramme)).
 - **Eingebettetes HTML, eingebettete Notizen und Front Matter** werden angezeigt, aber im Quelltext bearbeitet. Ein Klick darauf setzt den Cursor an die passende Stelle dort.
 
-Alles, was Markdown nicht ausdrücken kann, wird in der Vorschau blockiert: die Fenster für Schriften und Farben, das Lineal sowie das Einsetzen und Ablegen von formatiertem Text und Bildern. Eingesetztes HTML und RTF kommen als reiner Text an.
+Alles, was Markdown nicht ausdrücken kann, wird in der Vorschau blockiert: die Fenster für Schriften und Farben, das Lineal sowie das Einsetzen und Ablegen von formatiertem Text und Bildern. Eingesetztes HTML und RTF kommen als reiner Text an, außer du wählst [Als Markdown einsetzen](#formatierten-text-einsetzen).
 
 ### Formatierungsbefehle
 
@@ -245,6 +247,21 @@ Unterstrichen, Textmarker, Hochgestellt und Tiefgestellt werden als `<ins>`, `<m
 - In der Vorschau springt **Tab** in die nächste Zelle, **⇧Tab** in die vorherige und **Return** in die Zelle darunter. Tab in der letzten Zelle fügt eine Zeile hinzu.
 - Das Menü **Tabelle** fügt Zeilen und Spalten ein und löscht sie und legt die Ausrichtung einer Spalte fest (⌘{, ⌘|, ⌘}).
 - **Tabelle › Tabelle bündig ausrichten** füllt den Quelltext auf, damit die Spalten untereinander stehen.
+
+### Formatierten Text einsetzen
+
+**Bearbeiten › Als Markdown einsetzen** (⌃⌘V), auch im Kontextmenü beider Bereiche, setzt den Inhalt der Zwischenablage an der Auswahl als Markdown ein, als ein Schritt beim Widerrufen. ⌘V setzt weiterhin reinen Text ein.
+
+- **Aus einem Browser, Word, Google Docs, Confluence, Notizen oder Pages:** Überschriften, Fett, Kursiv, Unterstrichen, Durchgestrichen, Hoch- und Tiefgestellt, Links, Listen mit ihrer Verschachtelung, Zitate, Code und Tabellen kommen mit.
+- **Aus einer Tabellenkalkulation:** Zellen werden zu einer Tabelle mit Kopfzeile und rechtsbündigen Spalten bei Zahlen. Das gilt auch für Text, der durch Tabulatoren, Semikolons oder Kommas getrennt ist, wenn jede Zeile gleich viele Spalten hat.
+- **Bilder** mit einer Webadresse bleiben Links. Ein Bild im eingesetzten HTML wird zu einer Datei neben dem Dokument, das dafür einmal gesichert sein muss. Die temporären Bilddateien von Word werden nicht übernommen, ihr Alternativtext bleibt.
+- **Links** behalten nur `http`-, `https`-, `mailto`-, relative und `#`-Adressen; von jedem anderen Link bleibt der Text.
+
+### Metadaten
+
+**Format › Metadaten bearbeiten …** oder ein Klick auf die Metadatenzeile oben in der Vorschau öffnet ein Formular mit den Feldern des YAML-Front-Matters. Felder lassen sich ändern, hinzufügen und entfernen. Ein Feld mit einer Liste behält sie als Liste: Seine Werte stehen durch Kommas getrennt hintereinander, und ein Wert mit einem Komma steht in Anführungszeichen. Ein neues Feld namens `tags`, `aliases`, `keywords`, `categories`, `authors` oder `cssclasses` wird ebenfalls zu einer Liste. Verschachtelte Felder und mehrzeiliger Text sind dort zu sehen und werden im Quelltext bearbeitet.
+
+Was das Formular ändert, ist ein Schritt beim Widerrufen und betrifft nur die Zeilen der Felder, die du geändert hast: Kommentare, die Reihenfolge, ungewöhnliche Abstände, Anführungszeichen und Zeilenenden aller anderen bleiben Byte für Byte erhalten. Ein Dokument ohne Metadaten bekommt einen Block an seinem Anfang.
 
 ## Unterstütztes Markdown
 
@@ -315,7 +332,7 @@ Ohne eigenen Anker bekommt jede Überschrift wie auf GitHub einen aus ihrem Text
 - **Wiki-Links.** `[[Notiz]]` verlinkt auf `Notiz.md` im selben Ordner oder einem Ordner darunter. `[[Notiz|Angezeigter Text]]` zeigt deinen eigenen Text, und `[[Notiz#Überschrift]]` öffnet die Notiz. ⌘-Klick öffnet sie in Splat.
 - **Einbettungen.** `![[Notiz]]` zeigt die andere Notiz in dieser; darin eingebettete Notizen erscheinen als Links. `![[diagram.png]]` zeigt ein Bild. Wie in Obsidian nennen Einbettungen Notizen und Bilder im Ordner des Dokuments oder darunter, nie mit absolutem Pfad, und nur Markdown-Dateien erscheinen als Notizen.
 - **Kommentare.** `%%Nur im Quelltext%%` bleibt im Quelltext sichtbar und wird in der Vorschau und in jedem Export weggelassen, inline wie auch in eigenen Zeilen.
-- **Tags.** `#idee` oder `#projekt/splat` wird hervorgehoben. ⌘-Klick durchsucht das Dokument nach dem Tag.
+- **Tags.** `#idee` oder `#projekt/splat` wird hervorgehoben. ⌘-Klick durchsucht das Dokument und, in der Seitenleiste, den ganzen Ordner nach dem Tag.
 - **Aufklappbare Hinweisboxen.** Siehe [Hinweisboxen](#hinweisboxen).
 
 ### Zitate und Verweise
@@ -439,6 +456,23 @@ In der Vorschau setzt ein Klick den Cursor, damit du den Linktext bearbeiten kan
 
 **Einfügen › Inhaltsverzeichnis** fügt eine verlinkte Liste aller Überschriften ein. Steht der Cursor darin, aktualisiert derselbe Befehl sie. Die Gliederung in der Seitenleiste (⌃⌘S) springt in beiden Bereichen zu jeder Überschrift.
 
+## Notizen in einem Ordner
+
+Die Schaltflächen oben in der Seitenleiste wechseln zwischen der Gliederung, den Dateien und einer Suche.
+
+- **Dateien** (**Darstellung › Dateien einblenden**, ⌃⌘E). Alle Markdown-Dateien im Ordner des Dokuments oder, wenn es in einem Git-Repository liegt, im ganzen Repository. Ein Klick oder Return öffnet eine Notiz als Tab dieses Fensters; ist sie schon geöffnet, kommt sie nach vorn. Die Schaltfläche neben dem Ordnernamen zeigt in diesem Fenster einen anderen Ordner. Versteckte Dateien, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` und Ordner ohne Notizen bleiben draußen. Ein Dokument direkt in deinem Benutzerordner zeigt nur die Notizen daneben, damit Splat nicht durch alle deine Ordner läuft und für jeden davon um Erlaubnis fragt.
+- **Suche** (**Bearbeiten › Suchen › In allen Notizen suchen …**, ⇧⌘F). Findet Text in allen Notizen, unabhängig von Groß- und Kleinschreibung und davon, wie seine Akzente kodiert sind. `#tag` findet einen Tag, `#project` auch `#project/splat`, und nichts in Code. Ein Klick auf einen Treffer öffnet die Notiz an dieser Stelle.
+- **Verweise auf eine Notiz.** Das Kontextmenü einer Notiz listet die Notizen auf, die auf sie verweisen, per Wiki-Link, Einbettung, relativem Link oder Link-Referenzdefinition.
+- **Eine Notiz umbenennen.** Dasselbe Menü benennt sie um und ändert diese Links. Splat sagt zuerst, wie viele Links in wie vielen Dateien das sind. In jedem Link ändert sich nur der Name, und jedes andere Byte der Datei bleibt. Geöffnete Dokumente nehmen die Änderung als einen Schritt beim Widerrufen auf; in anderen Dateien können nur Git oder Versionen sie zurücknehmen. Eine Datei, die ein anderes Programm in der Zwischenzeit geändert hat, stoppt das Umbenennen aller Links, und Splat nennt sie.
+
+Die Liste folgt dem Ordner, wenn das Fenster nach vorn kommt. Die Suche sieht die Dateien so, wie sie auf dem Datenträger liegen, und Text, den du noch nicht gesichert hast, zählt ab dem nächsten automatischen Sichern.
+
+## Änderungen seit dem letzten Commit
+
+In einem Dokument in einem Git-Repository markieren Balken neben dem Text, was sich vom letzten Commit unterscheidet, im Quelltext und in der Vorschau: grün für hinzugefügte Zeilen, blau für geänderte Zeilen und eine kurze rote Markierung, wo etwas entfernt wurde. Sie folgen beim Tippen und wenn sich der Branch bewegt. **Darstellung › Änderungen seit dem letzten Commit** schaltet sie aus, für alle Fenster.
+
+Zeilen, die sich nur im Zeilenende unterscheiden, zählen nicht, eine Datei mit CRLF gegenüber einem Commit mit LF zeigt also keine Änderung. Eine neue Datei hat bis zu ihrem ersten Commit keine Markierungen, ebenso wenig ein Dokument über 32 MB.
+
 ## Exportieren, Drucken und Teilen
 
 | Format | Wie | Ergebnis |
@@ -451,6 +485,19 @@ In der Vorschau setzt ein Klick den Cursor, damit du den Linktext bearbeiten kan
 
 Das Menü **Ablage › Teilen** bietet all das an einer Stelle an. Exporte verwenden die Einstellung für typografische Satzzeichen und die Bilder aus dem Web, die du erlaubt hast; Bilder aus dem Web bleiben in HTML Links.
 
+**Ablage › Exportoptionen …** legt für alle Dokumente fest, was PDF, Drucken und Word dem Text hinzufügen:
+
+- **Seitenzahlen** in der Fußzeile von PDF und Ausdruck, als `2 / 9`.
+- **Kopf- und Fußzeile** für PDF und Drucken. `{title}`, `{author}`, `{date}`, `{page}` und `{pages}` stehen für ihre Werte, die ersten drei aus den Metadaten des Dokuments.
+- **Ein Titelblatt** für PDF, Drucken und Word, mit `title`, `subtitle`, `author` und `date` aus den Metadaten oder dem Namen des Dokuments als Titel. Es hat weder Kopf- noch Fußzeile.
+- **Eine Word-Vorlage**, eine `.docx` oder `.dotx`, deren Aussehen der Export übernimmt: ihre Stile, auch mit lokalisierten Namen, ihr Design, Seitengröße, Seitenränder, Kopf- und Fußzeilen. Eine Vorlage, die sich nicht lesen lässt, stoppt den Export und sagt das, statt dir ein Dokument ohne sie zu geben.
+
+## Word-Dokumente importieren
+
+**Ablage › Word-Dokument importieren …** fragt nach einer `.docx`- oder `.dotx`-Datei und danach, wohin ihr Markdown soll, und öffnet dann das Ergebnis. Bilder landen in einem Ordner daneben, der nach dem Dokument mit `-images` benannt ist.
+
+Überschriften und Listen kommen so an, wie die Stile und die Nummerierung von Word sie festlegen, auch in Dokumenten, deren Stile lokalisierte Namen haben. Fett, Kursiv, Unterstrichen, Durchgestrichen, Textmarker, Hoch- und Tiefgestellt, Links, Zitate, Code, Fußnoten, Endnoten und Tabellen kommen mit, Zellen über mehrere Spalten als HTML-Tabelle. Formeln werden zu LaTeX. Nachverfolgte Änderungen gelten als angenommen, und ein Inhaltsverzeichnis bleibt draußen, da **Einfügen › Inhaltsverzeichnis** ein neues erstellt. Alte `.doc`-Dateien und mit einem Kennwort geschützte Dokumente werden abgelehnt.
+
 ## Darstellung und Bedienungshilfen
 
 - **Dark Mode** folgt dem System. Formeln und Diagramme werden für jedes Erscheinungsbild neu dargestellt.
@@ -459,7 +506,7 @@ Das Menü **Ablage › Teilen** bietet all das an einer Stelle an. Exporte verwe
 - **Vollbildmodus, Tabs und eine anpassbare Symbolleiste**, wie in jeder Mac-App.
 - **VoiceOver.** Die Bereiche heißen „Markdown-Quelltext“ und „Vorschau“, Formeln werden als ihr Code vorgelesen und Diagramme mit ihrem Titel. Jeder Befehl ist über die Tastatur erreichbar.
 
-Splat hat kein Einstellungsfenster: Die wenigen Optionen stehen dort, wo sie wirken, in **Darstellung** und **Bearbeiten › Ersetzungen**.
+Splat hat kein Einstellungsfenster: Die wenigen Optionen stehen dort, wo sie wirken, in **Darstellung**, **Bearbeiten › Ersetzungen** und **Ablage › Exportoptionen …**.
 
 ## Sprachen
 
@@ -482,6 +529,9 @@ Hebräischer und arabischer Text läuft überall, wo er erscheint, von rechts na
 | Tabellenspalte links, zentriert, rechts ausrichten | ⌘{, ⌘\|, ⌘} |
 | Vorschau aus- oder einblenden | ⌥⌘P |
 | Gliederung ein- oder ausblenden | ⌃⌘S |
+| Dateien ein- oder ausblenden | ⌃⌘E |
+| In allen Notizen suchen | ⇧⌘F |
+| Als Markdown einsetzen | ⌃⌘V |
 | Vergrößern, Verkleinern, Originalgröße | ⌘+, ⌘−, ⌘0 |
 | Neues Dokument, Öffnen, Sichern, Duplizieren | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Papierformat, Drucken | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ Eine Markdown-Datei kann von jedem stammen, deshalb behandelt Splat jedes Dokume
 - **Bilder aus dem Web** laden erst mit deiner Erlaubnis, nur über `https`, nie von Hosts in deinem lokalen Netzwerk, höchstens 10 MB je Bild und in einer privaten Sitzung ohne Cookies.
 - **Isoliertes Dekodieren.** Bilder und die Grafiken von Formeln und Diagrammen werden in Hilfsprozessen dekodiert, die jede geerbte Datei schließen und sich in eine Sandbox sperren, bevor sie das erste Byte lesen: kein Dateizugriff, kein Netzwerk. Sie geben nur Pixel zurück, deren Größe geprüft wird, und werden nach 10 Sekunden gestoppt. Die Bild-Decoder von Apple sehen nur HEIC, TIFF, AVIF und PDF, und nur, wenn die Daten wirklich dieses Format haben; sie laufen in einem eigenen Hilfsprozess, der zusätzlich die Schriftenordner des Systems lesen und den Video-Decoder des Systems nutzen darf. SVGs, Formeln und Diagramme laufen ebenfalls durch diesen Hilfsprozess, sodass sie in Splat Bilder mit fester Auflösung sind: vier Pixel pro Punkt, bis zu 2560 an der längeren Seite.
 - **Lokale Dateien** erreichen ein Dokument nur über den Pfad, den es nennt. Einbettungen zeigen Markdown-Notizen aus dem Ordner des Dokuments und darunter, und ein fehlendes Bild wird nur dort gesucht. Ein Bildpfad anderswo, absolut oder mit `~` beginnend, lädt in der Vorschau weiterhin; HTML- und Word-Exporte, das Drucken und PDFs nehmen nur mit, was im Ordner des Dokuments oder in seinem Git-Repository liegt, es sei denn, dieses Repository enthält auch deinen Benutzerordner, damit ein fremdes Dokument deine Dateien nicht in einen Export zieht, den du weitergibst.
+- **Ordner mit Notizen** werden nur gelesen, solange die Seitenleiste sie zeigt, und das Umbenennen einer Notiz ändert andere Dateien erst, nachdem du bestätigt hast, wie viele.
+- **Git-Repositorys** liest Splat selbst. Es startet nie das Programm `git`, dessen Konfiguration in einem fremden Repository andere Programme starten kann, und es liest nicht mehr als die Version des geöffneten Dokuments aus dem letzten Commit. Es schreibt dort nichts und geht nicht ins Netzwerk.
+- **Word-Dokumente und eingesetzter Text** werden von den eigenen Parsern von Splat gelesen, mit Grenzen für Größe, Verschachtelung und dafür, wie weit sich eine Datei entpacken darf. Links darin behalten nur die Adressen, die Splat auch anderswo zulässt, und die Namen von Bildern in einer Word-Datei entscheiden nie darüber, wohin sie geschrieben werden.
 - **Kopien ungesicherten Textes** bleiben für die Wiederherstellung nach einem Absturz auf diesem Mac, in deinem Ordner „Library“. Sie verschwinden mit dem Sichern oder dem normalen Beenden von Splat; die Kopien, die ein Absturz hinterlassen hat, bleiben im Wiederherstellungsordner, bis du sie löschst.
 - **Links** starten nie per Klick ein Programm. Web- und Mail-Links öffnen wie gewohnt; Links zu anderen Apps fragen vorher nach.
 - **HTML in Dokumenten** wird vom eigenen Parser von Splat gelesen. Skripte, Stile, Frames und Formulare laufen nie.
@@ -530,7 +583,7 @@ Manche Änderungen werden vollständig verarbeitet, bei 10 MB mit etwa 300 ms pr
 ## Bekannte Einschränkungen
 
 - **Einzelne Tilden bedeuten Tiefstellung.** `~text~` ist wie in Pandoc tiefgestellt; Durchstreichen braucht `~~zwei~~`. GitHub streicht auch mit einer Tilde durch.
-- **Nur lesbar in der Vorschau:** Eingebettetes HTML, eingebettete Notizen und Front Matter werden im Quelltext bearbeitet.
+- **Nur lesbar in der Vorschau:** Eingebettetes HTML und eingebettete Notizen werden im Quelltext bearbeitet, Front Matter in seinem Formular oder im Quelltext.
 - **Sehr tiefe Verschachtelung:** HTML, das tiefer als 64 Ebenen verschachtelt ist, und Inline-HTML tiefer als 16 weichen ihrem Inhalt.
 - **Verbundene Tabellenzellen** gibt es nur in HTML-Tabellen und nur über Spalten (`colspan`, kein `rowspan`). Die Tabellensyntax von MultiMarkdown für verbundene Zellen wird nicht unterstützt.
 - **Literaturverzeichnisse** werden nur aus BibTeX gelesen, nicht aus CSL JSON oder YAML.
@@ -538,6 +591,11 @@ Manche Änderungen werden vollständig verarbeitet, bei 10 MB mit etwa 300 ms pr
 - **Typografische Satzzeichen:** Ein deutsches schließendes einfaches Anführungszeichen lässt sich nicht von einem Apostroph unterscheiden und wird als ’ gesetzt.
 - **Formeln, keine Dokumente:** keine LaTeX-Pakete, kein TikZ und keine vollständigen Dokumente.
 - **Der visuelle Formeleditor** schreibt LaTeX in der Notation von MathLive: Leerzeichen verschwinden (`E = mc^2` wird zu `E=mc^2`), die Darstellung bleibt gleich.
+- **Wortanzahl:** Thai, Laotisch, Khmer und Birmanisch werden ohne Leerzeichen geschrieben und je zusammenhängendem Textstück gezählt, nicht je Wort. `3.14` und `snake_case` sind je zwei Wörter.
+- **Eine Notiz umbenennen** ändert keine Links in eingebettetem HTML, und ein Wiki-Link bleibt, wie er ist, wenn der neue Name `#`, `|`, `^`, `[`, `]` oder `\` enthält.
+- **Änderungsmarkierungen** lesen Repositorys mit SHA-1-Objekten und einfachen oder gepackten Refs; eines mit SHA-256 oder Reftable zeigt keine. Eine Datei unter einem Git-Filter wie LFS wird mit dem verglichen, was der Filter gespeichert hat.
+- **Der Word-Import** übernimmt keinen Text aus Kopfzeilen, Fußzeilen und Kommentaren, und Bilder als `.emz` oder SVG behalten nur ihren Alternativtext.
+- **Als Markdown einsetzen** liest RTF als westlichen Text und übernimmt Überschriften dort nur aus Schriftgrößen. Die meisten Programme bieten auch HTML an, das es bevorzugt.
 - **Gewollt:** keine Zeilennummern, kein Einstellungsfenster, kein Hilfebuch, nicht im App Store.
 - **Auf Intel weniger getestet.** Die Selbsttests mit Fenster laufen nur auf Apple Silicon; auf Intel führt CI `cargo test` aus.
 
@@ -561,189 +619,7 @@ Manche Änderungen werden vollständig verarbeitet, bei 10 MB mit etwa 300 ms pr
 
 ## Für Entwickler
 
-Splat ist eine Rust-Anwendung, die direkt über [objc2](https://github.com/madsmtm/objc2) mit AppKit und WebKit spricht. Es gibt kein Swift, kein Objective-C, kein Xcode-Projekt und keine Interface-Builder-Datei.
-
-### Bauen
-
-Voraussetzungen:
-
-- macOS mit den Command Line Tools (`xcode-select --install`). Xcode wird nicht gebraucht; Splat baut ohne `actool`, `ibtool` und `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) nennt die genaue Version, die CI nutzt; rustup installiert sie selbst, das Rust von Homebrew ignoriert die Datei. Sie dort anzuheben ist der Weg, auf dem neue Compiler- und Clippy-Warnungen ins Projekt gelangen.
-- rustup, für `make lint`, `make check` und `make universal`: `cargo xtask check-library` baut die Bibliothek für Linux, um zu zeigen, dass sie kein macOS braucht, und das Rust von Homebrew hat keine anderen Targets.
-
-Das [Makefile](../../../Makefile) enthält kurze Einstiegspunkte; `make help` listet alle auf:
-
-```sh
-make build                  # target/release/Splat.app, gleich wie cargo xtask bundle --release
-make universal              # target/splat-universal für Apple Silicon und Intel, wie es das Disk-Image enthält
-make check                  # Formatierung, clippy ohne Warnungen, alle Tests, eingebundene Bibliotheken; was CI ausführt
-make test                   # make check, dann der Selbsttest ohne Fenster
-make test-gui               # Selbsttests mit Fenster; sie belegen den Mac etwa vier Minuten
-make test-long              # längere Zufallssuche und die Prüfung der Teilaktualisierung mit 10 MB
-make fuzz                   # Zufallseingaben für das Teil-Parsen und alle Ausgaben
-make coverage               # Zeilenabdeckung aller Tests und Selbsttests, mit einer Untergrenze je Modul
-make coverage-library       # dieselben Untergrenzen für die Module ohne Fenster, wie in CI
-make bench FILE=<file.md>   # Zeiten für Öffnen, Tippen und Scrollen einer großen Datei
-make release                # zuerst make test, dann das notarisierte Disk-Image
-```
-
-Die Build-Logik selbst steckt im Rust-Crate [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signiert mit "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, eine separate App, die nie Markdown-Dateien öffnet
-cargo xtask dmg                # dist/Splat-<version>.dmg zur Verteilung, Developer ID, notarisiert
-cargo xtask icon               # assets/AppIcon.icns und das README-Symbol aus assets/icon-1024.png neu bauen
-cargo xtask vendor check       # das mitgelieferte JavaScript gegen vendor.lock prüfen
-cargo xtask vendor fetch       # es nach einer Versionsänderung in vendor.lock erneut laden
-```
-
-`bundle` schreibt die `Info.plist`, kopiert die Ressourcen und Lokalisierungen und signiert die App mit dem Zertifikat „Splat Local Signing“. Der erste Build erstellt dieses Zertifikat in deinem Schlüsselbund „login“, 20 Jahre gültig. Solange es bleibt, behält Splat seine benutzten Dokumente und Ordnerberechtigungen über Neubauten hinweg; bei einer Ad-hoc-Signatur wäre jeder Build für macOS eine neue App. Debug- und Selbsttest-Builds tragen eigene Bundle-IDs (`local.splat.debug`, `local.splat.selftest`) und melden sich nicht für Markdown-Dateien an, sodass der Finder nie ein Dokument in einem veralteten Build öffnet und sie die Einstellungen der normalen App in Ruhe lassen.
-
-Die Version steht in [VERSION](../../../VERSION) als `major.minor.build` und ist die, die der nächste Build bekommt. Jeder erfolgreiche Release-Build (`make build`, `cargo xtask bundle --release`, `make release`) erhöht die Build-Nummer um eins; Debug- und Selbsttest-Builds lassen sie in Ruhe. Major und Minor werden von Hand erhöht: Setze VERSION auf, sagen wir, `1.1.0`, und der nächste Build bekommt genau diese.
-
-### Verteilung
-
-`cargo xtask dmg` (oder `make release`, das zuerst `make test` ausführt) baut ein Release, signiert es mit deiner Developer ID, lässt die App von Apple notarisieren und heftet das Ticket an, packt sie in ein komprimiertes, schreibgeschütztes Disk-Image mit einem Link auf „Programme“, notarisiert und heftet auch das Image an und prüft das Ergebnis mit Gatekeeper. Die App trägt ihr eigenes Ticket, damit eine ohne den Finder installierte Kopie, wie Homebrew es tut, auch beim ersten Start offline öffnet; die zwei Runden mit dem Notardienst dauern je einige Minuten. Nur ein Image, das jeden Schritt bestanden hat, wird zu `dist/Splat-<version>.dmg`, der Kopie, die eingecheckt wird, und die Build-Nummer steigt. Das vorherige Image bleibt für ein weiteres Release, da der Raw-Server von GitHub nach einem Push noch einige Minuten den alten Update-Feed ausliefern kann; ältere werden in den Papierkorb bewegt. Ein fehlgeschlagener Lauf lässt `dist/` und VERSION, wie sie waren.
-Jedes Release fügt dem Repository-Verlauf das vollständige Image hinzu, etwa 16 MB. Es läuft nur auf Aufruf, nie als Teil eines normalen Builds, und braucht:
-
-- ein Zertifikat „Developer ID Application“ im Schlüsselbund
-- eine gespeicherte Anmeldung für den Notardienst von Apple mit einem App-spezifischen Passwort, einmal angelegt mit `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- den privaten Schlüssel, der Updates signiert, im Schlüsselbund „login“. Sparkles `generate_keys` hat ihn erzeugt; seine öffentliche Hälfte ist `UPDATE_KEY` in [xtask/src/main.rs](../../../xtask/src/main.rs) und steckt in jeder installierten Kopie, die nur damit signierte Updates akzeptiert. Bewahre ein Backup in einem Passwortmanager auf: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exportiert ihn, `-f <file>` importiert ihn auf einem anderen Mac. Ohne ihn lassen sich installierte Kopien nie wieder aktualisieren.
-- rustup (`brew install rustup`, das Homebrews Rust unangetastet lässt)
-- `RELEASE_NOTES.md` mit dem, was dieses Release bringt. Der Update-Dialog zeigt es über einer Zeile dazu, wie man ein Problem meldet, daher stoppt `dmg`, wenn die Datei leer ist oder noch die Notizen des vorherigen Releases enthält
-
-Fehlt eines davon, bricht `dmg` ab, bevor es baut. Beim ersten Lauf fragt macOS, ob das Terminal den Finder steuern darf; ohne diese Erlaubnis zeigt das Disk-Image weder seinen Hintergrund noch die Anordnung der Symbole.
-
-Nur das Disk-Image trägt den Updater, [Sparkle](https://sparkle-project.org), den der Build einmal aus seinem GitHub-Release nach `target/` lädt und gegen die Prüfsumme in xtask prüft. Die Hardened Runtime lädt das Framework nur, wenn es die Team-ID der App trägt, die die Developer-ID-Signatur hat und dem lokalen Zertifikat fehlt; und ein Update darf keinen selbst gebauten Build ersetzen. Auch der Selbsttest-Build trägt Sparkle, um das Update-Menü dagegen zu prüfen: mit einem Feed, der nicht existiert, ohne die Frage von Sparkle beim zweiten Start und mit einem Entitlement, das die lokal signierte App das Framework laden lässt. `dmg` signiert das neue Image mit dem Update-Schlüssel und schreibt `dist/appcast.xml`, den Feed, den installierte Kopien von GitHub lesen. Committe und pushe das Image und den Feed zusammen: Von da an bieten installierte Kopien das Update an. Die Download-Links in diesem README und seinen Übersetzungen zeigen auf `Splat.dmg` im neuesten GitHub-Release, daher trägt jedes Release eine Kopie unter diesem Namen: `cp dist/Splat-<version>.dmg target/Splat.dmg`, dann `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Das Disk-Image ist ein Universal Binary für Apple Silicon und Intel; andere Builds sind nur für den Host-Prozessor gebaut. Das Rust von Homebrew liefert die Standardbibliothek nur für den Host-Prozessor, deshalb baut `dmg` über rustup, das die Toolchain und die Targets aus [rust-toolchain.toml](../../../rust-toolchain.toml) bei der ersten Verwendung installiert, und bricht ab, wenn dem Programm oder Sparkle der Code für einen der beiden Prozessoren fehlt. `make universal` baut nur das Programm. Die App darin trägt eine andere Signatur als ein lokaler Build, deshalb führt macOS für die beiden getrennte benutzte Dokumente und Ordnerberechtigungen.
-
-### Testen
-
-| Befehl | Prüft |
-|---|---|
-| `cargo test --release` | Unit-Tests, Zufalls- und Übersetzungstests |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | eine längere Zufallssuche; `SPLAT_FUZZ_SEED` variiert die Eingaben |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | eine Sprache, solange andere unvollständig sind |
-| `cargo clippy --release --all-targets [--features selftest]` | Lints, darunter die Begründung jedes `unsafe`-Blocks, die Länge von Funktionen und, in der Bibliothek, Zahlenkonvertierungen |
-| `cargo xtask check-library` | die Bibliothek baut für Linux, nichts darin braucht also macOS |
-| `cargo xtask vendor check` | die JavaScript-Bibliotheken stimmen Byte für Byte mit `vendor.lock` überein |
-| `cargo xtask selftest probe` | ohne Fenster, jeweils mit erwartetem Ergebnis: Formeln, Diagramme, Web-Bilder gegen einen Server im Prozess, blockierte Adressen, der Text, den jeder Befehl schreibt, jedes Bildformat durch beide Exporte, eine Seite, die nicht mehr antwortet, und die Abwehr der Web-Ansichten gegen eine Seite ohne sie. Dauert etwa eine halbe Minute. Was die App vor sich braucht, wird bei gesperrtem Bildschirm übersprungen |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | die laufende App, Klick für Klick. Öffnet ein Fenster und tippt hinein; der Mac ist etwa vier Minuten beschäftigt. `--scenarios` führt nur den zweiten Teil aus, in etwa anderthalb Minuten. `--only` führt eine Gruppe dieses Teils aus, in ihrem eigenen Dokument, auch bei gesperrtem Bildschirm. `--in-back` lässt aus, was die App im Vordergrund braucht; ohne das schlägt so eine Prüfung fehl |
-| `cargo xtask selftest resize` | verbreitert das Fenster, nachdem die Trennlinie verschoben wurde: Der Quelltext bricht um, während die Fenstergröße geändert wird. Dauert etwa zehn Sekunden |
-| `cargo xtask selftest typing [--by-hand]` | tippt durch Sicherungen hindurch, mit Tasten über die Ereigniswarteschlange der App oder, mit `--by-hand`, von Hand: Getipptes bleibt und zählt als ungesichert. Dauert etwa eine Minute |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | Zeiten für Öffnen, Tippen und Scrollen einer großen Datei; `--keystroke-ms` schlägt fehl, wenn der schnellste Tastendruck länger dauert |
-| `cargo test --release -- --ignored partial_updates` | ein Tastendruck in 10 MB: Teil- gegen Vollaktualisierung, dasselbe Ergebnis in höchstens einem Viertel der Zeit |
-| `cargo test --release --test hostile` | Dokumente, die den Stack überlaufen lassen oder quadratische Zeit brauchen, jedes in zwei Größen, deren Zeiten wie der Text wachsen müssen, durch Parsen, Layout, beide Exporte, Tastendrücke und Befehle |
-| `make mutants` | nacheinander eingebaute Fehler in `crates/splat-markdown`, `crates/splat-preview` und `crates/splat-file-state`, durch [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); sagt, welche kein Test bemerkt. Dauert Stunden; `FILE=crates/splat-preview/src/bridge/mod.rs` grenzt es ein |
-| `make fuzz` | Zufallseingaben über [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), das rustups Nightly braucht: Tastendrücke, die sich wie ein vollständiges Parsen lesen müssen, jede Ausgabe, Änderungen in der Vorschau, jeder Befehl und eine Datei, die so gesichert wird, wie sie geöffnet wurde. `SECONDS=600` sucht länger |
-| `cargo test --release --test fuzz_seeds` | die Seeds in `fuzz/seeds/` durch die Prüfungen dieser Fuzz-Ziele, ohne Fuzzer; Teil jedes `cargo test` |
-| `cargo test --profile checked --workspace` | die Tests mit dem, was ein Debug-Build zusätzlich prüft: Nach jedem Teil-Parsen passen die Blöcke zu ihrem Text, und was es weiterträgt, ist, was der Text sagt. Teil von `make test-long` |
-| `cargo test --release --test entry_points --test structure` | aus den Quellen: Alles, was das System aufruft, ist gegen Panics abgesichert, und Module hängen nur nach unten ab |
-| `cargo test --release --test decoder` | der Decoder-Prozess dekodiert Bilder und erreicht weder Dateien noch das Netzwerk |
-| `make coverage` | Zeilenabdeckung von `cargo test` und allen Selbsttests, durch [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); schlägt unter den Untergrenzen fehl. Belegt den Mac etwa fünf Minuten |
-| `make coverage-library` | die Crates `splat-markdown`, `splat-preview`, `splat-file-state` und `splat-i18n` gegen ihre höheren Untergrenzen, allein durch `cargo test` gemessen |
-
-Unit-Tests stehen neben dem Code, den sie testen. `crates/splat-testkit/tests/` enthält, was das Modell und die Vorschau von außen erreicht: die Zufallstests in `robustness.rs`, die den Generator von `splat-testkit` mit denen von `sync.rs` teilen, die Dokumente, die Schaden anrichten sollen, in `hostile.rs` und die Seeds der Fuzz-Ziele in `fuzz_seeds.rs`. `tests/` enthält, was das ganze Programm betrachtet: seine Quellen, seine Übersetzungen und den Decoder-Test, der das gebaute Programm startet. Entscheidungen in `src/editor/`, die kein Fenster brauchen, liegen in freien Funktionen mit eigenen Tests: alles, was der Controller weiß und wie sich das ändert, in `state.rs`, die Regeln der Darstellung in `render_queue.rs`, die Textkopie in `sync.rs`, Absatzstile, Schriften und Farben als Werte in `render.rs`, wofür die Kennungen der Symbolleiste stehen, in `toolbar.rs`, was ein Klick auf einen Link bedeutet, in `navigation.rs`.
-
-Ein Schritt des Fenster-Selbsttests wartet auf eine benannte Bedingung, nicht auf eine Zeit; nur was kein Signal gibt, wie das Fehlen von etwas, behält eine Pause mit ihrer Begründung. Vergebliches Warten ist eine gescheiterte Prüfung, die nennt, was nie kam, ein Schritt, der in Panik gerät, ist ebenfalls eine gescheiterte Prüfung, und der Lauf geht in beiden Fällen weiter. Eine Prüfung, die in diesem Lauf nichts aussagen kann, meldet `SELFTEST SKIP`: xtask listet sie auf, und sie besteht weder, noch scheitert sie. xtask verlangt von jedem Modus, und von `--scenarios` für sich, etwa neun Zehntel seiner Prüfungen. Der Fenster-Selbsttest führt nach seinem Haupt-Durchklicken einen zweiten Teil aus, in `src/editor/selftest/scenarios.rs`: jeden Formatierungs- und Tabellenbefehl, die Dialoge, Linkklicks, Einsetzen, Ablegen, Exporte, eine Datei, die ein anderes Programm geändert hat, eine große Änderung, Bilder, die sich auf dem Datenträger ändern, Speicherdruck, ein riesiges Dokument und die Wiederherstellung nach einem Absturz. Jede Gruppe davon öffnet ein eigenes Dokument, sodass ein Fehlschlag in einer nicht die nächste erreicht, und jede kann mit `--only` allein laufen. Der Selbsttest ohne Fenster macht das Sichern außerdem absichtlich kaputt: ein Ordner, der nichts annimmt, eine schreibgeschützte Datei, ein verschwundener Ordner, ein voller Datenträger und eine Panic in jedem Callback eines Sicherns, und nichts davon darf Text kosten.
-
-Die Abdeckung hat zwei Untergrenzen: jedes Modul mindestens 84 % seiner Zeilen, alle Module zusammen mindestens 96 %. `make coverage` misst `cargo test` zusammen mit den Selbsttests und schlägt unter einer von beiden fehl; `make coverage-library` hält, was kein Fenster braucht, auf 90 % und 97 %. Die Untergrenzen und die wenigen Ausnahmen, etwa der Panic-Hook in `main.rs`, der nur bei einem Absturz läuft, stehen in [xtask](../../../xtask/src/coverage.rs) neben ihren Gründen. Gemessene Builds gehen nach `target/coverage/`, sodass Messcode nie nach `target/release/` oder in ein Disk-Image gelangt. Der Decoder-Hilfsprozess öffnet seine Messdatei, bevor er sich einsperrt, und wird deshalb ebenfalls gemessen.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) führt `make check`, `make coverage-library` und den Universal-Build auf Apple Silicon sowie `cargo test` auf Intel bei jedem Push auf `main` und jedem Pull Request aus. Jede Nacht führt [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) `make test-long` mit neuen Zufallseingaben aus. Die Selbsttests und das Disk-Image bleiben auf dem Mac des Entwicklers: Sie brauchen einen Bildschirm und die Signaturzertifikate im Schlüsselbund.
-
-Die Ausgabe der Selbsttests geht nach `target/selftest/`. Der Selbsttest baut eine separate App (`target/release/Splat Selftest.app`, Bundle-ID `local.splat.selftest`) und lässt die Einstellungen, benutzten Dokumente und Dateizuordnungen der normalen App unberührt.
-
-### Projektaufbau
-
-Alles, was kein Fenster braucht, ist ein eigenes Crate unter `crates/`, das ohne macOS baut, sodass der Compiler einhält, wie sie voneinander abhängen. Die App in `src/` (Paket `splat-app`, Programm `splat`) baut darauf auf.
-
-- `crates/splat-markdown/`: der Baum, den jeder Verbraucher liest, `Doc` in `doc/`, der seinen Text besitzt, und die einzige Anbindung an den Parser in `reader/`: comrak wird sonst nirgends genannt, und `reader/assumptions.rs` hält fest, was der Code über ihn annimmt. Syntaxfarben und alle Befehle als reine Textänderungen (`Edit`) in `commands/`. Außerdem das erneute Parsen nach einer Änderung (`incremental.rs`), der Leser für eingebettetes HTML (`markup.rs`), Typografie, Tags, Verweise und Zitate im Fließtext (`typography.rs`), wie Text aussieht und welches Markdown und HTML ihn so macht (`style.rs`), was eine Adresse sein darf (`url.rs`) sowie der HTML- und Word-Export (`html.rs`, `docx.rs` mit `docx/html.rs` und `docx/xml.rs`). Eine Position hat ihren Typ: `Byte` im Quelltext, `U16` in der Quelltextansicht, `Shown` in der Vorschauansicht (`text.rs`).
-- `crates/splat-preview/`: das Layout der Vorschau in `layout/`, mit eingebettetem HTML in `layout/html.rs`, und die Zuordnung zwischen Vorschau und Quelltext (`Bridge`, `Index`). Eine `Bridge` weist ein Layout einer anderen Version des `Doc` zurück.
-- `crates/splat-file-state/`: welchen Text eine Datei enthält, in welchem Format und was ein Blick auf sie bedeutet.
-- `crates/splat-i18n/` mit `resources/*.lproj`: 35 Sprachen; die Schlüssel sind die deutschen Texte, und die App installiert beim Start die Tabelle der Oberflächensprache.
-- `crates/splat-testkit/`: der Generator der Zufallstests und die Prüfungen der Fuzz-Ziele.
-- `src/editor/`: das Fenster. Ein `EditorController`-Objekt bedient AppKit als Delegate beider Ansichten und leitet an Komponenten weiter, kleine Structs über dem Controller und dem Zustand, den sie besitzen, deren Felder die anderen Module nicht erreichen:
-
-| Modul | Verantwortung |
-|---|---|
-| `controller.rs` | Klasse, Delegate-Methoden, die weiterleiten, `invalidate` und was der Rest des Programms einem Editor mitteilt; nur dieses Modul erreicht die Komponenten |
-| `panes.rs` | `Panes`: die Textansichten, die Gliederung, Bereiche ein- und ausblenden und was Zugriff auf die Ansichten gibt |
-| `controller/layers.rs` | wer wen erreichen darf: Eine Komponente bekommt einen Griff auf den Controller, der bietet, was unter ihr liegt, und der Compiler hält das ein |
-| `state.rs` | was der Controller über das Dokument weiß und jede Art, wie sich das ändert; seine Felder sind privat, und es berührt keine Ansicht |
-| `model.rs` | leiht den Zustand und die Textkopie an Closures, die keine Ansicht erreichen |
-| `actions.rs` | Befehlsregister: Selektor, Titel, Kurzbefehl, Symbol, wann der Befehl gilt |
-| `editing.rs` | `Editing`: Befehle ausführen und prüfen, Tippen in der Vorschau |
-| `update.rs` | `Updater`: Parsen, Färben, Aktualisieren der Vorschau; nach einer Änderung nur die betroffenen Absätze |
-| `sync.rs` | Textkopie und Block-Buchführung, ohne AppKit und mit Zufallstests |
-| `progressive.rs` | `Progressive`: große Vorschauen Schritt für Schritt darstellen |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: Auswahl und Scrollposition beider Bereiche im Gleichschritt |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: der Formel- und Diagrammeditor |
-| `navigation.rs`, `links.rs` | `Links`: Links, Wiki-Links, Tags, Aufgabenkästchen, Falten, Fußnoten |
-| `env.rs` | was die Vorschau von außerhalb des Textes liest: typografische Satzzeichen, das Repository für `@name` und `#12`, die BibTeX-Datei, eingebettete Notizen |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | Vorschautext, lokale und entfernte Bilder; `Pictures` in `images.rs` |
-| `attributes.rs` | Textattribute; jeder Schlüssel bekommt nur einen Wert des Typs, den er erwartet |
-| `shadow.rs` | Kopien ungesicherten Textes für die Wiederherstellung nach einem Absturz |
-| `decoder.rs` | Hilfsprozesse in einer Sandbox, die Bilder und Grafiken dekodieren |
-| `export.rs`, `outline.rs` | `Sharing`: HTML- und Word-Export, die Weitergabedatei, Drucken; die Gliederung in der Seitenleiste |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit für MathJax, Mermaid, Graphviz, PlantUML und den visuellen Formeleditor; die Regeln, was wann dargestellt wird, abseits von WebKit |
-| `webkit.rs` | Aufrufe in WebKit; nur die Lebensdauer des Navigation-Delegates bleibt bei `js.rs` und `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | das Fenster aufbauen, Symbolleiste, Textansichten, Dialoge, Farben |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: Menüleiste, App-Delegate, Dokument (`MDDocument`, eine Unterklasse von `NSDocument`).
-- `src/util/`: Arbeitsthreads (`lanes.rs`), Volumes, die aufhören können zu antworten (`volumes.rs`), AppKit-Helfer, Dateien und Prozesse. `src/diag.rs`: was außerhalb der Sicht des Benutzers schiefgeht, geht ins Systemprotokoll, ohne irgendeinen Text eines Dokuments.
-- `src/large_alloc.rs`: große Allokationen kommen direkt vom Kernel und gehen beim Freigeben dorthin zurück, sodass der Speicher nach großen Änderungen zurückkehrt.
-- `resources/js/`: Webseiten und Bibliotheken; Versionen und Prüfsummen in [vendor.lock](../../../vendor.lock).
-- `xtask/`: Bundling, Signieren, das Disk-Image, das Symbol, Vendoring, der Selbsttest-Runner und die Abdeckungs-Untergrenzen.
-
-### Datenfluss
-
-Der Quelltext in der linken Textansicht ist die einzige Quelle der Wahrheit.
-
-1. Jede Zeichenänderung dort aktualisiert die Textkopie (`Snapshot`) an Ort und Stelle, ohne den Text erneut zu lesen.
-2. Eine Aktualisierung parst die Kopie, färbt den Quelltext nur dort neu, wo sich Farben geändert haben, setzt die Vorschau und ersetzt nur die Blöcke, deren Inhalt sich geändert hat.
-3. Nach einer Änderung werden nur die betroffenen Absätze neu geparst, gefärbt und gesetzt, solange ihre Nachbarn gleich bleiben; [docs/partial-parse.md](../../../docs/partial-parse.md) sagt, warum das dasselbe ergibt wie ein vollständiges Parsen und worauf zu achten ist, wenn sich comrak ändert. Dokumente mit `%%`-Kommentarblöcken, Änderungen am Front Matter und, in einem Dokument mit Link-Referenzdefinitionen, Änderungen an einem Teil mit einer Klammer werden vollständig verarbeitet. comrak erkennt einen Fußnotenverweis nur mit seiner Definition im selben Parse und verschiebt Definitionen hinter den Text, daher wird der Teil mit einer Platzhalterdefinition je Label geparst und übernimmt seine Nummern aus dem alten Baum; eine Änderung an den Verweisen oder Definitionen im Teil oder neben einer Inline-Fußnote wird vollständig verarbeitet.
-4. HTML-Blöcke, die `<details>` oder `<div align>` öffnen und später schließen, wirken auf die Markdown-Blöcke dazwischen; ein wiederverwendeter Block muss dieselbe Umgebung haben.
-5. Beim Tippen im Quelltext eines Dokuments bis 2 MB läuft die Teilaktualisierung sofort; trifft sie nicht zu, oder in einem größeren Dokument, laufen Parsen und Layout im Hintergrund. Beim Tippen in der Vorschau laufen sie sofort, weil der Cursor der Vorschau vom Ergebnis abhängt.
-6. Eingaben in der Vorschau übersetzt `Bridge` in eine Änderung am Quelltext, und sie nehmen von da an denselben Weg. Markdown hat zu viele Möglichkeiten, Text in Syntax zu verwandeln, als dass Regeln allein genügten, daher parst `preview/verify.rs` den geänderten Teil erneut und vergleicht, was er zeigt, mit dem, was getippt wurde; eine Änderung, die nicht standhält, wird weiter maskiert oder abgelehnt.
-7. Die Inline-Positionen von comrak stimmen an einigen Stellen nicht, zum Beispiel hinter einer Link-Referenzdefinition. `reader/positions.rs` prüft sie beim Lesen eines Blocks am Quelltext und liest sie dort, wo sie nicht passen, erneut aus dem Quelltext.
-
-### Regeln im Controller
-
-1. Die eigenen Änderungen des Controllers an den Ansichten laufen innerhalb von `Panes::silently`; die Delegate-Callbacks ignorieren sie. Überall sonst lassen sich die Ansichten nur lesen, der Compiler prüft das also. Was die Callbacks hören sollen oder was eine Ansicht an AppKit gibt, sagt das, indem es über `Panes::for_appkit` geht.
-2. Der Zustand wird nur zum Lesen und Berechnen geborgt, nie über einen Aufruf hinweg, der eine Ansicht ändert, setzt oder scrollt: `Model` leiht ihn an `Send`-Closures, und keine Ansicht ist `Send`, der Compiler prüft das also. Er ändert sich nur über seine eigenen Methoden, deren Tests kein Fenster brauchen.
-3. Nachrichten von außen (ein Bild geladen, eine Formel dargestellt) kommen verzögert über `renders_arrived` und `image_arrived` an, nie mitten in einer Aktualisierung.
-4. Neu zeichnen ohne Textänderung läuft nur über `invalidate(reason)`.
-5. Die Textkopie wird nicht über eine Änderung des Quelltextes hinweg gehalten, sonst kopiert diese Änderung den ganzen Text: `with_text` leiht sie nur für die Dauer einer `Send`-Closure.
-6. Ein neuer Befehl braucht einen Eintrag in `actions.rs`, eine Methode in `controller.rs` und einen Zweig in `Editing::perform`.
-7. Jeder `unsafe`-Block trägt seine Begründung als `// SAFETY:`-Kommentar. Bytes erreichen die Bild-Decoder des Systems nur im Hilfsprozess, über `decoder::decode_native`; ein Test durchsucht die Quellen nach anderen Aufrufen.
-8. Nichts im Hauptthread wartet auf die Ordner des Benutzers, da ein Netzwerkvolume aufhören kann zu antworten: Dateien werden im Thread `DISK` angesehen, und die Vorschau liest die Antworten über `Env::known`. Nur eine Aktion, auf die der Benutzer wartet, etwa ein Export oder das Sichern, darf den Datenträger direkt berühren.
-9. Was enden muss, endet auch nach einer Panic, denn der Hauptthread überlebt eine: Ein gesetztes Flag läuft über `with_raised`, eine Bearbeitung des Textspeichers über `editing` und was das Widerrufen nicht erfahren soll über `without_undo`. Ein Test findet, was davon von Hand geschrieben ist.
-10. Eine Adresse in einem Dokument hat genau eine Lesart, in `splat_markdown::url`; ein Test findet von Hand verglichene Schemata.
-
-### Einen Befehl hinzufügen
-
-Die Menüleiste, die Symbolleiste und das Kontextmenü bauen ihre Einträge alle aus dem Register in [src/editor/actions.rs](../../../src/editor/actions.rs), und die Menüvalidierung liest dort, wann ein Befehl gilt und ob er ein Häkchen zeigt. Ein neuer Befehl braucht:
-
-1. eine Variante von `Action` mit ihrem `Spec`: Selektor, Titel, Beschriftung in der Symbolleiste, Tooltip (beginnt mit einem Verb, höchstens 75 Zeichen), Kurzbefehl, SF Symbol und wann er gilt
-2. die Methode in `src/editor/controller.rs`
-3. einen Zweig in `Editing::perform`
-4. seine Texte in jeder `Localizable.strings`
-
-Der Test `every_command_has_a_method_and_every_method_a_command` prüft, dass Register und Methoden zusammenpassen. Die Standardkurzbefehle von Apple wie ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F und ⌘, bleiben unberührt.
-
-### Übersetzungen
-
-Der Code nutzt den deutschen Text als Schlüssel: `t("Fett")` schlägt ihn zur Laufzeit nach, `n("Fett")` markiert eine Konstante für das spätere Nachschlagen. Jedes `resources/<language>.lproj/` enthält:
-
-- `Localizable.strings`: jeden Text der Oberfläche, Menübegriffe nach den Glossaren von Apple
-- `InfoPlist.strings`: die Namen, die macOS für die App und ihren Dokumenttyp zeigt
-- `QuickReference.md`: die Markdown-Kurzreferenz
-
-`cargo xtask bundle` listet jeden `.lproj`-Ordner als Lokalisierung auf, und `CFBundleDevelopmentRegion` ist Englisch, sodass die Systemmenüs und der Sichern-Dialog derselben Sprache folgen. Der i18n-Test prüft, dass jede Sprache jeden Text hat und dass jede Kurzreferenz die Gliederung der deutschen hat.
-
-`assets/readme/<language>/` enthält dieses README in der jeweiligen Sprache, seinen Screenshot und das Demodokument, das der Screenshot zeigt. Eine Änderung an diesem README gehört auch in diese Kopien.
+Bauen, Testen, der Aufbau des Codes und die Regeln, denen er folgt, stehen in [docs/development.md](../../../docs/development.md) (auf Englisch).
 
 ### Komponenten von Drittanbietern
 
@@ -756,6 +632,10 @@ Der Code nutzt den deutschen Text als Schlüssel: `t("Fett")` schlägt ihn zur L
 | [image](https://github.com/image-rs/image) | 0.25 | Dekodieren von PNG, JPEG, GIF, WebP und BMP | MIT oder Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | Tabellenspalten ausrichten | MIT oder Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | die Namen der HTML-Zeichenverweise | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Entpacken von Word-Dateien und Git-Objekten | MIT, Zlib oder Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Lesen des XML von Word-Dateien | MIT oder Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | Namen und Suche über zusammengesetzte und zerlegte Buchstaben hinweg | MIT oder Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | Text wie `:shortcode:` in importiertem Text wörtlich belassen | MIT oder Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | Formeln darstellen | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visueller Formeleditor, mit KaTeX-Schriften | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-Diagramme | MIT |

@@ -11,6 +11,7 @@ mod clickthrough;
 mod controller;
 mod documents;
 mod mock_web;
+mod notes;
 mod probe;
 mod resize;
 mod saving;
@@ -69,11 +70,26 @@ fn skip(name: &str, reason: &str) {
     reported(name);
 }
 
-/// A check of what AppKit does only for the app in front, which a locked screen or another app takes away. A run may
-/// only leave it out if it was told to run behind other apps.
+/// Whether the screen is locked right now, as it can become during a run.
+fn screen_is_locked() -> bool {
+    std::process::Command::new("ioreg")
+        .args(["-n", "Root", "-d1", "-a"])
+        .output()
+        .is_ok_and(|output| {
+            let plist = String::from_utf8_lossy(&output.stdout);
+            plist
+                .split_once("<key>CGSSessionScreenIsLocked</key>")
+                .is_some_and(|(_, behind)| behind.trim_start().starts_with("<true/>"))
+        })
+}
+
+/// A check of what AppKit does only for the app in front, which a locked screen or another app takes away. A run leaves it
+/// out on a locked screen, or if it was told to run behind other apps.
 fn check_in_front(mtm: MainThreadMarker, name: &str, ok: bool, detail: &str) {
     if NSApplication::sharedApplication(mtm).isActive() {
         check(name, ok, detail);
+    } else if screen_is_locked() {
+        skip(name, "the screen is locked");
     } else if std::env::var_os("SPLAT_SELFTEST_IN_BACK").is_some() {
         skip(name, "the app is not active");
     } else {
@@ -101,39 +117,58 @@ fn after(seconds: f64, f: impl Fn() + 'static) {
     unsafe { NSTimer::scheduledTimerWithTimeInterval_repeats_block(seconds, false, &block) };
 }
 
-/// Calls `then` once `cond` holds, `seconds` from now at the earliest. Waiting in vain is a failed check that names what
-/// never came, and `then` still runs, as its checks tell what is missing.
-fn once(seconds: f64, name: &'static str, cond: impl Fn() -> bool + 'static, then: impl Fn() + 'static) {
-    let cond: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(cond);
-    let then: std::rc::Rc<dyn Fn()> = std::rc::Rc::new(then);
+/// The one way the self-test waits without blocking: from `seconds` on, looks at `holds` every 50 ms until it held
+/// `in_a_row` looks in a row or `timeout` seconds passed, then tells `done` whether it held. A run-loop turn lies between
+/// two looks, so what the first look started is seen by a later one; `controller::until` is the blocking form.
+fn wait(
+    seconds: f64,
+    timeout: f64,
+    in_a_row: usize,
+    holds: impl Fn() -> bool + 'static,
+    done: impl Fn(bool) + 'static,
+) {
+    fn look(
+        holds: std::rc::Rc<dyn Fn() -> bool>,
+        done: std::rc::Rc<dyn Fn(bool)>,
+        started: std::time::Instant,
+        timeout: f64,
+        needed: usize,
+        held: usize,
+    ) {
+        let held = if holds() { held + 1 } else { 0 };
+        if held >= needed {
+            done(true);
+        } else if started.elapsed().as_secs_f64() > timeout {
+            done(false);
+        } else {
+            after(0.05, move || {
+                look(holds.clone(), done.clone(), started, timeout, needed, held)
+            });
+        }
+    }
+    let holds: std::rc::Rc<dyn Fn() -> bool> = std::rc::Rc::new(holds);
+    let done: std::rc::Rc<dyn Fn(bool)> = std::rc::Rc::new(done);
     after(seconds, move || {
-        poll_once(
-            name,
-            UNTIL_TIMEOUT,
-            cond.clone(),
-            then.clone(),
+        look(
+            holds.clone(),
+            done.clone(),
             std::time::Instant::now(),
+            timeout,
+            in_a_row.max(1),
+            0,
         );
     });
 }
 
-fn poll_once(
-    name: &'static str,
-    timeout: f64,
-    cond: std::rc::Rc<dyn Fn() -> bool>,
-    then: std::rc::Rc<dyn Fn()>,
-    started: std::time::Instant,
-) {
-    if cond() {
+/// Calls `then` once `cond` holds, `seconds` from now at the earliest. Waiting in vain is a failed check that names what
+/// never came, and `then` still runs, as its checks tell what is missing.
+fn once(seconds: f64, name: &'static str, cond: impl Fn() -> bool + 'static, then: impl Fn() + 'static) {
+    wait(seconds, UNTIL_TIMEOUT, 1, cond, move |held| {
+        if !held {
+            check(name, false, &format!("waited {UNTIL_TIMEOUT} s for it"));
+        }
         then();
-    } else if started.elapsed().as_secs_f64() > timeout {
-        check(name, false, &format!("waited {timeout} s for it"));
-        then();
-    } else {
-        after(0.05, move || {
-            poll_once(name, timeout, cond.clone(), then.clone(), started)
-        });
-    }
+    });
 }
 
 /// Writes the visible part of both panes as PDF (text views draw reliably through the printing path).
@@ -271,7 +306,7 @@ fn neuer_absatz(e: &EditorController) -> (usize, usize) {
     )
 }
 
-pub(super) use controller::keeps_unshown_editor;
+pub(crate) use controller::keeps_unshown_editor;
 
 fn head(s: &str, n: usize) -> String {
     s.chars().take(n).collect()
@@ -453,12 +488,13 @@ fn dock_click_opens_a_document(mtm: MainThreadMarker, then: impl Fn() + 'static)
         let sent = event
             .sendEventWithOptions_timeout_error(objc2_foundation::NSAppleEventSendOptions::NoReply, 5.0)
             .map_err(|e| e.localizedDescription().to_string());
-        let started = std::time::Instant::now();
         let then = then.clone();
-        wait_for_window(
-            mtm,
-            started,
-            std::rc::Rc::new(move |shown| {
+        wait(
+            0.0,
+            5.0,
+            1,
+            move || document_window_shown(mtm),
+            move |shown| {
                 check(
                     "a click on the Dock icon opens a document",
                     closed && sent.is_ok() && shown,
@@ -469,18 +505,9 @@ fn dock_click_opens_a_document(mtm: MainThreadMarker, then: impl Fn() + 'static)
                 }
                 let then = then.clone();
                 once(0.3, "the document of the Dock icon to close", no_window, move || then());
-            }),
+            },
         );
     });
-}
-
-fn wait_for_window(mtm: MainThreadMarker, started: std::time::Instant, done: std::rc::Rc<dyn Fn(bool)>) {
-    let shown = document_window_shown(mtm);
-    if shown || started.elapsed().as_secs_f64() > 5.0 {
-        done(shown);
-    } else {
-        after(0.1, move || wait_for_window(mtm, started, done.clone()));
-    }
 }
 
 fn source(e: &EditorController) -> String {
@@ -562,45 +589,35 @@ fn wait_for(i: usize) {
     let Some(ctx) = CTX.with(|c| c.borrow().clone()) else {
         return;
     };
-    let seconds = STEPS.with(|s| s.borrow().get(i).map_or(0.0, |s| s.0.at_least));
-    after(seconds, move || poll(i, ctx.clone(), std::time::Instant::now(), 0));
-}
-
-/// Looks at the condition of step `i` every 50 ms.
-fn poll(i: usize, ctx: std::rc::Rc<Ctx>, started: std::time::Instant, held: usize) {
-    let (holds, needed, name) = STEPS.with(|s| {
-        s.borrow().get(i).map_or((true, 1, String::new()), |(wait, _)| {
-            ((wait.holds)(&ctx), wait.in_a_row, wait.name.clone())
+    let (seconds, in_a_row, name) = STEPS.with(|s| {
+        s.borrow().get(i).map_or((0.0, 1, String::new()), |(w, _)| {
+            (w.at_least, w.in_a_row, w.name.clone())
         })
     });
-    let held = if holds { held + 1 } else { 0 };
-    if held >= needed {
-        copy_is_the_source(&ctx.e, i);
-        post_step(i);
-    } else if started.elapsed().as_secs_f64() > UNTIL_TIMEOUT {
+    let looked_at = ctx.clone();
+    let holds = move || STEPS.with(|s| s.borrow().get(i).is_none_or(|(w, _)| (w.holds)(&looked_at)));
+    wait(seconds, UNTIL_TIMEOUT, in_a_row, holds, move |held| {
         let last = LAST_CHECK.with(|c| c.borrow().clone());
-        check(
-            &format!("step {i}, after \"{last}\", gets what it waits for"),
-            false,
-            &format!("waited {UNTIL_TIMEOUT} s for {name}"),
-        );
+        let step = format!("the step after \"{last}\" that waits for {name}");
+        if held {
+            copy_is_the_source(&ctx.e, &step);
+        } else {
+            check(&format!("{step} gets it"), false, &format!("waited {UNTIL_TIMEOUT} s"));
+        }
         post_step(i);
-    } else {
-        after(0.05, move || poll(i, ctx.clone(), started, held));
-    }
+    });
 }
 
 /// After every step: what the editor thinks the text is, is what the view holds. Going apart is what makes edits land in
 /// the wrong place, long before anything shows.
-fn copy_is_the_source(e: &EditorController, i: usize) {
+fn copy_is_the_source(e: &EditorController, step: &str) {
     if e.source().hasMarkedText() {
         return;
     }
     let shown = e.source().string().to_string();
     if e.source_text() != shown {
         FAILURES.with(|f| f.set(f.get() + 1));
-        let last = LAST_CHECK.with(|c| c.borrow().clone());
-        eprintln!("SELFTEST FAIL step {i}, after \"{last}\": the copy of the text differs from the source view");
+        eprintln!("SELFTEST FAIL {step}: the copy of the text differs from the source view");
     }
 }
 
@@ -646,7 +663,8 @@ fn run_steps(ctx: Ctx, list: Vec<Step>) {
                 return event as *const _ as *mut _;
             };
             let last = LAST_CHECK.with(|c| c.borrow().clone());
-            guarded(&format!("step {i}, after \"{last}\","), || {
+            let name = STEPS.with(|s| s.borrow().get(i).map(|(w, _)| w.name.clone()).unwrap_or_default());
+            guarded(&format!("the step after \"{last}\" that waits for {name}"), || {
                 STEPS.with(|s| (s.borrow()[i].1)(&ctx))
             });
             match STEPS.with(|s| s.borrow().len()) {
@@ -804,33 +822,27 @@ fn run(mtm: MainThreadMarker, out: &Path) {
     };
     let only = std::env::var("SPLAT_SELFTEST_ONLY").ok();
     let click_through_alone = only.as_deref() == Some(CLICK_THROUGH);
-    if std::env::var_os("SPLAT_SELFTEST_SCENARIOS").is_some() && !click_through_alone {
+    let one_group = clickthrough::groups()
+        .iter()
+        .any(|(name, _)| only.as_deref() == Some(*name));
+    if std::env::var_os("SPLAT_SELFTEST_SCENARIOS").is_some() && !click_through_alone && !one_group {
         run_steps(ctx, scenarios::steps());
         return;
     }
     // The first step waits until formulas and diagrams are rendered, so the edits below do not race them.
-    let groups = [
-        clickthrough::first_edits(),
-        clickthrough::toolbar_and_undo(),
-        clickthrough::selection_steps(),
-        clickthrough::preview_edit_steps(),
-        clickthrough::formula_editor_steps(),
-        clickthrough::scrolling_dark_mode_and_remote_steps(),
-        clickthrough::tables_and_spaces_steps(),
-        clickthrough::pending_format_steps(),
-        clickthrough::input_method_steps(),
-        clickthrough::toolbar_steps(),
-        clickthrough::command_and_link_steps(),
-        clickthrough::building_block_steps(),
-        clickthrough::empty_line_and_caret_steps(),
-        clickthrough::reload_and_hidden_preview_steps(),
-        if click_through_alone {
-            Vec::new()
-        } else {
-            scenarios::steps()
-        },
-    ];
-    run_steps(ctx, groups.into_iter().flatten().collect());
+    let mut steps = Vec::new();
+    for (i, (name, group)) in clickthrough::groups().into_iter().enumerate() {
+        if !one_group || only.as_deref() == Some(name) {
+            if i > 0 {
+                steps.extend(clickthrough::entry(name));
+            }
+            steps.extend(group);
+        }
+    }
+    if !click_through_alone && !one_group {
+        steps.extend(scenarios::steps());
+    }
+    run_steps(ctx, steps);
 }
 
 /// The UTF-16 index of the first character in the preview that links to `target`.

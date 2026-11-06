@@ -14,6 +14,7 @@ caseless = "0.2"
 comrak = { version = "0.59", default-features = false, features = ["shortcodes", "attributes"] }
 entities = "1"
 splat-i18n = { path = "../splat-i18n" }
+unicode-normalization = "0.1"
 unicode-width = "0.2"
 
 [dev-dependencies]

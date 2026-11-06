@@ -4,7 +4,7 @@
 
 **Editor Markdown untuk macOS yang memungkinkan Anda menulis langsung di sumber atau di pratinjau.**
 
-Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri dan pratinjau langsung yang sepenuhnya dapat diedit di sebelah kanan. Ketik di salah satunya: apa pun yang Anda tulis di pratinjau menjadi perubahan sekecil mungkin pada sumber, sehingga baris yang tidak Anda sentuh tetap identik byte demi byte dan diff Git Anda tetap bersih. Splat membaca Markdown yang sudah biasa Anda pakai: CommonMark dan GitHub Flavored Markdown, GitHub alerts, wiki link, embed, dan callout Obsidian, ekstensi Pandoc dan Typora, HTML tersemat, rumus LaTeX, serta diagram Mermaid, Graphviz, dan PlantUML, semuanya ditampilkan secara offline. Ekspor ke PDF, HTML, atau Word dengan satu klik. Splat ditulis dalam Rust dengan kontrol AppKit asli, tersedia dalam 35 bahasa, dan tidak mengirim apa pun melalui jaringan kecuali Anda memintanya.
+Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri dan pratinjau langsung yang sepenuhnya dapat diedit di sebelah kanan. Ketik di salah satunya: apa pun yang Anda tulis di pratinjau menjadi perubahan sekecil mungkin pada sumber, sehingga baris yang tidak Anda sentuh tetap identik byte demi byte dan diff Git Anda tetap bersih. Splat membaca Markdown yang sudah biasa Anda pakai: CommonMark dan GitHub Flavored Markdown, GitHub alerts, wiki link, embed, dan callout Obsidian, ekstensi Pandoc dan Typora, HTML tersemat, rumus LaTeX, serta diagram Mermaid, Graphviz, dan PlantUML, semuanya ditampilkan secara offline. Telusuri dan cari di seluruh folder catatan, lihat apa yang berubah sejak commit Git terakhir, tempel dari Word atau halaman web sebagai Markdown, dan ekspor ke PDF, HTML, atau Word dengan satu klik. Splat ditulis dalam Rust dengan kontrol AppKit asli, tersedia dalam 35 bahasa, dan tidak mengirim apa pun melalui jaringan kecuali Anda memintanya.
  
 
 
@@ -81,6 +81,8 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
   - [Perintah pemformatan](#perintah-pemformatan)
   - [Daftar dan tugas](#daftar-dan-tugas)
   - [Tabel](#tabel)
+  - [Menempel teks berformat](#menempel-teks-berformat)
+  - [Metadata](#metadata)
 - [Markdown yang didukung](#markdown-yang-didukung)
   - [CommonMark dan GitHub Flavored Markdown](#commonmark-dan-github-flavored-markdown)
   - [Kotak info](#kotak-info)
@@ -94,7 +96,10 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 - [Diagram](#diagram)
 - [Gambar](#gambar)
 - [Tautan dan navigasi](#tautan-dan-navigasi)
+- [Catatan dalam folder](#catatan-dalam-folder)
+- [Perubahan sejak commit terakhir](#perubahan-sejak-commit-terakhir)
 - [Ekspor, cetak, dan bagikan](#ekspor-cetak-dan-bagikan)
+- [Mengimpor dokumen Word](#mengimpor-dokumen-word)
 - [Tampilan dan aksesibilitas](#tampilan-dan-aksesibilitas)
 - [Bahasa](#bahasa)
 - [Pintasan keyboard](#pintasan-keyboard)
@@ -103,14 +108,6 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 - [Keterbatasan yang diketahui](#keterbatasan-yang-diketahui)
 - [Pemecahan masalah](#pemecahan-masalah)
 - [Untuk pengembang](#untuk-pengembang)
-  - [Building](#building)
-  - [Distribusi](#distribusi)
-  - [Pengujian](#pengujian)
-  - [Struktur proyek](#struktur-proyek)
-  - [Alur data](#alur-data)
-  - [Aturan di controller](#aturan-di-controller)
-  - [Menambah perintah](#menambah-perintah)
-  - [Terjemahan](#terjemahan)
   - [Komponen pihak ketiga](#komponen-pihak-ketiga)
 - [License](#license)
 
@@ -120,7 +117,10 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 - **Markdown yang sudah biasa Anda pakai.** CommonMark, GitHub Flavored Markdown, GitHub alerts, ekstensi Obsidian, Pandoc, dan Typora, shortcode emoji, spoiler, daftar definisi, jangkar heading, dan HTML seperti di README GitHub.
 - **Rumus dan diagram bawaan.** Rumus LaTeX melalui MathJax, dengan editor rumus visual. Diagram Mermaid, Graphviz, dan PlantUML ditampilkan di Mac Anda tanpa Java, server, atau koneksi jaringan.
 - **Tombol untuk semuanya.** Setiap elemen Markdown punya tombol bar alat dan item menu, dan yang umum dipakai juga punya pintasan keyboard. Tabel punya menu tersendiri untuk baris, kolom, dan perataan.
-- **Ekspor tanpa kehilangan apa pun.** PDF, satu file HTML mandiri, atau dokumen Word dengan heading, daftar, tabel, catatan kaki, dan gambar yang sungguhan.
+- **Folder, bukan sekadar file.** Bilah samping mencantumkan catatan di samping dokumen dan mencari di semuanya. Mengubah nama catatan mengubah tautan ke catatan itu, dan setiap byte di sekitarnya tetap sama.
+- **Perubahan sekilas.** Di repositori Git, bilah di samping teks menandai apa yang berbeda dari commit terakhir, di kedua panel.
+- **Dari Word dan web ke Markdown.** Tempel teks berformat sebagai Markdown, sel dari spreadsheet sebagai tabel, dan impor dokumen Word secara utuh beserta gambarnya.
+- **Ekspor tanpa kehilangan apa pun.** PDF, satu file HTML mandiri, atau dokumen Word dengan heading, daftar, tabel, catatan kaki, dan gambar yang sungguhan. Tambahkan nomor halaman, header, dan halaman judul, atau gunakan template Word perusahaan Anda.
 - **Asli sepenuhnya.** Jendela, tab, menu, popover, Versi, Simpan Otomatis, menu bagikan, mode gelap, pemeriksaan ejaan, dikte, dan VoiceOver yang sungguhan dari AppKit. Tanpa Electron, tanpa web view untuk teksnya sendiri.
 - **Cepat dengan file besar.** Merender satu ketukan tombol di dokumen 10 MB memerlukan sekitar 10 ms, sebelum pekerjaan view itu sendiri.
 - **Privat dan hati-hati.** Gambar dari web dimuat hanya setelah Anda mengizinkannya, tautan ke app lain meminta konfirmasi lebih dahulu, dan semua yang mendekode data gambar yang tidak tepercaya berjalan di proses bantu dalam sandbox.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Pembaruan.** Splat dari image disk atau Homebrew memperbarui dirinya sendiri melalui [Sparkle](https://sparkle-project.org). Pada peluncuran kedua, Splat bertanya apakah boleh mencari pembaruan sendiri, sekali sehari. **Splat › Periksa Pembaruan…** langsung memeriksa; **Periksa Pembaruan Secara Otomatis** dan **Unduh dan Instal Pembaruan Secara Otomatis** di menu yang sama mengubah pilihan Anda nanti. Splat hanya memasang pembaruan yang membawa tanda tangan pengembang. Build buatan sendiri tidak punya pemutakhir.
 
-**Dari sumber.** Lihat [Membangun](#building) untuk prasyaratnya, lalu:
+**Dari sumber.** Lihat [Membangun](../../../docs/development.md#building) untuk prasyaratnya, lalu:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Setiap dokumen terbuka di jendelanya sendiri, atau sebagai tab jika Anda lebih s
 
 - **Kiri: sumber.** Markdown Anda dalam SF Mono dengan pewarnaan sintaks.
 - **Kanan: pratinjau.** Dokumen yang sudah ditampilkan, siap diedit.
-- **Bilah samping kerangka (opsional).** Semua heading sebagai pohon; klik salah satunya untuk menampilkannya di kedua panel. Alihkan dengan **Lihat › Tampilkan Kerangka** (⌃⌘S).
+- **Bilah samping (opsional).** Semua heading sebagai pohon, klik salah satunya untuk menampilkannya di kedua panel: **Lihat › Tampilkan Kerangka** (⌃⌘S). Dua tab lainnya memuat [catatan di folder](#catatan-dalam-folder) dan pencarian di dalamnya.
 - **Bar alat.** Tombol dikelompokkan menurut apa yang diubahnya: karakter, paragraf, dan elemen yang disisipkan, lalu pratinjau hidup/mati, Bagikan, dan Dokumen Baru. Sesuaikan dengan **Lihat › Sesuaikan Bar Alat…**.
 
 Seret pembagi untuk memberi salah satu sisi lebih banyak ruang. **Lihat › Sembunyikan Pratinjau** (⌥⌘P) menyisakan sumber saja; Splat mengingatnya per jendela. Kedua panel bergulir bersama, dan pilihan di satu panel disorot di panel lainnya.
+
+Sudut jendela menampilkan jumlah kata dan karakter teks serta lama waktu membacanya, dan selama ada pilihan, juga jumlah untuk pilihan itu. Alamat tautan, tag HTML, metadata, komentar, rumus, dan diagram tidak dihitung. **Lihat › Sembunyikan Jumlah Kata** menghilangkannya.
 
 ### Dokumen, tab, dan versi
 
@@ -214,7 +216,7 @@ Pratinjau berperilaku seperti pengolah kata, tetapi semua yang Anda lakukan di s
 - **Rumus dan diagram** tampil sebagai grafik jadi. Klik salah satunya, pindahkan kursor ke atasnya, atau tekan Return di atasnya untuk membuka editornya (lihat [Rumus](#rumus) dan [Diagram](#diagram)).
 - **HTML tersemat, catatan tersemat, dan front matter** ditampilkan, tetapi Anda mengeditnya di sumber. Klik pada elemen itu menempatkan kursor di tempat yang sesuai di sana.
 
-Segala sesuatu yang tidak dapat diungkapkan Markdown diblokir di pratinjau: panel Font dan Warna, penggaris, serta menempel atau melepas teks kaya dan gambar. HTML dan RTF yang ditempel masuk sebagai teks biasa.
+Segala sesuatu yang tidak dapat diungkapkan Markdown diblokir di pratinjau: panel Font dan Warna, penggaris, serta menempel atau melepas teks kaya dan gambar. HTML dan RTF yang ditempel masuk sebagai teks biasa, kecuali Anda memilih [Tempel sebagai Markdown](#menempel-teks-berformat).
 
 ### Perintah pemformatan
 
@@ -245,6 +247,21 @@ Garis bawah, sorotan, superskrip, dan subskrip ditulis sebagai `<ins>`, `<mark>`
 - Di pratinjau, **Tab** pindah ke sel berikutnya, **⇧Tab** ke sel sebelumnya, dan **Return** ke sel di bawahnya. Tab di sel terakhir menambah satu baris.
 - Menu **Tabel** menyisipkan dan menghapus baris dan kolom serta mengatur perataan kolom (⌘{, ⌘|, ⌘}).
 - **Tabel › Ratakan Kolom Tabel** menambahkan spasi di sumber agar kolomnya sejajar.
+
+### Menempel teks berformat
+
+**Edit › Tempel sebagai Markdown** (⌃⌘V), juga di menu konteks kedua panel, mengubah isi clipboard menjadi Markdown di tempat pilihan, sebagai satu langkah urung. ⌘V tetap menyisipkan teks biasa.
+
+- **Dari browser, Word, Google Docs, Confluence, Catatan, atau Pages:** heading, tebal, cetak miring, garis bawah, coretan, superskrip dan subskrip, tautan, daftar beserta penyarangannya, kutipan, kode, dan tabel ikut terbawa.
+- **Dari spreadsheet:** sel menjadi tabel dengan baris header dan kolom angka rata kanan. Begitu juga teks yang dipisahkan tab, titik koma, atau koma, jika setiap baris memiliki jumlah kolom yang sama.
+- **Gambar** dengan alamat web tetap berupa tautan. Gambar di dalam HTML yang ditempel menjadi file di samping dokumen, yang untuk itu harus sudah disimpan sekali. File gambar sementara milik Word tertinggal, dan teks alternatifnya tetap ada.
+- **Tautan** hanya mempertahankan alamat `http`, `https`, `mailto`, relatif, dan `#`; dari tautan lain hanya teksnya yang tersisa.
+
+### Metadata
+
+**Format › Edit Metadata…**, atau klik pada baris metadata di bagian atas pratinjau, membuka formulir berisi bidang-bidang YAML front matter. Bidang dapat diubah, ditambahkan, dan dihapus. Bidang berisi daftar tetap berupa daftar: nilainya berderet dengan koma, dan nilai yang memuat koma ditulis dalam tanda kutip. Bidang baru bernama `tags`, `aliases`, `keywords`, `categories`, `authors`, atau `cssclasses` juga menjadi daftar. Bidang bersarang dan teks beberapa baris dapat dilihat di sana dan diedit di sumber.
+
+Yang diubah formulir adalah satu langkah urung dan hanya menyentuh baris bidang yang Anda ubah: komentar, urutan, spasi yang tidak lazim, tanda kutip, dan akhir baris semua baris lainnya tetap identik byte demi byte. Dokumen tanpa metadata mendapat blok di awalnya.
 
 ## Markdown yang didukung
 
@@ -315,7 +332,7 @@ Tanpa jangkar khusus, setiap heading mendapat jangkar yang diturunkan dari teksn
 - **Wiki link.** `[[Note]]` menautkan ke `Note.md` di folder yang sama atau folder di bawahnya. `[[Note|Teks tampilan]]` menampilkan teks Anda sendiri, dan `[[Note#Heading]]` membuka catatan. ⌘-klik membukanya di Splat.
 - **Embed.** `![[Note]]` menampilkan catatan lain di dalam catatan ini; catatan yang tersemat di dalamnya muncul sebagai tautan. `![[diagram.png]]` menampilkan gambar. Seperti di Obsidian, embed menyebut catatan dan gambar di folder dokumen atau di bawahnya, tidak pernah dengan path absolut, dan hanya file Markdown yang tampil sebagai catatan.
 - **Komentar.** `%%Hanya di sumber%%` tetap terlihat di sumber dan tidak disertakan di pratinjau dan semua ekspor, baik sebaris maupun di baris tersendiri.
-- **Tag.** `#idea` atau `#project/splat` disorot. ⌘-klik mencari tag di dokumen.
+- **Tag.** `#idea` atau `#project/splat` disorot. ⌘-klik mencari tag di dokumen dan, di bilah samping, di seluruh folder.
 - **Callout yang dapat dilipat.** Lihat [Kotak info](#kotak-info).
 
 ### Kutipan dan referensi
@@ -439,6 +456,23 @@ Di pratinjau, klik menempatkan kursor agar Anda dapat mengedit teks tautan; **�
 
 **Sisipkan › Daftar Isi** menyisipkan daftar bertaut dari semua heading. Dengan kursor di dalamnya, perintah yang sama memperbaruinya. Bilah samping kerangka (⌃⌘S) melompat ke heading mana pun di kedua panel.
 
+## Catatan dalam folder
+
+Tombol di bagian atas bilah samping beralih antara kerangka, file, dan pencarian.
+
+- **File** (**Lihat › Tampilkan File**, ⌃⌘E). Semua file Markdown di folder dokumen atau, jika folder itu berada di repositori Git, di seluruh repositori itu. Klik atau Return membuka catatan sebagai tab jendela ini; jika sudah terbuka, catatan itu dibawa ke depan. Tombol di samping nama folder menampilkan folder lain di jendela ini. File tersembunyi, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__`, dan folder tanpa catatan tidak disertakan. Dokumen yang berada langsung di folder Utama Anda hanya menampilkan catatan di sampingnya, agar Splat tidak menelusuri semua folder Anda dan meminta izin untuk masing-masing.
+- **Pencarian** (**Edit › Temukan › Cari di Semua Catatan…**, ⇧⌘F). Menemukan teks di semua catatan, apa pun huruf besar-kecilnya dan bagaimanapun aksennya dikodekan. `#tag` menemukan tag, `#project` juga `#project/splat`, dan tidak menemukan apa pun di dalam kode. Klik pada hasil membuka catatan di tempat itu.
+- **Tautan ke catatan.** Menu konteks catatan mencantumkan catatan yang menautkan ke catatan itu, lewat wiki link, embed, tautan relatif, atau definisi referensi tautan.
+- **Mengubah nama catatan.** Menu yang sama mengubah namanya dan mengubah tautan-tautan itu. Splat lebih dulu menyebutkan berapa tautan di berapa file yang terkena. Di setiap tautan hanya namanya yang berubah, dan setiap byte lain dalam file tetap sama. Dokumen yang terbuka menerima perubahan sebagai langkah urung; di file lain hanya Git atau Versi yang dapat mengurungkannya. File yang sementara itu diubah program lain menghentikan penggantian nama semua tautan, dan Splat menyebutkan file itu.
+
+Daftar mengikuti folder saat jendela dibawa ke depan. Pencarian melihat file sebagaimana adanya di disk, dan teks yang belum Anda simpan dihitung mulai Simpan Otomatis berikutnya.
+
+## Perubahan sejak commit terakhir
+
+Pada dokumen di repositori Git, bilah di samping teks menandai apa yang berbeda dari commit terakhir, di sumber dan di pratinjau: hijau untuk baris yang ditambahkan, biru untuk baris yang diubah, dan tanda merah pendek di tempat sesuatu dihapus. Bilah ini diperbarui saat Anda mengetik dan saat branch berpindah. **Lihat › Perubahan Sejak Commit Terakhir** mematikannya, untuk semua jendela.
+
+Baris yang hanya berbeda pada akhir barisnya tidak dihitung, sehingga file dengan CRLF terhadap commit dengan LF tidak menunjukkan perubahan. File baru tidak memiliki tanda sampai commit pertamanya, begitu pula dokumen di atas 32 MB.
+
 ## Ekspor, cetak, dan bagikan
 
 | Format | Cara | Hasilnya |
@@ -451,6 +485,19 @@ Di pratinjau, klik menempatkan kursor agar Anda dapat mengedit teks tautan; **�
 
 Menu **File › Bagikan** menawarkan semuanya di satu tempat. Ekspor memakai pengaturan tanda baca tipografis dan gambar dari web yang Anda izinkan; di HTML, gambar dari web tetap berupa tautan.
 
+**File › Pilihan Ekspor…** mengatur apa yang ditambahkan PDF, pencetakan, dan Word ke teks, untuk semua dokumen:
+
+- **Nomor halaman** di footer PDF dan cetakan, dalam bentuk `2 / 9`.
+- **Header dan footer** untuk PDF dan cetakan. `{title}`, `{author}`, `{date}`, `{page}`, dan `{pages}` mewakili nilainya, tiga yang pertama dari metadata dokumen.
+- **Halaman judul** untuk PDF, cetakan, dan Word, dengan `title`, `subtitle`, `author`, dan `date` dari metadata, atau nama dokumen sebagai judulnya. Halaman ini tidak memiliki header maupun footer.
+- **Template Word**, file `.docx` atau `.dotx` yang tampilannya diambil oleh ekspor: gayanya, termasuk nama yang dilokalkan, temanya, ukuran halaman, margin, header, dan footer. Template yang tidak dapat dibaca menghentikan ekspor dan memberitahukannya, alih-alih memberi Anda dokumen tanpa template itu.
+
+## Mengimpor dokumen Word
+
+**File › Impor Dokumen Word…** meminta file `.docx` atau `.dotx` dan ke mana Markdown-nya disimpan, lalu membuka hasilnya. Gambar masuk ke folder di sampingnya, yang dinamai seperti dokumen dengan tambahan `-images`.
+
+Heading dan daftar masuk sebagaimana ditentukan oleh gaya dan penomoran Word, juga di dokumen yang gayanya memiliki nama yang dilokalkan. Tebal, cetak miring, garis bawah, coretan, sorotan, superskrip dan subskrip, tautan, kutipan, kode, catatan kaki, catatan akhir, dan tabel ikut terbawa, sel yang melintasi beberapa kolom sebagai tabel HTML. Rumus menjadi LaTeX. Perubahan terlacak dianggap diterima, dan daftar isi tidak disertakan, karena **Sisipkan › Daftar Isi** membuat yang baru. File `.doc` lama dan dokumen yang dilindungi kata sandi ditolak.
+
 ## Tampilan dan aksesibilitas
 
 - **Mode gelap** mengikuti sistem. Rumus dan diagram ditampilkan untuk setiap tampilan.
@@ -459,7 +506,7 @@ Menu **File › Bagikan** menawarkan semuanya di satu tempat. Ekspor memakai pen
 - **Layar penuh, tab, dan bar alat yang dapat disesuaikan**, seperti di setiap app Mac.
 - **VoiceOver.** Panel diberi label "Sumber Markdown" dan "Pratinjau", rumus dibacakan sebagai kodenya dan diagram sebagai judulnya. Setiap perintah dapat dijangkau dari keyboard.
 
-Splat tidak punya jendela pengaturan: beberapa opsinya berada di tempat opsi itu berlaku, di **Lihat** dan **Edit › Substitusi**.
+Splat tidak punya jendela pengaturan: beberapa opsinya berada di tempat opsi itu berlaku, di **Lihat**, **Edit › Substitusi**, dan **File › Pilihan Ekspor…**.
 
 ## Bahasa
 
@@ -482,6 +529,9 @@ Teks Ibrani dan Arab dibaca dari kanan ke kiri di mana pun muncul, apa pun bahas
 | Ratakan kolom tabel ke kiri, tengah, kanan | ⌘{, ⌘\|, ⌘} |
 | Sembunyikan atau tampilkan pratinjau | ⌥⌘P |
 | Tampilkan atau sembunyikan kerangka | ⌃⌘S |
+| Tampilkan atau sembunyikan file | ⌃⌘E |
+| Cari di semua catatan | ⇧⌘F |
+| Tempel sebagai Markdown | ⌃⌘V |
 | Perbesar, perkecil, ukuran asli | ⌘+, ⌘−, ⌘0 |
 | Dokumen baru, buka, simpan, duplikatkan | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Pengaturan halaman, cetak | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ File Markdown bisa datang dari siapa saja, jadi Splat memperlakukan setiap dokum
 - **Gambar dari web** dimuat hanya setelah izin Anda, hanya melalui `https`, tidak pernah dari host di jaringan lokal Anda, paling banyak 10 MB per gambar, dan dalam sesi privat tanpa cookie.
 - **Dekode terisolasi.** Gambar serta grafik rumus dan diagram didekode di proses bantu yang menutup setiap file yang diwarisinya dan mengunci dirinya dalam sandbox sebelum membaca byte pertama: tanpa akses file, tanpa jaringan. Proses itu hanya mengembalikan piksel, yang ukurannya diperiksa, dan dihentikan setelah 10 detik. Dekoder gambar bawaan Apple hanya melihat HEIC, TIFF, AVIF, dan PDF, dan hanya jika datanya memang berformat itu; dekoder itu berjalan di proses bantu tersendiri, yang di samping itu boleh membaca folder font sistem dan memakai dekoder video sistem. SVG, rumus, dan diagram juga melewati proses bantu itu, sehingga di Splat semuanya berupa gambar dengan resolusi tetap: empat piksel per poin, hingga 2560 pada sisi yang lebih panjang.
 - **File lokal** sampai ke dokumen hanya melalui path yang disebutnya. Embed menampilkan catatan Markdown dari folder dokumen dan di bawahnya, dan gambar yang hilang dicari hanya di sana. Path gambar di tempat lain, absolut atau diawali `~`, tetap dimuat di pratinjau; ekspor HTML dan Word, pencetakan, dan PDF hanya membawa yang ada di folder dokumen atau repositori Git-nya, kecuali repositori itu juga memuat folder Utama Anda, sehingga dokumen dari orang lain tidak bisa menarik file Anda ke dalam ekspor yang Anda teruskan.
+- **Folder catatan** dibaca hanya selama bilah samping menampilkannya, dan mengubah nama catatan mengubah file lain hanya setelah Anda mengonfirmasi berapa banyak.
+- **Repositori Git** dibaca oleh Splat sendiri. Splat tidak pernah menjalankan program `git`, yang konfigurasinya di repositori dari orang lain dapat memulai program lain, dan tidak membaca lebih dari versi dokumen yang terbuka di commit terakhir. Splat tidak menulis apa pun di sana dan tidak mengakses jaringan.
+- **Dokumen Word dan teks yang ditempel** dibaca oleh parser Splat sendiri, dengan batas ukuran, penyarangan, dan seberapa jauh file boleh diekstrak. Tautan di dalamnya hanya mempertahankan alamat yang diizinkan Splat di tempat lain, dan nama gambar di file Word tidak pernah menentukan di mana gambar itu ditulis.
 - **Salinan teks yang belum disimpan** tetap berada di Mac ini, di folder Library Anda, untuk pemulihan setelah crash. Salinan itu hilang bersama penyimpanan atau berakhirnya Splat secara normal; salinan yang ditinggalkan crash tetap di folder pemulihan sampai Anda menghapusnya.
 - **Tautan** tidak pernah menjalankan program lewat klik. Tautan web dan email terbuka seperti biasa; tautan ke app lain meminta konfirmasi lebih dahulu.
 - **HTML di dokumen** dibaca oleh parser Splat sendiri. Skrip, gaya, bingkai, dan formulir tidak pernah berjalan.
@@ -530,7 +583,7 @@ Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB:
 ## Keterbatasan yang diketahui
 
 - **Satu tilde berarti subskrip.** `~teks~` adalah subskrip seperti di Pandoc; coretan memerlukan `~~dua~~`. GitHub juga mencoret dengan satu tilde.
-- **Hanya-baca di pratinjau:** HTML tersemat, catatan tersemat, dan front matter diedit di sumber.
+- **Hanya-baca di pratinjau:** HTML tersemat dan catatan tersemat diedit di sumber, front matter di formulirnya atau di sumber.
 - **Penyarangan yang sangat dalam:** HTML yang bersarang lebih dalam dari 64 tingkat, dan HTML sebaris lebih dalam dari 16, diganti dengan isinya.
 - **Sel tabel yang digabung** hanya ada di tabel HTML, dan hanya melintasi kolom (`colspan`, tanpa `rowspan`). Sintaks tabel MultiMarkdown untuk sel gabungan tidak didukung.
 - **Bibliografi** dibaca hanya dari BibTeX, tidak dari CSL JSON atau YAML.
@@ -538,6 +591,11 @@ Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB:
 - **Tanda baca tipografis:** tanda kutip tunggal penutup dalam bahasa Jerman tidak dapat dibedakan dari apostrof dan ditulis sebagai ’.
 - **Rumus, bukan dokumen:** tanpa paket LaTeX, TikZ, atau dokumen lengkap.
 - **Editor rumus visual** menulis LaTeX dalam notasi MathLive: spasi hilang (`E = mc^2` menjadi `E=mc^2`), tampilannya tetap sama.
+- **Jumlah kata:** Thai, Lao, Khmer, dan Myanmar ditulis tanpa spasi dan dihitung per rentetan teks, bukan per kata. `3.14` dan `snake_case` masing-masing dua kata.
+- **Mengubah nama catatan** tidak mengubah tautan di HTML tersemat, dan wiki link tetap seperti semula jika nama baru memuat `#`, `|`, `^`, `[`, `]`, atau `\`.
+- **Tanda perubahan** membaca repositori dengan objek SHA-1 dan ref biasa atau ref terkemas; repositori dengan SHA-256 atau reftable tidak menunjukkan tanda apa pun. File di bawah filter Git seperti LFS dibandingkan dengan apa yang disimpan filter itu.
+- **Impor Word** meninggalkan teks di header, footer, dan komentar, dan gambar berupa `.emz` atau SVG hanya mempertahankan teks alternatifnya.
+- **Tempel sebagai Markdown** membaca RTF sebagai teks Barat, dan di sana mengambil heading hanya dari ukuran font. Sebagian besar program juga menawarkan HTML, yang lebih diutamakannya.
 - **Menurut rancangan:** tanpa nomor baris, tanpa jendela pengaturan, tanpa Help Book, tidak ada di App Store.
 - **Kurang diuji di Intel.** Uji mandiri jendela hanya berjalan di Apple Silicon; di Intel, CI menjalankan `cargo test`.
 
@@ -561,190 +619,7 @@ Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB:
 
 ## Untuk pengembang
 
-Splat adalah aplikasi Rust yang berbicara langsung dengan AppKit dan WebKit melalui [objc2](https://github.com/madsmtm/objc2). Tidak ada Swift, tidak ada Objective-C, tidak ada proyek Xcode, dan tidak ada file Interface Builder.
-
-### Building
-
-Prasyarat:
-
-- macOS dengan Command Line Tools (`xcode-select --install`). Xcode tidak diperlukan; Splat dibangun tanpa `actool`, `ibtool`, dan `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) menyebut versi persis yang dipakai CI; rustup memasangnya sendiri, sedangkan Rust dari Homebrew mengabaikan file itu. Menaikkannya di sana adalah cara peringatan compiler dan clippy yang baru sampai ke proyek.
-- rustup, untuk `make lint`, `make check`, dan `make universal`: `cargo xtask check-library` membangun pustaka untuk Linux guna membuktikan bahwa pustaka itu tidak memerlukan macOS, dan Rust dari Homebrew tidak punya target lain.
-
-[Makefile](../../../Makefile) berisi titik masuk singkat; `make help` mendaftarkan semuanya:
-
-```sh
-make build                  # target/release/Splat.app, same as cargo xtask bundle --release
-make universal              # target/splat-universal for Apple Silicon and Intel, as the disk image carries it
-make check                  # formatting, clippy without warnings, all tests, vendored libraries; what CI runs
-make test                   # make check, then the self-test without a window
-make test-gui               # self-tests with a window; they occupy the Mac for about four minutes
-make test-long              # longer randomised search and the 10 MB partial-update check
-make fuzz                   # masukan acak untuk parse sebagian dan semua keluaran
-make coverage               # line coverage of all tests and self-tests, with a floor per module
-make coverage-library       # the same floors for the modules without a window, as in CI
-make bench FILE=<file.md>   # timings for opening, typing and scrolling a large file
-make release                # make test first, then the notarized disk image
-```
-
-Logika build itu sendiri berada di crate Rust [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signed with "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, a separate app that never opens Markdown files
-cargo xtask dmg                # dist/Splat-<version>.dmg for distribution, Developer ID, notarized
-cargo xtask icon               # rebuild assets/AppIcon.icns and the README icon from assets/icon-1024.png
-cargo xtask vendor check       # verify the bundled JavaScript against vendor.lock
-cargo xtask vendor fetch       # download it again after changing a version in vendor.lock
-```
-
-`bundle` menulis `Info.plist`, menyalin resource dan lokalisasi, serta menandatangani app dengan sertifikat "Splat Local Signing". Build pertama membuat sertifikat itu di keychain login Anda, berlaku 20 tahun. Selama sertifikat itu ada, Splat mempertahankan dokumen terbaru dan izin foldernya di antara build ulang; dengan tanda tangan ad hoc, setiap build akan menjadi app baru bagi macOS. Build debug dan uji mandiri membawa bundle ID tersendiri (`local.splat.debug`, `local.splat.selftest`) dan tidak mendaftar untuk file Markdown, sehingga Finder tidak pernah membuka dokumen di build yang usang dan keduanya tidak mengganggu pengaturan app yang normal.
-
-Versi berada di [VERSION](../../../VERSION) sebagai `major.minor.build` dan merupakan versi yang diterima build berikutnya. Setiap build rilis yang berhasil (`make build`, `cargo xtask bundle --release`, `make release`) menaikkan nomor build satu angka; build debug dan uji mandiri tidak mengubahnya. Major dan minor dinaikkan secara manual: isi VERSION dengan, misalnya, `1.1.0`, dan build berikutnya mendapat persis itu.
-
-### Distribusi
-
-`cargo xtask dmg` (atau `make release`, yang menjalankan `make test` lebih dahulu) membangun rilis, menandatanganinya dengan Developer ID Anda, menotarisasi app pada Apple dan menyematkan tiketnya, mengemasnya ke image disk terkompresi yang hanya-baca dengan tautan ke Aplikasi, menotarisasi dan menyematkan tiket image itu juga, lalu memeriksa hasilnya dengan Gatekeeper. App membawa tiketnya sendiri agar salinan yang dipasang tanpa Finder, seperti yang dilakukan Homebrew, terbuka secara offline juga pada peluncuran pertama; dua putaran dengan layanan notarisasi memerlukan beberapa menit masing-masing. Hanya image yang lolos setiap langkah menjadi `dist/Splat-<version>.dmg`, salinan yang di-commit, dan nomor build naik. Image sebelumnya tetap ada untuk satu rilis lagi, karena server raw GitHub dapat memberikan feed pembaruan lama selama beberapa menit setelah push; yang lebih lama dipindahkan ke tempat sampah. Proses yang gagal membiarkan `dist/` dan VERSION seperti semula.
-Setiap rilis menambahkan image penuh, sekitar 16 MB, ke riwayat repositori. Proses ini hanya berjalan saat dipanggil, tidak pernah sebagai bagian dari build normal, dan memerlukan:
-
-- sertifikat "Developer ID Application" di keychain
-- login tersimpan untuk layanan notarisasi Apple dengan kata sandi khusus app, dibuat sekali dengan `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- kunci privat yang menandatangani pembaruan, di keychain login. `generate_keys` dari Sparkle membuatnya; separuh publiknya adalah `UPDATE_KEY` di [xtask/src/main.rs](../../../xtask/src/main.rs) dan di dalam setiap salinan yang terpasang, yang hanya menerima pembaruan yang ditandatangani dengannya. Simpan cadangannya di pengelola kata sandi: `target/sparkle-2.10.1/bin/generate_keys -x <file>` mengekspornya, `-f <file>` mengimpornya di Mac lain. Tanpanya, salinan yang terpasang tidak akan pernah bisa diperbarui lagi.
-- rustup (`brew install rustup`, yang membiarkan Rust dari Homebrew tetap ada)
-- `RELEASE_NOTES.md`, berisi apa yang dibawa rilis ini. Dialog pembaruan menampilkannya di atas baris tentang cara melaporkan masalah, sehingga `dmg` berhenti jika file kosong atau masih berisi catatan rilis sebelumnya
-
-Jika salah satunya tidak ada, `dmg` berhenti sebelum membangun. Pada proses pertama, macOS bertanya apakah Terminal boleh mengendalikan Finder; tanpa izin itu, image disk tidak menampilkan latar belakang maupun susunan ikonnya.
-
-Hanya image disk yang membawa pemutakhir, [Sparkle](https://sparkle-project.org), yang diunduh build sekali ke `target/` dari rilis GitHub-nya dan diperiksa terhadap checksum di xtask. Hardened runtime memuat framework itu hanya jika membawa Team ID app, yang dimiliki tanda tangan Developer ID dan tidak dimiliki sertifikat lokal; dan pembaruan tidak boleh menggantikan build buatan sendiri. Build uji mandiri juga membawa Sparkle, untuk memeriksa menu pembaruan terhadapnya: dengan feed yang tidak ada, tanpa pertanyaan Sparkle pada peluncuran kedua, dan dengan entitlement yang memungkinkan app bertanda tangan lokal memuat framework itu. `dmg` menandatangani image baru dengan kunci pembaruan dan menulis `dist/appcast.xml`, feed yang dibaca salinan terpasang dari GitHub. Commit dan push image dan feed bersama-sama: sejak saat itu, salinan yang terpasang menawarkan pembaruan. Tautan unduhan di README ini dan terjemahannya mengarah ke `Splat.dmg` di rilis GitHub terbaru, jadi setiap rilis membawa salinan dengan nama itu: `cp dist/Splat-<version>.dmg target/Splat.dmg`, lalu `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Image disk adalah binary universal untuk Apple Silicon dan Intel; build lain hanya untuk prosesor host. Rust dari Homebrew hanya menyertakan pustaka standar untuk prosesor host, jadi `dmg` membangun melalui rustup, yang memasang toolchain dan target dari [rust-toolchain.toml](../../../rust-toolchain.toml) pada pemakaian pertama, dan berhenti jika program atau Sparkle tidak memiliki kode untuk salah satu prosesor. `make universal` hanya membangun programnya.
-App di dalamnya membawa tanda tangan yang berbeda dari build lokal, sehingga macOS menyimpan dokumen terbaru dan izin folder yang terpisah untuk keduanya.
-
-### Pengujian
-
-| Perintah | Memeriksa |
-|---|---|
-| `cargo test --release` | uji unit, acak, dan terjemahan |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | pencarian acak yang lebih panjang; `SPLAT_FUZZ_SEED` memvariasikan inputnya |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | satu bahasa, selagi yang lain belum lengkap |
-| `cargo clippy --release --all-targets [--features selftest]` | lint, termasuk pembenaran setiap blok `unsafe`, panjang fungsi dan, di pustaka, konversi angka |
-| `cargo xtask check-library` | pustaka bisa dibangun untuk Linux, jadi tidak ada di dalamnya yang memerlukan macOS |
-| `cargo xtask vendor check` | pustaka JavaScript cocok dengan `vendor.lock` byte demi byte |
-| `cargo xtask selftest probe` | tanpa jendela, masing-masing dengan hasil yang diharapkan: rumus, diagram, gambar web terhadap server di dalam proses, alamat yang diblokir, teks yang ditulis setiap perintah, setiap format gambar melalui kedua ekspor, halaman yang berhenti menjawab, dan pertahanan web view terhadap halaman tanpa pertahanan itu. Memakan waktu sekitar setengah menit. Yang memerlukan app di depan layar dilewati pada layar terkunci |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | app yang berjalan, klik demi klik. Membuka jendela dan mengetik di dalamnya; Mac sibuk sekitar empat menit. `--scenarios` hanya menjalankan bagian kedua, dalam sekitar satu setengah menit. `--only` menjalankan satu grup dari bagian itu, dalam dokumennya sendiri, juga pada layar terkunci. `--in-back` melewati yang memerlukan aplikasi di depan; tanpanya pemeriksaan seperti itu gagal |
-| `cargo xtask selftest resize` | melebarkan jendela setelah menggeser pembagi: sumber membungkus ulang selagi jendela diubah ukurannya. Memerlukan sekitar sepuluh detik |
-| `cargo xtask selftest typing [--by-hand]` | mengetik melewati penyimpanan, dengan tombol melalui antrean peristiwa aplikasi atau, dengan `--by-hand`, secara manual: yang diketik tetap ada dan terhitung belum disimpan. Sekitar satu menit |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | waktu untuk membuka, mengetik, dan menggulir file besar; `--keystroke-ms` gagal saat ketukan tercepat memakan waktu lebih lama |
-| `cargo test --release -- --ignored partial_updates` | satu ketukan tombol di 10 MB: pembaruan parsial dibandingkan penuh, hasil yang sama dalam paling lama seperempat waktunya |
-| `cargo test --release --test hostile` | dokumen yang dibuat untuk meluapkan stack atau memakan waktu kuadratik, masing-masing dalam dua ukuran yang waktunya harus tumbuh sebanding teks, melalui penguraian, tata letak, kedua ekspor, ketukan tombol, dan perintah |
-| `make mutants` | kesalahan yang ditanamkan di `crates/splat-markdown`, `crates/splat-preview`, dan `crates/splat-file-state` satu per satu, melalui [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); menyebutkan mana yang tidak terdeteksi uji mana pun. Memakan waktu berjam-jam; `FILE=crates/splat-preview/src/bridge/mod.rs` mempersempitnya |
-| `make fuzz` | masukan acak melalui [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), yang memerlukan nightly dari rustup: ketukan tombol yang harus terbaca seperti parse penuh, semua keluaran, pengeditan di pratinjau, semua perintah, dan file yang tersimpan seperti saat dibuka. `SECONDS=600` mencari lebih lama |
-| `cargo test --release --test fuzz_seeds` | seed di `fuzz/seeds/` melalui pemeriksaan target fuzz tersebut, tanpa fuzzer; bagian dari setiap `cargo test` |
-| `cargo test --profile checked --workspace` | pengujian ditambah yang diperiksa build debug: setelah setiap parse sebagian, blok cocok dengan teksnya, dan yang dibawanya adalah yang dikatakan teks. Bagian dari `make test-long` |
-| `cargo test --release --test entry_points --test structure` | dari sumber: semua yang dipanggil sistem dilindungi dari panic, dan modul hanya bergantung ke bawah |
-| `cargo test --release --test decoder` | proses dekoder mendekode gambar dan tidak menjangkau file maupun jaringan |
-| `make coverage` | cakupan baris `cargo test` dan semua uji mandiri, melalui [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); gagal di bawah batas minimum. Menyibukkan Mac sekitar lima menit |
-| `make coverage-library` | crate `splat-markdown`, `splat-preview`, `splat-file-state`, dan `splat-i18n` terhadap batas minimum yang lebih tinggi, diukur oleh `cargo test` saja |
-
-Uji unit berada di samping kode yang diujinya. `crates/splat-testkit/tests/` berisi apa yang menjangkau model dan pratinjau dari luar: uji acak di `robustness.rs`, yang berbagi generator `splat-testkit` dengan uji di `sync.rs`, dokumen yang dibuat untuk menyakiti di `hostile.rs`, dan seed target fuzz di `fuzz_seeds.rs`. `tests/` berisi apa yang memeriksa seluruh program: sumbernya, terjemahannya, dan uji dekoder, yang menjalankan program yang sudah dibangun. Keputusan di `src/editor/` yang tidak memerlukan jendela berada di fungsi bebas dengan ujinya sendiri: semua yang diketahui controller dan bagaimana itu berubah di `state.rs`, aturan penampilan di `render_queue.rs`, salinan teks di `sync.rs`, gaya paragraf, font, dan warna sebagai nilai di `render.rs`, arti pengenal toolbar di `toolbar.rs`, arti klik pada tautan di `navigation.rs`.
-
-Langkah uji mandiri jendela menunggu kondisi bernama, bukan waktu; hanya yang tidak memberi sinyal, seperti ketiadaan sesuatu, tetap memakai jeda beserta alasannya. Menunggu dengan sia-sia adalah pemeriksaan gagal yang menyebut apa yang tidak pernah datang, langkah yang panik juga pemeriksaan gagal, dan proses berjalan terus dalam kedua kasus. Pemeriksaan yang tidak bisa menyatakan apa pun pada proses ini melaporkan `SELFTEST SKIP`: xtask mendaftarkannya, dan ia tidak lulus maupun gagal. xtask menahan setiap mode, dan `--scenarios` tersendiri, pada sekitar sembilan persepuluh pemeriksaannya. Uji mandiri jendela menjalankan bagian kedua setelah click-through utamanya, di `src/editor/selftest/scenarios.rs`: setiap perintah pemformatan dan tabel, dialog, klik tautan, menempel, melepas, ekspor, file yang diubah program lain, perubahan besar, gambar yang berubah di disk, tekanan memori, dokumen sangat besar, dan pemulihan setelah crash. Setiap grupnya membuka dokumen sendiri, sehingga kegagalan di satu grup tidak mencapai grup berikutnya, dan setiap grup dapat dijalankan sendiri dengan `--only`. Uji mandiri tanpa jendela juga sengaja merusak penyimpanan: folder yang tidak menerima apa pun, file hanya baca, folder yang sudah hilang, disk penuh, dan panic di setiap callback penyimpanan, dan tidak satu pun boleh menghilangkan teks.
-
-Cakupan punya dua batas minimum: setiap modul sedikitnya 84 % barisnya, semua modul bersama sedikitnya 96 %. `make coverage` mengukur `cargo test` bersama uji mandiri dan gagal di bawah salah satunya; `make coverage-library` menahan yang tidak memerlukan jendela pada 90 % dan 97 %. Batas minimum dan beberapa pengecualian, seperti panic hook di `main.rs` yang hanya berjalan saat crash, ada di [xtask](../../../xtask/src/coverage.rs) bersama alasannya. Build terukur masuk ke `target/coverage/`, sehingga kode pengukur tidak pernah sampai ke `target/release/` atau image disk. Proses bantu dekoder membuka file pengukurannya sebelum mengunci dirinya, sehingga ikut terukur.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) menjalankan `make check`, `make coverage-library`, dan build universal di Apple Silicon serta `cargo test` di Intel untuk setiap push ke `main` dan setiap pull request. Setiap malam, [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) menjalankan `make test-long` dengan input acak yang baru. Uji mandiri dan image disk tetap di Mac pengembang: keduanya memerlukan layar dan sertifikat penandatanganan di keychain.
-
-Keluaran uji mandiri masuk ke `target/selftest/`. Uji mandiri membangun app terpisah (`target/release/Splat Selftest.app`, bundle ID `local.splat.selftest`) dan membiarkan pengaturan, dokumen terbaru, dan asosiasi file app yang normal tidak tersentuh.
-
-### Struktur proyek
-
-Semua yang tidak memerlukan jendela adalah crate tersendiri di bawah `crates/`, yang dibangun tanpa macOS, sehingga compiler menegakkan cara mereka saling bergantung. App di `src/` (paket `splat-app`, program `splat`) dibangun di atasnya.
-
-- `crates/splat-markdown/`: pohon yang dibaca setiap konsumen, `Doc` di `doc/`, yang memiliki teksnya sendiri, dan satu-satunya binding ke parser di `reader/`: comrak tidak disebut di tempat lain, dan `reader/assumptions.rs` memuat apa yang diasumsikan kode tentangnya. Warna sintaks, dan semua perintah sebagai pengeditan teks murni (`Edit`) di `commands/`. Juga penguraian ulang setelah pengeditan (`incremental.rs`), pembaca untuk HTML tersemat (`markup.rs`), tipografi, tag, referensi, dan kutipan pustaka dalam teks mengalir (`typography.rs`), bagaimana teks terlihat dan Markdown serta HTML mana yang membuatnya begitu (`style.rs`), alamat apa yang diperbolehkan (`url.rs`), serta ekspor HTML dan Word (`html.rs`, `docx.rs` dengan `docx/html.rs` dan `docx/xml.rs`). Sebuah posisi punya tipenya sendiri: `Byte` di teks sumber, `U16` di tampilan sumber, `Shown` di tampilan pratinjau (`text.rs`).
-- `crates/splat-preview/`: tata letak pratinjau di `layout/`, dengan HTML tersemat di `layout/html.rs`, dan pemetaan antara pratinjau dan sumber (`Bridge`, `Index`). `Bridge` menolak tata letak dari versi `Doc` yang lain.
-- `crates/splat-file-state/`: teks apa yang dimuat sebuah file, dalam format apa, dan apa arti melihatnya.
-- `crates/splat-i18n/` dengan `resources/*.lproj`: 35 bahasa; kuncinya adalah teks Jerman, dan app memasang tabel bahasa antarmuka saat dimulai.
-- `crates/splat-testkit/`: generator uji acak dan pemeriksaan target fuzz.
-- `src/editor/`: jendela. Satu objek `EditorController` melayani AppKit sebagai delegate kedua view dan meneruskan ke komponen, struct kecil di atas controller dan state yang dimilikinya, yang field-nya tidak dapat dijangkau modul lain:
-
-| Modul | Tanggung jawab |
-|---|---|
-| `controller.rs` | kelas, metode delegate yang meneruskan, `invalidate`, serta apa yang dikatakan bagian program lainnya kepada editor; hanya ini yang mencapai komponen |
-| `panes.rs` | `Panes`: text view, kerangka, menampilkan dan menyembunyikan panel, dan apa yang memberi akses ke view |
-| `controller/layers.rs` | siapa boleh mencapai siapa: komponen mendapat pegangan controller yang menawarkan apa yang ada di bawahnya, dan compiler menegakkannya |
-| `state.rs` | apa yang diketahui controller tentang dokumen dan setiap cara itu berubah; field-nya privat, dan tidak menyentuh view |
-| `model.rs` | meminjamkan state dan salinan teks ke closure yang tidak dapat menjangkau view |
-| `actions.rs` | registri perintah: selector, judul, pintasan, simbol, kapan perintah berlaku |
-| `editing.rs` | `Editing`: menjalankan dan memvalidasi perintah, mengetik di pratinjau |
-| `update.rs` | `Updater`: menguraikan, mewarnai, memperbarui pratinjau; setelah pengeditan hanya paragraf yang terpengaruh |
-| `sync.rs` | salinan teks dan pembukuan blok, tanpa AppKit dan dengan uji acak |
-| `progressive.rs` | `Progressive`: menampilkan pratinjau besar selangkah demi selangkah |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: pilihan dan posisi gulir kedua panel agar selaras |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: editor rumus dan diagram |
-| `navigation.rs`, `links.rs` | `Links`: tautan, wiki link, tag, kotak centang tugas, pelipatan, catatan kaki |
-| `env.rs` | apa yang dibaca pratinjau dari luar teks: tanda baca tipografis, repositori untuk `@name` dan `#12`, file BibTeX, catatan tersemat |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | teks pratinjau, gambar lokal dan jarak jauh; `Pictures` di `images.rs` |
-| `attributes.rs` | atribut teks; setiap kunci hanya mendapat nilai bertipe yang diharapkannya |
-| `shadow.rs` | salinan teks yang belum disimpan untuk pemulihan setelah crash |
-| `decoder.rs` | proses bantu dalam sandbox yang mendekode gambar dan grafik |
-| `export.rs`, `outline.rs` | `Sharing`: ekspor HTML dan Word, file bagikan, pencetakan; bilah samping kerangka |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit untuk MathJax, Mermaid, Graphviz, PlantUML, dan editor rumus visual; aturan tentang apa yang ditampilkan kapan, terlepas dari WebKit |
-| `webkit.rs` | pemanggilan ke WebKit; hanya masa hidup delegate navigasi yang tetap pada `js.rs` dan `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | membangun jendela, bar alat, text view, dialog, warna |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: bilah menu, delegate app, dokumen (`MDDocument`, subkelas `NSDocument`).
-- `src/util/`: worker thread (`lanes.rs`), volume yang bisa berhenti menjawab (`volumes.rs`), helper AppKit, file, dan proses. `src/diag.rs`: apa yang salah di luar pandangan pengguna masuk ke log sistem, tanpa teks dokumen apa pun.
-- `src/large_alloc.rs`: alokasi besar datang langsung dari kernel dan kembali ke sana saat dibebaskan, sehingga memori kembali setelah pengeditan besar.
-- `resources/js/`: halaman web dan pustaka; versi dan checksum di [vendor.lock](../../../vendor.lock).
-- `xtask/`: bundling, penandatanganan, image disk, ikon, vendoring, runner uji mandiri, dan batas minimum cakupan.
-
-### Alur data
-
-Teks sumber di text view kiri adalah satu-satunya sumber kebenaran.
-
-1. Setiap perubahan karakter di sana memperbarui salinan teks (`Snapshot`) di tempat, tanpa membaca teksnya lagi.
-2. Pembaruan mengurai salinan, mewarnai ulang sumber hanya di tempat warna berubah, menata pratinjau, dan mengganti hanya blok yang isinya berubah.
-3. Setelah pengeditan, hanya paragraf yang terpengaruh yang diurai, diwarnai, dan ditata ulang, selama tetangganya tetap sama; [docs/partial-parse.md](../../../docs/partial-parse.md) menyatakan mengapa hal itu memberi hasil yang sama dengan parse penuh, dan apa yang perlu dilihat ketika comrak berubah. Dokumen dengan blok komentar `%%`, perubahan pada front matter, dan, pada dokumen dengan definisi referensi tautan, perubahan pada bagian yang memuat tanda kurung siku diproses penuh. comrak mengenali referensi catatan kaki hanya dengan definisinya dalam penguraian yang sama dan memindahkan definisi ke belakang teks, jadi bagian itu diurai dengan definisi pengganti per label dan mengambil nomornya dari pohon lama; perubahan pada referensi atau definisi di bagian itu, atau di dekat catatan kaki sebaris, diproses penuh.
-4. Blok HTML yang membuka `<details>` atau `<div align>` dan menutupnya kemudian memengaruhi blok Markdown di antaranya; blok yang dipakai ulang harus memiliki lingkungan yang sama.
-5. Saat Anda mengetik di sumber dokumen hingga 2 MB, pembaruan parsial berjalan seketika; bila tidak berlaku, atau di dokumen yang lebih besar, penguraian dan tata letak berjalan di latar belakang. Saat Anda mengetik di pratinjau, keduanya berjalan seketika, karena kursor pratinjau bergantung pada hasilnya.
-6. Input di pratinjau diterjemahkan oleh `Bridge` menjadi pengeditan sumber dan menempuh jalur yang sama sejak saat itu. Markdown punya terlalu banyak cara mengubah teks menjadi sintaks untuk aturan saja, jadi `preview/verify.rs` menguraikan lagi bagian yang berubah dan membandingkan apa yang ditampilkannya dengan apa yang diketik; pengeditan yang tidak bertahan di-escape lebih jauh atau ditolak.
-7. Posisi sebaris comrak salah di beberapa tempat, misalnya di belakang definisi referensi tautan. `reader/positions.rs` memeriksanya terhadap sumber saat membaca blok dan membacanya lagi dari sumber bila tidak cocok.
-
-### Aturan di controller
-
-1. Perubahan controller sendiri pada view berjalan di dalam `Panes::silently`; callback delegate mengabaikannya. Di tempat lain view hanya bisa dibaca, jadi compiler yang memeriksanya. Apa yang memang harus didengar callback, atau apa yang menyerahkan view ke AppKit, menyatakannya dengan melewati `Panes::for_appkit`.
-2. State dipinjam hanya untuk membaca dan menghitung, tidak pernah melintasi pemanggilan yang mengubah, menata, atau menggulir view: `Model` meminjamkannya ke closure `Send`, dan tidak ada view yang `Send`, jadi compiler yang memeriksanya. Ia berubah hanya melalui metodenya sendiri, yang ujinya tidak memerlukan jendela.
-3. Pesan dari luar (gambar dimuat, rumus ditampilkan) tiba tertunda melalui `renders_arrived` dan `image_arrived`, tidak pernah di tengah pembaruan.
-4. Menggambar ulang tanpa perubahan teks hanya melalui `invalidate(reason)`.
-5. Salinan teks tidak ditahan melintasi perubahan sumber, atau perubahan itu menyalin seluruh teks: `with_text` meminjamkannya hanya selama satu closure `Send`.
-6. Perintah baru memerlukan entri di `actions.rs`, metode di `controller.rs`, dan cabang di `Editing::perform`.
-7. Setiap blok `unsafe` membawa pembenarannya sebagai komentar `// SAFETY:`. Byte sampai ke dekoder gambar sistem hanya di proses pembantu, melalui `decoder::decode_native`; sebuah tes memindai sumber untuk pemanggilan lain.
-8. Tidak ada di thread utama yang menunggu folder pengguna, karena volume jaringan dapat berhenti menjawab: file dilihat di thread `DISK`, dan pratinjau membaca jawabannya melalui `Env::known`. Hanya tindakan yang ditunggu pengguna, seperti ekspor atau menyimpan, yang boleh menyentuh disk secara langsung.
-9. Yang harus berakhir juga berakhir setelah panic, karena thread utama selamat darinya: flag yang dinaikkan melewati `with_raised`, pengeditan penyimpanan teks melewati `editing`, dan apa yang tidak boleh diketahui undo melewati `without_undo`. Sebuah uji menemukan yang ditulis dengan tangan.
-10. Alamat dalam dokumen punya satu pembacaan, di `splat_markdown::url`; sebuah uji menemukan skema yang dibandingkan dengan tangan.
-
-### Menambah perintah
-
-Bilah menu, bar alat, dan menu konteks semuanya membangun itemnya dari registri di [src/editor/actions.rs](../../../src/editor/actions.rs), dan validasi menu membaca di sana kapan perintah berlaku dan apakah menampilkan tanda centang. Perintah baru memerlukan:
-
-1. varian `Action` dengan `Spec`-nya: selector, judul, label bar alat, tooltip (diawali kata kerja, paling banyak 75 karakter), pintasan, SF Symbol, dan kapan berlaku
-2. metode di `src/editor/controller.rs`
-3. cabang di `Editing::perform`
-4. teksnya di setiap `Localizable.strings`
-
-Uji `every_command_has_a_method_and_every_method_a_command` memeriksa bahwa registri dan metode cocok. Pintasan standar Apple seperti ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F, dan ⌘, tidak disentuh.
-
-### Terjemahan
-
-Kode memakai teks Jerman sebagai kunci: `t("Fett")` mencarinya saat runtime, `n("Fett")` menandai konstanta untuk pencarian nanti. Setiap `resources/<language>.lproj/` berisi:
-
-- `Localizable.strings`: setiap teks antarmuka, istilah menu mengikuti glosarium resmi Apple
-- `InfoPlist.strings`: nama yang ditampilkan macOS untuk app dan jenis dokumennya
-- `QuickReference.md`: referensi singkat Markdown
-
-`cargo xtask bundle` mendaftarkan setiap folder `.lproj` sebagai lokalisasi, dan `CFBundleDevelopmentRegion` adalah bahasa Inggris, sehingga menu sistem dan dialog simpan mengikuti bahasa yang sama. Uji i18n memeriksa bahwa setiap bahasa memiliki setiap teks dan bahwa setiap referensi singkat memiliki kerangka yang sama dengan yang berbahasa Jerman.
-
-`assets/readme/<language>/` berisi README ini dalam bahasa tersebut, tangkapan layarnya, dan dokumen demo yang ditampilkan tangkapan layar itu. Perubahan pada README ini juga perlu dilakukan di salinan-salinan itu.
+Cara membangun, menguji, struktur kode, dan aturan yang diikutinya dijelaskan di [docs/development.md](../../../docs/development.md) (dalam bahasa Inggris).
 
 ### Komponen pihak ketiga
 
@@ -757,6 +632,10 @@ Kode memakai teks Jerman sebagai kunci: `t("Fett")` mencarinya saat runtime, `n(
 | [image](https://github.com/image-rs/image) | 0.25 | mendekode PNG, JPEG, GIF, WebP, dan BMP | MIT atau Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | meratakan kolom tabel | MIT atau Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | nama referensi karakter HTML | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | membongkar file Word dan objek Git | MIT, Zlib atau Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | membaca XML file Word | MIT atau Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nama dan pencarian lintas huruf tersusun dan terurai | MIT atau Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | menjaga teks mirip `:shortcode:` apa adanya dalam teks yang diimpor | MIT atau Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | menampilkan rumus | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | editor rumus visual, dengan font KaTeX | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | diagram Mermaid | MIT |

@@ -82,6 +82,7 @@ enum Click<'a> {
     ToggleTask,
     ToggleFold,
     ShowFootnote(&'a str),
+    EditMetadata,
     /// With ⌘ a link leads somewhere, so that a click to place the caret never does.
     Open(&'a Link),
     PlaceCaret,
@@ -92,6 +93,7 @@ fn click_meaning(link: &Link, command_held: bool) -> Click<'_> {
         Link::Task => Click::ToggleTask,
         Link::Fold => Click::ToggleFold,
         Link::Footnote(name) => Click::ShowFootnote(name),
+        Link::Metadata => Click::EditMetadata,
         Link::Address(_) | Link::WikiPage(_) | Link::Tag(_) | Link::Reference(_) if command_held => Click::Open(link),
         Link::Address(_) | Link::WikiPage(_) | Link::Tag(_) | Link::Reference(_) => Click::PlaceCaret,
     }
@@ -124,7 +126,7 @@ fn opening(link: &Link, doc_dir: Option<&Path>) -> Opening {
             LinkTarget::Nothing => Opening::Refuse,
             found => Opening::LookAt(found),
         },
-        Link::Footnote(_) | Link::Fold | Link::Task => Opening::Nothing,
+        Link::Footnote(_) | Link::Fold | Link::Task | Link::Metadata => Opening::Nothing,
     }
 }
 
@@ -202,6 +204,7 @@ impl Links<'_> {
                     view.showFindIndicatorForRange(range);
                 }
             }
+            Click::EditMetadata => self.host.editing().perform(super::Action::EditMetadata, None),
             Click::Open(link) => self.open_link(link),
             Click::PlaceCaret => view.setSelectedRange(NSRange::new(index, 0)),
         }
@@ -210,7 +213,10 @@ impl Links<'_> {
 
     fn open_link(&self, link: &Link) {
         match opening(link, self.host.doc_dir().as_deref()) {
-            Opening::Find(tag) => self.find_in_source(&tag),
+            Opening::Find(tag) => {
+                self.find_in_source(&tag);
+                self.host.notes().search_tag(&tag);
+            }
             Opening::Reference(reference) => {
                 let url = super::env::Env::known(self.host.doc_dir(), "")
                     .repository

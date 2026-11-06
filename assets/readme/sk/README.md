@@ -4,7 +4,7 @@
 
 **Editor Markdownu pre macOS, v ktorom píšete v zdrojovom texte alebo priamo v náhľade.**
 
-Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a živý, plne upraviteľný náhľad vpravo. Písať môžete v ktoromkoľvek z nich: všetko, čo napíšete v náhľade, sa prenesie do zdrojového textu ako minimálna zmena, takže riadky, ktorých ste sa nedotkli, zostanú bajt po bajte rovnaké a vaše diffy v Gite zostanú čisté. Splat rozumie Markdownu, ktorý už používate: CommonMark a GitHub Flavored Markdown, upozornenia GitHubu, wiki odkazy, vloženia a informačné rámčeky z Obsidianu, rozšírenia Pandocu a Typory, vložené HTML, vzorce LaTeX a diagramy Mermaid, Graphviz a PlantUML, to všetko vykreslené offline. Export do PDF, HTML alebo Wordu jedným kliknutím. Je napísaný v Ruste na skutočných ovládacích prvkoch AppKit, hovorí 35 jazykmi a nič neposiela po sieti, kým o to nepožiadate.
+Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a živý, plne upraviteľný náhľad vpravo. Písať môžete v ktoromkoľvek z nich: všetko, čo napíšete v náhľade, sa prenesie do zdrojového textu ako minimálna zmena, takže riadky, ktorých ste sa nedotkli, zostanú bajt po bajte rovnaké a vaše diffy v Gite zostanú čisté. Splat rozumie Markdownu, ktorý už používate: CommonMark a GitHub Flavored Markdown, upozornenia GitHubu, wiki odkazy, vloženia a informačné rámčeky z Obsidianu, rozšírenia Pandocu a Typory, vložené HTML, vzorce LaTeX a diagramy Mermaid, Graphviz a PlantUML, to všetko vykreslené offline. Prechádzajte a prehľadávajte celý priečinok poznámok, pozrite si, čo sa zmenilo od posledného commitu v Gite, vkladajte z Wordu alebo webovej stránky ako Markdown a exportujte do PDF, HTML alebo Wordu jedným kliknutím. Je napísaný v Ruste na skutočných ovládacích prvkoch AppKit, hovorí 35 jazykmi a nič neposiela po sieti, kým o to nepožiadate.
  
 
 
@@ -81,6 +81,8 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
   - [Príkazy formátovania](#príkazy-formátovania)
   - [Zoznamy a úlohy](#zoznamy-a-úlohy)
   - [Tabuľky](#tabuľky)
+  - [Vkladanie formátovaného textu](#vkladanie-formátovaného-textu)
+  - [Metadáta](#metadáta)
 - [Podporovaný Markdown](#podporovaný-markdown)
   - [CommonMark a GitHub Flavored Markdown](#commonmark-a-github-flavored-markdown)
   - [Informačné rámčeky](#informačné-rámčeky)
@@ -94,7 +96,10 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 - [Diagramy](#diagramy)
 - [Obrázky](#obrázky)
 - [Odkazy a navigácia](#odkazy-a-navigácia)
+- [Poznámky v priečinku](#poznámky-v-priečinku)
+- [Zmeny od posledného commitu](#zmeny-od-posledného-commitu)
 - [Export, tlač a zdieľanie](#export-tlač-a-zdieľanie)
+- [Import dokumentov Word](#import-dokumentov-word)
 - [Vzhľad a prístupnosť](#vzhľad-a-prístupnosť)
 - [Jazyky](#jazyky)
 - [Klávesové skratky](#klávesové-skratky)
@@ -103,14 +108,6 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 - [Známe obmedzenia](#známe-obmedzenia)
 - [Riešenie problémov](#riešenie-problémov)
 - [Pre vývojárov](#pre-vývojárov)
-  - [Zostavenie](#zostavenie)
-  - [Distribúcia](#distribúcia)
-  - [Testovanie](#testovanie)
-  - [Štruktúra projektu](#štruktúra-projektu)
-  - [Tok dát](#tok-dát)
-  - [Pravidlá v ovládači](#pravidlá-v-ovládači)
-  - [Pridanie príkazu](#pridanie-príkazu)
-  - [Preklady](#preklady)
   - [Komponenty tretích strán](#komponenty-tretích-strán)
 - [Licencia](#licencia)
 
@@ -120,7 +117,10 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 - **Markdown, ktorý už používate.** CommonMark, GitHub Flavored Markdown, upozornenia GitHubu, rozšírenia Obsidianu, Pandocu a Typory, emotikony zapísané skratkou, spoilery, zoznamy definícií, kotvy nadpisov a HTML ako v README na GitHube.
 - **Vzorce a diagramy priamo v aplikácii.** Vzorce LaTeX cez MathJax s vizuálnym editorom vzorcov. Diagramy Mermaid, Graphviz a PlantUML sa vykresľujú na vašom Macu bez Javy, servera či pripojenia k sieti.
 - **Tlačidlo pre všetko.** Každý prvok Markdownu má tlačidlo na paneli s nástrojmi a položku v menu, bežné aj klávesovú skratku. Tabuľky majú vlastné menu pre riadky, stĺpce a zarovnanie.
-- **Export bez straty.** PDF, jeden samostatný súbor HTML alebo dokument Word so skutočnými nadpismi, zoznamami, tabuľkami, poznámkami pod čiarou a obrázkami.
+- **Priečinok, nielen súbor.** Bočný panel zobrazuje poznámky okolo dokumentu a prehľadáva ich všetky. Premenovanie poznámky zmení odkazy na ňu a každý bajt okolo nich zostane.
+- **Zmeny na prvý pohľad.** V repozitári Git značia pruhy vedľa textu to, čo sa líši od posledného commitu, v oboch paneloch.
+- **Z Wordu a webu do Markdownu.** Vkladajte formátovaný text ako Markdown a bunky z tabuľkového procesora ako tabuľku a importujte celé dokumenty Word aj s obrázkami.
+- **Export bez straty.** PDF, jeden samostatný súbor HTML alebo dokument Word so skutočnými nadpismi, zoznamami, tabuľkami, poznámkami pod čiarou a obrázkami. Pridajte číslovanie strán, hlavičky a titulnú stranu alebo použite šablónu Word svojej firmy.
 - **Natívny od základov.** Skutočné okná AppKit, taby, menu, popovery, Verzie, Automatické ukladanie, menu Zdieľať, tmavý režim, kontrola pravopisu, diktovanie a VoiceOver. Žiadny Electron, žiadny webový prvok pre samotný text.
 - **Rýchly aj pri veľkých súboroch.** Vykreslenie stlačenia klávesu v dokumente s veľkosťou 10 MB trvá asi 10 ms, pred vlastnou prácou zobrazenia.
 - **Súkromný a opatrný.** Obrázky z webu sa načítajú, až keď ich povolíte, odkazy do iných aplikácií sa najprv pýtajú a všetko, čo dekóduje nedôveryhodné obrázkové dáta, beží v pomocných procesoch v sandboxe.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Aktualizácie.** Splat z obrazu disku alebo z Homebrew sa aktualizuje sám cez [Sparkle](https://sparkle-project.org). Pri druhom spustení sa spýta, či môže raz denne sám vyhľadávať aktualizácie. **Splat › Vyhľadať aktualizácie…** vyhľadá ihneď; **Automaticky vyhľadávať aktualizácie** a **Automaticky sťahovať a inštalovať aktualizácie** v tom istom menu vašu voľbu neskôr zmenia. Splat nainštaluje aktualizáciu, iba ak nesie podpis vývojára. Vlastná zostavená verzia nemá aktualizátor.
 
-**Zo zdrojového kódu.** Predpoklady nájdete v časti [Zostavenie](#zostavenie), potom:
+**Zo zdrojového kódu.** Predpoklady nájdete v časti [Zostavenie](../../../docs/development.md#building), potom:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Každý dokument sa otvorí vo vlastnom okne alebo ako tab, ak máte radi taby:
 
 - **Vľavo: zdrojový text.** Váš Markdown v písme SF Mono so zvýraznením syntaxe.
 - **Vpravo: náhľad.** Vykreslený dokument pripravený na úpravy.
-- **Bočný panel s osnovou (voliteľný).** Všetky nadpisy ako strom; kliknutím na nadpis ho zobrazíte v oboch paneloch. Zobrazíte ho cez **Zobraziť › Zobraziť osnovu** (⌃⌘S).
+- **Bočný panel (voliteľný).** Všetky nadpisy ako strom, kliknutím na nadpis ho zobrazíte v oboch paneloch: **Zobraziť › Zobraziť osnovu** (⌃⌘S). Ďalšie dva taby obsahujú [poznámky v priečinku](#poznámky-v-priečinku) a ich prehľadávanie.
 - **Panel s nástrojmi.** Tlačidlá zoradené podľa toho, čo menia: znaky, odseky a vkladané prvky, potom zapnutie a vypnutie náhľadu, Zdieľať a Nový dokument. Prispôsobíte ho cez **Zobraziť › Prispôsobiť panel s nástrojmi…**.
 
 Potiahnutím deliacej čiary dáte jednej strane viac miesta. **Zobraziť › Skryť náhľad** (⌥⌘P) nechá iba zdrojový text; Splat si to pamätá pre každé okno zvlášť. Oba panely sa posúvajú spolu a výber v jednom z nich sa zvýrazní aj v druhom.
+
+V rohu okna sa zobrazuje počet slov a znakov textu a čas čítania, a kým existuje výber, to isté pre výber. Adresy odkazov, značky HTML, metadáta, komentáre, vzorce a diagramy sa nepočítajú. **Zobraziť › Skryť počet slov** tento údaj odstráni.
 
 ### Dokumenty, taby a verzie
 
@@ -214,7 +216,7 @@ Náhľad sa správa ako textový procesor, ale všetko, čo v ňom urobíte, sko
 - **Vzorce a diagramy** sa zobrazujú ako hotová grafika. Kliknutím na ne, presunutím kurzora na ne alebo stlačením Return na nich otvoríte ich editor (pozri [Vzorce](#vzorce) a [Diagramy](#diagramy)).
 - **Vložené HTML, vložené poznámky a front matter** sa zobrazujú, ale upravujete ich v zdrojovom texte. Kliknutie na ne umiestni kurzor na zodpovedajúce miesto tam.
 
-Všetko, čo Markdown nedokáže vyjadriť, je v náhľade zablokované: panely Písma a Farby, pravítko a vkladanie alebo púšťanie formátovaného textu a obrázkov. Vložené HTML a RTF sa vložia ako čistý text.
+Všetko, čo Markdown nedokáže vyjadriť, je v náhľade zablokované: panely Písma a Farby, pravítko a vkladanie alebo púšťanie formátovaného textu a obrázkov. Vložené HTML a RTF sa vložia ako čistý text, pokiaľ nezvolíte [Vložiť ako Markdown](#vkladanie-formátovaného-textu).
 
 ### Príkazy formátovania
 
@@ -245,6 +247,21 @@ Podčiarknutie, zvýraznenie, horný a dolný index sa zapisujú ako `<ins>`, `<
 - V náhľade sa **Tab** presunie na ďalšiu bunku, **⇧Tab** na predchádzajúcu a **Return** na bunku pod ňou. Tab v poslednej bunke pridá riadok.
 - Menu **Tabuľka** vkladá a maže riadky a stĺpce a nastavuje zarovnanie stĺpca (⌘{, ⌘|, ⌘}).
 - **Tabuľka › Zarovnať stĺpce tabuľky** doplní zdrojový text medzerami, aby stĺpce lícovali.
+
+### Vkladanie formátovaného textu
+
+**Upraviť › Vložiť ako Markdown** (⌃⌘V), aj v kontextovom menu oboch panelov, premení obsah schránky na Markdown v mieste výberu, ako jeden krok odvolania. ⌘V naďalej vkladá čistý text.
+
+- **Z prehliadača, Wordu, Google Docs, Confluence, Poznámok alebo Pages:** prenesú sa nadpisy, tučné písmo, kurzíva, podčiarknutie, preškrtnutie, horný a dolný index, odkazy, zoznamy aj s vnorením, citácie, kód a tabuľky.
+- **Z tabuľkového procesora:** z buniek vznikne tabuľka s riadkom hlavičky a stĺpcami čísel zarovnanými doprava. To isté platí pre text oddelený tabulátormi, bodkočiarkami alebo čiarkami, ak má každý riadok rovnaký počet stĺpcov.
+- **Obrázky** s webovou adresou zostanú odkazmi. Obrázok vo vloženom HTML sa stane súborom vedľa dokumentu, ktorý musí byť na to raz uložený. Dočasné obrázkové súbory Wordu sa neprenesú, ich alternatívny text však zostane.
+- **Odkazy** si ponechajú iba adresy `http`, `https`, `mailto`, relatívne a `#`; z každého iného odkazu zostane iba text.
+
+### Metadáta
+
+**Formát › Upraviť metadáta…** alebo kliknutie na riadok metadát hore v náhľade otvorí formulár s poľami YAML front matter. Polia možno meniť, pridávať a odstraňovať. Pole so zoznamom zostane zoznamom: jeho hodnoty nasledujú za sebou, oddelené čiarkami, a hodnota obsahujúca čiarku je v úvodzovkách. Nové pole s názvom `tags`, `aliases`, `keywords`, `categories`, `authors` alebo `cssclasses` sa tiež stane zoznamom. Vnorené polia a viacriadkový text tam uvidíte a upravíte ich v zdrojovom texte.
+
+To, čo formulár zmení, je jeden krok odvolania a týka sa len riadkov polí, ktoré ste zmenili: komentáre, poradie, nezvyčajné medzery, úvodzovky a konce riadkov všetkých ostatných zostanú bajt po bajte rovnaké. Dokument bez metadát dostane blok na svojom začiatku.
 
 ## Podporovaný Markdown
 
@@ -315,7 +332,7 @@ Bez vlastnej kotvy dostane každý nadpis kotvu odvodenú z jeho textu, ako na G
 - **Wiki odkazy.** `[[Note]]` odkazuje na `Note.md` v rovnakom priečinku alebo v priečinku pod ním. `[[Note|Zobrazený text]]` zobrazí váš vlastný text a `[[Note#Heading]]` otvorí poznámku. ⌘-kliknutie ju otvorí v Splate.
 - **Vloženia.** `![[Note]]` zobrazí inú poznámku vo vnútri tejto; poznámky vložené v nej sa zobrazia ako odkazy. `![[diagram.png]]` zobrazí obrázok. Ako v Obsidiane, vloženia pomenúvajú poznámky a obrázky v priečinku dokumentu alebo pod ním, nikdy absolútnou cestou, a ako poznámky sa zobrazujú iba súbory Markdown.
 - **Komentáre.** `%%Iba v zdrojovom texte%%` zostane viditeľný v zdrojovom texte a z náhľadu aj zo všetkých exportov sa vynechá, v texte aj na samostatných riadkoch.
-- **Štítky.** `#idea` alebo `#project/splat` sa zvýrazní. ⌘-kliknutie vyhľadá štítok v dokumente.
+- **Štítky.** `#idea` alebo `#project/splat` sa zvýrazní. ⌘-kliknutie vyhľadá štítok v dokumente a v bočnom paneli v celom priečinku.
 - **Zbaliteľné informačné rámčeky.** Pozri [Informačné rámčeky](#informačné-rámčeky).
 
 ### Citácie a odkazy na zdroje
@@ -439,6 +456,23 @@ V náhľade kliknutie umiestni kurzor, aby ste mohli upraviť text odkazu; **⌘
 
 **Vložiť › Obsah** vloží prepojený zoznam všetkých nadpisov. Ak je kurzor v ňom, ten istý príkaz ho aktualizuje. Bočný panel s osnovou (⌃⌘S) prejde na ľubovoľný nadpis v oboch paneloch.
 
+## Poznámky v priečinku
+
+Tlačidlá hore v bočnom paneli prepínajú medzi osnovou, súbormi a vyhľadávaním.
+
+- **Súbory** (**Zobraziť › Zobraziť súbory**, ⌃⌘E). Všetky súbory Markdown v priečinku dokumentu alebo, ak dokument leží v repozitári Git, v celom repozitári. Kliknutie alebo Return otvorí poznámku ako tab tohto okna; ak už je otvorená, prejde do popredia. Tlačidlo vedľa názvu priečinka zobrazí v tomto okne iný priečinok. Skryté súbory, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` a priečinky bez poznámok zostanú mimo zoznamu. Dokument ležiaci priamo vo vašom domovskom priečinku zobrazí iba poznámky vedľa seba, aby Splat neprechádzal všetky vaše priečinky a nepýtal sa na každý z nich.
+- **Vyhľadávanie** (**Upraviť › Nájsť › Vyhľadať vo všetkých poznámkach…**, ⇧⌘F). Nájde text vo všetkých poznámkach bez ohľadu na veľkosť písmen a na to, ako je zakódovaná diakritika. `#tag` nájde štítok, `#project` aj `#project/splat`, a nič vnútri kódu. Kliknutie na výsledok otvorí poznámku na tom mieste.
+- **Odkazy na poznámku.** Kontextové menu poznámky uvádza poznámky, ktoré na ňu odkazujú, wiki odkazom, vložením, relatívnym odkazom alebo definíciou referenčného odkazu.
+- **Premenovanie poznámky.** To isté menu ju premenuje a zmení tieto odkazy. Splat najprv povie, koľkých odkazov v koľkých súboroch sa to týka. V každom odkaze sa zmení iba názov a všetky ostatné bajty súboru zostanú. Otvorené dokumenty prijmú zmenu ako krok odvolania; v ostatných súboroch ju môže vrátiť iba Git alebo Verzie. Súbor, ktorý medzitým zmenil iný program, zastaví premenovanie všetkých odkazov a Splat ho uvedie.
+
+Zoznam sleduje priečinok, keď sa okno dostane do popredia. Vyhľadávanie pracuje so súbormi tak, ako sú na disku, a text, ktorý ste ešte neuložili, sa počíta od ďalšieho automatického uloženia.
+
+## Zmeny od posledného commitu
+
+V dokumente v repozitári Git značia pruhy vedľa textu to, čo sa líši od posledného commitu, v zdrojovom texte aj v náhľade: zelená pre pridané riadky, modrá pre zmenené riadky a krátka červená značka tam, kde sa niečo odstránilo. Sledujú vaše písanie aj posun vetvy. **Zobraziť › Zmeny od posledného commitu** ich vypne pre všetky okná.
+
+Riadky, ktoré sa líšia iba koncom riadka, sa nepočítajú, takže súbor s CRLF oproti commitu s LF neukáže žiadnu zmenu. Nový súbor nemá žiadne značky až do svojho prvého commitu a nemá ich ani dokument nad 32 MB.
+
 ## Export, tlač a zdieľanie
 
 | Formát | Ako | Čo získate |
@@ -451,6 +485,19 @@ V náhľade kliknutie umiestni kurzor, aby ste mohli upraviť text odkazu; **⌘
 
 Menu **Súbor › Zdieľať** ponúka všetko z toho na jednom mieste. Exporty používajú nastavenie typografickej interpunkcie a obrázky z webu, ktoré ste povolili; obrázky z webu zostanú v HTML odkazmi.
 
+**Súbor › Možnosti exportu…** nastavuje, čo PDF, tlač a Word pridajú k textu, pre všetky dokumenty:
+
+- **Číslovanie strán** v pätičke PDF a tlače, v tvare `2 / 9`.
+- **Hlavička a pätička** pre PDF a tlač. `{title}`, `{author}`, `{date}`, `{page}` a `{pages}` zastupujú svoje hodnoty, prvé tri z metadát dokumentu.
+- **Titulná strana** pre PDF, tlač a Word, s `title`, `subtitle`, `author` a `date` z metadát alebo s názvom dokumentu ako titulom. Nemá hlavičku ani pätičku.
+- **Šablóna Word**, súbor `.docx` alebo `.dotx`, ktorého vzhľad export prevezme: jeho štýly, aj s lokalizovanými názvami, motív, veľkosť strany, okraje, hlavičky a pätičky. Šablóna, ktorú nemožno prečítať, export zastaví a povie to, namiesto toho, aby vám dala dokument bez nej.
+
+## Import dokumentov Word
+
+**Súbor › Importovať dokument Word…** sa opýta na súbor `.docx` alebo `.dotx` a na to, kam pôjde jeho Markdown, a potom výsledok otvorí. Obrázky skončia v priečinku vedľa neho, pomenovanom podľa dokumentu s `-images`.
+
+Nadpisy a zoznamy sa prenesú tak, ako ich definujú štýly a číslovanie Wordu, aj v dokumentoch, ktorých štýly majú lokalizované názvy. Tučné písmo, kurzíva, podčiarknutie, preškrtnutie, zvýraznenie, horný a dolný index, odkazy, citácie, kód, poznámky pod čiarou, vysvetlivky a tabuľky sa prenesú, bunky cez viac stĺpcov ako tabuľka HTML. Vzorce sa stanú LaTeXom. Sledované zmeny sa považujú za prijaté a obsah sa vynechá, pretože **Vložiť › Obsah** vytvorí nový. Staré súbory `.doc` a dokumenty chránené heslom sa odmietnu.
+
 ## Vzhľad a prístupnosť
 
 - **Tmavý režim** sleduje systém. Vzorce a diagramy sa vykresľujú pre každý vzhľad.
@@ -459,7 +506,7 @@ Menu **Súbor › Zdieľať** ponúka všetko z toho na jednom mieste. Exporty p
 - **Celá obrazovka, taby a prispôsobiteľný panel s nástrojmi**, ako v každej aplikácii pre Mac.
 - **VoiceOver.** Panely sa volajú „Zdrojový text Markdown“ a „Náhľad“, vzorce sa čítajú ako ich kód a diagramy ako ich názov. Každý príkaz sa dá vyvolať z klávesnice.
 
-Splat nemá okno s nastaveniami: niekoľko možností je tam, kde sa uplatňujú, v menu **Zobraziť** a **Upraviť › Zámeny**.
+Splat nemá okno s nastaveniami: niekoľko možností je tam, kde sa uplatňujú, v menu **Zobraziť**, **Upraviť › Zámeny** a **Súbor › Možnosti exportu…**.
 
 ## Jazyky
 
@@ -482,6 +529,9 @@ Hebrejský a arabský text sa čítajú sprava doľava všade, kde sa objavia, b
 | Zarovnať stĺpec tabuľky vľavo, na stred, vpravo | ⌘{, ⌘\|, ⌘} |
 | Skryť alebo zobraziť náhľad | ⌥⌘P |
 | Zobraziť alebo skryť osnovu | ⌃⌘S |
+| Zobraziť alebo skryť súbory | ⌃⌘E |
+| Vyhľadať vo všetkých poznámkach | ⇧⌘F |
+| Vložiť ako Markdown | ⌃⌘V |
 | Zväčšiť, zmenšiť, skutočná veľkosť | ⌘+, ⌘−, ⌘0 |
 | Nový dokument, otvoriť, uložiť, duplikovať | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Nastavenie strany, tlač | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ Súbor Markdown môže pochádzať od kohokoľvek, preto Splat považuje každý
 - **Obrázky z webu** sa načítajú až s vaším povolením, len cez `https`, nikdy z hostiteľov vo vašej lokálnej sieti, najviac po 10 MB a v súkromnej relácii bez cookies.
 - **Izolované dekódovanie.** Obrázky a grafiku vzorcov a diagramov dekódujú pomocné procesy, ktoré zatvoria každý zdedený súbor a pred čítaním prvého bajtu sa zamknú do sandboxu: bez prístupu k súborom, bez siete. Vracajú iba pixely, ktorých veľkosť sa kontroluje, a po 10 sekundách sa zastavia. Dekodéry obrázkov od Applu vidia iba HEIC, TIFF, AVIF a PDF, a to len vtedy, keď dáta naozaj majú tento formát; bežia vo vlastnom pomocnom procese, ktorý smie navyše čítať systémové priečinky s písmami a používať systémový dekodér videa. Týmto pomocníkom prechádzajú aj SVG, vzorce a diagramy, takže v Splate sú to obrázky s pevným rozlíšením: štyri pixely na bod, najviac 2560 na dlhšej strane.
 - **Lokálne súbory** sa do dokumentu dostanú len cez cestu, ktorú uvádza. Vloženia zobrazujú poznámky Markdown z priečinka dokumentu a pod ním a chýbajúci obrázok sa hľadá len tam. Cesta k obrázku inde, absolútna alebo začínajúca `~`, sa v náhľade stále načíta; exporty do HTML a Wordu, tlač a PDF berú len to, čo leží v priečinku dokumentu alebo v jeho repozitári Git, pokiaľ tento repozitár neobsahuje aj váš domovský priečinok, takže cudzí dokument nemôže vtiahnuť vaše súbory do exportu, ktorý odovzdáte ďalej.
+- **Priečinky s poznámkami** sa čítajú iba vtedy, keď ich bočný panel zobrazuje, a premenovanie poznámky zmení iné súbory až potom, ako potvrdíte, koľko ich je.
+- **Repozitáre Git** číta Splat sám. Nikdy nespúšťa program `git`, ktorého konfigurácia v cudzom repozitári môže spustiť iné programy, a nečíta viac než verziu otvoreného dokumentu z posledného commitu. Nič tam nezapisuje a nepristupuje k sieti.
+- **Dokumenty Word a vložený text** čítajú vlastné parsery Splatu, s limitmi veľkosti, vnorenia a toho, ako veľmi sa súbor smie rozbaliť. Odkazy v nich si ponechajú iba adresy, ktoré Splat povoľuje aj inde, a názvy obrázkov v súbore Word nikdy nerozhodujú o tom, kam sa zapíšu.
 - **Kópie neuloženého textu** zostávajú na tomto Macu, vo vašom priečinku Knižnica, na obnovenie po páde. Odídu s uložením alebo normálnym ukončením Splatu; kópie, ktoré zanechal pád, zostanú v priečinku obnovy, kým ich nevymažete.
 - **Odkazy** nikdy nespustia program kliknutím. Webové a poštové odkazy sa otvoria ako zvyčajne; odkazy do iných aplikácií sa najprv opýtajú.
 - **HTML v dokumentoch** číta vlastný parser Splatu. Skripty, štýly, rámce a formuláre sa nikdy nespustia.
@@ -530,7 +583,7 @@ Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klá
 ## Známe obmedzenia
 
 - **Jedna vlnovka znamená dolný index.** `~text~` je dolný index ako v Pandocu; preškrtnutie vyžaduje `~~dve~~`. GitHub preškrtáva aj jednou vlnovkou.
-- **Iba na čítanie v náhľade:** vložené HTML, vložené poznámky a front matter sa upravujú v zdrojovom texte.
+- **Iba na čítanie v náhľade:** vložené HTML a vložené poznámky sa upravujú v zdrojovom texte, front matter vo svojom formulári alebo v zdrojovom texte.
 - **Veľmi hlboké vnorenie:** HTML vnorené hlbšie ako 64 úrovní a HTML v texte hlbšie ako 16 ustúpi svojmu obsahu.
 - **Zlúčené bunky tabuľky** existujú len v tabuľkách HTML a len cez stĺpce (`colspan`, nie `rowspan`). Syntax tabuliek MultiMarkdownu pre zlúčené bunky nie je podporovaná.
 - **Bibliografie** sa čítajú iba z BibTeXu, nie z CSL JSON ani YAML.
@@ -538,6 +591,11 @@ Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klá
 - **Typografická interpunkcia:** nemeckú zatváraciu jednoduchú úvodzovku nemožno odlíšiť od apostrofu a nastaví sa ako ’.
 - **Vzorce, nie dokumenty:** žiadne balíky LaTeX, TikZ ani úplné dokumenty.
 - **Vizuálny editor vzorcov** zapisuje LaTeX v zápise MathLive: medzery miznú (`E = mc^2` sa zmení na `E=mc^2`), vykreslenie zostane rovnaké.
+- **Počet slov:** thajčina, laoština, khmérčina a barmčina sa píšu bez medzier a počítajú sa po úsekoch textu, nie po slovách. `3.14` a `snake_case` sú po dve slová.
+- **Premenovanie poznámky** nemení odkazy vo vloženom HTML a wiki odkaz zostane, ako je, ak nový názov obsahuje `#`, `|`, `^`, `[`, `]` alebo `\`.
+- **Značky zmien** čítajú repozitáre s objektmi SHA-1 a obyčajnými alebo zbalenými refmi; repozitár so SHA-256 alebo reftable žiadne neukáže. Súbor pod filtrom Gitu, ako je LFS, sa porovnáva s tým, čo filter uložil.
+- **Import z Wordu** vynechá text v hlavičkách, pätičkách a komentároch a obrázky vo formáte `.emz` alebo SVG si ponechajú iba alternatívny text.
+- **Vložiť ako Markdown** číta RTF ako západný text a nadpisy v ňom berie iba z veľkosti písma. Väčšina programov ponúka aj HTML, ktorému dáva prednosť.
 - **Zámerne:** žiadne čísla riadkov, žiadne okno s nastaveniami, žiadny Help Book, nie v App Store.
 - **Menej testované na Intele.** Testy okna bežia len na Apple Silicon; na Intele CI spúšťa `cargo test`.
 
@@ -561,190 +619,7 @@ Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klá
 
 ## Pre vývojárov
 
-Splat je aplikácia v Ruste, ktorá komunikuje s AppKit a WebKit priamo cez [objc2](https://github.com/madsmtm/objc2). Nie je tu žiadny Swift, žiadny Objective-C, žiadny projekt Xcode a žiadny súbor Interface Builderu.
-
-### Zostavenie
-
-Predpoklady:
-
-- macOS s Command Line Tools (`xcode-select --install`). Xcode nie je potrebný; Splat sa zostaví bez `actool`, `ibtool` a `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) uvádza presnú verziu, ktorú používa CI; rustup ju nainštaluje sám, Rust z Homebrew súbor ignoruje. Jej zvýšením sa do projektu dostanú nové upozornenia kompilátora a clippy.
-- rustup, pre `make lint`, `make check` a `make universal`: `cargo xtask check-library` zostaví knižnicu pre Linux, aby ukázal, že nepotrebuje macOS, a Rust z Homebrew iné ciele nemá.
-
-[Makefile](../../../Makefile) obsahuje krátke vstupné body; `make help` ich vypíše všetky:
-
-```sh
-make build                  # target/release/Splat.app, rovnako ako cargo xtask bundle --release
-make universal              # target/splat-universal pre Apple Silicon a Intel, ako ho nesie obraz disku
-make check                  # formátovanie, clippy bez upozornení, všetky testy, vendorované knižnice; čo spúšťa CI
-make test                   # make check, potom self-test bez okna
-make test-gui               # self-testy s oknom; zaberú Mac asi na štyri minúty
-make test-long              # dlhšie náhodné hľadanie a kontrola čiastočnej aktualizácie pri 10 MB
-make fuzz                   # náhodný vstup pre čiastočnú analýzu a všetky výstupy
-make coverage               # pokrytie riadkov všetkými testami a self-testami, s limitom pre každý modul
-make coverage-library       # rovnaké limity pre moduly bez okna, ako v CI
-make bench FILE=<file.md>   # časy otvorenia, písania a posúvania veľkého súboru
-make release                # najprv make test, potom notarizovaný obraz disku
-```
-
-Samotná logika zostavenia je v crate Rustu [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, podpísané "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, samostatná aplikácia, ktorá nikdy neotvára súbory Markdown
-cargo xtask dmg                # dist/Splat-<version>.dmg na distribúciu, Developer ID, notarizovaný
-cargo xtask icon               # znova vytvorí assets/AppIcon.icns a ikonu README z assets/icon-1024.png
-cargo xtask vendor check       # overí pribalený JavaScript voči vendor.lock
-cargo xtask vendor fetch       # stiahne ho znova po zmene verzie vo vendor.lock
-```
-
-`bundle` zapíše `Info.plist`, skopíruje zdroje a lokalizácie a podpíše aplikáciu certifikátom „Splat Local Signing“. Prvé zostavenie vytvorí tento certifikát vo vašej kľúčenke prihlásenia s platnosťou 20 rokov. Kým zostane, Splat si cez nové zostavenia zachová nedávne dokumenty a oprávnenia priečinkov; s podpisom ad hoc by bolo každé zostavenie pre macOS novou aplikáciou. Zostavenia pre ladenie a self-testy majú vlastné ID balíkov (`local.splat.debug`, `local.splat.selftest`) a neregistrujú sa pre súbory Markdown, takže Finder nikdy neotvorí dokument v zastaranom zostavení a nastavenia bežnej aplikácie nechávajú na pokoji.
-
-Verzia je vo [VERSION](../../../VERSION) ako `major.minor.build` a je to tá, ktorú dostane ďalšie zostavenie. Každé úspešné zostavenie vydania (`make build`, `cargo xtask bundle --release`, `make release`) zvýši číslo zostavenia o jedna; zostavenia pre ladenie a self-testy ho nechávajú. Hlavné a vedľajšie číslo sa zvyšujú ručne: nastavte VERSION napríklad na `1.1.0` a ďalšie zostavenie dostane presne to.
-
-### Distribúcia
-
-`cargo xtask dmg` (alebo `make release`, ktoré najprv spustí `make test`) zostaví vydanie, podpíše ho vaším Developer ID, notarizuje aplikáciu u Applu a pripojí tiket, zabalí ju do komprimovaného obrazu disku len na čítanie s odkazom na Aplikácie, notarizuje a označí tiketom aj obraz a výsledok skontroluje cez Gatekeeper. Aplikácia nesie vlastný tiket, aby sa kópia nainštalovaná bez Findera, ako to robí Homebrew, pri prvom spustení otvorila aj offline; dve kolá so službou notarizácie trvajú niekoľko minút každé. Len obraz, ktorý prešiel všetkými krokmi, sa stane `dist/Splat-<version>.dmg`, kópiou, ktorá sa commituje, a číslo zostavenia sa zvýši. Predchádzajúci obraz zostane ešte jedno vydanie, pretože raw server GitHubu môže pár minút po pushi vydávať starý kanál aktualizácií; staršie sa presunú do koša. Neúspešný beh nechá `dist/` a VERSION tak, ako boli.
-Každé vydanie pridá do histórie repozitára celý obraz, asi 16 MB. Beží len na požiadanie, nikdy ako súčasť bežného zostavenia, a potrebuje:
-
-- certifikát „Developer ID Application“ v kľúčenke
-- uložené prihlásenie k notárskej službe Applu s heslom špecifickým pre aplikáciu, vytvorené raz cez `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- súkromný kľúč, ktorým sa podpisujú aktualizácie, v kľúčenke prihlásenia. Vytvoril ho `generate_keys` zo Sparkle; jeho verejná polovica je `UPDATE_KEY` v [xtask/src/main.rs](../../../xtask/src/main.rs) a vo vnútri každej nainštalovanej kópie, ktorá prijíma iba aktualizácie ním podpísané. Uchovávajte zálohu v správcovi hesiel: `target/sparkle-2.10.1/bin/generate_keys -x <file>` ho exportuje, `-f <file>` ho importuje na inom Macu. Bez neho sa už nainštalované kópie nikdy nedajú aktualizovať.
-- rustup (`brew install rustup`, ktorý Rust z Homebrew ponechá)
-- `RELEASE_NOTES.md` s tým, čo toto vydanie prináša. Dialóg aktualizácie ho zobrazí nad riadkom o tom, ako nahlásiť problém, preto sa `dmg` zastaví, ak je súbor prázdny alebo v ňom stále sú poznámky predchádzajúceho vydania
-
-Ak niečo z toho chýba, `dmg` sa zastaví pred zostavením. Pri prvom spustení sa macOS opýta, či smie Terminál ovládať Finder; bez tohto oprávnenia obraz disku nezobrazí ani pozadie, ani rozmiestnenie ikon.
-
-Aktualizátor, [Sparkle](https://sparkle-project.org), nesie iba obraz disku; zostavenie ho raz stiahne do `target/` z jeho vydania na GitHube a overí voči kontrolnému súčtu v xtasku. Hardened runtime načíta framework len vtedy, keď nesie Team ID aplikácie, ktoré podpis Developer ID má a lokálny certifikát nemá; a aktualizácia nesmie nahradiť vlastné zostavenie. Zostavenie pre self-test nesie Sparkle tiež, aby voči nemu overilo menu aktualizácií: s kanálom, ktorý neexistuje, bez otázky Sparkle pri druhom spustení a s oprávnením, ktoré lokálne podpísanej aplikácii dovolí framework načítať. `dmg` podpíše nový obraz kľúčom aktualizácií a zapíše `dist/appcast.xml`, kanál, ktorý nainštalované kópie čítajú z GitHubu. Obraz a kanál commitnite a pushnite spolu: odvtedy nainštalované kópie ponúknu aktualizáciu. Odkazy na stiahnutie v tomto README a jeho prekladoch vedú na `Splat.dmg` v najnovšom vydaní na GitHube, preto každé vydanie obsahuje kópiu s týmto názvom: `cp dist/Splat-<version>.dmg target/Splat.dmg` a potom `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Obraz disku je univerzálny binárny súbor pre Apple Silicon aj Intel; ostatné zostavenia sú len pre procesor hostiteľa. Rust z Homebrew dodáva štandardnú knižnicu len pre procesor hostiteľa, preto `dmg` zostavuje cez rustup, ktorý pri prvom použití nainštaluje toolchain a ciele z [rust-toolchain.toml](../../../rust-toolchain.toml) a zastaví sa, ak programu alebo Sparkle chýba kód pre niektorý z procesorov. `make universal` zostaví len program.
-Aplikácia v ňom nesie iný podpis ako lokálne zostavenie, takže macOS vedie pre obe samostatné nedávne dokumenty a oprávnenia priečinkov.
-
-### Testovanie
-
-| Príkaz | Čo kontroluje |
-|---|---|
-| `cargo test --release` | jednotkové, náhodné a prekladové testy |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | dlhšie náhodné hľadanie; `SPLAT_FUZZ_SEED` mení vstupy |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | jeden jazyk, kým iné nie sú úplné |
-| `cargo clippy --release --all-targets [--features selftest]` | lintery, vrátane zdôvodnenia každého bloku `unsafe`, dĺžky funkcií a v knižnici aj prevodov čísel |
-| `cargo xtask check-library` | knižnica sa zostaví pre Linux, takže nič v nej nepotrebuje macOS |
-| `cargo xtask vendor check` | knižnice JavaScriptu sa zhodujú s `vendor.lock` bajt po bajte |
-| `cargo xtask selftest probe` | bez okna, každá s očakávaným výsledkom: vzorce, diagramy, webové obrázky voči serveru vnútri procesu, blokované adresy, text, ktorý píše každý príkaz, každý formát obrázka cez oba exporty, stránka, ktorá prestane odpovedať, a obrany webových zobrazení voči stránke bez nich. Trvá asi pol minúty. To, čo potrebuje aplikáciu v popredí, sa na zamknutej obrazovke preskočí |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | bežiaca aplikácia, kliknutie po kliknutí. Otvorí okno a píše do neho; Mac je zaneprázdnený asi štyri minúty. `--scenarios` spustí len druhú časť, asi za minútu a pol. `--only` spustí jednu skupinu tejto časti, v jej vlastnom dokumente, aj na zamknutej obrazovke. `--in-back` vynechá to, čo potrebuje aplikáciu v popredí; bez neho taká kontrola zlyhá |
-| `cargo xtask selftest resize` | rozšíri okno po presunutí deliacej čiary: zdrojový text sa zalomí znova, kým sa mení veľkosť okna. Trvá asi desať sekúnd |
-| `cargo xtask selftest typing [--by-hand]` | píše aj cez ukladanie, klávesmi cez front udalostí aplikácie alebo s `--by-hand` ručne: napísaný text zostáva a počíta sa ako neuložený. Trvá asi minútu |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | časy otvorenia, písania a posúvania veľkého súboru; `--keystroke-ms` zlyhá, keď najrýchlejšie stlačenie trvá dlhšie |
-| `cargo test --release -- --ignored partial_updates` | stlačenie klávesu pri 10 MB: čiastočná oproti úplnej aktualizácii, rovnaký výsledok najviac za štvrtinu času |
-| `cargo test --release --test hostile` | dokumenty zostavené tak, aby pretiekli zásobník alebo si vyžiadali kvadratický čas, každý v dvoch veľkostiach, ktorých časy musia rásť spolu s textom, cez parsovanie, rozvrhnutie, oba exporty, stlačenia klávesov a príkazy |
-| `make mutants` | chyby vnesené do `crates/splat-markdown`, `crates/splat-preview` a `crates/splat-file-state` jedna po druhej cez [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); povie, ktoré z nich žiadny test nezaznamená. Trvá hodiny; `FILE=crates/splat-preview/src/bridge/mod.rs` to zúži |
-| `make fuzz` | náhodný vstup cez [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), ktorý potrebuje nightly z rustupu: stlačenia klávesov, ktoré sa musia čítať ako úplná analýza, všetky výstupy, úpravy v náhľade, všetky príkazy a súbor, ktorý sa uloží tak, ako sa otvoril. `SECONDS=600` hľadá dlhšie |
-| `cargo test --release --test fuzz_seeds` | seedy v `fuzz/seeds/` cez kontroly týchto cieľov fuzzingu, bez fuzzera; súčasť každého `cargo test` |
-| `cargo test --profile checked --workspace` | testy s tým, čo navyše kontroluje ladiaca zostava: po každej čiastočnej analýze bloky zodpovedajú textu a to, čo nesie ďalej, je to, čo hovorí text. Súčasť `make test-long` |
-| `cargo test --release --test entry_points --test structure` | zo zdrojov: všetko, čo volá systém, je chránené pred panikou a moduly závisia len smerom nadol |
-| `cargo test --release --test decoder` | proces dekodéra dekóduje obrázky a nedosiahne ani súbory, ani sieť |
-| `make coverage` | pokrytie riadkov pre `cargo test` a všetky self-testy cez [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); zlyhá pod limitmi. Zaberie Mac asi na päť minút |
-| `make coverage-library` | crates `splat-markdown`, `splat-preview`, `splat-file-state` a `splat-i18n` voči ich vyšším limitom, merané samotným `cargo test` |
-
-Jednotkové testy sú vedľa kódu, ktorý testujú. `crates/splat-testkit/tests/` obsahuje to, čo dosahuje model a náhľad zvonka: náhodné testy v `robustness.rs`, ktoré zdieľajú generátor z `splat-testkit` s testami v `sync.rs`, dokumenty vytvorené tak, aby škodili, v `hostile.rs`, a seedy cieľov fuzzingu v `fuzz_seeds.rs`. `tests/` obsahuje to, čo sa pozerá na celý program: jeho zdroje, jeho preklady a test dekodéra, ktorý spúšťa zostavený program. Rozhodnutia v `src/editor/`, ktoré nepotrebujú okno, sú vo voľných funkciách s vlastnými testami: všetko, čo ovládač vie, a ako sa to mení, v `state.rs`, pravidlá vykresľovania v `render_queue.rs`, kópia textu v `sync.rs`, štýly odsekov, písma a farby ako hodnoty v `render.rs`, čo znamenajú identifikátory panela s nástrojmi, v `toolbar.rs`, čo znamená kliknutie na odkaz, v `navigation.rs`.
-
-Krok self-testu okna čaká na pomenovanú podmienku, nie na čas; pauzu s dôvodom si necháva len to, čo nedáva signál, napríklad neprítomnosť niečoho. Zbytočné čakanie je zlyhaná kontrola, ktorá pomenuje, čo nikdy neprišlo, a krok, ktorý zhavaruje, je tiež zlyhaná kontrola; beh pokračuje v oboch prípadoch. Kontrola, ktorá v tomto behu nemá čo povedať, hlási `SELFTEST SKIP`: xtask ju vypíše a ani nepreberie, ani nezlyhá. xtask drží každý režim, a `--scenarios` osobitne, na asi deviatich desatinách jeho kontrol. Self-test okna spúšťa po hlavnom prechode klikaním druhú časť v `src/editor/selftest/scenarios.rs`: každý príkaz formátovania a tabuľky, dialógy, kliknutia na odkazy, vkladanie, pretiahnutie, exporty, súbor, ktorý zmenil iný program, veľkú zmenu, obrázky meniace sa na disku, nedostatok pamäte, obrovský dokument a obnovu po páde. Každá jej skupina otvára vlastný dokument, takže zlyhanie v jednej sa nedostane do ďalšej, a každá môže bežať samostatne s `--only`. Self-test bez okna tiež zámerne rozbíja ukladanie: priečinok, ktorý nič neprijme, súbor len na čítanie, priečinok, ktorý zmizol, plný disk a panika v každom callbacku uloženia, a nič z toho nesmie stáť text.
-
-Pokrytie má dva limity: každý modul aspoň 84 % riadkov, všetky moduly spolu aspoň 96 %. `make coverage` meria `cargo test` spolu so self-testami a zlyhá pod ktorýmkoľvek z nich; `make coverage-library` drží to, čo nepotrebuje okno, na 90 % a 97 %. Limity a niekoľko výnimiek, ako háčik na panic v `main.rs`, ktorý beží len pri páde, sú v [xtask](../../../xtask/src/coverage.rs) vedľa svojich dôvodov. Merané zostavenia idú do `target/coverage/`, takže meraný kód nikdy neskončí v `target/release/` ani v obraze disku. Pomocník dekodéra otvorí svoj súbor s meraním skôr, než sa zamkne, takže sa meria tiež.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) pri každom pushi do `main` a každom pull requeste spúšťa `make check`, `make coverage-library` a univerzálne zostavenie na Apple Silicon a `cargo test` na Intele. Každú noc [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) spúšťa `make test-long` s novými náhodnými vstupmi. Self-testy a obraz disku zostávajú na Macu vývojára: potrebujú obrazovku a podpisové certifikáty v kľúčenke.
-
-Výstup self-testov ide do `target/selftest/`. Self-test zostaví samostatnú aplikáciu (`target/release/Splat Selftest.app`, ID balíka `local.splat.selftest`) a nastavenia, nedávne dokumenty a priradenia súborov bežnej aplikácie nechá nedotknuté.
-
-### Štruktúra projektu
-
-Všetko, čo nepotrebuje okno, je samostatný crate v `crates/`, ktorý sa zostaví bez macOS, takže kompilátor stráži, ako na sebe závisia. Aplikácia v `src/` (balík `splat-app`, program `splat`) na nich stavia.
-
-- `crates/splat-markdown/`: strom, ktorý čítajú všetci spotrebitelia, `Doc` v `doc/`, ktorý vlastní svoj text, a jediná väzba na parser v `reader/`: comrak sa nikde inde nespomína a `reader/assumptions.rs` obsahuje, čo kód o ňom predpokladá. Farby syntaxe a všetky príkazy ako čisté úpravy textu (`Edit`) v `commands/`. Ďalej opätovné parsovanie po úprave (`incremental.rs`), čítač vloženého HTML (`markup.rs`), typografia, značky, odkazy a citácie v texte (`typography.rs`), ako text vyzerá a ktorý Markdown a HTML ho tak urobia (`style.rs`), čo môže byť adresa (`url.rs`) a export do HTML a Wordu (`html.rs`, `docx.rs` s `docx/html.rs` a `docx/xml.rs`). Pozícia má svoj typ: `Byte` v zdrojovom texte, `U16` v zobrazení zdroja, `Shown` v zobrazení náhľadu (`text.rs`).
-- `crates/splat-preview/`: rozvrhnutie náhľadu v `layout/`, s vloženým HTML v `layout/html.rs`, a priradenie medzi náhľadom a zdrojom (`Bridge`, `Index`). `Bridge` odmietne rozvrhnutie inej verzie `Doc`.
-- `crates/splat-file-state/`: aký text súbor obsahuje, v akom formáte a čo znamená pohľad naň.
-- `crates/splat-i18n/` s `resources/*.lproj`: 35 jazykov; kľúčmi sú nemecké texty a aplikácia pri štarte nainštaluje tabuľku jazyka rozhrania.
-- `crates/splat-testkit/`: generátor náhodných testov a kontroly cieľov fuzzingu.
-- `src/editor/`: okno. Jediný objekt `EditorController` obsluhuje AppKit ako delegát oboch zobrazení a odovzdáva prácu komponentom, malým štruktúram nad ovládačom a stavom, ktorý vlastnia; ich polia ostatné moduly nedosiahnu:
-
-| Modul | Zodpovednosť |
-|---|---|
-| `controller.rs` | trieda, metódy delegáta, ktoré odovzdávajú ďalej, `invalidate` a to, čo zvyšok programu hovorí editoru; len on sa dostane ku komponentom |
-| `panes.rs` | `Panes`: textové zobrazenia, osnova, zobrazenie a skrytie panelov a to, čo dáva prístup k zobrazeniam |
-| `controller/layers.rs` | kto smie kam: komponent dostane prístup ku kontroléru, ktorý ponúka to, čo leží pod ním, a kompilátor to stráži |
-| `state.rs` | čo ovládač vie o dokumente a každý spôsob, ktorým sa to mení; jeho polia sú súkromné a nedotýka sa žiadneho zobrazenia |
-| `model.rs` | požičiava stav a kópiu textu uzáverom, ktoré nedosiahnu zobrazenie |
-| `actions.rs` | register príkazov: selektor, názov, skratka, symbol, kedy sa príkaz uplatňuje |
-| `editing.rs` | `Editing`: spúšťanie a overovanie príkazov, písanie v náhľade |
-| `update.rs` | `Updater`: parsovanie, farbenie, aktualizácia náhľadu; po úprave len dotknuté odseky |
-| `sync.rs` | kópia textu a evidencia blokov, bez AppKit a s náhodnými testami |
-| `progressive.rs` | `Progressive`: vykresľovanie veľkých náhľadov po krokoch |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: výber a poloha posunu oboch panelov v súlade |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: editor vzorcov a diagramov |
-| `navigation.rs`, `links.rs` | `Links`: odkazy, wiki odkazy, štítky, zaškrtávacie políčka úloh, zbaľovanie, poznámky pod čiarou |
-| `env.rs` | čo náhľad číta zvonka textu: typografická interpunkcia, repozitár pre `@name` a `#12`, súbor BibTeX, vložené poznámky |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | text náhľadu, lokálne a vzdialené obrázky; `Pictures` v `images.rs` |
-| `attributes.rs` | atribúty textu; každý kľúč dostane len hodnotu očakávaného typu |
-| `shadow.rs` | kópie neuloženého textu na obnovu po páde |
-| `decoder.rs` | pomocné procesy v sandboxe, ktoré dekódujú obrázky a grafiku |
-| `export.rs`, `outline.rs` | `Sharing`: export do HTML a Wordu; bočný panel s osnovou |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit pre MathJax, Mermaid, Graphviz, PlantUML a vizuálny editor vzorcov; pravidlá, čo sa kedy vykresľuje, nezávisle od WebKitu |
-| `webkit.rs` | volania do WebKitu; s `js.rs` a `mathfield.rs` zostáva len životnosť delegáta navigácie |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | zostavenie okna, panel s nástrojmi, textové zobrazenia, dialógy, farby |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: lišta menu, delegát aplikácie, dokument (`MDDocument`, podtrieda `NSDocument`).
-- `src/util/`: pracovné vlákna (`lanes.rs`), zväzky, ktoré môžu prestať odpovedať (`volumes.rs`), pomocníci pre AppKit, súbory a procesy. `src/diag.rs`: čo sa pokazí mimo dohľadu používateľa, ide do systémového záznamu, bez akéhokoľvek textu dokumentu.
-- `src/large_alloc.rs`: veľké alokácie idú priamo z jadra a po uvoľnení sa mu vrátia, takže sa pamäť po veľkých úpravách vráti.
-- `resources/js/`: webové stránky a knižnice; verzie a kontrolné súčty vo [vendor.lock](../../../vendor.lock).
-- `xtask/`: zostavovanie, podpisovanie, obraz disku, ikona, vendorovanie, spúšťač self-testov a limity pokrytia.
-
-### Tok dát
-
-Zdrojový text v ľavom textovom zobrazení je jediným zdrojom pravdy.
-
-1. Každá zmena znaku tam aktualizuje kópiu textu (`Snapshot`) na mieste, bez opätovného čítania textu.
-2. Aktualizácia parsuje kópiu, prefarbí zdrojový text len tam, kde sa farby zmenili, rozvrhne náhľad a nahradí len bloky, ktorých obsah sa zmenil.
-3. Po úprave sa znova parsujú, farbia a rozvrhujú len dotknuté odseky, pokiaľ ich susedia zostávajú rovnakí; [docs/partial-parse.md](../../../docs/partial-parse.md) povie, prečo to dáva to isté čo úplná analýza a na čo sa pozrieť, keď sa comrak zmení. Dokumenty s blokmi komentárov `%%`, zmeny front matter a v dokumente s definíciami referenčných odkazov zmeny časti so zátvorkou sa spracúvajú celé. comrak rozpozná odkaz na poznámku pod čiarou len s jej definíciou v tom istom parsovaní a presúva definície za text, preto sa časť parsuje so zástupnou definíciou pre každý štítok a čísla preberá zo starého stromu; zmena odkazov alebo definícií v časti, alebo vedľa poznámky pod čiarou v texte, sa spracúva celá.
-4. Bloky HTML, ktoré otvoria `<details>` alebo `<div align>` a zatvoria ho neskôr, ovplyvňujú bloky Markdownu medzi nimi; opätovne použitý blok musí mať rovnaké okolie.
-5. Počas písania v zdrojovom texte dokumentu do 2 MB beží čiastočná aktualizácia okamžite; keď sa neuplatní, alebo vo väčšom dokumente, parsovanie a rozvrhnutie bežia na pozadí. Počas písania v náhľade bežia okamžite, pretože kurzor náhľadu závisí od výsledku.
-6. Vstup v náhľade `Bridge` preloží na úpravu zdrojového textu a odtiaľ ide rovnakou cestou. Markdown má príliš veľa spôsobov, ako zmeniť text na syntax, aby stačili samotné pravidlá, preto `preview/verify.rs` zmenenú časť parsuje znova a porovná, čo zobrazuje, s tým, čo sa napísalo; úprava, ktorá nesedí, sa ošetrí ďalej alebo odmietne.
-7. Pozície v texte z comraku sú na niekoľkých miestach chybné, napríklad za definíciou referenčného odkazu. `reader/positions.rs` ich pri čítaní bloku overí voči zdrojovému textu a tam, kde nesedia, ich prečíta znova zo zdrojového textu.
-
-### Pravidlá v ovládači
-
-1. Vlastné zmeny zobrazení v ovládači bežia vnútri `Panes::silently`; spätné volania delegáta ich ignorujú. Inde sa zobrazenia dajú len čítať, takže to kontroluje kompilátor. Čo majú spätné volania počuť, alebo čo odovzdáva zobrazenie AppKit, to hovorí tým, že ide cez `Panes::for_appkit`.
-2. Stav sa vypožičiava len na čítanie a výpočet, nikdy cez volanie, ktoré zobrazenie mení, rozvrhuje alebo posúva: `Model` ho požičiava uzáverom `Send` a žiadne zobrazenie nie je `Send`, takže to kontroluje kompilátor. Mení sa len vlastnými metódami, ktorých testy nepotrebujú okno.
-3. Správy zvonka (načítaný obrázok, vykreslený vzorec) prichádzajú oneskorene cez `renders_arrived` a `image_arrived`, nikdy uprostred aktualizácie.
-4. Prekreslenie bez zmeny textu ide len cez `invalidate(reason)`.
-5. Kópia textu sa nedrží cez zmenu zdroja, inak táto zmena skopíruje celý text: `with_text` ju požičiava len na dĺžku uzáveru `Send`.
-6. Nový príkaz potrebuje záznam v `actions.rs`, metódu v `controller.rs` a vetvu v `Editing::perform`.
-7. Každý blok `unsafe` nesie svoje zdôvodnenie ako komentár `// SAFETY:`. Bajty sa k systémovým dekodérom obrázkov dostanú len v pomocnom procese, cez `decoder::decode_native`; test prehľadá zdrojové súbory kvôli iným volaniam.
-8. Nič na hlavnom vlákne nečaká na priečinky používateľa, pretože sieťový zväzok môže prestať odpovedať: súbory sa preverujú na vlákne `DISK` a náhľad číta odpovede cez `Env::known`. Priamo na disk smie siahnuť len akcia, na ktorú používateľ čaká, ako export alebo ukladanie.
-9. Čo musí skončiť, skončí aj po panike, pretože hlavné vlákno ju prežije: nastavený príznak ide cez `with_raised`, úprava úložiska textu cez `editing` a to, o čom nemá vedieť funkcia Späť, cez `without_undo`. Test nájde, čo je z toho napísané ručne.
-10. Adresa v dokumente má jediné čítanie, v `splat_markdown::url`; test nájde schémy porovnávané ručne.
-
-### Pridanie príkazu
-
-Lišta menu, panel s nástrojmi aj kontextové menu budujú svoje položky z registra v [src/editor/actions.rs](../../../src/editor/actions.rs) a validácia menu tam číta, kedy sa príkaz uplatňuje a či zobrazuje začiarknutie. Nový príkaz potrebuje:
-
-1. variant `Action` s jeho `Spec`: selektor, názov, popis na paneli s nástrojmi, tooltip (začínajúci slovesom, najviac 75 znakov), skratka, SF Symbol a kedy sa uplatňuje
-2. metódu v `src/editor/controller.rs`
-3. vetvu v `Editing::perform`
-4. jeho texty v každom `Localizable.strings`
-
-Test `every_command_has_a_method_and_every_method_a_command` kontroluje, či register a metódy zodpovedajú. Štandardné skratky Applu ako ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F a ⌘, zostávajú nedotknuté.
-
-### Preklady
-
-Kód používa nemecký text ako kľúč: `t("Fett")` ho vyhľadá za behu, `n("Fett")` označí konštantu na neskoršie vyhľadanie. Každý `resources/<language>.lproj/` obsahuje:
-
-- `Localizable.strings`: každý text rozhrania, pojmy menu podľa glosárov Applu
-- `InfoPlist.strings`: názvy, ktoré macOS zobrazuje pre aplikáciu a jej typ dokumentu
-- `QuickReference.md`: stručný prehľad Markdownu
-
-`cargo xtask bundle` uvedie každý priečinok `.lproj` ako lokalizáciu a `CFBundleDevelopmentRegion` je angličtina, takže systémové menu a dialóg ukladania sledujú ten istý jazyk. Test i18n kontroluje, či má každý jazyk každý text a či má každý stručný prehľad osnovu nemeckého.
-
-`assets/readme/<language>/` obsahuje toto README v danom jazyku, jeho snímku obrazovky a ukážkový dokument, ktorý snímka zobrazuje. Zmena tohto README patrí aj do týchto kópií.
+Zostavenie, testovanie, štruktúra kódu a pravidlá, ktorými sa riadi, sú opísané v [docs/development.md](../../../docs/development.md) (po anglicky).
 
 ### Komponenty tretích strán
 
@@ -757,6 +632,10 @@ Kód používa nemecký text ako kľúč: `t("Fett")` ho vyhľadá za behu, `n("
 | [image](https://github.com/image-rs/image) | 0.25 | dekódovanie PNG, JPEG, GIF, WebP a BMP | MIT alebo Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | zarovnávanie stĺpcov tabuliek | MIT alebo Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | názvy odkazov na znaky HTML | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | rozbaľovanie súborov Word a objektov Gitu | MIT, Zlib alebo Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | čítanie XML súborov Word | MIT alebo Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | názvy a vyhľadávanie naprieč zloženými a rozloženými písmenami | MIT alebo Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | ponechanie textu podobného `:shortcode:` doslovne v importovanom texte | MIT alebo Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | vykresľovanie vzorcov | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | vizuálny editor vzorcov, s písmami KaTeX | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | diagramy Mermaid | MIT |

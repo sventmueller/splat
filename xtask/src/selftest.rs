@@ -12,7 +12,7 @@ pub(crate) const LSREGISTER: &str =
 /// one and type into it, so they need the Mac to themselves for their duration.
 pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
     let mode = args.first().map(String::as_str).ok_or(USAGE)?;
-    let app = bundle(true, true)?;
+    let app = bundle(Build::Selftest { release: true })?;
     // Launched by its path, the app would stay unknown to Launch Services, and with it the probe type.
     run(Command::new(LSREGISTER).arg("-f").arg(&app))?;
     let binary = app.join("Contents/MacOS").join(APP);
@@ -58,6 +58,8 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
             if listed_checks(mode, part).is_some() {
                 println!("{}", report.summary());
             }
+            files::create_dir_all(skipped_dir())?;
+            files::write(skipped_dir().join(format!("{mode}.txt")), report.skipped.join("\n"))?;
             if let Some(budget) = keystroke_budget(args)? {
                 within_budget(&report, budget)?;
             }
@@ -73,6 +75,9 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
                     ""
                 };
                 files::write(root().join("xtask/checks").join(file), recorded(&report, also_listed))?;
+                if mode == "gui" {
+                    keep_click_through_entries(&work)?;
+                }
                 return Ok(());
             }
             return verdict(mode, part, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
@@ -83,6 +88,37 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         }
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
+}
+
+/// The texts the click-through groups start from, as a recording run wrote them, for the next build to take in.
+fn keep_click_through_entries(work: &std::path::Path) -> Result<(), String> {
+    let written = work.join("click-through");
+    if !written.exists() {
+        return Ok(());
+    }
+    let kept = root().join("xtask/checks/click-through");
+    files::create_dir_all(&kept)?;
+    for entry in files::read_dir(&written)?.flatten() {
+        files::copy(entry.path(), kept.join(entry.file_name()))?;
+    }
+    Ok(())
+}
+
+/// Where each mode leaves the names of the checks it skipped, for a run of several modes to report them together.
+pub(crate) fn skipped_dir() -> std::path::PathBuf {
+    root().join("target/selftest-skipped")
+}
+
+/// The checks the modes skipped, one line per mode that skipped any, from the lists in [`skipped_dir`].
+pub(crate) fn skipped_by_mode(modes: &[&str]) -> Vec<(String, Vec<String>)> {
+    modes
+        .iter()
+        .filter_map(|mode| {
+            let text = fs::read_to_string(skipped_dir().join(format!("{mode}.txt"))).ok()?;
+            let names: Vec<String> = text.lines().filter(|l| !l.is_empty()).map(str::to_string).collect();
+            (!names.is_empty()).then(|| ((*mode).to_string(), names))
+        })
+        .collect()
 }
 
 /// What `--keystroke-ms` allows a keystroke in the window, if anything.
@@ -117,10 +153,6 @@ fn set_up_mode(cmd: &mut Command, mode: &str, args: &[String], work: &std::path:
             cmd.env("SPLAT_RENDER_PROBE", "1");
         }
         "gui" => {
-            // A group of the caller's choice may need neither.
-            if screen_locked() && !args.iter().any(|a| a == "--only") {
-                return Err("the screen is locked: popovers do not close and screen captures fail".into());
-            }
             // A copy, since the test edits the document and autosave would write the changes back.
             let file = work.join("QuickReference.md");
             files::copy(root().join("resources/de.lproj/QuickReference.md"), &file)?;
@@ -138,11 +170,11 @@ fn set_up_mode(cmd: &mut Command, mode: &str, args: &[String], work: &std::path:
             if args.iter().any(|a| a == "--in-back") {
                 cmd.env("SPLAT_SELFTEST_IN_BACK", "1");
             }
+            if args.iter().any(|a| a == "--record") {
+                cmd.env("SPLAT_SELFTEST_RECORD", "1");
+            }
         }
         "resize" => {
-            if screen_locked() {
-                return Err("the screen is locked: the window cannot be resized".into());
-            }
             let file = work.join("Breite.md");
             let paragraph =
                 "Ein langer Absatz, der in der Spalte umbricht und bei jeder neuen Breite anders. ".repeat(4);
@@ -153,9 +185,6 @@ fn set_up_mode(cmd: &mut Command, mode: &str, args: &[String], work: &std::path:
             cmd.env("SPLAT_RESIZE_PROBE", "1").env("SPLAT_SELFTEST_FILE", &file);
         }
         "typing" => {
-            if screen_locked() {
-                return Err("the screen is locked: keys reach no window".into());
-            }
             let file = work.join("Tippen.md");
             let paragraph = "Ein Absatz, an dessen Ende weitergetippt wird. ".repeat(4);
             files::write(&file, format!("# Tippen\n\n{paragraph}\n"))?;
@@ -357,25 +386,6 @@ fn recorded(report: &Report, also_listed: &str) -> String {
     }
     names.sort();
     names.into_iter().map(|name| name + "\n").collect()
-}
-
-/// The login window's lock state, as the window server reports it to the I/O registry.
-pub(crate) fn screen_locked() -> bool {
-    Command::new("ioreg")
-        .args(["-n", "Root", "-d1", "-a"])
-        .output()
-        .ok()
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .and_then(|plist| {
-            let at = plist.find("<key>CGSSessionScreenIsLocked</key>")?;
-            Some(
-                plist[at..]
-                    .trim_start_matches("<key>CGSSessionScreenIsLocked</key>")
-                    .trim_start()
-                    .starts_with("<true/>"),
-            )
-        })
-        .unwrap_or(false)
 }
 
 #[cfg(test)]

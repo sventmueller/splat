@@ -9,3 +9,6 @@ resources/js/mathlive-fonts/** linguist-vendored
 vendor/comrak/** linguist-vendored
 # Inputs of the fuzz targets, byte for byte.
 fuzz/seeds/** -text -diff linguist-vendored
+# Files that Word and textutil wrote, byte for byte.
+crates/splat-import/tests/corpus/*.rtf -text -diff linguist-vendored
+crates/splat-import/tests/corpus/*.html -text -diff linguist-vendored

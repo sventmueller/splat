@@ -15,7 +15,7 @@ use objc2_foundation::NSRange;
 use super::attributes::{attributed, set_typing_attributes};
 use super::layers::ForUpdater;
 use super::panes::Views;
-use super::render::RenderCtx;
+use super::render::{Live, RenderCtx};
 use super::state::{
     Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, laid_out,
 };
@@ -373,7 +373,7 @@ impl Updater<'_> {
     /// an image changes neither the layout nor any other block.
     pub(super) fn show_arrived_images(&self) {
         let arrived = self.state.arrivals.take();
-        if self.host.under_way().holds_back_what_can_wait() {
+        if self.host.under_way().defers_background_results() {
             self.state.arrivals.put_back(arrived);
             perform_later(self.host.object(), sel!(showArrivedImages), 0.1, true);
             return;
@@ -566,21 +566,14 @@ impl Updater<'_> {
             return;
         }
         let same_text = self.host.on_source_text(|current| current == text);
-        if !same_text || self.host.under_way().holds_back_what_can_wait() {
+        if !same_text || self.host.under_way().defers_background_results() {
             free_in_background(background);
             self.schedule_update();
             return;
         }
-        #[cfg(feature = "selftest")]
-        let started = std::time::Instant::now();
-        self.advance(Some(background));
-        #[cfg(feature = "selftest")]
-        if std::env::var_os("SPLAT_BENCH").is_some() {
-            eprintln!(
-                "BENCH applying a background result on the main thread: {:.1} ms",
-                started.elapsed().as_secs_f64() * 1000.0
-            );
-        }
+        crate::test_hooks::timed("applying a background result on the main thread", || {
+            self.advance(Some(background));
+        });
     }
 
     /// Brings source colors and preview in line with the state, which already says what comes next: until the preview
@@ -610,6 +603,8 @@ impl Updater<'_> {
         }
         if text_changed {
             self.host.panes().show_headings_if_open();
+            self.host.word_counter().text_changed();
+            self.host.change_marks().text_changed();
         }
         if text_changed && !self.host.pictures().remote_allowed() {
             let remote = self
@@ -664,6 +659,9 @@ impl Updater<'_> {
         };
         let eager = eager_blocks(changed.clone(), || self.host.progressive().visible_preview_block());
         let doc_dir = self.host.doc_dir();
+        let live = Live {
+            requester: Some(self.host.object()),
+        };
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
             zoom,
@@ -675,6 +673,7 @@ impl Updater<'_> {
             remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: false,
             macros: self.host.model().read(|st| st.macros()),
+            drawn: &live,
         };
         let replacement = objc2_foundation::NSMutableAttributedString::new();
         let mut plain = String::new();

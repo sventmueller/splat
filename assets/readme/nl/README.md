@@ -9,8 +9,10 @@ een van beide: wat je in de voorvertoning schrijft, wordt een minimale wijziging
 hebt aangeraakt byte voor byte gelijk blijven en je Git-diffs overzichtelijk blijven. Splat leest de Markdown die je al
 gebruikt: CommonMark en GitHub Flavored Markdown, GitHub-alerts, wikilinks, insluitingen en infokaders van Obsidian,
 extensies van Pandoc en Typora, ingebedde HTML, LaTeX-formules en diagrammen in Mermaid, Graphviz en PlantUML, alles
-offline weergegeven. Exporteer met één klik naar pdf, HTML of Word. Het is geschreven in Rust op echte
-AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, tenzij jij dat vraagt.
+offline weergegeven. Blader door en zoek in een hele map met notities, zie wat er is gewijzigd sinds de laatste
+Git-commit, plak vanuit Word of een webpagina als Markdown en exporteer met één klik naar pdf, HTML of Word. Het is
+geschreven in Rust op echte AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, tenzij jij
+dat vraagt.
  
 
 
@@ -87,6 +89,8 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
   - [Opmaakopdrachten](#opmaakopdrachten)
   - [Lijsten en taken](#lijsten-en-taken)
   - [Tabellen](#tabellen)
+  - [Opgemaakte tekst plakken](#opgemaakte-tekst-plakken)
+  - [Metadata](#metadata)
 - [Ondersteunde Markdown](#ondersteunde-markdown)
   - [CommonMark en GitHub Flavored Markdown](#commonmark-en-github-flavored-markdown)
   - [Infokaders](#infokaders)
@@ -100,7 +104,10 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 - [Diagrammen](#diagrammen)
 - [Afbeeldingen](#afbeeldingen)
 - [Links en navigatie](#links-en-navigatie)
+- [Notities in een map](#notities-in-een-map)
+- [Wijzigingen sinds de laatste commit](#wijzigingen-sinds-de-laatste-commit)
 - [Exporteren, afdrukken en delen](#exporteren-afdrukken-en-delen)
+- [Word-documenten importeren](#word-documenten-importeren)
 - [Uiterlijk en toegankelijkheid](#uiterlijk-en-toegankelijkheid)
 - [Talen](#talen)
 - [Toetscombinaties](#toetscombinaties)
@@ -109,14 +116,6 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
 - [Bekende beperkingen](#bekende-beperkingen)
 - [Problemen oplossen](#problemen-oplossen)
 - [Voor ontwikkelaars](#voor-ontwikkelaars)
-  - [Bouwen](#bouwen)
-  - [Distributie](#distributie)
-  - [Testen](#testen)
-  - [Projectindeling](#projectindeling)
-  - [Gegevensstroom](#gegevensstroom)
-  - [Regels in de controller](#regels-in-de-controller)
-  - [Een opdracht toevoegen](#een-opdracht-toevoegen)
-  - [Vertalingen](#vertalingen)
   - [Componenten van derden](#componenten-van-derden)
 - [Licentie](#licentie)
 
@@ -131,8 +130,15 @@ AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, t
   Mermaid, Graphviz en PlantUML, weergegeven op je Mac zonder Java, server of netwerkverbinding.
 - **Een knop voor alles.** Elk Markdown-element heeft een knop in de knoppenbalk en een menu-item, de gangbare ook een
   toetscombinatie. Tabellen hebben een eigen menu voor rijen, kolommen en uitlijning.
+- **Een map, niet alleen een bestand.** De zijbalk toont de notities rond een document en doorzoekt ze allemaal. De naam
+  van een notitie wijzigen past de links ernaar aan, en elke byte eromheen blijft staan.
+- **Wijzigingen in één oogopslag.** In een Git-repository markeren balken naast de tekst wat afwijkt van de laatste
+  commit, in beide deelvensters.
+- **Van Word en het web naar Markdown.** Plak opgemaakte tekst als Markdown en cellen uit een spreadsheet als tabel, en
+  importeer hele Word-documenten met hun afbeeldingen.
 - **Exporteren zonder verlies.** Pdf, één zelfstandig HTML-bestand of een Word-document met echte koppen, lijsten,
-  tabellen, voetnoten en afbeeldingen.
+  tabellen, voetnoten en afbeeldingen. Voeg paginanummers, kopteksten en een titelpagina toe, of gebruik het
+  Word-sjabloon van je bedrijf.
 - **Door en door native.** Echte AppKit-vensters, tabbladen, menu's, pop-overs, Versies, automatisch bewaren, het
   deelmenu, donkere modus, spellingcontrole, dicteren en VoiceOver. Geen Electron en geen webweergave voor de tekst
   zelf.
@@ -172,7 +178,7 @@ zoekt meteen; met **Zoek automatisch naar updates** en **Download en installeer 
 menu wijzig je je keuze later. Splat installeert een update alleen als die de handtekening van de ontwikkelaar draagt.
 Een eigen build heeft geen updater.
 
-**Vanaf de broncode.** Zie [Bouwen](#bouwen) voor de vereisten en voer dan uit:
+**Vanaf de broncode.** Zie [Bouwen](../../../docs/development.md#building) voor de vereisten en voer dan uit:
 
 ```sh
 make build
@@ -192,14 +198,19 @@ Elk document opent in een eigen venster, of als tabblad als je liever tabbladen 
 
 - **Links: de bron.** Je Markdown in SF Mono met syntaxiskleuren.
 - **Rechts: de voorvertoning.** Het weergegeven document, klaar om te bewerken.
-- **Structuurzijbalk (optioneel).** Alle koppen als boom; een klik op een kop toont die in beide deelvensters. Zet de
-  zijbalk aan of uit met **Weergave › Toon structuur** (⌃⌘S).
+- **Zijbalk (optioneel).** Alle koppen als boom, een klik op een kop toont die in beide deelvensters: **Weergave › Toon
+  structuur** (⌃⌘S). Twee andere tabbladen bevatten de [notities in de map](#notities-in-een-map) en een zoekfunctie
+  daarin.
 - **Knoppenbalk.** Knoppen gegroepeerd naar wat ze wijzigen: tekens, alinea's en ingevoegde onderdelen, daarna
   voorvertoning aan/uit, Deel en Nieuw document. Pas de balk aan met **Weergave › Pas knoppenbalk aan…**.
 
 Sleep de scheiding om een van beide kanten meer ruimte te geven. **Weergave › Verberg voorvertoning** (⌥⌘P) laat alleen
 de bron staan; Splat onthoudt dit per venster. Beide deelvensters scrollen samen en een selectie in het ene deelvenster
 wordt in het andere gemarkeerd.
+
+De hoek van het venster toont de woorden en tekens van de tekst en hoe lang het lezen duurt, en die van de selectie
+zolang er een is. Linkadressen, HTML-tags, metadata, opmerkingen, formules en diagrammen tellen niet mee. **Weergave ›
+Verberg aantal woorden** haalt dit weg.
 
 ### Documenten, tabbladen en versies
 
@@ -277,7 +288,7 @@ De voorvertoning gedraagt zich als een tekstverwerker, maar alles wat je erin do
 
 Alles wat Markdown niet kan uitdrukken, is in de voorvertoning geblokkeerd: de paletten Lettertype en Kleuren, de
 liniaal en het plakken of neerzetten van opgemaakte tekst en afbeeldingen. Geplakte HTML en RTF komen binnen als
-gewone tekst.
+gewone tekst, tenzij je [Plak als Markdown](#opgemaakte-tekst-plakken) kiest.
 
 ### Opmaakopdrachten
 
@@ -312,6 +323,33 @@ GitHub toont `==` en `^` zoals getypt en `~sub~` als doorhaling.
   in de laatste cel voegt een rij toe.
 - Het menu **Tabel** voegt rijen en kolommen in en verwijdert ze, en stelt de uitlijning van een kolom in (⌘{, ⌘|, ⌘}).
 - **Tabel › Lijn tabelkolommen uit** vult de bron aan zodat de kolommen netjes onder elkaar staan.
+
+### Opgemaakte tekst plakken
+
+**Wijzig › Plak als Markdown** (⌃⌘V), ook in het contextmenu van beide deelvensters, zet wat op het klembord staat om in
+Markdown op de plek van de selectie, als één stap om ongedaan te maken. ⌘V blijft gewone tekst invoegen.
+
+- **Vanuit een browser, Word, Google Docs, Confluence, Notities of Pages:** koppen, vet, cursief, onderstreept,
+  doorgehaald, superscript en subscript, links, lijsten met hun nesting, citaten, code en tabellen komen mee.
+- **Vanuit een spreadsheet:** cellen worden een tabel met een kopregel en rechts uitgelijnde kolommen met getallen. Dat
+  geldt ook voor tekst die gescheiden is door tabs, puntkomma's of komma's, als elke regel evenveel kolommen heeft.
+- **Afbeeldingen** met een webadres blijven links. Een afbeelding in de geplakte HTML wordt een bestand naast het
+  document, dat daarvoor één keer bewaard moet zijn. De tijdelijke afbeeldingsbestanden van Word komen niet mee, en hun
+  alt-tekst blijft staan.
+- **Links** behouden alleen `http`-, `https`-, `mailto`-, relatieve en `#`-adressen; van elke andere link blijft de
+  tekst over.
+
+### Metadata
+
+**Opmaak › Wijzig metadata…**, of een klik op de metadataregel boven in de voorvertoning, opent een formulier met de
+velden van de YAML-front matter. Velden kun je wijzigen, toevoegen en verwijderen. Een veld met een lijst houdt die als
+lijst: de waarden staan met komma's achter elkaar, en een waarde met een komma erin staat tussen aanhalingstekens. Een
+nieuw veld met de naam `tags`, `aliases`, `keywords`, `categories`, `authors` of `cssclasses` wordt ook een lijst.
+Geneste velden en tekst over meerdere regels zijn daar te zien en bewerk je in de bron.
+
+Wat het formulier wijzigt, is één stap om ongedaan te maken en raakt alleen de regels van de velden die je hebt
+gewijzigd: opmerkingen, de volgorde, afwijkende spatiëring, aanhalingstekens en regeleinden van alle andere blijven byte
+voor byte gelijk. Een document zonder metadata krijgt een blok aan het begin.
 
 ## Ondersteunde Markdown
 
@@ -394,7 +432,8 @@ bereiken als `#aan-de-slag`.
   notities.
 - **Opmerkingen.** `%%Alleen in de bron%%` blijft zichtbaar in de bron en wordt weggelaten uit de voorvertoning en uit
   elke export, zowel inline als op een eigen regel.
-- **Tags.** `#idee` of `#project/splat` wordt gemarkeerd. ⌘-klik zoekt de tag in het document.
+- **Tags.** `#idee` of `#project/splat` wordt gemarkeerd. ⌘-klik zoekt de tag in het document en, in de zijbalk, in de
+  hele map.
 - **Inklapbare infokaders.** Zie [Infokaders](#infokaders).
 
 ### Citaten en verwijzingen
@@ -552,6 +591,41 @@ In de voorvertoning plaatst een klik de cursor zodat je de linktekst kunt bewerk
 **Voeg in › Inhoudsopgave** voegt een gelinkte lijst van alle koppen in. Met de cursor erin werkt dezelfde opdracht
 haar bij. De structuurzijbalk (⌃⌘S) springt in beide deelvensters naar elke kop.
 
+## Notities in een map
+
+De knoppen boven in de zijbalk schakelen tussen de structuur, de bestanden en een zoekopdracht.
+
+- **Bestanden** (**Weergave › Toon bestanden**, ⌃⌘E). Alle Markdown-bestanden in de map van het document of, als dat in
+  een Git-repository staat, in die hele repository. Een klik of Return opent een notitie als tabblad van dit venster; is
+  ze al geopend, dan komt ze naar voren. De knop naast de mapnaam toont een andere map in dit venster. Verborgen
+  bestanden, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` en mappen zonder notities blijven buiten
+  beeld. Een document direct in je thuismap toont alleen de notities ernaast, zodat Splat niet door al je mappen loopt
+  en voor elk daarvan toestemming vraagt.
+- **Zoeken** (**Wijzig › Zoek › Zoek in alle notities…**, ⇧⌘F). Vindt tekst in alle notities, ongeacht hoofdletters en
+  kleine letters en hoe de accenten zijn gecodeerd. `#tag` vindt een tag, `#project` ook `#project/splat`, en niets in
+  code. Een klik op een resultaat opent de notitie op die plek.
+- **Links naar een notitie.** Het contextmenu van een notitie toont de notities die ernaar linken, via wikilink,
+  insluiting, relatieve link of definitie van een linkverwijzing.
+- **De naam van een notitie wijzigen.** Hetzelfde menu wijzigt de naam en past die links aan. Splat zegt eerst om
+  hoeveel links in hoeveel bestanden het gaat. In elke link verandert alleen de naam, en elke andere byte van het
+  bestand blijft staan. Geopende documenten nemen de wijziging over als een stap om ongedaan te maken; in andere
+  bestanden kunnen alleen Git of Versies haar terugdraaien. Een bestand dat een ander programma intussen heeft
+  gewijzigd, stopt het aanpassen van alle links, en Splat noemt het.
+
+De lijst volgt de map wanneer het venster naar voren komt. Zoeken kijkt naar de bestanden zoals ze op schijf staan, en
+tekst die je nog niet hebt bewaard, telt mee vanaf de volgende keer automatisch bewaren.
+
+## Wijzigingen sinds de laatste commit
+
+In een document in een Git-repository markeren balken naast de tekst wat afwijkt van de laatste commit, in de bron en in
+de voorvertoning: groen voor toegevoegde regels, blauw voor gewijzigde regels en een korte rode markering waar iets is
+verwijderd. Ze volgen terwijl je typt en wanneer de branch verschuift. **Weergave › Wijzigingen sinds laatste commit**
+zet ze uit, voor alle vensters.
+
+Regels die alleen in hun regeleinde verschillen, tellen niet mee, dus een bestand met CRLF tegenover een commit met LF
+toont geen wijziging. Een nieuw bestand heeft geen markeringen tot zijn eerste commit, en een document boven 32 MB
+evenmin.
+
 ## Exporteren, afdrukken en delen
 
 | Formaat | Hoe | Wat je krijgt |
@@ -565,6 +639,28 @@ haar bij. De structuurzijbalk (⌃⌘S) springt in beide deelvensters naar elke 
 Het menu **Archief › Deel** biedt dit alles op één plek. Exports gebruiken de instelling voor typografische leestekens en
 de afbeeldingen van het web die je hebt toegestaan; afbeeldingen van het web blijven in HTML links.
 
+**Archief › Exportopties…** bepaalt wat pdf, afdrukken en Word aan de tekst toevoegen, voor alle documenten:
+
+- **Paginanummers** in de voettekst van pdf en afdruk, als `2 / 9`.
+- **Koptekst en voettekst** voor pdf en afdrukken. `{title}`, `{author}`, `{date}`, `{page}` en `{pages}` staan voor hun
+  waarden, de eerste drie uit de metadata van het document.
+- **Een titelpagina** voor pdf, afdrukken en Word, met `title`, `subtitle`, `author` en `date` uit de metadata, of de
+  naam van het document als titel. Die heeft geen koptekst of voettekst.
+- **Een Word-sjabloon**, een `.docx` of `.dotx` waarvan de export het uiterlijk overneemt: de stijlen, ook met
+  gelokaliseerde namen, het thema, het paginaformaat, de marges, de kopteksten en de voetteksten. Een sjabloon dat niet
+  te lezen is, stopt de export en meldt dat, in plaats van je een document zonder sjabloon te geven.
+
+## Word-documenten importeren
+
+**Archief › Importeer Word-document…** vraagt om een `.docx`- of `.dotx`-bestand en waar de Markdown moet komen, en
+opent dan het resultaat. Afbeeldingen komen in een map ernaast, genoemd naar het document met `-images`.
+
+Koppen en lijsten worden overgenomen zoals de stijlen en nummering van Word ze bepalen, ook in documenten waarvan de stijlen
+gelokaliseerde namen hebben. Vet, cursief, onderstreept, doorgehaald, markering, superscript en subscript, links,
+citaten, code, voetnoten, eindnoten en tabellen komen mee, cellen over meerdere kolommen als HTML-tabel. Formules worden
+LaTeX. Bijgehouden wijzigingen gelden als geaccepteerd, en een inhoudsopgave blijft achterwege, omdat **Voeg in ›
+Inhoudsopgave** een nieuwe maakt. Oude `.doc`-bestanden en met een wachtwoord beveiligde documenten worden geweigerd.
+
 ## Uiterlijk en toegankelijkheid
 
 - **Donkere modus** volgt het systeem. Formules en diagrammen worden voor elk uiterlijk weergegeven.
@@ -574,7 +670,8 @@ de afbeeldingen van het web die je hebt toegestaan; afbeeldingen van het web bli
 - **VoiceOver.** De deelvensters heten "Markdown-bron" en "Voorvertoning", formules worden voorgelezen als hun code en
   diagrammen als hun titel. Elke opdracht is met het toetsenbord te bereiken.
 
-Splat heeft geen instellingenvenster: de weinige opties staan waar ze gelden, in **Weergave** en **Wijzig › Vervanging**.
+Splat heeft geen instellingenvenster: de weinige opties staan waar ze gelden, in **Weergave**, **Wijzig › Vervanging**
+en **Archief › Exportopties…**.
 
 ## Talen
 
@@ -606,6 +703,9 @@ systeemtaal spiegelt macOS ook het venster, zodat de voorvertoning links staat.
 | Tabelkolom links, gecentreerd, rechts uitlijnen | ⌘{, ⌘\|, ⌘} |
 | Voorvertoning verbergen of tonen | ⌥⌘P |
 | Structuur tonen of verbergen | ⌃⌘S |
+| Bestanden tonen of verbergen | ⌃⌘E |
+| Zoek in alle notities | ⇧⌘F |
+| Plak als Markdown | ⌃⌘V |
 | Zoom in, uit, werkelijke grootte | ⌘+, ⌘−, ⌘0 |
 | Nieuw document, open, bewaar, dupliceer | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Pagina-instelling, druk af | ⇧⌘P, ⌘P |
@@ -646,6 +746,14 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
   elders, absoluut of beginnend met `~`, laadt in de voorvertoning nog steeds; HTML- en Word-exports, afdrukken en pdf's
   nemen alleen mee wat in de map van het document of in zijn Git-repository staat, tenzij die repository ook je thuismap
   bevat, zodat een document van iemand anders je bestanden niet in een export kan trekken die je doorgeeft.
+- **Mappen met notities** worden alleen gelezen zolang de zijbalk ze toont, en de naam van een notitie wijzigen
+  verandert andere bestanden pas nadat je hebt bevestigd hoeveel.
+- **Git-repository's** leest Splat zelf. Het voert nooit het programma `git` uit, waarvan de configuratie in een
+  repository van iemand anders andere programma's kan starten, en het leest niet meer dan de versie van het geopende
+  document in de laatste commit. Het schrijft daar niets en gaat niet het netwerk op.
+- **Word-documenten en geplakte tekst** worden gelezen door de eigen parsers van Splat, met grenzen aan de grootte, de
+  nesting en hoe ver een bestand mag uitpakken. Links daarin behouden alleen de adressen die Splat ook elders toestaat,
+  en de namen van afbeeldingen in een Word-bestand bepalen nooit waar ze worden weggeschreven.
 - **Kopieën van niet-bewaarde tekst** blijven op deze Mac, in je map Library, voor het herstel na een crash. Ze
   verdwijnen bij het bewaren of het normaal afsluiten van Splat; de kopieën die een crash heeft achtergelaten, blijven in
   de herstelmap staan totdat je ze verwijdert.
@@ -688,7 +796,8 @@ tweemaal gedefinieerde voetnoot of een voetnoot binnen een citaat of lijst. Het 
 
 - **Een enkele tilde betekent subscript.** `~tekst~` is subscript zoals in Pandoc; doorhaling vraagt `~~twee~~`. GitHub
   haalt ook door met één tilde.
-- **Alleen-lezen in de voorvertoning:** ingebedde HTML, ingesloten notities en front matter bewerk je in de bron.
+- **Alleen-lezen in de voorvertoning:** ingebedde HTML en ingesloten notities bewerk je in de bron, front matter in zijn
+  formulier of in de bron.
 - **Zeer diepe nesting:** HTML die dieper dan 64 niveaus is genest, en inline HTML dieper dan 16, wijkt voor zijn inhoud.
 - **Samengevoegde tabelcellen** bestaan alleen in HTML-tabellen, en alleen over kolommen (`colspan`, geen `rowspan`). De
   tabelsyntaxis van MultiMarkdown voor samengevoegde cellen wordt niet ondersteund.
@@ -698,6 +807,17 @@ tweemaal gedefinieerde voetnoot of een voetnoot binnen een citaat of lijst. Het 
 - **Formules, geen documenten:** geen LaTeX-pakketten, TikZ of volledige documenten.
 - **De visuele formule-editor** schrijft LaTeX in de notatie van MathLive: spaties verdwijnen (`E = mc^2` wordt
   `E=mc^2`), de weergave blijft gelijk.
+- **Aantal woorden:** Thai, Laotiaans, Khmer en Birmaans worden zonder spaties geschreven en per tekstreeks geteld, niet
+  per woord. `3.14` en `snake_case` zijn elk twee woorden.
+- **De naam van een notitie wijzigen** past geen links in ingebedde HTML aan, en een wikilink blijft zoals hij is als de
+  nieuwe naam `#`, `|`, `^`, `[`, `]` of `\` bevat.
+- **Wijzigingsmarkeringen** lezen repository's met SHA-1-objecten en gewone of ingepakte refs; een repository met
+  SHA-256 of reftable toont er geen. Een bestand onder een Git-filter zoals LFS wordt vergeleken met wat het filter
+  heeft opgeslagen.
+- **Word-import** neemt tekst in kopteksten, voetteksten en opmerkingen niet mee, en afbeeldingen als `.emz` of SVG
+  behouden alleen hun alt-tekst.
+- **Plak als Markdown** leest RTF als westerse tekst en haalt koppen daaruit alleen uit lettergroottes. De meeste
+  programma's bieden ook HTML aan, en dat gaat voor.
 - **Bewust zo:** geen regelnummers, geen instellingenvenster, geen Help Book, niet in de App Store.
 - **Minder getest op Intel.** De zelftests met een venster draaien alleen op Apple Silicon; op Intel draait CI `cargo test`.
 
@@ -732,282 +852,7 @@ Graphviz of PlantUML.
 
 ## Voor ontwikkelaars
 
-Splat is een Rust-applicatie die rechtstreeks met AppKit en WebKit praat via
-[objc2](https://github.com/madsmtm/objc2). Er is geen Swift, geen Objective-C, geen Xcode-project en geen Interface
-Builder-bestand.
-
-### Bouwen
-
-Vereisten:
-
-- macOS met de Command Line Tools (`xcode-select --install`). Xcode is niet nodig; Splat bouwt zonder `actool`,
-  `ibtool` en `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) noemt de exacte versie die CI gebruikt;
-  rustup installeert die zelf, de Rust van Homebrew negeert het bestand. Door die versie daar te verhogen, bereiken
-  nieuwe waarschuwingen van compiler en clippy het project.
-- rustup, voor `make lint`, `make check` en `make universal`: `cargo xtask check-library` bouwt de bibliotheek voor Linux om te laten zien dat ze geen macOS nodig heeft, en de Rust van Homebrew heeft geen andere targets.
-
-De [Makefile](../../../Makefile) bevat korte ingangen; `make help` toont ze allemaal:
-
-```sh
-make build                  # target/release/Splat.app, hetzelfde als cargo xtask bundle --release
-make universal              # target/splat-universal voor Apple Silicon en Intel, zoals de schijfkopie het bevat
-make check                  # opmaak, clippy zonder waarschuwingen, alle tests, meegeleverde bibliotheken; wat CI draait
-make test                   # make check, daarna de zelftest zonder venster
-make test-gui               # zelftests met een venster; ze houden de Mac ongeveer vier minuten bezet
-make test-long              # langer willekeurig zoeken en de gedeeltelijke-update-controle met 10 MB
-make fuzz                   # willekeurige invoer voor de gedeeltelijke parse en alle uitvoer
-make coverage               # regeldekking van alle tests en zelftests, met een ondergrens per module
-make coverage-library       # dezelfde ondergrenzen voor de modules zonder venster, zoals in CI
-make bench FILE=<file.md>   # tijden voor openen, typen en scrollen in een groot bestand
-make release                # eerst make test, dan de genotariseerde schijfkopie
-```
-
-De bouwlogica zelf staat in de Rust-crate [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, ondertekend met "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, een aparte app die nooit Markdown-bestanden opent
-cargo xtask dmg                # dist/Splat-<version>.dmg voor distributie, Developer ID, genotariseerd
-cargo xtask icon               # bouw assets/AppIcon.icns en het README-icoon opnieuw uit assets/icon-1024.png
-cargo xtask vendor check       # controleer het meegeleverde JavaScript tegen vendor.lock
-cargo xtask vendor fetch       # download het opnieuw na een versiewijziging in vendor.lock
-```
-
-`bundle` schrijft de `Info.plist`, kopieert de resources en lokalisaties en ondertekent de app met het certificaat
-"Splat Local Signing". De eerste build maakt dat certificaat aan in je inlogsleutelhanger, 20 jaar geldig. Zolang het
-blijft bestaan, behoudt Splat zijn recente documenten en maptoestemmingen bij herbouwen; met een ad-hocondertekening
-zou elke build voor macOS een nieuwe app zijn. Debug- en zelftestbuilds dragen eigen bundle-ID's (`local.splat.debug`,
-`local.splat.selftest`) en registreren zich niet voor Markdown-bestanden, zodat de Finder nooit een document in een
-verouderde build opent en ze de instellingen van de normale app met rust laten.
-
-De versie staat in [VERSION](../../../VERSION) als `major.minor.build` en is die welke de volgende build krijgt. Elke release-build
-die slaagt (`make build`, `cargo xtask bundle --release`, `make release`) verhoogt het buildnummer met één;
-debug- en zelftestbuilds laten het met rust. Major en minor verhoog je met de hand: zet VERSION op bijvoorbeeld `1.1.0`
-en de volgende build krijgt precies die.
-
-### Distributie
-
-`cargo xtask dmg` (of `make release`, dat eerst `make test` draait) bouwt een release, ondertekent die met je Developer
-ID, notariseert de app bij Apple en hecht het ticket eraan vast, verpakt haar in een gecomprimeerde, alleen-lezen schijfkopie met een link naar
-Programma's, notariseert ook de schijfkopie en hecht er het ticket aan vast en controleert het resultaat met Gatekeeper. De app draagt haar eigen
-ticket, zodat een kopie die zonder de Finder is geïnstalleerd, zoals Homebrew doet, ook bij de eerste start offline opent; de twee
-rondes met de notarisdienst duren elk een paar minuten. Alleen een schijfkopie die elke stap heeft doorstaan, wordt
-`dist/Splat-<version>.dmg`, de kopie die wordt gecommit, en het buildnummer
-gaat omhoog. De vorige schijfkopie blijft nog één release staan, omdat de raw-server van GitHub na een push enkele minuten de oude
-updatefeed kan blijven uitgeven; oudere gaan naar de prullenmand. Een mislukte run laat `dist/` en VERSION zoals ze waren.
-Elke release voegt de volledige schijfkopie, ongeveer 16 MB, toe aan de repositorygeschiedenis. Het draait alleen als je het aanroept, nooit als onderdeel van een normale build, en vraagt:
-
-- een certificaat "Developer ID Application" in de sleutelhanger
-- een bewaarde login voor de notarisdienst van Apple met een appspecifiek wachtwoord, eenmalig aangemaakt met
-  `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- de privésleutel die updates ondertekent, in de inlogsleutelhanger. `generate_keys` van Sparkle heeft haar aangemaakt; de publieke helft
-  is `UPDATE_KEY` in [xtask/src/main.rs](../../../xtask/src/main.rs) en zit in elke geïnstalleerde kopie, die alleen updates
-  accepteert die ermee zijn ondertekend. Bewaar een back-up in een wachtwoordbeheerder: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exporteert
-  haar, `-f <file>` importeert haar op een andere Mac. Zonder haar kunnen geïnstalleerde kopieën nooit meer worden bijgewerkt.
-- rustup (`brew install rustup`, dat de Rust van Homebrew laat staan)
-- `RELEASE_NOTES.md`, met wat deze release brengt. Het updatevenster toont het boven een regel over hoe je een probleem meldt, dus `dmg` stopt als het bestand leeg is of nog de notities van de vorige release bevat
-
-Ontbreekt er een van, dan stopt `dmg` voordat het bouwt. Bij de eerste run vraagt macOS of Terminal de Finder mag
-bedienen; zonder die toestemming toont de schijfkopie noch haar achtergrond noch de pictogramindeling.
-
-Alleen de schijfkopie bevat de updater, [Sparkle](https://sparkle-project.org), die de build eenmalig in
-`target/` downloadt van zijn GitHub-release en controleert tegen de controlesom in xtask. De hardened runtime laadt het framework
-alleen als het de Team ID van de app draagt, wat de Developer ID-handtekening heeft en het lokale certificaat mist; en een
-update mag geen eigen build vervangen. De zelftestbuild bevat ook Sparkle, om het updatemenu ertegen te controleren:
-met een feed die niet bestaat, zonder de vraag van Sparkle bij de tweede start en met een entitlement
-waarmee de lokaal ondertekende app het framework kan laden. `dmg` ondertekent de nieuwe schijfkopie met de updatesleutel en schrijft
-`dist/appcast.xml`, de feed die geïnstalleerde kopieën van GitHub lezen. Commit en push de schijfkopie en de feed samen: vanaf dat moment bieden geïnstalleerde kopieën de update aan. De downloadlinks in deze README en haar vertalingen wijzen naar `Splat.dmg` in de nieuwste GitHub-release, dus elke release bevat een kopie onder die naam: `cp dist/Splat-<version>.dmg target/Splat.dmg`, daarna `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-De schijfkopie is een universele binary voor Apple Silicon en Intel; andere builds zijn alleen voor de hostprocessor.
-De Rust van Homebrew levert de standaardbibliotheek alleen voor de hostprocessor, dus `dmg` bouwt via rustup, dat de
-toolchain en targets van [rust-toolchain.toml](../../../rust-toolchain.toml) bij het eerste gebruik installeert, en stopt als het programma of
-Sparkle de code voor een van beide processors mist. `make universal` bouwt alleen het programma.
-De app erin draagt een andere handtekening dan een lokale build, dus macOS houdt voor beide aparte recente documenten en
-maptoestemmingen bij.
-
-### Testen
-
-| Opdracht | Controleert |
-|---|---|
-| `cargo test --release` | unit-, willekeurige en vertaaltests |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | een langer willekeurig zoekproces; `SPLAT_FUZZ_SEED` varieert de invoer |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | één taal, terwijl andere onvolledig zijn |
-| `cargo clippy --release --all-targets [--features selftest]` | lints, inclusief de verantwoording van elk `unsafe`-blok, de lengte van functies en, in de bibliotheek, getalconversies |
-| `cargo xtask check-library` | de bibliotheek bouwt voor Linux, dus niets erin heeft macOS nodig |
-| `cargo xtask vendor check` | de JavaScript-bibliotheken komen byte voor byte overeen met `vendor.lock` |
-| `cargo xtask selftest probe` | zonder venster, elk met zijn verwachte resultaat: formules, diagrammen, webafbeeldingen tegen een server binnen het proces, geblokkeerde adressen, de tekst die elke opdracht schrijft, elk afbeeldingsformaat via beide exports, een pagina die niet meer antwoordt en de verdediging van de webweergaven tegen een pagina zonder die verdediging. Duurt ongeveer een halve minuut. Wat de app op het scherm nodig heeft, wordt bij een vergrendeld scherm overgeslagen |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | de draaiende app, klik voor klik. Opent een venster en typt erin; de Mac is ongeveer vier minuten bezet. `--scenarios` draait alleen het tweede deel, in ongeveer anderhalve minuut. `--only` draait één groep van dat deel, in een eigen document, ook bij een vergrendeld scherm. `--in-back` laat weg wat de app vooraan nodig heeft; zonder dat faalt zo’n controle |
-| `cargo xtask selftest resize` | maakt het venster breder na het verplaatsen van de scheiding: de bron breekt opnieuw af terwijl het venster van grootte verandert. Duurt ongeveer tien seconden |
-| `cargo xtask selftest typing [--by-hand]` | typt door bewaarmomenten heen, met toetsen via de gebeurtenissenwachtrij van de app of, met `--by-hand`, met de hand: wat getypt is blijft staan en geldt als niet bewaard. Duurt ongeveer een minuut |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | tijden voor openen, typen en scrollen in een groot bestand; `--keystroke-ms` faalt als de snelste toetsaanslag langer duurt |
-| `cargo test --release -- --ignored partial_updates` | een toetsaanslag in 10 MB: gedeeltelijke tegen volledige update, hetzelfde resultaat in hooguit een kwart van de tijd |
-| `cargo test --release --test hostile` | documenten die een stackoverflow of kwadratische rekentijd uitlokken, elk in twee groottes waarvan de tijden net zo moeten groeien als de tekst, via parseren, opmaak, beide exports, toetsaanslagen en opdrachten |
-| `make mutants` | fouten die één voor één in `crates/splat-markdown`, `crates/splat-preview` en `crates/splat-file-state` worden ingebouwd, via [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); zegt welke geen enkele test opmerkt. Duurt uren; `FILE=crates/splat-preview/src/bridge/mod.rs` beperkt het |
-| `make fuzz` | willekeurige invoer via [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), dat de nightly van rustup nodig heeft: toetsaanslagen die als een volledige parse moeten lezen, alle uitvoer, bewerkingen in de voorvertoning, elke opdracht en een bestand dat bewaard wordt zoals het geopend is. `SECONDS=600` zoekt langer |
-| `cargo test --release --test fuzz_seeds` | de seeds in `fuzz/seeds/` door de controles van die fuzz-doelen, zonder fuzzer; onderdeel van elke `cargo test` |
-| `cargo test --profile checked --workspace` | de tests met wat een debug-build daarbovenop controleert: na elke gedeeltelijke parse passen de blokken bij hun tekst, en wat ze meeneemt is wat de tekst zegt. Onderdeel van `make test-long` |
-| `cargo test --release --test entry_points --test structure` | uit de broncode: alles wat het systeem aanroept is beschermd tegen panics, en modules hangen alleen naar beneden af |
-| `cargo test --release --test decoder` | het decoderproces decodeert afbeeldingen en bereikt noch bestanden noch het netwerk |
-| `make coverage` | regeldekking van `cargo test` en alle zelftests, via [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); mislukt onder de ondergrenzen. Houdt de Mac ongeveer vijf minuten bezet |
-| `make coverage-library` | de crates `splat-markdown`, `splat-preview`, `splat-file-state` en `splat-i18n` tegen hun hogere ondergrenzen, alleen gemeten door `cargo test` |
-
-Unittests staan naast de code die ze testen. `crates/splat-testkit/tests/` bevat wat het model en de voorvertoning van
-buitenaf bereikt: de willekeurige tests in `robustness.rs`, die de generator van `splat-testkit` delen met die van
-`sync.rs`, de documenten die schade moeten aanrichten in `hostile.rs` en de seeds van de fuzz-doelen in `fuzz_seeds.rs`.
-`tests/` bevat wat naar het hele programma kijkt: de broncode, de vertalingen en de decodertest, die het gebouwde
-programma start. Beslissingen in `src/editor/` die geen venster nodig hebben, staan in losse functies met eigen
-tests: alles wat de controller weet en hoe dat verandert in `state.rs`, de regels van het weergeven in `render_queue.rs`, de tekstkopie in `sync.rs`, alinea-stijlen, lettertypen en kleuren als waarden in `render.rs`, waar de ID's van de knoppenbalk voor staan in `toolbar.rs`, wat een linkklik betekent in `navigation.rs`.
-
-Een stap van de venster-zelftest wacht op een benoemde voorwaarde, niet op een tijd; alleen wat geen signaal geeft, zoals de afwezigheid van iets, houdt een pauze met haar reden. Vergeefs wachten is een mislukte controle die benoemt wat nooit kwam, een stap die panic veroorzaakt is ook een mislukte controle, en de run gaat in beide gevallen door. Een controle die in deze run niets kan zeggen, meldt `SELFTEST SKIP`: xtask somt ze op, en ze slaagt noch mislukt. xtask houdt elke modus, en `--scenarios` apart, aan ongeveer negen tiende van zijn controles. De venster-zelftest
-draait na zijn hoofdklikreeks een tweede deel, in `src/editor/selftest/scenarios.rs`: elke opmaak- en
-tabelopdracht, de dialogen, linkklikken, plakken, neerzetten, exports, een bestand dat een ander programma heeft
-gewijzigd, een grote wijziging, afbeeldingen die op schijf
-veranderen, geheugendruk, een enorm document en het herstel na een crash. Elke groep daarvan opent een eigen document,
-zodat een fout in de ene de volgende niet bereikt, en elke groep kan los draaien met `--only`. De zelftest zonder
-venster maakt bovendien het bewaren met opzet stuk: een map die niets aanneemt, een alleen-lezenbestand, een map die
-verdwenen is, een volle schijf en een panic in elke callback van een bewaaractie, en niets daarvan mag tekst kosten.
-
-Dekking kent twee ondergrenzen: elke module minstens 84 % van zijn regels, alle modules samen minstens 96 %. `make coverage`
-meet `cargo test` samen met de zelftests en mislukt onder een van beide; `make coverage-library` houdt wat geen venster nodig heeft aan 90 % en 97 %. De ondergrenzen en de weinige uitzonderingen, zoals
-de panic-hook in `main.rs` die alleen bij een crash draait, staan in [xtask](../../../xtask/src/coverage.rs) naast hun redenen.
-Gemeten builds komen in `target/coverage/`, zodat metende code nooit in `target/release/` of een schijfkopie terechtkomt. Het
-decoderhulpproces opent zijn meetbestand voordat het zichzelf opsluit, dus het wordt ook gemeten.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) draait `make check`, `make coverage-library` en de universele
-build op Apple Silicon en `cargo test` op Intel bij elke push naar `main` en elke pull request. Elke nacht draait
-[.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) `make test-long` met nieuwe willekeurige invoer. De zelftests en de schijfkopie blijven op de Mac van de ontwikkelaar: ze hebben een scherm en de
-ondertekeningscertificaten in de sleutelhanger nodig.
-
-De uitvoer van zelftests gaat naar `target/selftest/`. De zelftest bouwt een aparte app (`target/release/Splat Selftest.app`,
-bundle-ID `local.splat.selftest`) en laat de instellingen, recente documenten en bestandskoppelingen van de normale app
-ongemoeid.
-
-### Projectindeling
-
-Alles wat geen venster nodig heeft is een eigen crate onder `crates/`, die zonder macOS bouwt, zodat de compiler zich
-houdt aan de manier waarop ze van elkaar afhangen. De app in `src/` (pakket `splat-app`, programma `splat`) bouwt erop
-voort.
-
-- `crates/splat-markdown/`: de boom die elke afnemer leest, `Doc` in `doc/`, die zijn eigen tekst bezit, en de enige koppeling met de parser in `reader/`: comrak wordt nergens anders genoemd, en `reader/assumptions.rs` bevat wat de code over comrak aanneemt. Syntaxiskleuren, en alle opdrachten als zuivere tekstbewerkingen (`Edit`) in `commands/`. Ook
-  het opnieuw parseren na een bewerking (`incremental.rs`), de lezer voor ingebedde HTML (`markup.rs`), typografie, tags,
-  verwijzingen en citaten in lopende tekst (`typography.rs`), hoe tekst eruitziet en welke Markdown en HTML dat bewerkstelligen
-  (`style.rs`), wat een adres mag zijn (`url.rs`) en de HTML- en Word-export (`html.rs`, `docx.rs` met `docx/html.rs`
-  en `docx/xml.rs`). Een positie heeft een eigen type: `Byte` in de brontekst, `U16` in de bronweergave, `Shown` in de voorvertoningsweergave (`text.rs`).
-- `crates/splat-preview/`: de opmaak van de voorvertoning in `layout/`, met ingebedde HTML in `layout/html.rs`, en de afbeelding tussen voorvertoning en bron (`Bridge`, `Index`). Een `Bridge` weigert een opmaak van een andere versie van de `Doc`.
-- `crates/splat-file-state/`: welke tekst een bestand bevat, in welke indeling en wat een blik erop betekent.
-- `crates/splat-i18n/` met `resources/*.lproj`: 35 talen; de sleutels zijn de Duitse teksten, en de app installeert bij het starten de tabel van de interfacetaal.
-- `crates/splat-testkit/`: de generator van de willekeurige tests en de controles van de fuzz-doelen.
-- `src/editor/`: het venster. Eén `EditorController`-object bedient AppKit als delegate van beide weergaven en stuurt door naar componenten, kleine structs boven de controller en de toestand die ze bezitten, waarvan de andere modules de velden niet kunnen bereiken:
-
-| Module | Verantwoordelijkheid |
-|---|---|
-| `controller.rs` | klasse, delegate-methoden die doorsturen, `invalidate` en wat de rest van het programma een editor vertelt; alleen dit bereikt de componenten |
-| `panes.rs` | `Panes`: de tekstweergaven, de structuur, deelvensters tonen en verbergen, en wat toegang tot de weergaven geeft |
-| `controller/layers.rs` | wie wie mag bereiken: een component krijgt een handvat van de controller dat biedt wat eronder ligt, en de compiler houdt zich daaraan |
-| `state.rs` | wat de controller over het document weet en elke manier waarop dat verandert; de velden zijn privé en het raakt geen weergave aan |
-| `model.rs` | leent de toestand en de tekstkopie uit aan closures die geen weergave kunnen bereiken |
-| `actions.rs` | opdrachtenregister: selector, titel, toetscombinatie, symbool, wanneer de opdracht geldt |
-| `editing.rs` | `Editing`: opdrachten uitvoeren en valideren, typen in de voorvertoning |
-| `update.rs` | `Updater`: parseren, kleuren, de voorvertoning bijwerken; na een bewerking alleen de betrokken alinea's |
-| `sync.rs` | tekstkopie en blokadministratie, zonder AppKit en met willekeurige tests |
-| `progressive.rs` | `Progressive`: grote voorvertoningen stap voor stap weergeven |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: selectie en scrollpositie van beide deelvensters gelijk houden |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: de formule- en diagrameditor |
-| `navigation.rs`, `links.rs` | `Links`: links, wikilinks, tags, takenvakjes, vouwen, voetnoten |
-| `env.rs` | wat de voorvertoning van buiten de tekst leest: typografische leestekens, de repository voor `@name` en `#12`, het BibTeX-bestand, ingesloten notities |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | voorvertoningstekst, lokale en externe afbeeldingen; `Pictures` in `images.rs` |
-| `attributes.rs` | tekstattributen; elke sleutel krijgt alleen een waarde van het type dat hij verwacht |
-| `shadow.rs` | kopieën van niet-bewaarde tekst voor het herstel na een crash |
-| `decoder.rs` | hulpprocessen in een sandbox die afbeeldingen en grafische data decoderen |
-| `export.rs`, `outline.rs` | `Sharing`: HTML- en Word-export, het deelbestand, afdrukken; de structuurzijbalk |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit voor MathJax, Mermaid, Graphviz, PlantUML en de visuele formule-editor; de regels van wat wanneer wordt weergegeven, los van WebKit |
-| `webkit.rs` | aanroepen naar WebKit; alleen de levensduur van de navigatiedelegate blijft bij `js.rs` en `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | het venster opbouwen, knoppenbalk, tekstweergaven, dialogen, kleuren |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: menubalk, app-delegate, document (`MDDocument`, een subklasse van
-  `NSDocument`).
-- `src/util/`: werkthreads (`lanes.rs`), volumes die kunnen ophouden te antwoorden (`volumes.rs`), AppKit-hulpjes, bestanden en processen. `src/diag.rs`: wat buiten het zicht van de gebruiker misgaat, gaat naar het systeemlogboek, zonder enige tekst van een document.
-- `src/large_alloc.rs`: grote toewijzingen komen rechtstreeks van de kernel en gaan er bij vrijgave naar terug, zodat het geheugen
-  na grote bewerkingen terugkeert.
-- `resources/js/`: webpagina's en bibliotheken; versies en controlesommen in [vendor.lock](../../../vendor.lock).
-- `xtask/`: bundelen, ondertekenen, de schijfkopie, het icoon, vendoring, de zelftestrunner en de dekkingsondergrenzen.
-
-### Gegevensstroom
-
-De brontekst in de tekstweergave links is de enige bron van waarheid.
-
-1. Elke tekenwijziging daar werkt de tekstkopie (`Snapshot`) ter plekke bij, zonder de tekst opnieuw te lezen.
-2. Een update parseert de kopie, kleurt de bron alleen opnieuw waar kleuren zijn veranderd, maakt de voorvertoning op en
-   vervangt alleen de blokken waarvan de inhoud is veranderd.
-3. Na een bewerking worden alleen de betrokken alinea's opnieuw geparseerd, gekleurd en opgemaakt, zolang hun buren
-   gelijk blijven; [docs/partial-parse.md](../../../docs/partial-parse.md) zegt waarom dat hetzelfde oplevert als een
-   volledige parse, en waar je naar moet kijken als comrak verandert. Documenten met `%%`-opmerkingsblokken, wijzigingen
-   aan de front matter en, in een document met definities van linkverwijzingen, wijzigingen aan een deel met een
-   vierkante haak worden volledig verwerkt. comrak herkent een voetnootverwijzing
-   alleen met haar definitie in dezelfde parse en verplaatst definities achter de tekst, dus het deel wordt geparseerd
-   met een vervangende definitie per label en neemt zijn nummers uit de oude boom; een wijziging aan de verwijzingen of
-   definities in het deel, of naast een inline voetnoot, wordt volledig verwerkt.
-4. HTML-blokken die `<details>` of `<div align>` openen en later sluiten, hebben invloed op de Markdown-blokken ertussen; een
-   hergebruikt blok moet dezelfde omgeving hebben.
-5. Tijdens het typen in de bron van een document tot 2 MB draait de gedeeltelijke update meteen; als die niet van toepassing is,
-   of in een groter document, draaien parseren en opmaken op de achtergrond. Tijdens het typen in de voorvertoning draaien ze
-   meteen, omdat de cursor van de voorvertoning van het resultaat afhangt.
-6. Invoer in de voorvertoning wordt door `Bridge` vertaald naar een bewerking van de bron en volgt vanaf daar hetzelfde pad.
-   Markdown kent te veel manieren om tekst in syntaxis te veranderen voor regels alleen, dus `preview/verify.rs` parseert het gewijzigde deel
-   opnieuw en vergelijkt wat het toont met wat is getypt; een bewerking die niet standhoudt, wordt verder ge-escaped of geweigerd.
-7. De inline posities van comrak kloppen op een paar plekken niet, bijvoorbeeld achter een definitie van een linkverwijzing. `reader/positions.rs`
-   controleert ze bij het lezen van een blok tegen de bron en leest ze opnieuw uit de bron waar ze niet passen.
-
-### Regels in de controller
-
-1. De eigen wijzigingen van de controller aan de weergaven lopen binnen `Panes::silently`; de delegate-callbacks negeren ze. Overal elders zijn de weergaven alleen te lezen, dus de compiler controleert dit. Wat de callbacks wel moeten horen, of wat een weergave aan AppKit geeft, zegt dat door via `Panes::for_appkit` te lopen.
-2. De toestand wordt alleen geleend om te lezen en te rekenen, nooit over een aanroep heen die een weergave wijzigt, opmaakt of laat scrollen: `Model` leent haar uit aan `Send`-closures, en geen enkele weergave is `Send`, dus de compiler controleert dit. Ze verandert alleen via haar eigen methoden, waarvan de tests geen venster nodig hebben.
-3. Berichten van buiten (een afbeelding geladen, een formule weergegeven) komen vertraagd binnen via `renders_arrived` en `image_arrived`, nooit
-   midden in een update.
-4. Opnieuw tekenen zonder tekstwijziging loopt alleen via `invalidate(reason)`.
-5. De tekstkopie wordt niet vastgehouden over een wijziging van de bron heen, anders kopieert die wijziging de hele tekst: `with_text` leent haar alleen uit voor de duur van een `Send`-closure.
-6. Een nieuwe opdracht vraagt een item in `actions.rs`, een methode in `controller.rs` en een tak in `Editing::perform`.
-7. Elk `unsafe`-blok draagt zijn verantwoording als `// SAFETY:`-commentaar. Bytes bereiken de afbeeldingsdecoders van het systeem alleen in het hulpproces, via `decoder::decode_native`; een test doorzoekt de bronnen op andere aanroepen.
-8. Niets op de hoofdthread wacht op de mappen van de gebruiker, omdat een netwerkvolume kan ophouden te antwoorden: bestanden worden
-   bekeken op de thread `DISK` en de voorvertoning leest de antwoorden via `Env::known`. Alleen een actie waarop de gebruiker
-   wacht, zoals een export of bewaren, mag de schijf rechtstreeks aanraken.
-9. Wat moet eindigen, eindigt ook na een panic, want de hoofdthread overleeft er een: een gehesen vlag loopt via
-   `with_raised`, een bewerking van de tekstopslag via `editing`, en wat ongedaan maken niet mag weten via
-   `without_undo`. Een test vindt wat daarvan met de hand is geschreven.
-10. Een adres in een document heeft één lezing, in `splat_markdown::url`; een test vindt schema's die met de hand worden
-    vergeleken.
-
-### Een opdracht toevoegen
-
-De menubalk, de knoppenbalk en het contextmenu bouwen hun items allemaal uit het register in
-[src/editor/actions.rs](../../../src/editor/actions.rs), en menuvalidatie leest daar wanneer een opdracht geldt en of ze
-een vinkje toont. Een nieuwe opdracht vraagt:
-
-1. een variant van `Action` met zijn `Spec`: selector, titel, label voor de knoppenbalk, tooltip (beginnend met een werkwoord, hooguit 75
-   tekens), toetscombinatie, SF Symbol en wanneer ze geldt
-2. de methode in `src/editor/controller.rs`
-3. een tak in `Editing::perform`
-4. de teksten ervan in elke `Localizable.strings`
-
-De test `every_command_has_a_method_and_every_method_a_command` controleert of register en methoden overeenkomen. De
-standaardtoetscombinaties van Apple zoals ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F en ⌘, blijven ongemoeid.
-
-### Vertalingen
-
-De code gebruikt de Duitse tekst als sleutel: `t("Fett")` zoekt hem tijdens het draaien op, `n("Fett")` markeert een constante voor latere
-opzoeking. Elke `resources/<language>.lproj/` bevat:
-
-- `Localizable.strings`: elke interfacetekst, menutermen volgens de eigen woordenlijsten van Apple
-- `InfoPlist.strings`: de namen die macOS toont voor de app en haar documenttype
-- `QuickReference.md`: de beknopte Markdown-naslag
-
-`cargo xtask bundle` vermeldt elke `.lproj`-map als lokalisatie en `CFBundleDevelopmentRegion` is Engels, zodat
-de systeemmenu's en de bewaardialoog dezelfde taal volgen. De i18n-test controleert of elke taal elke
-tekst heeft en of elke beknopte naslag de opbouw van de Duitse heeft.
-
-`assets/readme/<language>/` bevat deze README in die taal, haar schermafbeelding en het demodocument dat de schermafbeelding
-toont. Een wijziging in deze README hoort ook in die kopieën.
+Bouwen, testen, de opbouw van de code en de regels die hij volgt staan in [docs/development.md](../../../docs/development.md) (in het Engels).
 
 ### Componenten van derden
 
@@ -1020,6 +865,10 @@ toont. Een wijziging in deze README hoort ook in die kopieën.
 | [image](https://github.com/image-rs/image) | 0.25 | decoderen van PNG, JPEG, GIF, WebP en BMP | MIT of Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | tabelkolommen uitlijnen | MIT of Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | de namen van HTML-tekenverwijzingen | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | uitpakken van Word-bestanden en Git-objecten | MIT, Zlib of Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | lezen van de XML van Word-bestanden | MIT of Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | namen en zoeken over samengestelde en ontlede letters heen | MIT of Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | tekst als `:shortcode:` letterlijk houden in geïmporteerde tekst | MIT of Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | formules weergeven | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuele formule-editor, met KaTeX-lettertypen | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-diagrammen | MIT |

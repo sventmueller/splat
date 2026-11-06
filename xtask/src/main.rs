@@ -41,7 +41,14 @@ fn main() -> ExitCode {
     let release = args.iter().any(|a| a == "--release");
     let selftest = args.iter().any(|a| a == "--selftest");
     let result = match args.first().map(String::as_str) {
-        Some("bundle") => bundle(release, selftest).map(|p| println!("{}", p.display())),
+        Some("bundle") => {
+            let build = match (selftest, release) {
+                (true, release) => Build::Selftest { release },
+                (false, true) => Build::Release,
+                (false, false) => Build::Debug,
+            };
+            bundle(build).map(|p| println!("{}", p.display()))
+        }
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
         Some("universal") => universal_program().map(|p| println!("{}", p.display())),
         Some("check-library") => check_library(),
@@ -216,6 +223,28 @@ mod tests {
         assert_eq!(offered_image(&feed), Some("Splat-1.0.4.dmg"));
         assert_eq!(offered_image("<rss/>"), None);
         assert!(appcast("1.0.4", "Splat-1.0.4.dmg", "ERROR: no key", "", "").is_err());
+    }
+
+    #[test]
+    fn each_build_has_its_name_its_profile_and_its_updates() {
+        let builds = [
+            Build::Debug,
+            Build::Release,
+            Build::Selftest { release: false },
+            Build::Selftest { release: true },
+            Build::Distribution,
+        ];
+        let seen: Vec<_> = builds.map(|b| (b.variant(), b.release(), b.updates())).into();
+        assert_eq!(
+            seen,
+            [
+                (Some("Debug"), false, Updates::Off),
+                (None, true, Updates::Off),
+                (Some("Selftest"), false, Updates::Selftest),
+                (Some("Selftest"), true, Updates::Selftest),
+                (None, true, Updates::Published),
+            ]
+        );
     }
 
     #[test]

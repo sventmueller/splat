@@ -4,7 +4,7 @@
 
 **Markdown-editoren for macOS der du skriver i kildeteksten eller rett i forhåndsvisningen.**
 
-Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levende, fullt redigerbar forhåndsvisning til høyre. Skriv i den ene eller den andre: det du skriver i forhåndsvisningen, blir til en minimal endring i kildeteksten, så linjer du ikke har rørt, forblir byte for byte like, og Git-diffene dine holder seg ryddige. Splat leser den Markdownen du allerede bruker: CommonMark og GitHub Flavored Markdown, GitHub-varsler, Obsidians wikilenker, innbygginger og infobokser, utvidelser fra Pandoc og Typora, innebygd HTML, LaTeX-formler og diagrammer i Mermaid, Graphviz og PlantUML, alt gjengitt uten nett. Eksporter til PDF, HTML eller Word med ett klikk. Appen er skrevet i Rust på ekte AppKit-kontroller, finnes på 35 språk og sender ingenting over nettverket med mindre du ber om det.
+Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levende, fullt redigerbar forhåndsvisning til høyre. Skriv i den ene eller den andre: det du skriver i forhåndsvisningen, blir til en minimal endring i kildeteksten, så linjer du ikke har rørt, forblir byte for byte like, og Git-diffene dine holder seg ryddige. Splat leser den Markdownen du allerede bruker: CommonMark og GitHub Flavored Markdown, GitHub-varsler, Obsidians wikilenker, innbygginger og infobokser, utvidelser fra Pandoc og Typora, innebygd HTML, LaTeX-formler og diagrammer i Mermaid, Graphviz og PlantUML, alt gjengitt uten nett. Bla gjennom og søk i en hel mappe med notater, se hva som er endret siden siste Git-commit, lim inn fra Word eller en nettside som Markdown, og eksporter til PDF, HTML eller Word med ett klikk. Appen er skrevet i Rust på ekte AppKit-kontroller, finnes på 35 språk og sender ingenting over nettverket med mindre du ber om det.
  
 
 
@@ -81,6 +81,8 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
   - [Formateringskommandoer](#formateringskommandoer)
   - [Lister og oppgaver](#lister-og-oppgaver)
   - [Tabeller](#tabeller)
+  - [Lime inn formatert tekst](#lime-inn-formatert-tekst)
+  - [Metadata](#metadata)
 - [Støttet Markdown](#støttet-markdown)
   - [CommonMark og GitHub Flavored Markdown](#commonmark-og-github-flavored-markdown)
   - [Infobokser](#infobokser)
@@ -94,7 +96,10 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 - [Diagrammer](#diagrammer)
 - [Bilder](#bilder)
 - [Lenker og navigasjon](#lenker-og-navigasjon)
+- [Notater i en mappe](#notater-i-en-mappe)
+- [Endringer siden siste commit](#endringer-siden-siste-commit)
 - [Eksportere, skrive ut og dele](#eksportere-skrive-ut-og-dele)
+- [Importere Word-dokumenter](#importere-word-dokumenter)
 - [Utseende og tilgjengelighet](#utseende-og-tilgjengelighet)
 - [Språk](#språk)
 - [Hurtigtaster](#hurtigtaster)
@@ -103,14 +108,6 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 - [Kjente begrensninger](#kjente-begrensninger)
 - [Feilsøking](#feilsøking)
 - [For utviklere](#for-utviklere)
-  - [Bygging](#bygging)
-  - [Distribusjon](#distribusjon)
-  - [Testing](#testing)
-  - [Prosjektstruktur](#prosjektstruktur)
-  - [Dataflyt](#dataflyt)
-  - [Regler i kontrolleren](#regler-i-kontrolleren)
-  - [Legge til en kommando](#legge-til-en-kommando)
-  - [Oversettelser](#oversettelser)
   - [Tredjepartskomponenter](#tredjepartskomponenter)
 - [Lisens](#lisens)
 
@@ -120,7 +117,10 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 - **Markdownen du allerede bruker.** CommonMark, GitHub Flavored Markdown, GitHub-varsler, utvidelser fra Obsidian, Pandoc og Typora, emoji-kortkoder, spoilere, definisjonslister, overskriftsankere og HTML som i GitHub-README-filer.
 - **Formler og diagrammer innebygd.** LaTeX-formler via MathJax, med en visuell formelredigerer. Diagrammer i Mermaid, Graphviz og PlantUML, gjengitt på Macen din uten Java, tjener eller nettforbindelse.
 - **En knapp for alt.** Hver Markdown-konstruksjon har en verktøylinjeknapp og et menyvalg, de vanligste også en hurtigtast. Tabeller har en egen meny for rader, kolonner og justering.
-- **Eksport uten tap.** PDF, én enkelt selvstendig HTML-fil eller et Word-dokument med ekte overskrifter, lister, tabeller, fotnoter og bilder.
+- **En mappe, ikke bare en fil.** Sidefeltet viser notatene rundt et dokument og søker i alle sammen. Når du endrer navn på et notat, endres lenkene til det, og hver byte rundt dem blir stående.
+- **Endringer med ett blikk.** I et Git-repositorium markerer streker ved siden av teksten det som avviker fra siste commit, i begge rutene.
+- **Fra Word og nettet til Markdown.** Lim inn formatert tekst som Markdown og celler fra et regneark som en tabell, og importer hele Word-dokumenter med bildene sine.
+- **Eksport uten tap.** PDF, én enkelt selvstendig HTML-fil eller et Word-dokument med ekte overskrifter, lister, tabeller, fotnoter og bilder. Legg til sidetall, topptekster og en tittelside, eller bruk bedriftens Word-mal.
 - **Native helt inn i margen.** Ekte AppKit-vinduer, faner, menyer, popovere, Versjoner, Lagre automatisk, delingsmenyen, mørk modus, stavekontroll, diktering og VoiceOver. Ingen Electron, ingen nettvisning for selve teksten.
 - **Rask med store filer.** Å gjengi et tastetrykk i et dokument på 10 MB tar rundt 10 ms, før visningens eget arbeid.
 - **Privat og varsom.** Bilder fra nettet lastes først etter at du har tillatt det, lenker til andre apper spør først, og alt som dekoder upålitelige bildedata, kjører i helperprosesser i en sandkasse.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Oppdateringer.** Splat fra diskbildet eller Homebrew holder seg selv oppdatert med [Sparkle](https://sparkle-project.org). Ved andre oppstart spør appen om den én gang om dagen får søke etter oppdateringer på egen hånd. **Splat › Søk etter oppdateringer…** søker med en gang; **Søk etter oppdateringer automatisk** og **Last ned og installer oppdateringer automatisk** i den samme menyen endrer valget ditt senere. Splat installerer en oppdatering bare hvis den har utviklerens signatur. Et bygg du har laget selv, har ingen oppdaterer.
 
-**Fra kildekoden.** Se [Bygging](#bygging) for forutsetningene, og kjør deretter:
+**Fra kildekoden.** Se [Bygging](../../../docs/development.md#building) for forutsetningene, og kjør deretter:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Hvert dokument åpnes i sitt eget vindu, eller som en fane hvis du foretrekker f
 
 - **Til venstre: kildeteksten.** Markdownen din i SF Mono med syntaksfarger.
 - **Til høyre: forhåndsvisningen.** Det gjengitte dokumentet, klart til redigering.
-- **Disposisjonssidefelt (valgfritt).** Alle overskrifter som et tre; et klikk på en av dem viser den i begge rutene. Slå det av og på med **Vis › Vis disposisjon** (⌃⌘S).
+- **Sidefelt (valgfritt).** Alle overskrifter som et tre, et klikk på en av dem viser den i begge rutene: **Vis › Vis disposisjon** (⌃⌘S). To faner til rommer [notatene i mappen](#notater-i-en-mappe) og et søk i dem.
 - **Verktøylinje.** Knapper gruppert etter det de endrer: tegn, avsnitt og innsatte elementer, deretter forhåndsvisning av/på, Del og Nytt dokument. Tilpass den med **Vis › Tilpass verktøylinje…**.
 
 Dra i skillelinjen for å gi den ene siden mer plass. **Vis › Skjul forhåndsvisning** (⌥⌘P) lar bare kildeteksten stå igjen; Splat husker dette per vindu. Begge rutene ruller sammen, og en markering i den ene ruten utheves i den andre.
+
+Hjørnet av vinduet viser ordene og tegnene i teksten og hvor lang tid den tar å lese, og det samme for markeringen så lenge det finnes en. Lenkeadresser, HTML-tagger, metadata, kommentarer, formler og diagrammer teller ikke. **Vis › Skjul antall ord** fjerner visningen.
 
 ### Dokumenter, faner og versjoner
 
@@ -214,7 +216,7 @@ Forhåndsvisningen oppfører seg som et tekstbehandlingsprogram, men alt du gjø
 - **Formler og diagrammer** vises som ferdige grafikker. Klikk på en, flytt markøren til den eller trykk Return på den for å åpne editoren (se [Formler](#formler) og [Diagrammer](#diagrammer)).
 - **Innebygd HTML, innebygde notater og front matter** vises, men du redigerer dem i kildeteksten. Et klikk på dem setter markøren på det tilsvarende stedet der.
 
-Alt Markdown ikke kan uttrykke, er blokkert i forhåndsvisningen: Font- og Farge-panelene, linjalen, og det å lime inn eller slippe formatert tekst og bilder. Innlimt HTML og RTF kommer inn som ren tekst.
+Alt Markdown ikke kan uttrykke, er blokkert i forhåndsvisningen: Font- og Farge-panelene, linjalen, og det å lime inn eller slippe formatert tekst og bilder. Innlimt HTML og RTF kommer inn som ren tekst, med mindre du velger [Lim inn som Markdown](#lime-inn-formatert-tekst).
 
 ### Formateringskommandoer
 
@@ -245,6 +247,21 @@ Understreking, utheving, hevet og senket tekst skrives som `<ins>`, `<mark>`, `<
 - I forhåndsvisningen flytter **Tab** til neste celle, **⇧Tab** til forrige og **Return** til cellen under. Tab i den siste cellen legger til en rad.
 - **Tabell**-menyen setter inn og sletter rader og kolonner og angir justeringen til en kolonne (⌘{, ⌘|, ⌘}).
 - **Tabell › Juster tabellkolonner** fyller kildeteksten med mellomrom slik at kolonnene står på linje.
+
+### Lime inn formatert tekst
+
+**Rediger › Lim inn som Markdown** (⌃⌘V), som også finnes i kontekstmenyen i begge rutene, gjør innholdet på utklippstavlen om til Markdown ved markeringen, som ett angretrinn. ⌘V setter fortsatt inn ren tekst.
+
+- **Fra en nettleser, Word, Google Docs, Confluence, Notater eller Pages:** overskrifter, halvfet, kursiv, understreking, gjennomstreking, hevet og senket tekst, lenker, lister med nestingen sin, sitater, kode og tabeller blir med.
+- **Fra et regneark:** celler blir til en tabell med en overskriftsrad og høyrejusterte tallkolonner. Det samme gjelder tekst atskilt med tabulatorer, semikolon eller komma, hvis hver linje har like mange kolonner.
+- **Bilder** med en nettadresse forblir lenker. Et bilde inne i den innlimte HTML-en blir til en fil ved siden av dokumentet, som må være lagret én gang for dette. Words midlertidige bildefiler blir ikke med, men den alternative teksten deres blir stående.
+- **Lenker** beholder bare `http`, `https`, `mailto`, relative adresser og `#`-adresser; av alle andre lenker blir bare teksten igjen.
+
+### Metadata
+
+**Format › Rediger metadata…** eller et klikk på metadatalinjen øverst i forhåndsvisningen åpner et skjema med feltene i YAML-front matter. Felter kan endres, legges til og fjernes. Et felt med en liste beholder den som liste: verdiene står etter hverandre med komma mellom, og en verdi som inneholder komma, står i anførselstegn. Et nytt felt som heter `tags`, `aliases`, `keywords`, `categories`, `authors` eller `cssclasses`, blir også en liste. Nestede felter og tekst over flere linjer kan ses der og redigeres i kildeteksten.
+
+Det skjemaet endrer, er ett angretrinn og når bare linjene til feltene du har endret: kommentarer, rekkefølgen, uvanlig avstand, anførselstegn og linjeslutt i alle andre forblir byte for byte like. Et dokument uten metadata får en blokk i begynnelsen.
 
 ## Støttet Markdown
 
@@ -315,7 +332,7 @@ Uten et eget anker får hver overskrift et som er avledet av teksten, som på Gi
 - **Wikilenker.** `[[Notat]]` lenker til `Notat.md` i samme mappe eller en mappe under. `[[Notat|Vist tekst]]` viser din egen tekst, og `[[Notat#Overskrift]]` åpner notatet. ⌘-klikk åpner det i Splat.
 - **Innbygginger.** `![[Notat]]` viser det andre notatet inne i dette; notater som er bygd inn i det, vises som lenker. `![[diagram.png]]` viser et bilde. Som i Obsidian navngir innbygginger notater og bilder i dokumentets mappe eller under, aldri med en absolutt sti, og bare Markdown-filer vises som notater.
 - **Kommentarer.** `%%Bare i kildeteksten%%` forblir synlig i kildeteksten og utelates fra forhåndsvisningen og alle eksporter, både i teksten og på egne linjer.
-- **Tagger.** `#idé` eller `#prosjekt/splat` utheves. ⌘-klikk søker etter taggen i dokumentet.
+- **Tagger.** `#idé` eller `#prosjekt/splat` utheves. ⌘-klikk søker etter taggen i dokumentet og, i sidefeltet, i hele mappen.
 - **Sammenleggbare infobokser.** Se [Infobokser](#infobokser).
 
 ### Siteringer og referanser
@@ -439,6 +456,23 @@ I forhåndsvisningen setter et klikk markøren slik at du kan redigere lenketeks
 
 **Sett inn › Innholdsfortegnelse** setter inn en lenket liste over alle overskrifter. Står markøren inni den, oppdaterer den samme kommandoen listen. Disposisjonssidefeltet (⌃⌘S) hopper til en hvilken som helst overskrift i begge rutene.
 
+## Notater i en mappe
+
+Knappene øverst i sidefeltet bytter mellom disposisjonen, filene og et søk.
+
+- **Filer** (**Vis › Vis filer**, ⌃⌘E). Alle Markdown-filer i dokumentets mappe eller, hvis dokumentet ligger i et Git-repositorium, i hele repositoriet. Et klikk eller Return åpner et notat som en fane i dette vinduet; er det allerede åpent, kommer det frem. Knappen ved siden av mappenavnet viser en annen mappe i dette vinduet. Skjulte filer, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` og mapper uten notater holdes utenfor. Et dokument som ligger rett i Hjem-mappen din, viser bare notatene ved siden av seg, slik at Splat ikke går gjennom alle mappene dine og spør om hver av dem.
+- **Søk** (**Rediger › Finn › Søk i alle notater…**, ⇧⌘F). Finner tekst i alle notater, uansett store og små bokstaver og uansett hvordan aksentene er kodet. `#tag` finner en tagg, `#project` også `#project/splat`, og ingenting inne i kode. Et klikk på et treff åpner notatet på det stedet.
+- **Lenker til et notat.** Kontekstmenyen til et notat viser notatene som lenker til det, med wikilenke, innbygging, relativ lenke eller lenkereferansedefinisjon.
+- **Endre navn på et notat.** Samme meny endrer navnet og disse lenkene. Splat sier først hvor mange lenker i hvor mange filer det gjelder. Bare navnet endres i hver lenke, og alle andre byte i filen blir stående. Åpne dokumenter tar imot endringen som et angretrinn; i andre filer er det bare Git eller Versjoner som kan ta den tilbake. En fil som et annet program har endret i mellomtiden, stopper navneendringen for alle lenker, og Splat navngir den.
+
+Listen følger mappen når vinduet kommer frem. Søket ser på filene slik de ligger på disken, og tekst du ennå ikke har lagret, teller fra neste automatiske lagring.
+
+## Endringer siden siste commit
+
+I et dokument i et Git-repositorium markerer streker ved siden av teksten det som avviker fra siste commit, i kildeteksten og i forhåndsvisningen: grønt for tilføyde linjer, blått for endrede linjer og et kort rødt merke der noe er fjernet. De følger med mens du skriver og når grenen flytter seg. **Vis › Endringer siden siste commit** slår dem av for alle vinduer.
+
+Linjer som bare skiller seg i linjeslutten, teller ikke, så en fil med CRLF mot en commit med LF viser ingen endring. En ny fil har ingen merker før sin første commit, og det har heller ikke et dokument over 32 MB.
+
 ## Eksportere, skrive ut og dele
 
 | Format | Slik gjør du det | Det du får |
@@ -451,6 +485,19 @@ I forhåndsvisningen setter et klikk markøren slik at du kan redigere lenketeks
 
 Menyen **Fil › Del** har alle disse på ett sted. Eksportene bruker innstillingen for typografisk tegnsetting og bildene du har tillatt fra nettet; bilder fra nettet forblir lenker i HTML.
 
+**Fil › Eksportvalg…** angir hva PDF, utskrift og Word legger til teksten, for alle dokumenter:
+
+- **Sidetall** i bunnteksten i PDF og utskrift, som `2 / 9`.
+- **Topptekst og bunntekst** for PDF og utskrift. `{title}`, `{author}`, `{date}`, `{page}` og `{pages}` står for verdiene sine, de tre første fra dokumentets metadata.
+- **En tittelside** for PDF, utskrift og Word, med `title`, `subtitle`, `author` og `date` fra metadataene, eller dokumentets navn som tittel. Den har verken topptekst eller bunntekst.
+- **En Word-mal**, en `.docx` eller `.dotx` som eksporten overtar utseendet til: stilene, også med lokaliserte navn, temaet, papirstørrelsen, margene, topptekstene og bunntekstene. En mal som ikke kan leses, stopper eksporten og sier fra om det, i stedet for å gi deg et dokument uten den.
+
+## Importere Word-dokumenter
+
+**Fil › Importer Word-dokument…** spør etter en `.docx`- eller `.dotx`-fil og hvor Markdownen skal, og åpner deretter resultatet. Bilder havner i en mappe ved siden av, oppkalt etter dokumentet med `-images`.
+
+Overskrifter og lister kommer gjennom slik Words stiler og nummerering definerer dem, også i dokumenter der stilene har lokaliserte navn. Halvfet, kursiv, understreking, gjennomstreking, utheving, hevet og senket tekst, lenker, sitater, kode, fotnoter, sluttnoter og tabeller blir med, celler som strekker seg over kolonner, som en HTML-tabell. Formler blir til LaTeX. Sporede endringer regnes som godtatt, og en innholdsfortegnelse holdes utenfor, siden **Sett inn › Innholdsfortegnelse** lager en ny. Gamle `.doc`-filer og passordbeskyttede dokumenter avvises.
+
 ## Utseende og tilgjengelighet
 
 - **Mørk modus** følger systemet. Formler og diagrammer gjengis for hvert utseende.
@@ -459,7 +506,7 @@ Menyen **Fil › Del** har alle disse på ett sted. Eksportene bruker innstillin
 - **Fullskjerm, faner og en verktøylinje som kan tilpasses**, som i alle Mac-apper.
 - **VoiceOver.** Rutene heter «Markdown-kildetekst» og «Forhåndsvisning», formler leses som koden sin og diagrammer som tittelen sin. Hver kommando kan nås fra tastaturet.
 
-Splat har ikke noe innstillingsvindu: de få valgene ligger der de gjelder, i **Vis** og **Rediger › Automatiske endringer**.
+Splat har ikke noe innstillingsvindu: de få valgene ligger der de gjelder, i **Vis**, **Rediger › Automatiske endringer** og **Fil › Eksportvalg…**.
 
 ## Språk
 
@@ -482,6 +529,9 @@ Hebraisk og arabisk tekst leses fra høyre mot venstre overalt der den vises, ua
 | Juster tabellkolonne til venstre, sentrert, til høyre | ⌘{, ⌘\|, ⌘} |
 | Skjul eller vis forhåndsvisningen | ⌥⌘P |
 | Vis eller skjul disposisjonen | ⌃⌘S |
+| Vis eller skjul filene | ⌃⌘E |
+| Søk i alle notater | ⇧⌘F |
+| Lim inn som Markdown | ⌃⌘V |
 | Zoom inn, ut, faktisk størrelse | ⌘+, ⌘−, ⌘0 |
 | Nytt dokument, åpne, lagre, dupliser | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Utskriftsformat, skriv ut | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 - **Bilder fra nettet** lastes først etter at du har gitt tillatelse, bare over `https`, aldri fra verter i det lokale nettverket ditt, på maksimalt 10 MB hver og i en privat økt uten informasjonskapsler.
 - **Isolert dekoding.** Bilder og grafikken til formler og diagrammer dekodes i helperprosesser som lukker alle filer de har arvet og låser seg inn i en sandkasse før de leser den første byten: ingen filtilgang, ingen nettverk. De leverer bare tilbake piksler, hvis størrelse kontrolleres, og stoppes etter 10 sekunder. Apples egne bildedekodere ser bare HEIC, TIFF, AVIF og PDF, og bare når dataene faktisk har det formatet; de kjører i en helper for seg, som i tillegg kan lese systemets fontmapper og bruke systemets videodekoder. SVG-er, formler og diagrammer går også gjennom denne helperen, så de er bilder med fast oppløsning i Splat: fire piksler per punkt, opptil 2560 på den lengste siden.
 - **Lokale filer** når et dokument bare via stien det navngir. Innbygginger viser Markdown-notater fra dokumentets mappe og nedover, og et manglende bilde letes det bare etter der. En bildesti andre steder, absolutt eller som begynner med `~`, lastes fortsatt i forhåndsvisningen; HTML- og Word-eksporter, utskrift og PDF-er tar bare med det som ligger i dokumentets mappe eller Git-repositoriet, med mindre det repositoriet også inneholder Hjem-mappen din, så et dokument fra noen andre ikke kan dra filene dine inn i en eksport du gir videre.
+- **Mapper med notater** leses bare mens sidefeltet viser dem, og å endre navn på et notat endrer andre filer først etter at du har bekreftet hvor mange.
+- **Git-repositorier** leses av Splat selv. Appen kjører aldri programmet `git`, hvis konfigurasjon i et repositorium fra noen andre kan starte andre programmer, og leser ikke mer enn versjonen av det åpne dokumentet i siste commit. Den skriver ingenting der og går ikke ut på nettverket.
+- **Word-dokumenter og innlimt tekst** leses av Splats egne parsere, med grenser for størrelse, nesting og hvor mye en fil kan pakke seg ut. Lenker i dem beholder bare adressene Splat tillater ellers, og navnene på bilder i en Word-fil avgjør aldri hvor de skrives.
 - **Kopier av ulagret tekst** blir på denne Macen, i Bibliotek-mappen din, for gjenopprettingen etter et krasj. De forsvinner ved lagring eller når Splat avsluttes normalt; kopiene et krasj etterlot, blir liggende i gjenopprettingsmappen til du sletter dem.
 - **Lenker** starter aldri et program ved et klikk. Web- og e-postlenker åpnes som vanlig; lenker til andre apper spør først.
 - **HTML i dokumenter** leses av Splats egen parser. Skript, stiler, rammer og skjemaer kjører aldri.
@@ -530,7 +583,7 @@ Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB
 ## Kjente begrensninger
 
 - **Enkelt tilde betyr senket tekst.** `~tekst~` er senket tekst som i Pandoc; gjennomstreking krever `~~to~~`. GitHub stryker også gjennom med én tilde.
-- **Skrivebeskyttet i forhåndsvisningen:** innebygd HTML, innebygde notater og front matter redigeres i kildeteksten.
+- **Skrivebeskyttet i forhåndsvisningen:** innebygd HTML og innebygde notater redigeres i kildeteksten, front matter i skjemaet sitt eller i kildeteksten.
 - **Svært dyp nesting:** HTML som er nestet dypere enn 64 nivåer, og HTML i teksten dypere enn 16, viker for innholdet sitt.
 - **Sammenslåtte tabellceller** finnes bare i HTML-tabeller, og bare på tvers av kolonner (`colspan`, ingen `rowspan`). MultiMarkdowns tabellsyntaks for sammenslåtte celler støttes ikke.
 - **Bibliografier** leses bare fra BibTeX, ikke fra CSL JSON eller YAML.
@@ -538,6 +591,11 @@ Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB
 - **Typografisk tegnsetting:** et tysk avsluttende enkelt anførselstegn kan ikke skilles fra en apostrof og settes som ’.
 - **Formler, ikke dokumenter:** ingen LaTeX-pakker, TikZ eller fullstendige dokumenter.
 - **Den visuelle formelredigereren** skriver LaTeX i MathLives notasjon: mellomrom forsvinner (`E = mc^2` blir til `E=mc^2`), gjengivelsen forblir den samme.
+- **Antall ord:** thai, lao, khmer og burmesisk skrives uten mellomrom og telles per tekststykke, ikke per ord. `3.14` og `snake_case` er to ord hver.
+- **Å endre navn på et notat** endrer ikke lenker i innebygd HTML, og en wikilenke forblir som den er hvis det nye navnet inneholder `#`, `|`, `^`, `[`, `]` eller `\`.
+- **Endringsmerker** leser repositorier med SHA-1-objekter og vanlige eller pakkede referanser; et med SHA-256 eller reftable viser ingen. En fil under et Git-filter som LFS sammenlignes med det filteret har lagret.
+- **Word-import** tar ikke med tekst i topptekster, bunntekster og kommentarer, og bilder som `.emz` eller SVG beholder bare den alternative teksten.
+- **Lim inn som Markdown** leser RTF som vestlig tekst og henter overskrifter der bare fra skriftstørrelser. De fleste programmer tilbyr også HTML, som den foretrekker.
 - **Av prinsipp:** ingen linjenumre, ikke noe innstillingsvindu, ingen Help Book, ikke i App Store.
 - **Mindre testet på Intel.** Vindusselvtestene kjører bare på Apple Silicon; på Intel kjører CI `cargo test`.
 
@@ -561,190 +619,7 @@ Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB
 
 ## For utviklere
 
-Splat er et Rust-program som snakker direkte med AppKit og WebKit gjennom [objc2](https://github.com/madsmtm/objc2). Det finnes ingen Swift, ingen Objective-C, ingen Xcode-prosjekter og ingen Interface Builder-filer.
-
-### Bygging
-
-Forutsetninger:
-
-- macOS med Command Line Tools (`xcode-select --install`). Xcode trengs ikke; Splat bygges uten `actool`, `ibtool` og `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) navngir den nøyaktige versjonen CI bruker; rustup installerer den av seg selv, mens Homebrews Rust ignorerer filen. Å heve den der er måten nye kompilator- og clippy-advarsler når prosjektet på.
-- rustup, for `make lint`, `make check` og `make universal`: `cargo xtask check-library` bygger biblioteket for Linux for å vise at det ikke trenger macOS, og Homebrews Rust har ingen andre mål.
-
-[Makefile](../../../Makefile) inneholder korte inngangspunkter; `make help` lister dem alle:
-
-```sh
-make build                  # target/release/Splat.app, samme som cargo xtask bundle --release
-make universal              # target/splat-universal for Apple Silicon og Intel, slik diskbildet har det
-make check                  # formatering, clippy uten advarsler, alle tester, medfølgende biblioteker; det CI kjører
-make test                   # make check, deretter selvtesten uten vindu
-make test-gui               # selvtester med vindu; de opptar Macen i omtrent fire minutter
-make test-long              # lengre tilfeldig søk og kontrollen av 10 MB delvis oppdatering
-make fuzz                   # tilfeldig inndata for delvis parsing og alle utdata
-make coverage               # linjedekning for alle tester og selvtester, med en nedre grense per modul
-make coverage-library       # de samme grensene for modulene uten vindu, som i CI
-make bench FILE=<file.md>   # tidtaking for åpning, skriving og rulling i en stor fil
-make release                # først make test, deretter det notariserte diskbildet
-```
-
-Selve byggelogikken ligger i Rust-craten [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signert med "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, en egen app som aldri åpner Markdown-filer
-cargo xtask dmg                # dist/Splat-<version>.dmg for distribusjon, Developer ID, notarisert
-cargo xtask icon               # bygg assets/AppIcon.icns og README-ikonet på nytt fra assets/icon-1024.png
-cargo xtask vendor check       # kontroller det medfølgende JavaScript mot vendor.lock
-cargo xtask vendor fetch       # last det ned på nytt etter at en versjon i vendor.lock er endret
-```
-
-`bundle` skriver `Info.plist`, kopierer ressursene og lokaliseringene og signerer appen med sertifikatet «Splat Local Signing». Det første bygget lager sertifikatet i påloggingsnøkkelringen din, gyldig i 20 år. Så lenge det blir der, beholder Splat de nylige dokumentene og mappetillatelsene sine på tvers av nye bygg; med en ad hoc-signatur ville hvert bygg vært en ny app for macOS. Debug- og selvtestbygg har egne bundle-ID-er (`local.splat.debug`, `local.splat.selftest`) og registrerer seg ikke for Markdown-filer, så Finder aldri åpner et dokument i et utdatert bygg, og de lar innstillingene til den vanlige appen være i fred.
-
-Versjonen ligger i [VERSION](../../../VERSION) som `major.minor.build` og er den neste bygget får. Hvert vellykkede release-bygg (`make build`, `cargo xtask bundle --release`, `make release`) øker build-nummeret med én; debug- og selvtestbygg lar det stå. Major og minor økes for hånd: sett VERSION til for eksempel `1.1.0`, så får neste bygg akkurat det.
-
-### Distribusjon
-
-`cargo xtask dmg` (eller `make release`, som kjører `make test` først) bygger en release, signerer den med Developer ID-en din, notariserer appen hos Apple og hefter på billetten, pakker den i et komprimert, skrivebeskyttet diskbilde med en lenke til Apper, notariserer og hefter også på diskbildet og kontrollerer resultatet med Gatekeeper. Appen bærer sin egen billett, slik at en kopi som er installert uten Finder, slik Homebrew gjør det, også åpnes uten nett ved første oppstart; de to rundene med notartjenesten tar noen minutter hver. Bare et bilde som har bestått alle trinn, blir til `dist/Splat-<version>.dmg`, kopien som sjekkes inn, og build-nummeret går opp. Det forrige bildet blir liggende én utgivelse til, siden GitHubs raw-server kan levere den gamle oppdateringsfeeden i noen minutter etter en push; eldre bilder flyttes til papirkurven. En mislykket kjøring lar `dist/` og VERSION stå som de var.
-Hver utgivelse legger til hele bildet, rundt 16 MB, i historikken til repositoriet. Det kjører bare når det kalles, aldri som del av et vanlig bygg, og krever:
-
-- et «Developer ID Application»-sertifikat i nøkkelringen
-- en lagret pålogging til Apples notartjeneste med et appspesifikt passord, opprettet én gang med `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- den private nøkkelen som signerer oppdateringer, i påloggingsnøkkelringen. Sparkles `generate_keys` opprettet den; den offentlige halvdelen er `UPDATE_KEY` i [xtask/src/main.rs](../../../xtask/src/main.rs) og inne i hver installert kopi, som bare godtar oppdateringer signert med den. Ta en sikkerhetskopi i en passordbehandler: `target/sparkle-2.10.1/bin/generate_keys -x <file>` eksporterer den, `-f <file>` importerer den på en annen Mac. Uten den kan installerte kopier aldri oppdateres igjen.
-- rustup (`brew install rustup`, som lar Homebrews Rust stå)
-- `RELEASE_NOTES.md` med det denne utgivelsen bringer. Oppdateringsdialogen viser den over en linje om hvordan man rapporterer et problem, så `dmg` stopper hvis filen er tom eller fortsatt inneholder notatene fra forrige utgivelse
-
-Mangler noe av dette, stopper `dmg` før bygging. Ved første kjøring spør macOS om Terminal får styre Finder; uten den tillatelsen viser diskbildet verken bakgrunnen eller ikonplasseringen sin.
-
-Bare diskbildet har oppdatereren, [Sparkle](https://sparkle-project.org), som bygget laster ned én gang til `target/` fra GitHub-utgivelsen og kontrollerer mot sjekksummen i xtask. Hardened runtime laster rammeverket bare når det bærer appens Team ID, som Developer ID-signaturen har og det lokale sertifikatet mangler; og en oppdatering må ikke erstatte et bygg du har laget selv. Selvtestbygget har også Sparkle, for å kontrollere oppdateringsmenyen mot det: med en feed som ikke finnes, uten Sparkles spørsmål ved andre oppstart og med en entitlement som lar den lokalt signerte appen laste rammeverket. `dmg` signerer det nye bildet med oppdateringsnøkkelen og skriver `dist/appcast.xml`, feeden installerte kopier leser fra GitHub. Sjekk inn og push bildet og feeden sammen: fra da av tilbyr installerte kopier oppdateringen. Nedlastingslenkene i denne README-filen og oversettelsene av den peker til `Splat.dmg` i den nyeste GitHub-utgivelsen, så hver utgivelse har en kopi med det navnet: `cp dist/Splat-<version>.dmg target/Splat.dmg`, deretter `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Diskbildet er en universell binærfil for Apple Silicon og Intel; andre bygg er bare for vertsprosessoren. Homebrews Rust leveres med standardbiblioteket bare for vertsprosessoren, så `dmg` bygger gjennom rustup, som ved første bruk installerer verktøykjeden og målene fra [rust-toolchain.toml](../../../rust-toolchain.toml), og stopper hvis programmet eller Sparkle mangler koden for en av prosessorene. `make universal` bygger bare programmet.
-Appen i det har en annen signatur enn et lokalt bygg, så macOS fører separate nylige dokumenter og mappetillatelser for de to.
-
-### Testing
-
-| Kommando | Kontrollerer |
-|---|---|
-| `cargo test --release` | enhetstester, tilfeldighetstester og oversettelsestester |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | et lengre tilfeldig søk; `SPLAT_FUZZ_SEED` varierer inndataene |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | ett språk, mens andre er ufullstendige |
-| `cargo clippy --release --all-targets [--features selftest]` | lint, inkludert begrunnelsen for hver `unsafe`-blokk, lengden på funksjoner og, i biblioteket, tallkonverteringer |
-| `cargo xtask check-library` | biblioteket bygger for Linux, så ingenting i det trenger macOS |
-| `cargo xtask vendor check` | JavaScript-bibliotekene stemmer byte for byte med `vendor.lock` |
-| `cargo xtask selftest probe` | uten vindu, hver med forventet resultat: formler, diagrammer, nettbilder mot en server inne i prosessen, blokkerte adresser, teksten hver kommando skriver, hvert bildeformat gjennom begge eksportene, en side som slutter å svare, og forsvaret til nettvisningene mot en side uten det. Tar omtrent et halvt minutt. Det som trenger appen foran seg, hoppes over på en låst skjerm |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | den kjørende appen, klikk for klikk. Åpner et vindu og skriver inn i det; Macen er opptatt i omtrent fire minutter. `--scenarios` kjører bare den andre delen, på rundt halvannet minutt. `--only` kjører én gruppe av den delen, i sitt eget dokument, også på en låst skjerm. `--in-back` utelater det som trenger appen foran; uten det feiler en slik sjekk |
-| `cargo xtask selftest resize` | gjør vinduet bredere etter at skillelinjen er flyttet: kildeteksten brytes om mens vinduet endrer størrelse. Tar rundt ti sekunder |
-| `cargo xtask selftest typing [--by-hand]` | skriver gjennom lagringer, med taster via appens hendelseskø eller, med `--by-hand`, for hånd: det som skrives, blir stående og vises som ulagret. Tar omtrent ett minutt |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | tidtaking for åpning, skriving og rulling i en stor fil; `--keystroke-ms` feiler når det raskeste tastetrykket tar lengre tid |
-| `cargo test --release -- --ignored partial_updates` | et tastetrykk i 10 MB: delvis mot full oppdatering, samme resultat på høyst en fjerdedel av tiden |
-| `cargo test --release --test hostile` | dokumenter bygd for å fylle opp stakken eller ta kvadratisk tid, hvert i to størrelser der tidene må vokse som teksten, gjennom tolking, utlegging, begge eksportene, tastetrykk og kommandoer |
-| `make mutants` | feil som bygges inn i `crates/splat-markdown`, `crates/splat-preview` og `crates/splat-file-state` én etter én, gjennom [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); sier hvilke ingen test merker. Tar timer; `FILE=crates/splat-preview/src/bridge/mod.rs` snevrer det inn |
-| `make fuzz` | tilfeldig inndata gjennom [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), som trenger rustups nightly: tastetrykk som må leses som en full parsing, alle utdata, redigeringer i forhåndsvisningen, alle kommandoer og en fil som lagres slik den ble åpnet. `SECONDS=600` søker lenger |
-| `cargo test --release --test fuzz_seeds` | frøene i `fuzz/seeds/` gjennom kontrollene til disse fuzz-målene, uten fuzzer; en del av hver `cargo test` |
-| `cargo test --profile checked --workspace` | testene med det en feilsøkingsbygg sjekker i tillegg: etter hver delvise parsing passer blokkene til teksten, og det den bærer videre er det teksten sier. Del av `make test-long` |
-| `cargo test --release --test entry_points --test structure` | fra kildene: alt systemet kaller er beskyttet mot panics, og moduler avhenger bare nedover |
-| `cargo test --release --test decoder` | dekoderprosessen dekoder bilder og når verken filer eller nettverket |
-| `make coverage` | linjedekning for `cargo test` og alle selvtester, gjennom [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); feiler under grensene. Opptar Macen i omtrent fem minutter |
-| `make coverage-library` | cratene `splat-markdown`, `splat-preview`, `splat-file-state` og `splat-i18n` mot de høyere grensene sine, målt av `cargo test` alene |
-
-Enhetstester ligger ved siden av koden de tester. `crates/splat-testkit/tests/` inneholder det som når modellen og forhåndsvisningen utenfra: tilfeldighetstestene i `robustness.rs`, som deler generatoren i `splat-testkit` med dem i `sync.rs`, dokumentene som er bygd for å skade i `hostile.rs`, og frøene til fuzz-målene i `fuzz_seeds.rs`. `tests/` inneholder det som ser på hele programmet: kildene, oversettelsene og dekodertesten, som starter det bygde programmet. Beslutninger i `src/editor/` som ikke trenger noe vindu, ligger i frie funksjoner med egne tester: alt kontrolleren vet og hvordan det endrer seg i `state.rs`, reglene for gjengivelse i `render_queue.rs`, tekstkopien i `sync.rs`, avsnittsstiler, skrifter og farger som verdier i `render.rs`, hva verktøylinjens identifikatorer står for i `toolbar.rs`, hva et klikk på en lenke betyr i `navigation.rs`.
-
-Et trinn i vindusselvtesten venter på en navngitt betingelse, ikke på en tid; bare det som ikke gir noe signal, som at noe uteblir, beholder en pause med begrunnelsen sin. Å vente forgjeves er en mislykket kontroll som navngir det som aldri kom, et trinn som går i panikk er også en mislykket kontroll, og kjøringen fortsetter i begge tilfeller. En kontroll som ikke kan si noe i denne kjøringen, melder `SELFTEST SKIP`: xtask lister den, og den verken består eller feiler. xtask holder hver modus, og `--scenarios` for seg, til omtrent ni tiendedeler av kontrollene sine. Vindusselvtesten kjører en andre del etter den første klikkrunden, i `src/editor/selftest/scenarios.rs`: hver formaterings- og tabellkommando, dialogene, lenkeklikk, innliming, slipping, eksporter, en fil som et annet program har endret, en stor endring, bilder som endres på disken, minnepress, et enormt dokument og gjenopprettingen etter et krasj. Hver gruppe i den åpner sitt eget dokument, slik at en feil i én ikke når den neste, og hver kan kjøre alene med `--only`. Selvtesten uten vindu ødelegger også lagringen med vilje: en mappe som ikke tar imot noe, en skrivebeskyttet fil, en mappe som er borte, en full disk og en panic i hver callback under en lagring, og ingenting av dette får koste tekst.
-
-Dekningen har to grenser: hver modul minst 84 % av linjene sine, alle moduler til sammen minst 96 %. `make coverage` måler `cargo test` sammen med selvtestene og feiler under begge; `make coverage-library` holder det som ikke trenger noe vindu, til 90 % og 97 %. Grensene og de få unntakene, som panikk-hooken i `main.rs` som bare kjører ved et krasj, står i [xtask](../../../xtask/src/coverage.rs) ved siden av begrunnelsene sine. Målte bygg går til `target/coverage/`, så målekode når aldri `target/release/` eller et diskbilde. Dekoderhelperen åpner målefilen sin før den låser seg inne, så den måles også.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) kjører `make check`, `make coverage-library` og det universelle bygget på Apple Silicon og `cargo test` på Intel for hver push til `main` og hver pull request. Hver natt kjører [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) `make test-long` med nye tilfeldige inndata. Selvtestene og diskbildet blir på utviklerens Mac: de trenger en skjerm og signeringssertifikatene i nøkkelringen.
-
-Selvtestresultatene går til `target/selftest/`. Selvtesten bygger en egen app (`target/release/Splat Selftest.app`, bundle-ID `local.splat.selftest`) og lar innstillingene, de nylige dokumentene og filtilknytningene til den vanlige appen være urørt.
-
-### Prosjektstruktur
-
-Alt som ikke trenger noe vindu, er en egen crate under `crates/`, som bygger uten macOS, så kompilatoren holder fast ved hvordan de avhenger av hverandre. Appen i `src/` (pakken `splat-app`, programmet `splat`) bygger på dem.
-
-- `crates/splat-markdown/`: treet som alle brukere leser, `Doc` i `doc/`, som eier sin egen tekst, og den eneste bindingen til parseren i `reader/`: comrak nevnes ingen andre steder, og `reader/assumptions.rs` rommer det koden antar om den. Syntaksfarger, og alle kommandoer som rene tekstendringer (`Edit`) i `commands/`. Også ny tolking etter en redigering (`incremental.rs`), leseren for innebygd HTML (`markup.rs`), typografi, tagger, referanser og siteringer i løpende tekst (`typography.rs`), hvordan tekst ser ut og hvilken Markdown og HTML som gir det (`style.rs`), hva en adresse kan være (`url.rs`), og HTML- og Word-eksporten (`html.rs`, `docx.rs` med `docx/html.rs` og `docx/xml.rs`). En posisjon har sin egen type: `Byte` i kildeteksten, `U16` i kildevisningen, `Shown` i forhåndsvisningen (`text.rs`).
-- `crates/splat-preview/`: utleggingen av forhåndsvisningen i `layout/`, med innebygd HTML i `layout/html.rs`, og koblingen mellom forhåndsvisning og kildetekst (`Bridge`, `Index`). En `Bridge` avviser en utlegging av en annen versjon av `Doc`.
-- `crates/splat-file-state/`: hvilken tekst en fil inneholder, i hvilket format, og hva en titt på den betyr.
-- `crates/splat-i18n/` med `resources/*.lproj`: 35 språk; nøklene er de tyske tekstene, og appen installerer tabellen for grensesnittspråket ved oppstart.
-- `crates/splat-testkit/`: generatoren for tilfeldighetstestene og kontrollene til fuzz-målene.
-- `src/editor/`: vinduet. Ett `EditorController`-objekt betjener AppKit som delegat for begge visningene og videresender til komponenter, små structer over kontrolleren og tilstanden de eier, hvis felter de andre modulene ikke kan nå:
-
-| Modul | Ansvar |
-|---|---|
-| `controller.rs` | klasse, delegatmetoder som videresender, `invalidate` og det resten av programmet forteller en editor; bare den når komponentene |
-| `panes.rs` | `Panes`: tekstvisningene, disposisjonen, å vise og skjule panelene, og det som gir tilgang til visningene |
-| `controller/layers.rs` | hvem som kan nå hvem: en komponent får et håndtak til kontrolleren som tilbyr det som ligger under den, og kompilatoren holder fast ved det |
-| `state.rs` | det kontrolleren vet om dokumentet og alle måter det endrer seg på; feltene er private, og den rører ingen visning |
-| `model.rs` | låner ut tilstanden og tekstkopien til closures som ikke kan nå en visning |
-| `actions.rs` | kommandoregister: selector, tittel, hurtigtast, symbol, når kommandoen gjelder |
-| `editing.rs` | `Editing`: kjøring og validering av kommandoer, skriving i forhåndsvisningen |
-| `update.rs` | `Updater`: tolking, fargelegging, oppdatering av forhåndsvisningen; etter en redigering bare de berørte avsnittene |
-| `sync.rs` | tekstkopi og blokkbokføring, uten AppKit og med tilfeldighetstester |
-| `progressive.rs` | `Progressive`: trinnvis gjengivelse av store forhåndsvisninger |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: markering og rulleposisjon i begge rutene i takt |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: formel- og diagramredigereren |
-| `navigation.rs`, `links.rs` | `Links`: lenker, wikilenker, tagger, oppgavebokser, sammenfolding, fotnoter |
-| `env.rs` | det forhåndsvisningen leser utenfra teksten: typografisk tegnsetting, repositoriet for `@name` og `#12`, BibTeX-filen, innebygde notater |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | forhåndsvisningstekst, lokale og eksterne bilder; `Pictures` i `images.rs` |
-| `attributes.rs` | tekstattributter; hver nøkkel får bare en verdi av den typen den forventer |
-| `shadow.rs` | kopier av ulagret tekst for gjenopprettingen etter et krasj |
-| `decoder.rs` | helperprosesser i sandkasse som dekoder bilder og grafikk |
-| `export.rs`, `outline.rs` | `Sharing`: HTML- og Word-eksport, delingsfilen, utskrift; disposisjonssidefeltet |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML og den visuelle formelredigereren; reglene for hva som gjengis når, atskilt fra WebKit |
-| `webkit.rs` | kall inn i WebKit; bare levetiden til navigasjonsdelegaten blir hos `js.rs` og `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | bygging av vinduet, verktøylinje, tekstvisninger, dialoger, farger |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: menylinje, app-delegat, dokument (`MDDocument`, en underklasse av `NSDocument`).
-- `src/util/`: arbeidstråder (`lanes.rs`), volumer som kan slutte å svare (`volumes.rs`), AppKit-hjelpere, filer og prosesser. `src/diag.rs`: det som går galt utenfor brukerens syn, går til systemloggen, uten noen tekst fra et dokument.
-- `src/large_alloc.rs`: store allokeringer kommer rett fra kjernen og går tilbake til den når de frigjøres, så minnet kommer tilbake etter store redigeringer.
-- `resources/js/`: nettsider og biblioteker; versjoner og sjekksummer i [vendor.lock](../../../vendor.lock).
-- `xtask/`: bunting, signering, diskbildet, ikonet, vendoring, selvtestkjøreren og dekningsgrensene.
-
-### Dataflyt
-
-Kildeteksten i den venstre tekstvisningen er den eneste sannhetskilden.
-
-1. Hver tegnendring der oppdaterer tekstkopien (`Snapshot`) på stedet, uten å lese teksten på nytt.
-2. En oppdatering tolker kopien, fargelegger kildeteksten på nytt bare der fargene har endret seg, legger ut forhåndsvisningen og erstatter bare blokkene hvis innhold har endret seg.
-3. Etter en redigering blir bare de berørte avsnittene tolket, fargelagt og lagt ut på nytt, så lenge naboene deres forblir like; [docs/partial-parse.md](../../../docs/partial-parse.md) sier hvorfor det gir det samme som en full parsing, og hva man må se på når comrak endres. Dokumenter med `%%`-kommentarblokker, endringer i front matter og, i et dokument med lenkereferansedefinisjoner, endringer i en del som inneholder en hakeparentes behandles i sin helhet. comrak gjenkjenner en fotnotereferanse bare med definisjonen i samme tolking og flytter definisjoner bak teksten, så delen tolkes med en stedfortredende definisjon per etikett og henter numrene sine fra det gamle treet; en endring i referansene eller definisjonene i delen, eller ved siden av en fotnote i teksten, behandles i sin helhet.
-4. HTML-blokker som åpner `<details>` eller `<div align>` og lukker det senere, påvirker Markdown-blokkene imellom; en gjenbrukt blokk må ha de samme omgivelsene.
-5. Mens du skriver i kildeteksten til et dokument på opptil 2 MB, kjører den delvise oppdateringen umiddelbart; når den ikke kan brukes, eller i et større dokument, kjører tolking og utlegging i bakgrunnen. Mens du skriver i forhåndsvisningen, kjører de umiddelbart, fordi markøren i forhåndsvisningen avhenger av resultatet.
-6. Inndata i forhåndsvisningen oversettes av `Bridge` til en redigering av kildeteksten og tar den samme veien derfra. Markdown har for mange måter å gjøre tekst om til syntaks på til at regler alene rekker, så `preview/verify.rs` tolker den endrede delen på nytt og sammenligner det den viser, med det som ble skrevet; en redigering som ikke holder, escapes videre eller avvises.
-7. comraks posisjoner i teksten blir feil noen få steder, for eksempel bak en lenkereferansedefinisjon. `reader/positions.rs` kontrollerer dem mot kildeteksten når en blokk leses, og leser dem på nytt fra kildeteksten der de ikke passer.
-
-### Regler i kontrolleren
-
-1. Kontrollerens egne endringer i visningene kjører inne i `Panes::silently`; delegatkallene ignorerer dem. Alle andre steder kan visningene bare leses, så kompilatoren sjekker dette. Det callbackene skal høre, eller det som gir en visning til AppKit, sier fra om det ved å gå gjennom `Panes::for_appkit`.
-2. Tilstanden lånes bare til å lese og beregne, aldri over et kall som endrer, legger ut eller ruller en visning: `Model` låner den ut til `Send`-closures, og ingen visning er `Send`, så kompilatoren sjekker dette. Den endres bare gjennom sine egne metoder, hvis tester ikke trenger noe vindu.
-3. Meldinger utenfra (et bilde er lastet, en formel er gjengitt) kommer forsinket gjennom `renders_arrived` og `image_arrived`, aldri midt i en oppdatering.
-4. Ny tegning uten tekstendring går bare gjennom `invalidate(reason)`.
-5. Tekstkopien holdes ikke over en endring av kildeteksten, ellers kopierer endringen hele teksten: `with_text` låner den ut bare så lenge en `Send`-closure varer.
-6. En ny kommando trenger en oppføring i `actions.rs`, en metode i `controller.rs` og en gren i `Editing::perform`.
-7. Hver `unsafe`-blokk har begrunnelsen sin som en `// SAFETY:`-kommentar. Byte når systemets bildedekodere bare i hjelpeprosessen, gjennom `decoder::decode_native`; en test skanner kildene etter andre kall.
-8. Ingenting på hovedtråden venter på brukerens mapper, siden et nettverksvolum kan slutte å svare: filer undersøkes på tråden `DISK`, og forhåndsvisningen leser svarene gjennom `Env::known`. Bare en handling brukeren venter på, som en eksport eller lagring, kan berøre disken direkte.
-9. Det som må ta slutt, tar også slutt etter en panic, siden hovedtråden overlever en: et hevet flagg går gjennom `with_raised`, en redigering av tekstlageret gjennom `editing`, og det angre ikke skal vite om gjennom `without_undo`. En test finner de som er skrevet for hånd.
-10. En adresse i et dokument har én lesning, i `splat_markdown::url`; en test finner skjemaer som sammenlignes for hånd.
-
-### Legge til en kommando
-
-Menylinjen, verktøylinjen og kontekstmenyen bygger alle sine valg fra registeret i [src/editor/actions.rs](../../../src/editor/actions.rs), og menyvalideringen leser der når en kommando gjelder og om den viser et hakemerke. En ny kommando trenger:
-
-1. en variant av `Action` med sin `Spec`: selector, tittel, verktøylinjeetikett, verktøytips (som begynner med et verb, på høyst 75 tegn), hurtigtast, SF-symbol og når den gjelder
-2. metoden i `src/editor/controller.rs`
-3. en gren i `Editing::perform`
-4. tekstene sine i hver `Localizable.strings`
-
-Testen `every_command_has_a_method_and_every_method_a_command` kontrollerer at register og metoder stemmer overens. Apples standard hurtigtaster som ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F og ⌘, forblir urørt.
-
-### Oversettelser
-
-Koden bruker den tyske teksten som nøkkel: `t("Fett")` slår den opp ved kjøring, `n("Fett")` markerer en konstant for senere oppslag. Hver `resources/<language>.lproj/` inneholder:
-
-- `Localizable.strings`: hver grensesnitttekst, menybegreper etter Apples egne ordlister
-- `InfoPlist.strings`: navnene macOS viser for appen og dokumenttypen den har
-- `QuickReference.md`: Markdown-hurtigreferansen
-
-`cargo xtask bundle` lister hver `.lproj`-mappe som en lokalisering, og `CFBundleDevelopmentRegion` er engelsk, så systemmenyene og lagringsdialogen følger det samme språket. i18n-testen kontrollerer at hvert språk har hver tekst, og at hver hurtigreferanse har den samme disposisjonen som den tyske.
-
-`assets/readme/<language>/` inneholder denne README-filen på det språket, skjermbildet og demodokumentet skjermbildet viser. En endring i denne README-filen hører hjemme i disse kopiene også.
+Bygging, testing, oppbygningen av koden og reglene den følger er beskrevet i [docs/development.md](../../../docs/development.md) (på engelsk).
 
 ### Tredjepartskomponenter
 
@@ -757,6 +632,10 @@ Koden bruker den tyske teksten som nøkkel: `t("Fett")` slår den opp ved kjøri
 | [image](https://github.com/image-rs/image) | 0.25 | dekoding av PNG, JPEG, GIF, WebP og BMP | MIT eller Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | justering av tabellkolonner | MIT eller Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | navnene på HTML-tegnreferanser | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | utpakking av Word-filer og Git-objekter | MIT, Zlib eller Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | lesing av XML-en i Word-filer | MIT eller Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | navn og søk på tvers av sammensatte og oppdelte bokstaver | MIT eller Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | holder tekst som ligner `:shortcode:`, bokstavelig i importert tekst | MIT eller Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | gjengivelse av formler | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuell formelredigerer, med KaTeX-fonter | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-diagrammer | MIT |

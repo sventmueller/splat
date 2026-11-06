@@ -5,8 +5,10 @@ mod editor;
 mod feedback;
 mod large_alloc;
 mod menu;
+mod test_hooks;
 mod updates;
 mod util;
+mod word_import;
 
 use objc2::runtime::ProtocolObject;
 use objc2::{ClassType, MainThreadMarker};

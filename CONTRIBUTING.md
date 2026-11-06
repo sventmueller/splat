@@ -10,9 +10,9 @@ Small fixes can go straight to a pull request. For anything larger, describe the
 [Discussions](https://github.com/sventmueller/splat/discussions/new?category=ideas) first, so that no work goes into a
 change Splat will not take.
 
-- [For developers](README.md#for-developers) explains how to build and test Splat.
+- [docs/development.md](docs/development.md) explains how to build and test Splat.
 - `make check` must pass. It covers formatting, clippy without warnings, all tests and the vendored libraries.
-- New interface texts need a translation in every language, see [Translations](README.md#translations). The tests fail
+- New interface texts need a translation in every language, see [Translations](docs/development.md#translations). The tests fail
   without them.
 - Keep to one change per pull request.
 

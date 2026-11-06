@@ -1,12 +1,18 @@
+use std::cell::RefCell;
+use std::path::{Path, PathBuf};
+
 use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::{MainThreadMarker, MainThreadOnly};
+use objc2::runtime::AnyObject;
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
-    NSAlert, NSAlertFirstButtonReturn, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSTextField, NSView, NSWindow,
+    NSAlert, NSAlertFirstButtonReturn, NSButton, NSControlStateValueOff, NSControlStateValueOn, NSModalResponse,
+    NSModalResponseOK, NSOpenPanel, NSTextField, NSView, NSWindow,
 };
-use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSURL};
+use objc2_foundation::{NSArray, NSObjectProtocol, NSPoint, NSRect, NSSize, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 
+use super::export_options::ExportOptions;
 use crate::i18n::t;
 use crate::util::{guarded, ns};
 
@@ -154,6 +160,194 @@ pub fn table(window: &NSWindow, done: impl Fn(usize, usize) + 'static) {
             if response == NSAlertFirstButtonReturn {
                 let (r, c) = table_size(rows.integerValue(), cols.integerValue());
                 done(r, c);
+            }
+        });
+    });
+    a.beginSheetModalForWindow_completionHandler(window, Some(&handler));
+}
+
+/// Asks for a note's new name; `done` receives what was typed.
+pub fn rename(window: &NSWindow, name: &str, done: impl Fn(String) + 'static) {
+    let mtm = window.mtm();
+    let field = field(mtm, name, "");
+    let view = form(mtm, &[(t("Name:"), &field)]);
+    let a = NSAlert::new(mtm);
+    a.setMessageText(&ns(t("Notiz umbenennen")));
+    a.addButtonWithTitle(&ns(t("Umbenennen")));
+    a.addButtonWithTitle(&ns(t("Abbrechen")))
+        .setKeyEquivalent(&ns("\u{1b}"));
+    a.setAccessoryView(Some(&view));
+    a.layout();
+    a.window().setInitialFirstResponder(Some(&field));
+    let handler = RcBlock::new(move |response: NSModalResponse| {
+        guarded((), || {
+            if response == NSAlertFirstButtonReturn {
+                done(field.stringValue().to_string());
+            }
+        });
+    });
+    a.beginSheetModalForWindow_completionHandler(window, Some(&handler));
+}
+
+pub struct OptionIvars {
+    template: RefCell<Option<PathBuf>>,
+    label: Retained<NSTextField>,
+}
+
+define_class!(
+    #[unsafe(super(objc2::runtime::NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MDExportOptionsForm"]
+    #[ivars = OptionIvars]
+    pub struct OptionsForm;
+
+    unsafe impl NSObjectProtocol for OptionsForm {}
+
+    impl OptionsForm {
+        #[unsafe(method(optionsChooseTemplate:))]
+        fn choose_template(&self, _sender: Option<&AnyObject>) {
+            guarded((), || {
+                let panel = NSOpenPanel::openPanel(self.mtm());
+                panel.setCanChooseFiles(true);
+                panel.setCanChooseDirectories(false);
+                panel.setAllowsMultipleSelection(false);
+                let kinds: Vec<Retained<UTType>> = ["docx", "dotx"]
+                    .iter()
+                    .filter_map(|extension| UTType::typeWithFilenameExtension(&ns(extension)))
+                    .collect();
+                panel.setAllowedContentTypes(&NSArray::from_retained_slice(&kinds));
+                if panel.runModal() == NSModalResponseOK
+                    && let Some(path) = panel.URL().and_then(|u| u.path())
+                {
+                    self.show_template(Some(PathBuf::from(path.to_string())));
+                }
+            });
+        }
+
+        #[unsafe(method(optionsClearTemplate:))]
+        fn clear_template(&self, _sender: Option<&AnyObject>) {
+            guarded((), || self.show_template(None));
+        }
+    }
+);
+
+impl OptionsForm {
+    fn show_template(&self, template: Option<PathBuf>) {
+        let shown = template
+            .as_deref()
+            .and_then(Path::file_name)
+            .map_or_else(|| t("Keine").to_string(), |name| name.to_string_lossy().into_owned());
+        self.ivars().label.setStringValue(&ns(&shown));
+        self.ivars()
+            .label
+            .setToolTip(template.as_deref().and_then(Path::to_str).map(ns).as_deref());
+        *self.ivars().template.borrow_mut() = template;
+    }
+}
+
+/// Asks what exports add to the text; `done` receives the options when the user confirms.
+pub fn export_options(window: &NSWindow, current: ExportOptions, done: impl Fn(ExportOptions) + 'static) {
+    let mtm = window.mtm();
+    let check = |title: &str, on: bool| {
+        // SAFETY: Without a target and an action the box only holds its state, which is read when the sheet ends.
+        let b = unsafe { NSButton::checkboxWithTitle_target_action(&ns(title), None, None, mtm) };
+        b.setState(if on {
+            NSControlStateValueOn
+        } else {
+            NSControlStateValueOff
+        });
+        b
+    };
+    let numbers = check(t("Seitenzahlen"), current.page_numbers);
+    let title_page = check(t("Titelblatt aus den Metadaten"), current.title_page);
+    let header = field(mtm, &current.header, "{title}");
+    let footer = field(mtm, &current.footer, "{author} · {date}");
+    let fields = form(mtm, &[(t("Kopfzeile:"), &header), (t("Fußzeile:"), &footer)]);
+
+    let label = NSTextField::labelWithString(&ns(""), mtm);
+    label.setLineBreakMode(objc2_app_kit::NSLineBreakMode::ByTruncatingMiddle);
+    let options: Retained<OptionsForm> = {
+        let this = OptionsForm::alloc(mtm).set_ivars(OptionIvars {
+            template: RefCell::new(None),
+            label: label.clone(),
+        });
+        // SAFETY: NSObject's initializer, called once on the newly allocated object.
+        unsafe { msg_send![super(this), init] }
+    };
+    options.show_template(current.word_template.clone());
+    let action_button = |title: &str, action: objc2::runtime::Sel| {
+        // SAFETY: The target is `options`, which the sheet's completion handler keeps until the sheet has ended.
+        let b = unsafe { NSButton::buttonWithTitle_target_action(&ns(title), Some(&*options), Some(action), mtm) };
+        b.setControlSize(objc2_app_kit::NSControlSize::Small);
+        b.sizeToFit();
+        b
+    };
+    let choose = action_button(t("Wählen …"), objc2::sel!(optionsChooseTemplate:));
+    let clear = action_button(t("Entfernen"), objc2::sel!(optionsClearTemplate:));
+    let template_title = NSTextField::labelWithString(&ns(t("Word-Vorlage:")), mtm);
+
+    let fields_height = fields.frame().size.height;
+    let total = fields_height + 3.0 * 24.0 + 2.0 * LABEL_HEIGHT + 24.0;
+    let view = NSView::initWithFrame(
+        NSView::alloc(mtm),
+        NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(FORM_WIDTH, total)),
+    );
+    let place = |control: &NSView, x: f64, y: f64, width: f64, height: f64| {
+        control.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(width, height)));
+        view.addSubview(control);
+    };
+    let mut y = total - 20.0;
+    place(&numbers, LABEL_INDENT, y, FORM_WIDTH - LABEL_INDENT, 18.0);
+    y -= 24.0;
+    place(&title_page, LABEL_INDENT, y, FORM_WIDTH - LABEL_INDENT, 18.0);
+    y -= fields_height + 8.0;
+    place(&fields, 0.0, y, FORM_WIDTH, fields_height);
+    y -= LABEL_HEIGHT + 12.0;
+    place(
+        &template_title,
+        LABEL_INDENT,
+        y,
+        FORM_WIDTH - LABEL_INDENT,
+        LABEL_HEIGHT,
+    );
+    y -= 26.0;
+    let (choose_width, clear_width) = (choose.frame().size.width, clear.frame().size.width);
+    place(
+        &label,
+        LABEL_INDENT,
+        y,
+        FORM_WIDTH - LABEL_INDENT - choose_width - clear_width - 12.0,
+        LABEL_HEIGHT,
+    );
+    place(
+        &choose,
+        FORM_WIDTH - choose_width - clear_width - 4.0,
+        y - 3.0,
+        choose_width,
+        24.0,
+    );
+    place(&clear, FORM_WIDTH - clear_width, y - 3.0, clear_width, 24.0);
+
+    let a = NSAlert::new(mtm);
+    a.setMessageText(&ns(t("Exportoptionen")));
+    a.setInformativeText(&ns(t(
+        "Kopf- und Fußzeile gelten für PDF und Drucken, eine Word-Vorlage bringt ihre eigenen mit. Dort stehen {title}, {author}, {date}, {page} und {pages} für den jeweiligen Wert.",
+    )));
+    a.addButtonWithTitle(&ns(t("Übernehmen")));
+    a.addButtonWithTitle(&ns(t("Abbrechen")))
+        .setKeyEquivalent(&ns("\u{1b}"));
+    a.setAccessoryView(Some(&view));
+    a.layout();
+    let handler = RcBlock::new(move |response: NSModalResponse| {
+        guarded((), || {
+            if response == NSAlertFirstButtonReturn {
+                done(ExportOptions {
+                    page_numbers: numbers.state() == NSControlStateValueOn,
+                    title_page: title_page.state() == NSControlStateValueOn,
+                    header: header.stringValue().to_string(),
+                    footer: footer.stringValue().to_string(),
+                    word_template: options.ivars().template.borrow().clone(),
+                });
             }
         });
     });

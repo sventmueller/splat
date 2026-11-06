@@ -52,11 +52,7 @@ define_class!(
                 crate::editor::watch_memory(self.mtm());
                 crate::editor::keep_copies(self.mtm());
                 crate::util::DISK.run(|| crate::editor::discard_share_files(false));
-                // The alert would stop a self-test run; the self-test shows it itself.
-                #[cfg(not(feature = "selftest"))]
-                crate::editor::offer_recovered(self.mtm());
-                #[cfg(feature = "selftest")]
-                crate::editor::selftest::start(self.mtm());
+                crate::test_hooks::after_launch(self.mtm());
             });
         }
 
@@ -85,6 +81,13 @@ define_class!(
     }
 
     impl AppDelegate {
+        #[unsafe(method(mdImportWord:))]
+        fn import_word(&self, _sender: Option<&AnyObject>) {
+            guarded((), || {
+                crate::word_import::ask(self.mtm());
+            });
+        }
+
         #[unsafe(method(mdOpenMarkdownHere:))]
         fn open_markdown_here(&self, _sender: Option<&AnyObject>) {
             guarded((), || make_default(MARKDOWN));

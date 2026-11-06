@@ -207,12 +207,14 @@ the formula editor's page loads
 the formula editor's script runs
 the formula editor's web view draws no background
 the help menu leads to the problem form, the feature form and the repository
+the help menu's commands lead where they say
 the helper for the system's decoders reads no files and reaches no network
 the look after a panic in a reload reads the file
 the outline lists two nested headings
 the page answers a diagram with the fields the app reads
 the page answers a formula with the fields the app reads
 the picture after a helper that stopped answering decodes
+the preview shows formulas and web pictures from what it is given, and asks for web pictures only when allowed
 the preview takes input again once the text is small enough
 the problem form names the version of Splat and of macOS
 the recent documents list a document just noted

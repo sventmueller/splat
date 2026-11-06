@@ -1,13 +1,17 @@
 //! The way from the app to the project on GitHub.
 
 use objc2_app_kit::NSWorkspace;
-use objc2_foundation::{NSBundle, NSProcessInfo, NSString, NSURL};
+use objc2_foundation::NSURL;
+use objc2_foundation::{NSBundle, NSProcessInfo, NSString};
 
 use crate::util::ns;
 
 const REPOSITORY: &str = "https://github.com/sventmueller/splat";
 
 fn open(address: &str) {
+    if crate::test_hooks::keeps_from_the_browser(address) {
+        return;
+    }
     if let Some(url) = NSURL::URLWithString(&ns(address)) {
         NSWorkspace::sharedWorkspace().openURL(&url);
     }

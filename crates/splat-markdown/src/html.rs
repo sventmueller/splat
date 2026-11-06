@@ -14,11 +14,12 @@ use super::markup::{self, Element, Node, is_void, kept_in_exports, read_tag, str
 use super::reader::parse;
 use super::style::html_element;
 use super::text::{Byte, offsets, right_to_left};
-use super::typography::{Open, Quotes, TextMark, before_text, citation_shown, marks, smarten};
+use super::typography::{Open, Quotes, Running, Segment, TextMark, Within, citation_shown};
 use splat_i18n::t;
 
 /// What the page needs from outside the text.
 pub struct Export<'a> {
+    /// The page's `<title>`.
     pub title: &'a str,
     /// The rendered formula or diagram as `<img>` element, if one is ready.
     pub figure: &'a dyn Fn(&Figure) -> Option<String>,
@@ -39,6 +40,7 @@ const KEPT_ATTRIBUTES: [&str; 11] = [
     "align", "title", "alt", "width", "height", "colspan", "rowspan", "start", "open", "href", "src",
 ];
 
+/// `text` as a self-contained HTML page.
 pub fn to_html(text: &str, export: &Export) -> String {
     let doc = parse(text);
     let mut page = Page {
@@ -368,34 +370,27 @@ impl<'a> Page<'a> {
 
     /// Running text, with typographic punctuation, tags, references and citations as in the preview.
     fn text(&mut self, literal: &str, at: Byte, around: Inside) {
-        if around.code {
-            self.body.push_str(&escape(literal));
-            return;
-        }
-        let before = before_text(self.text, at);
-        let shown = match self.export.quotes {
-            Some(quotes) => smarten(literal, before, quotes, &mut self.open),
-            None => literal.to_string(),
+        let within = Within {
+            code: around.code,
+            link: around.link,
+            html: false,
         };
-        if around.link {
-            self.body.push_str(&escape(&shown));
-            return;
+        let running = Running::of(self.text, literal, at, within, self.export.quotes, &mut self.open, true);
+        let export = &self.export;
+        let segments = running.segments(|_, mark| match mark {
+            TextMark::Tag(name) => Some(format!("<span class=\"tag\">#{}</span>", escape(name))),
+            TextMark::Reference(reference) => (export.reference)(reference)
+                .map(|url| format!("<a href=\"{}\">{}</a>", escape(&url), escape(reference))),
+            TextMark::Citation(keys) => {
+                citation_shown(keys, export.citation).map(|shown_as| format!("<cite>{}</cite>", escape(&shown_as)))
+            }
+        });
+        for segment in segments {
+            match segment {
+                Segment::Text(text) => self.body.push_str(&escape(text)),
+                Segment::Mark(html) => self.body.push_str(&html),
+            }
         }
-        let mut done = 0;
-        for (range, mark) in marks(&shown, before, true) {
-            let replacement = match &mark {
-                TextMark::Tag(name) => Some(format!("<span class=\"tag\">#{}</span>", escape(name))),
-                TextMark::Reference(reference) => (self.export.reference)(reference)
-                    .map(|url| format!("<a href=\"{}\">{}</a>", escape(&url), escape(reference))),
-                TextMark::Citation(keys) => citation_shown(keys, self.export.citation)
-                    .map(|shown_as| format!("<cite>{}</cite>", escape(&shown_as))),
-            };
-            let Some(replacement) = replacement else { continue };
-            self.body.push_str(&escape(&shown[done..range.start]));
-            self.body.push_str(&replacement);
-            done = range.end;
-        }
-        self.body.push_str(&escape(&shown[done..]));
     }
 }
 
@@ -625,6 +620,7 @@ pub fn web_image_type(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
+/// `bytes` of the type `mime` as a `data:` URL.
 pub fn data_url(mime: &str, bytes: &[u8]) -> String {
     format!("data:{mime};base64,{}", base64(bytes))
 }
@@ -647,6 +643,7 @@ fn base64(bytes: &[u8]) -> String {
     out
 }
 
+/// `s` with `&`, `<`, `>` and `"` escaped, for HTML text and quoted attribute values.
 pub fn escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")

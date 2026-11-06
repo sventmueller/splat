@@ -44,10 +44,7 @@ struct Stored {
 }
 
 const MAX_RUNNING: usize = 6;
-#[cfg(not(feature = "selftest"))]
-const FIRST_RETRY: Duration = Duration::from_secs(30);
-#[cfg(feature = "selftest")]
-const FIRST_RETRY: Duration = Duration::from_millis(500);
+const FIRST_RETRY: Duration = crate::test_hooks::FIRST_RETRY;
 const LAST_RETRY: Duration = Duration::from_secs(15 * 60);
 
 thread_local! {
@@ -303,12 +300,7 @@ fn session() -> Retained<NSURLSession> {
     let config = NSURLSessionConfiguration::ephemeralSessionConfiguration();
     config.setTimeoutIntervalForRequest(20.0);
     config.setTimeoutIntervalForResource(60.0);
-    // Self-tests must not depend on a server somewhere.
-    #[cfg(feature = "selftest")]
-    // SAFETY: The array holds a subclass of NSURLProtocol.
-    unsafe {
-        config.setProtocolClasses(Some(&super::selftest::protocol_classes()))
-    };
+    crate::test_hooks::serve_the_web_inside(&config);
     // SAFETY: NSObject's initializer, called once on the newly allocated object.
     let delegate: Retained<Loader> = unsafe { msg_send![super(Loader::alloc().set_ivars(())), init] };
     // The session keeps its delegate; its callbacks arrive on a background queue of its own.

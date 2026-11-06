@@ -4,7 +4,6 @@ a click on ▸ unfolds the callout
 a click opens the HTML details
 a closed editor does not reopen while the caret stays
 a discarded formula edit leaves the document unedited
-a pane toggled twice during its animation ends as it was
 a preview selection shows in the source in the selection colour
 a preview shown again has the text typed while it was hidden
 a preview the divider brings back has the text typed while it was hidden
@@ -52,7 +51,6 @@ link dialog fields are full width
 link dialog fields span the sheet
 making the app the default for a type it opens needs no confirmation and shows no error
 opened details show their Markdown
-panes toggled twice in a moment end as they were
 pdf export
 plus opens a new document as a tab
 popover edits apply live
@@ -62,6 +60,7 @@ remote image loads
 return creates a paragraph
 return twice in the preview leaves two empty lines
 scroll positions follow the text typed while the preview was hidden
+scrolled to its end, the text's last line stands above the count
 scrolling the source scrolls the preview
 share hands over the current text as a .md file
 source view stays on TextKit 2
@@ -70,6 +69,7 @@ tab selects the next placeholder
 table of contents links the headings
 the app menu checks for updates through Sparkle
 the app menu offers to open Markdown files in Splat, ticked once it does
+the caret at the end brings the last line above the count
 the new formula is kept when its editor closes
 the preview shows the source selection on screen
 the share file holds no text before sharing

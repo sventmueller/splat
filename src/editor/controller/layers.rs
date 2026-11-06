@@ -1,6 +1,7 @@
 //! Who may reach whom, lowest first, as the compiler holds it: only this module and the controller see the ways to the
 //! components. A component gets a handle that offers what lies below it and nothing else, and what happens across several of
-//! them is for the controller to put together. Upward go only `invalidate`, `under_way`, `image_arrived` and `toggle_preview`.
+//! them is for the controller to put together. Upward go only `invalidate`, `under_way`, `image_arrived`, `toggle_preview`,
+//! `toggle_files` and `search_notes`.
 
 use std::ops::Deref;
 use std::path::PathBuf;
@@ -13,14 +14,18 @@ use objc2_foundation::NSUndoManager;
 use super::EditorController;
 use crate::document::MdDocument;
 use crate::editor::atom::AtomEditor;
+use crate::editor::changes::ChangeMarks;
+use crate::editor::counter::WordCounter;
 use crate::editor::editing::Editing;
 use crate::editor::export::Sharing;
 use crate::editor::images::Pictures;
 use crate::editor::model::Model;
+use crate::editor::notes::Notes;
 use crate::editor::panes::Panes;
 use crate::editor::progressive::Progressive;
 use crate::editor::scroll::ScrollSync;
 use crate::editor::selection::Selection;
+use crate::editor::sidebar::SidebarTab;
 use crate::editor::state::{Invalidate, State};
 use crate::editor::sync::Snapshot;
 use crate::editor::update::Updater;
@@ -123,7 +128,7 @@ pub(in crate::editor) struct UnderWay {
 
 impl UnderWay {
     /// Whether a result that can wait has to wait.
-    pub(in crate::editor) fn holds_back_what_can_wait(self) -> bool {
+    pub(in crate::editor) fn defers_background_results(self) -> bool {
         self.own_change || self.preview_edit
     }
 
@@ -162,12 +167,15 @@ macro_rules! layer {
 layer!(ForSelection above ForPanes, reaches panes -> Panes);
 layer!(ForPictures above ForSelection, reaches selection -> Selection);
 layer!(ForProgressive above ForPictures, reaches pictures -> Pictures);
-layer!(ForScroll above ForProgressive, reaches progressive -> Progressive);
+layer!(ForCounter above ForProgressive, reaches progressive -> Progressive);
+layer!(ForChanges above ForCounter, reaches word_counter -> WordCounter);
+layer!(ForScroll above ForChanges, reaches change_marks -> ChangeMarks);
 layer!(ForUpdater above ForScroll, reaches scroll_sync -> ScrollSync);
 layer!(ForSharing above ForUpdater, reaches updater -> Updater);
 layer!(ForAtoms above ForSharing, reaches sharing -> Sharing);
 layer!(ForEditing above ForAtoms, reaches atom_editor -> AtomEditor);
-layer!(ForLinks above ForEditing, reaches editing -> Editing);
+layer!(ForNotes above ForEditing, reaches editing -> Editing);
+layer!(ForLinks above ForNotes, reaches notes -> Notes);
 
 impl ForPictures<'_> {
     /// A picture that arrived reports to whoever waits for it, up to the update that shows it.
@@ -179,6 +187,16 @@ impl ForPictures<'_> {
 impl ForEditing<'_> {
     pub(in crate::editor) fn toggle_preview(&self) {
         self.object().toggle_preview();
+    }
+
+    pub(in crate::editor) fn toggle_files(&self) {
+        if self.object().panes().toggle_tab(SidebarTab::Files) {
+            self.object().notes().rescan();
+        }
+    }
+
+    pub(in crate::editor) fn search_notes(&self) {
+        self.object().notes().show_search();
     }
 }
 
@@ -199,7 +217,7 @@ mod tests {
             (under_way(false, true, false), true, false),
             (under_way(false, false, true), false, true),
         ] {
-            assert_eq!(now.holds_back_what_can_wait(), can_wait, "{now:?}");
+            assert_eq!(now.defers_background_results(), can_wait, "{now:?}");
             assert_eq!(now.holds_back_an_update(), update, "{now:?}");
         }
     }

@@ -1,13 +1,21 @@
+//! The colors of the source view for each token, in light and dark mode, with and without increased contrast.
+
 use super::highlight::Token;
 
+/// A color as 8-bit red, green and blue.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rgb(pub u8, pub u8, pub u8);
 
+/// The look of macOS the colors are picked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Appearance {
+    /// Light mode, Aqua.
     Light,
+    /// Dark mode, Dark Aqua.
     Dark,
+    /// Light mode with Increase Contrast on.
     LightHighContrast,
+    /// Dark mode with Increase Contrast on.
     DarkHighContrast,
 }
 

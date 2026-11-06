@@ -1,0 +1,19 @@
+[package]
+name = "splat-import"
+version = "0.0.0"
+description = "Foreign formats as Markdown: what the pasteboard offers, Word files and Word templates"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+emojis = "0.9"
+miniz_oxide = { version = "0.9", default-features = false, features = ["with-alloc"] }
+roxmltree = "0.21"
+splat-markdown = { path = "../splat-markdown" }
+
+[dev-dependencies]
+splat-testkit = { path = "../splat-testkit" }

@@ -36,8 +36,12 @@ test-long: ## Longer random search (ROUNDS=20000, SPLAT_FUZZ_SEED=<n>) and the 1
 	cargo test --release -- --ignored partial_updates
 	cargo test --profile checked --workspace
 
-mutants: ## Faults built into the model and the preview one by one, which the tests must notice; takes hours (FILE=<file> narrows it)
-	cargo mutants --package splat-markdown --package splat-preview --package splat-file-state $(if $(FILE),--file "$(FILE)") --jobs 4 --output target/mutants; code=$$?; case $$code in 0|2|3) ;; *) exit $$code ;; esac
+# cargo-mutants 27 runs its baseline on the mutated packages alone, whatever test_package in .cargo/mutants.toml says,
+# and fails on the test targets of the others; the baseline runs here instead, with the tests every mutant gets.
+LIBRARIES := splat-markdown splat-preview splat-file-state splat-git splat-import splat-notes
+mutants: ## Faults built into the libraries one by one, which the tests must notice; takes hours (FILE=<file> narrows it)
+	cargo test $(foreach p,$(LIBRARIES) splat-testkit,--package $(p)) --lib --test robustness --test corpus
+	cargo mutants $(foreach p,$(LIBRARIES),--package $(p)) --baseline=skip --timeout 180 $(if $(FILE),--file "$(FILE)") --jobs 4 --output target/mutants; code=$$?; case $$code in 0|2|3) ;; *) exit $$code ;; esac
 	@echo "survivors: target/mutants/mutants.out/missed.txt"
 
 fuzz: ## Random input for the partial parse and everything that makes something of a text: make fuzz SECONDS=600; needs rustup's nightly and cargo-fuzz

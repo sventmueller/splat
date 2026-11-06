@@ -1,3 +1,6 @@
+//! Positions in a source text and what is counted by them: byte and UTF-16 offsets, lines, the marks that open
+//! containers, and the changed part of an edit.
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ops::Range;
@@ -33,6 +36,8 @@ pub fn decode_entity(s: &str) -> Option<(Cow<'static, str>, usize)> {
     named.get(name).map(|c| (Cow::Borrowed(*c), end + 1))
 }
 
+/// Defines an offset type counted in one unit, which no other offset type mixes with.
+#[macro_export]
 macro_rules! position {
     ($(#[$doc:meta])* $name:ident) => {
         $(#[$doc])*
@@ -40,10 +45,12 @@ macro_rules! position {
         pub struct $name(usize);
 
         impl $name {
+            /// The position `at` units from the start.
             pub const fn new(at: usize) -> $name {
                 $name(at)
             }
 
+            /// How many units from the start it lies.
             pub const fn get(self) -> usize {
                 self.0
             }
@@ -106,12 +113,6 @@ position!(
     U16
 );
 
-position!(
-    /// A position in the text of the preview view, in UTF-16 units. It has nothing to do with a position in the source
-    /// but what `preview_offset` and `insert_point` say.
-    Shown
-);
-
 /// `range` in the source text, from plain numbers.
 pub const fn bytes(range: Range<usize>) -> Range<Byte> {
     Byte(range.start)..Byte(range.end)
@@ -124,11 +125,15 @@ pub const fn offsets(range: &Range<Byte>) -> Range<usize> {
 
 /// Slicing a source text by source positions.
 pub trait TextAt {
+    /// The part of the text in `range`.
     fn at(&self, range: Range<Byte>) -> &str;
+    /// The text from `start` to its end.
     fn from(&self, start: Byte) -> &str;
+    /// The text from its start up to `end`.
     fn upto(&self, end: Byte) -> &str;
     /// Whether a character starts or the text ends there.
     fn boundary(&self, at: Byte) -> bool;
+    /// The position behind the last byte.
     fn end(&self) -> Byte;
 }
 
@@ -182,12 +187,14 @@ pub fn line_start(text: &str, at: Byte) -> Byte {
 /// Which way through a text or a table something goes.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
+    /// Towards the end.
     Forward,
+    /// Towards the start.
     Backward,
 }
 
 /// Where the line in front of the one starting at `line` starts, if there is one.
-pub fn previous_line_start(text: &str, line: Byte) -> Option<Byte> {
+pub(crate) fn previous_line_start(text: &str, line: Byte) -> Option<Byte> {
     let before = text.upto(line);
     let end = before
         .strip_suffix("\r\n")
@@ -224,40 +231,40 @@ pub fn is_quote_prefix(s: &str) -> bool {
 /// A part of a text and where it starts in it. Positions of blocks count from the start of the whole text, while what stands
 /// at them is read from the part.
 #[derive(Clone, Copy, Debug)]
-pub struct Stretch<'a> {
+pub(crate) struct TextPart<'a> {
     pub text: &'a str,
     pub start: Byte,
 }
 
-impl<'a> Stretch<'a> {
-    pub fn whole(text: &'a str) -> Self {
-        Stretch {
+impl<'a> TextPart<'a> {
+    pub(crate) fn whole(text: &'a str) -> Self {
+        TextPart {
             text,
             start: Byte::default(),
         }
     }
 
     /// The position in the part of what stands at `at` in the whole text; `None` for what lies in front of the part.
-    pub fn inside(self, at: Byte) -> Option<Byte> {
+    pub(crate) fn inside(self, at: Byte) -> Option<Byte> {
         at.get().checked_sub(self.start.get()).map(Byte::new)
     }
 }
 
 /// How far `s` is indented while what follows can still open a block: up to three spaces, as a fourth or a tab makes code.
-pub fn block_indent(s: &str) -> Option<usize> {
+pub(crate) fn block_indent(s: &str) -> Option<usize> {
     let spaces = s.len() - s.trim_start_matches(' ').len();
     (spaces < 4 && !s[spaces..].starts_with('\t')).then_some(spaces)
 }
 
 /// Where the next quote mark of `line` stands, looked for from `from`.
-pub fn next_quote_mark(line: &str, from: usize) -> Option<usize> {
+pub(crate) fn next_quote_mark(line: &str, from: usize) -> Option<usize> {
     let rest = &line[from..];
     let indent = block_indent(rest)?;
     rest[indent..].starts_with('>').then_some(from + indent)
 }
 
 /// Where a line's quote marks end, behind its last one; 0 without one.
-pub fn behind_quote_marks(line: &str) -> usize {
+pub(crate) fn behind_quote_marks(line: &str) -> usize {
     let (mut end, mut from) = (0, 0);
     while let Some(mark) = next_quote_mark(line, from) {
         end = mark + 1;
@@ -269,8 +276,11 @@ pub fn behind_quote_marks(line: &str) -> usize {
 /// A mark that opens a container at the start of what is left of a source line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ContainerMark {
+    /// `>`, which opens a block quote.
     Quote,
+    /// `-`, `*` or `+`, which open a bullet list item.
     Bullet,
+    /// Digits followed by `.` or `)`, which open an ordered list item.
     Number,
 }
 
@@ -338,7 +348,7 @@ pub fn count32(n: usize) -> u32 {
 }
 
 /// How much later `new` lies than `old`.
-pub fn growth(new: Byte, old: Byte) -> isize {
+pub(crate) fn growth(new: Byte, old: Byte) -> isize {
     signed(new.0) - signed(old.0)
 }
 
@@ -353,10 +363,10 @@ pub fn units<T: Copy + std::ops::Sub<Output = usize>>(range: &Range<T>) -> usize
 }
 
 /// Byte offsets of line starts, used to resolve comrak's 1-based line/byte-column positions.
-pub struct LineStarts(Vec<Byte>);
+pub(crate) struct LineStarts(Vec<Byte>);
 
 impl LineStarts {
-    pub fn new(text: &str) -> Self {
+    pub(crate) fn new(text: &str) -> Self {
         let mut starts = vec![Byte(0)];
         if text.contains('\r') {
             // comrak ends a line at `\r` too, as files from old Macs do.
@@ -371,7 +381,7 @@ impl LineStarts {
     }
 
     /// Only the lines of `span` and the start of the next, for those who ask by `line_of` and `line_range`.
-    pub fn around(text: &str, span: &Range<Byte>) -> Self {
+    pub(crate) fn around(text: &str, span: &Range<Byte>) -> Self {
         let first = line_start(text, span.start.min(text.end()));
         let last = next_line_start(text, span.end.min(text.end())).unwrap_or(text.end());
         let part = LineStarts::new(text.at(first..last));
@@ -384,23 +394,23 @@ impl LineStarts {
     }
 
     /// Start offset of a position whose column is 1-based.
-    pub fn start(&self, line: usize, column: usize) -> Byte {
+    pub(crate) fn start(&self, line: usize, column: usize) -> Byte {
         self.line_start(line) + column.saturating_sub(1)
     }
 
     /// Exclusive end offset of a position whose column points at the last byte (inclusive).
-    pub fn end(&self, line: usize, column: usize) -> Byte {
+    pub(crate) fn end(&self, line: usize, column: usize) -> Byte {
         self.line_start(line) + column
     }
 
-    pub fn line_of(&self, offset: Byte) -> usize {
+    pub(crate) fn line_of(&self, offset: Byte) -> usize {
         match self.0.binary_search(&offset) {
             Ok(i) => i,
             Err(i) => i - 1,
         }
     }
 
-    pub fn line_range(&self, text: &str, line: usize) -> Range<Byte> {
+    pub(crate) fn line_range(&self, text: &str, line: usize) -> Range<Byte> {
         let start = self.0[line];
         let end = self.0.get(line + 1).copied().unwrap_or(text.end());
         start..end
@@ -415,6 +425,7 @@ pub struct Utf16Map {
 }
 
 impl Utf16Map {
+    /// The map of the offsets in `text`.
     pub fn new(text: &str) -> Self {
         if text.is_ascii() {
             return Utf16Map {
@@ -437,6 +448,7 @@ impl Utf16Map {
         }
     }
 
+    /// The length of the whole text in UTF-16 units.
     pub fn len_u16(&self) -> usize {
         match self.ascii_len {
             Some(len) => len,
@@ -444,6 +456,8 @@ impl Utf16Map {
         }
     }
 
+    /// The UTF-16 position of `byte`; a byte inside a character gives the character's start, one beyond the text its
+    /// end.
     pub fn to_u16(&self, byte: Byte) -> U16 {
         U16(match self.ascii_len {
             Some(len) => byte.0.min(len),
@@ -497,7 +511,7 @@ pub fn right_to_left(text: &str) -> Option<bool> {
 }
 
 /// Length of the common byte prefix of two texts.
-pub fn common_prefix(a: &[u8], b: &[u8]) -> usize {
+pub(crate) fn common_prefix(a: &[u8], b: &[u8]) -> usize {
     const CHUNK: usize = 4096;
     let n = a.len().min(b.len());
     let mut i = 0;
@@ -508,7 +522,7 @@ pub fn common_prefix(a: &[u8], b: &[u8]) -> usize {
 }
 
 /// Length of the common byte suffix of two texts, at most `max`.
-pub fn common_suffix(a: &[u8], b: &[u8], max: usize) -> usize {
+pub(crate) fn common_suffix(a: &[u8], b: &[u8], max: usize) -> usize {
     const CHUNK: usize = 4096;
     let n = a.len().min(b.len()).min(max);
     let (a, b) = (&a[a.len() - n..], &b[b.len() - n..]);
@@ -566,6 +580,7 @@ pub struct Utf16Cursor<'a> {
 }
 
 impl<'a> Utf16Cursor<'a> {
+    /// A cursor at the start of `text`.
     pub fn new(text: &'a str) -> Self {
         Utf16Cursor {
             text,

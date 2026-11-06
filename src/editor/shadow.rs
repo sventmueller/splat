@@ -34,8 +34,9 @@ thread_local! {
 
 /// The folders of all runs. A self-test without an output folder must not touch the user's copies.
 fn copies_root() -> Option<PathBuf> {
-    #[cfg(feature = "selftest")]
-    std::env::var_os("SPLAT_SELFTEST_OUT")?;
+    if crate::test_hooks::SELFTEST {
+        crate::test_hooks::output_dir()?;
+    }
     Some(recovery_dir()?.parent()?.join("Unsaved"))
 }
 
@@ -107,8 +108,8 @@ fn start_keeping(recovered: &Path) {
 }
 
 /// Moves what ended runs left in `root` to `recovery`, and returns what it moved.
-fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Vec<PathBuf> {
-    let mut adopted = Vec::new();
+fn collect_ended_runs(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Vec<PathBuf> {
+    let mut collected = Vec::new();
     for run in std::fs::read_dir(root).into_iter().flatten().flatten() {
         let name = run.file_name();
         let Some(pid) = name.to_str().and_then(|n| n.parse::<u32>().ok()) else {
@@ -126,7 +127,7 @@ fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Ve
             let target = free_name(recovery, &name);
             if std::fs::create_dir_all(recovery).is_ok() && std::fs::rename(file.path(), &target).is_ok() {
                 start_keeping(&target);
-                adopted.push(target);
+                collected.push(target);
             } else {
                 left_behind = true;
             }
@@ -136,20 +137,20 @@ fn adopt(root: &Path, recovery: &Path, alive: impl Fn(&Path, u32) -> bool) -> Ve
             let _ = std::fs::remove_dir_all(run.path());
         }
     }
-    adopted
+    collected
 }
 
 /// Moves what ended runs left behind to the recovery folder, where `offer_recovered` points to it.
-pub(super) fn adopt_left_behind() {
+pub(super) fn collect_left_behind() {
     if let (Some(root), Some(recovery)) = (copies_root(), recovery_dir()) {
-        adopt(&root, &recovery, run_is_alive);
+        collect_ended_runs(&root, &recovery, run_is_alive);
         clear_old_recovered(&recovery, std::time::SystemTime::now());
     }
 }
 
 /// Takes over what ended runs left behind, and from now on copies unsaved text.
 pub fn keep_copies(_mtm: MainThreadMarker) {
-    adopt_left_behind();
+    collect_left_behind();
     let block = RcBlock::new(move |_: NonNull<NSTimer>| crate::util::guarded((), copy_unsaved));
     // SAFETY: The block only touches main-thread objects, and the timer runs on the main run loop it is scheduled on.
     let timer = unsafe { NSTimer::scheduledTimerWithTimeInterval_repeats_block(EVERY_SECONDS, true, &block) };
@@ -380,16 +381,16 @@ mod tests {
             std::fs::create_dir_all(unsaved.join(run)).unwrap();
             std::fs::write(unsaved.join(run).join(file), "Text").unwrap();
         }
-        let adopted = adopt(&unsaved, &recovery, |_, pid| pid == 222);
-        assert_eq!(adopted, [recovery.join("111-1-Notiz.md")]);
-        assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "Text");
+        let collected = collect_ended_runs(&unsaved, &recovery, |_, pid| pid == 222);
+        assert_eq!(collected, [recovery.join("111-1-Notiz.md")]);
+        assert_eq!(std::fs::read_to_string(&collected[0]).unwrap(), "Text");
         assert!(!unsaved.join("111").exists(), "the ended run's folder goes");
         assert!(
             unsaved.join("222/2-Brief.md").exists(),
             "a running app keeps its copies"
         );
         assert!(unsaved.join("kein-prozess/x.md").exists());
-        assert!(adopt(&root.join("Fehlt"), &recovery, |_, _| false).is_empty());
+        assert!(collect_ended_runs(&root.join("Fehlt"), &recovery, |_, _| false).is_empty());
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -402,11 +403,11 @@ mod tests {
         // A file where the recovery folder should be keeps it from being made.
         let recovery = root.join("Recovery");
         std::fs::write(&recovery, "").unwrap();
-        assert!(adopt(&unsaved, &recovery, |_, _| false).is_empty());
+        assert!(collect_ended_runs(&unsaved, &recovery, |_, _| false).is_empty());
         assert_eq!(std::fs::read_to_string(unsaved.join("111/1-Notiz.md")).unwrap(), "Text");
         std::fs::remove_file(&recovery).unwrap();
         assert_eq!(
-            adopt(&unsaved, &recovery, |_, _| false),
+            collect_ended_runs(&unsaved, &recovery, |_, _| false),
             [recovery.join("111-1-Notiz.md")]
         );
         assert!(!unsaved.join("111").exists());
@@ -421,13 +422,13 @@ mod tests {
         std::fs::write(recovery.join("111-1-Notiz.md"), "älter").unwrap();
         std::fs::create_dir_all(unsaved.join("111")).unwrap();
         std::fs::write(unsaved.join("111/1-Notiz.md"), "neuer").unwrap();
-        let adopted = adopt(&unsaved, &recovery, |_, _| false);
-        assert_eq!(adopted, [recovery.join("2-111-1-Notiz.md")]);
+        let collected = collect_ended_runs(&unsaved, &recovery, |_, _| false);
+        assert_eq!(collected, [recovery.join("2-111-1-Notiz.md")]);
         assert_eq!(
             std::fs::read_to_string(recovery.join("111-1-Notiz.md")).unwrap(),
             "älter"
         );
-        assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "neuer");
+        assert_eq!(std::fs::read_to_string(&collected[0]).unwrap(), "neuer");
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -445,9 +446,9 @@ mod tests {
             .unwrap()
             .set_modified(long_ago)
             .unwrap();
-        let adopted = adopt(&unsaved, &recovery, |_, _| false);
+        let collected = collect_ended_runs(&unsaved, &recovery, |_, _| false);
         clear_old_recovered(&recovery, std::time::SystemTime::now());
-        assert_eq!(std::fs::read_to_string(&adopted[0]).unwrap(), "Text");
+        assert_eq!(std::fs::read_to_string(&collected[0]).unwrap(), "Text");
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -506,14 +507,14 @@ mod tests {
         let lock = std::fs::File::create(run.join(RUN_LOCK)).unwrap();
         lock.try_lock().unwrap();
         assert!(run_is_alive(&run, std::process::id()), "it holds its lock");
-        assert!(adopt(&unsaved, &recovery, run_is_alive).is_empty());
+        assert!(collect_ended_runs(&unsaved, &recovery, run_is_alive).is_empty());
         drop(lock);
         assert!(
             !run_is_alive(&run, std::process::id()),
             "this process lives, but the run of that folder has ended"
         );
         assert_eq!(
-            adopt(&unsaved, &recovery, run_is_alive).len(),
+            collect_ended_runs(&unsaved, &recovery, run_is_alive).len(),
             1,
             "and its copy is taken over"
         );

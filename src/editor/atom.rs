@@ -33,10 +33,6 @@ mod edit;
 pub(super) use edit::atom_at_preview;
 use edit::atom_content;
 
-const GREEK_TAG: isize = 100;
-const RELATION_TAG: isize = 200;
-const DIAGRAM_TAG: isize = 1000;
-
 const DIAGRAM_ACTIONS: [DiagramAction; 21] = [
     DiagramAction::Node(Shape::Rectangle),
     DiagramAction::Node(Shape::Rounded),
@@ -63,8 +59,59 @@ const DIAGRAM_ACTIONS: [DiagramAction; 21] = [
 
 pub(super) const VISUAL_DEFAULT: &str = "FormulaEditorCode";
 
+/// What a building-block control puts into the code: an entry of one of the lists, carried in the control's tag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BuildingBlock {
+    /// An entry of `snippets::FORMULA_BUTTONS`.
+    Formula(usize),
+    /// An entry of `snippets::GREEK`.
+    Greek(usize),
+    /// An entry of `snippets::RELATIONS`.
+    Relation(usize),
+    /// An entry of `DIAGRAM_ACTIONS`.
+    Diagram(usize),
+}
+
+/// Each list counts in tags of its own, so no entry of one can be read as an entry of another.
+const TAGS_PER_LIST: usize = 1000;
+const _: () = assert!(
+    snippets::FORMULA_BUTTONS.len() < TAGS_PER_LIST
+        && snippets::GREEK.len() < TAGS_PER_LIST
+        && snippets::RELATIONS.len() < TAGS_PER_LIST
+        && DIAGRAM_ACTIONS.len() < TAGS_PER_LIST
+);
+
+impl BuildingBlock {
+    pub(super) fn tag(self) -> isize {
+        let (list, n) = match self {
+            BuildingBlock::Formula(n) => (0, n),
+            BuildingBlock::Greek(n) => (1, n),
+            BuildingBlock::Relation(n) => (2, n),
+            BuildingBlock::Diagram(n) => (3, n),
+        };
+        crate::util::to_isize(list * TAGS_PER_LIST + n)
+    }
+
+    pub(super) fn of_tag(tag: isize) -> Option<BuildingBlock> {
+        let tag = usize::try_from(tag).ok()?;
+        let n = tag % TAGS_PER_LIST;
+        match tag / TAGS_PER_LIST {
+            0 => Some(BuildingBlock::Formula(n)),
+            1 => Some(BuildingBlock::Greek(n)),
+            2 => Some(BuildingBlock::Relation(n)),
+            3 => Some(BuildingBlock::Diagram(n)),
+            _ => None,
+        }
+    }
+}
+
+/// The tag of the control for `action`; every action the controls offer stands in `DIAGRAM_ACTIONS`, which a test holds.
 pub(super) fn diagram_tag(action: DiagramAction) -> isize {
-    DIAGRAM_TAG + crate::util::to_isize(DIAGRAM_ACTIONS.iter().position(|a| *a == action).unwrap_or(0))
+    let n = DIAGRAM_ACTIONS
+        .iter()
+        .position(|a| *a == action)
+        .unwrap_or(DIAGRAM_ACTIONS.len());
+    BuildingBlock::Diagram(n).tag()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -191,18 +238,18 @@ fn building_blocks(row: &mut Row, kind: AtomKind, diagram_kind: MermaidKind) {
     match kind {
         AtomKind::Formula { .. } => {
             for (n, s) in snippets::FORMULA_BUTTONS.iter().enumerate() {
-                row.button(t(s.label), t(s.tip), crate::util::to_isize(n));
+                row.button(t(s.label), t(s.tip), BuildingBlock::Formula(n).tag());
             }
             let greek: Vec<(&str, isize)> = snippets::GREEK
                 .iter()
                 .enumerate()
-                .map(|(n, (l, _))| (*l, GREEK_TAG + crate::util::to_isize(n)))
+                .map(|(n, (l, _))| (*l, BuildingBlock::Greek(n).tag()))
                 .collect();
             row.pull_down("α β", t("Griechische Buchstaben"), &greek);
             let relations: Vec<(&str, isize)> = snippets::RELATIONS
                 .iter()
                 .enumerate()
-                .map(|(n, (l, _))| (*l, RELATION_TAG + crate::util::to_isize(n)))
+                .map(|(n, (l, _))| (*l, BuildingBlock::Relation(n).tag()))
                 .collect();
             row.pull_down("≤ →", t("Relationen, Operatoren und Pfeile"), &relations);
         }
@@ -331,7 +378,7 @@ impl AtomEditor<'_> {
 
     pub(super) fn cell_clicked(&self, view: &NSTextView, frame: NSRect, index: usize) {
         if self.host.panes().is_preview(Some(view)) {
-            self.edit_at_preview(crate::markdown::text::Shown::new(index), Some(frame));
+            self.edit_at_preview(crate::preview::map::Shown::new(index), Some(frame));
         }
     }
 
@@ -430,11 +477,7 @@ impl AtomEditor<'_> {
         self.color_code();
         self.show_status();
         popover.showRelativeToRect_ofView_preferredEdge(rect, anchor_view, NSRectEdge::MaxY);
-        #[cfg(feature = "selftest")]
-        let kept_for_checks = super::selftest::keeps_unshown_editor();
-        #[cfg(not(feature = "selftest"))]
-        let kept_for_checks = false;
-        if !popover.isShown() && !kept_for_checks {
+        if !popover.isShown() && !crate::test_hooks::keeps_unshown_editor() {
             let never_shown = self.state.edit.borrow_mut().take();
             drop(never_shown);
             return;
@@ -455,6 +498,7 @@ impl AtomEditor<'_> {
         controller.setView(root);
         let popover = NSPopover::new(mtm);
         popover.setBehavior(NSPopoverBehavior::Transient);
+        popover.setAnimates(crate::test_hooks::ANIMATES);
         popover.setContentViewController(Some(&controller));
         popover.setContentSize(size);
         popover.setDelegate(Some(ProtocolObject::from_ref(self.host.object())));
@@ -604,8 +648,11 @@ impl AtomEditor<'_> {
             let Some(e) = edit.as_ref() else { return };
             (e.kind, e.visual.get(), e.view.clone())
         };
-        if tag >= DIAGRAM_TAG {
-            let Some(action) = DIAGRAM_ACTIONS.get(crate::util::to_usize(tag - DIAGRAM_TAG)) else {
+        let Some(block) = BuildingBlock::of_tag(tag) else {
+            return;
+        };
+        if let BuildingBlock::Diagram(n) = block {
+            let Some(action) = DIAGRAM_ACTIONS.get(n) else {
                 return;
             };
             let code = view.string().to_string();
@@ -616,16 +663,11 @@ impl AtomEditor<'_> {
             replace_in_view(&view, &bytes(edit.range), &edit.text, Some(bytes(select)));
             return;
         }
-        let template = if tag >= RELATION_TAG {
-            snippets::RELATIONS
-                .get(crate::util::to_usize(tag - RELATION_TAG))
-                .map(|r| r.1)
-        } else if tag >= GREEK_TAG {
-            snippets::GREEK.get(crate::util::to_usize(tag - GREEK_TAG)).map(|g| g.1)
-        } else {
-            snippets::FORMULA_BUTTONS
-                .get(crate::util::to_usize(tag))
-                .map(|s| s.text)
+        let template = match block {
+            BuildingBlock::Formula(n) => snippets::FORMULA_BUTTONS.get(n).map(|s| s.text),
+            BuildingBlock::Greek(n) => snippets::GREEK.get(n).map(|g| g.1),
+            BuildingBlock::Relation(n) => snippets::RELATIONS.get(n).map(|r| r.1),
+            BuildingBlock::Diagram(_) => None,
         };
         let Some(template) = template else { return };
         if !matches!(kind, AtomKind::Formula { .. }) {
@@ -786,5 +828,33 @@ mod tests {
         assert!(atoms.opens_at(Byte::new(9)), "another formula opens right away");
         atoms.forget_closed();
         assert!(atoms.opens_at(Byte::new(3)));
+    }
+
+    #[test]
+    fn a_building_block_comes_back_from_its_tag_and_no_list_reaches_into_another() {
+        let all: Vec<BuildingBlock> = (0..snippets::FORMULA_BUTTONS.len())
+            .map(BuildingBlock::Formula)
+            .chain((0..snippets::GREEK.len()).map(BuildingBlock::Greek))
+            .chain((0..snippets::RELATIONS.len()).map(BuildingBlock::Relation))
+            .chain((0..DIAGRAM_ACTIONS.len()).map(BuildingBlock::Diagram))
+            .collect();
+        for block in &all {
+            assert_eq!(BuildingBlock::of_tag(block.tag()), Some(*block));
+        }
+        let tags: std::collections::HashSet<isize> = all.iter().map(|b| b.tag()).collect();
+        assert_eq!(tags.len(), all.len());
+        assert_eq!(BuildingBlock::of_tag(-1), None);
+        assert_eq!(BuildingBlock::of_tag(4 * crate::util::to_isize(TAGS_PER_LIST)), None);
+    }
+
+    #[test]
+    fn every_diagram_action_a_control_offers_has_a_tag_of_its_own() {
+        let offered = Shape::ALL
+            .iter()
+            .map(|(s, _)| DiagramAction::Node(*s))
+            .chain(DIRECTIONS.iter().map(|(d, _)| DiagramAction::Direction(d)));
+        for action in offered {
+            assert!(DIAGRAM_ACTIONS.contains(&action), "{action:?}");
+        }
     }
 }

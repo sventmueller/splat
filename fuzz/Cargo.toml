@@ -54,3 +54,24 @@ path = "fuzz_targets/encoding.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "git"
+path = "fuzz_targets/git.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "import"
+path = "fuzz_targets/import.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "notes"
+path = "fuzz_targets/notes.rs"
+test = false
+doc = false
+bench = false

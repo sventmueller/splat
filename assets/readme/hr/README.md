@@ -4,7 +4,7 @@
 
 **Markdown uređivač za macOS u kojem pišete u izvornom kodu ili izravno u pregledu.**
 
-Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno živi pregled koji u potpunosti možete uređivati. Tipkajte u jednom ili u drugom: sve što napišete u pregledu postaje minimalna promjena izvornog koda, pa retci koje niste dirali ostaju bajt po bajt isti, a vaši Git diffovi ostaju čisti. Splat čita Markdown koji već koristite: CommonMark i GitHub Flavored Markdown, GitHub upozorenja, Obsidianove wiki linkove, ugrađene bilješke i okvire s napomenom, Pandocova i Typorina proširenja, ugrađeni HTML, LaTeX formule te Mermaid, Graphviz i PlantUML dijagrame, sve prikazano izvan mreže. Izvezite u PDF, HTML ili Word jednim klikom. Napisan je u Rustu na pravim AppKit kontrolama, govori 35 jezika i ništa ne šalje mrežom ako to ne zatražite.
+Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno živi pregled koji u potpunosti možete uređivati. Tipkajte u jednom ili u drugom: sve što napišete u pregledu postaje minimalna promjena izvornog koda, pa retci koje niste dirali ostaju bajt po bajt isti, a vaši Git diffovi ostaju čisti. Splat čita Markdown koji već koristite: CommonMark i GitHub Flavored Markdown, GitHub upozorenja, Obsidianove wiki linkove, ugrađene bilješke i okvire s napomenom, Pandocova i Typorina proširenja, ugrađeni HTML, LaTeX formule te Mermaid, Graphviz i PlantUML dijagrame, sve prikazano izvan mreže. Pregledavajte i pretražujte cijelu mapu bilješki, vidite što se promijenilo od zadnjeg Git commita, lijepite iz Worda ili s web stranice kao Markdown i izvezite u PDF, HTML ili Word jednim klikom. Napisan je u Rustu na pravim AppKit kontrolama, govori 35 jezika i ništa ne šalje mrežom ako to ne zatražite.
  
 
 
@@ -81,6 +81,8 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
   - [Naredbe za formatiranje](#naredbe-za-formatiranje)
   - [Popisi i zadaci](#popisi-i-zadaci)
   - [Tablice](#tablice)
+  - [Lijepljenje formatiranog teksta](#lijepljenje-formatiranog-teksta)
+  - [Metapodaci](#metapodaci)
 - [Podržani Markdown](#podržani-markdown)
   - [CommonMark i GitHub Flavored Markdown](#commonmark-i-github-flavored-markdown)
   - [Okviri s napomenom](#okviri-s-napomenom)
@@ -94,7 +96,10 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
 - [Dijagrami](#dijagrami)
 - [Slike](#slike)
 - [Linkovi i navigacija](#linkovi-i-navigacija)
+- [Bilješke u mapi](#bilješke-u-mapi)
+- [Promjene od zadnjeg commita](#promjene-od-zadnjeg-commita)
 - [Izvoz, ispis i dijeljenje](#izvoz-ispis-i-dijeljenje)
+- [Uvoz Word dokumenata](#uvoz-word-dokumenata)
 - [Izgled i pristupačnost](#izgled-i-pristupačnost)
 - [Jezici](#jezici)
 - [Tipkovnički prečaci](#tipkovnički-prečaci)
@@ -103,14 +108,6 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
 - [Poznata ograničenja](#poznata-ograničenja)
 - [Rješavanje problema](#rješavanje-problema)
 - [Za programere](#za-programere)
-  - [Izgradnja](#izgradnja)
-  - [Distribucija](#distribucija)
-  - [Testiranje](#testiranje)
-  - [Struktura projekta](#struktura-projekta)
-  - [Tok podataka](#tok-podataka)
-  - [Pravila u kontroleru](#pravila-u-kontroleru)
-  - [Dodavanje naredbe](#dodavanje-naredbe)
-  - [Prijevodi](#prijevodi)
   - [Komponente trećih strana](#komponente-trećih-strana)
 - [Licenca](#licenca)
 
@@ -120,7 +117,10 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
 - **Markdown koji već koristite.** CommonMark, GitHub Flavored Markdown, GitHub upozorenja, Obsidian, proširenja za Pandoc i Typoru, emoji kratice, spoileri, popisi definicija, sidra naslova i HTML kao u GitHubovim README datotekama.
 - **Ugrađene formule i dijagrami.** LaTeX formule putem MathJaxa, s vizualnim uređivačem formula. Dijagrami u Mermaidu, Graphvizu i PlantUML-u, prikazani na vašem Macu bez Jave, poslužitelja ili mrežne veze.
 - **Gumb za sve.** Svaki Markdown element ima gumb na alatnoj traci i stavku izbornika, a uobičajeni i tipkovnički prečac. Tablice imaju vlastiti izbornik za retke, stupce i poravnavanje.
-- **Izvoz bez gubitaka.** PDF, jedna samostalna HTML datoteka ili Word dokument sa stvarnim naslovima, popisima, tablicama, fusnotama i slikama.
+- **Mapa, a ne samo datoteka.** Bočna traka prikazuje bilješke oko dokumenta i pretražuje ih sve. Preimenovanje bilješke mijenja linkove na nju, a svaki bajt oko njih ostaje.
+- **Promjene na prvi pogled.** U Git repozitoriju trake pokraj teksta označavaju ono što se razlikuje od zadnjeg commita, u oba okna.
+- **Iz Worda i s weba u Markdown.** Zalijepite formatirani tekst kao Markdown, ćelije iz proračunske tablice kao tablicu i uvezite cijele Word dokumente zajedno sa slikama.
+- **Izvoz bez gubitaka.** PDF, jedna samostalna HTML datoteka ili Word dokument sa stvarnim naslovima, popisima, tablicama, fusnotama i slikama. Dodajte brojeve stranica, zaglavlja i naslovnu stranicu ili upotrijebite Word predložak svoje tvrtke.
 - **Izvorno do srži.** Pravi AppKit prozori, kartice, izbornici, skočni prozori, Verzije, automatsko spremanje, izbornik za dijeljenje, tamni način rada, provjera pravopisa, diktiranje i VoiceOver. Bez Electrona, bez web prikaza za sam tekst.
 - **Brz s velikim datotekama.** Iscrtavanje pritiska tipke u dokumentu od 10 MB traje oko 10 ms, prije vlastitog rada prikaza.
 - **Privatan i oprezan.** Slike s weba učitavaju se tek kad to dopustite, linkovi prema drugim aplikacijama najprije pitaju, a sve što dekodira nepouzdane slikovne podatke radi u pomoćnim procesima u sandboxu.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Ažuriranja.** Splat iz slike diska ili s Homebrewa sam se održava ažurnim putem [Sparkla](https://sparkle-project.org). Pri drugom pokretanju pita smije li jednom dnevno sam potražiti ažuriranja. **Splat › Potraži ažuriranja…** traži odmah; **Automatski traži ažuriranja** i **Automatski preuzmi i instaliraj ažuriranja** u istom izborniku kasnije mijenjaju vaš odabir. Splat instalira ažuriranje samo ako nosi potpis razvojnog programera. Vlastita izgradnja nema ažuriranje.
 
-**Iz izvornog koda.** Preduvjete potražite u odjeljku [Izgradnja](#izgradnja), a zatim:
+**Iz izvornog koda.** Preduvjete potražite u odjeljku [Izgradnja](../../../docs/development.md#building), a zatim:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Svaki dokument otvara se u vlastitom prozoru ili, ako više volite kartice, kao 
 
 - **Lijevo: izvorni kod.** Vaš Markdown u fontu SF Mono s bojanjem sintakse.
 - **Desno: pregled.** Prikazani dokument, spreman za uređivanje.
-- **Bočna traka sa strukturom (neobavezno).** Svi naslovi kao stablo; klik na naslov prikazuje ga u oba okna. Uključite je s **Prikaz › Prikaži strukturu** (⌃⌘S).
+- **Bočna traka (neobavezno).** Svi naslovi kao stablo, klik na naslov prikazuje ga u oba okna: **Prikaz › Prikaži strukturu** (⌃⌘S). Još dvije kartice sadrže [bilješke u mapi](#bilješke-u-mapi) i njihovu pretragu.
 - **Alatna traka.** Gumbi grupirani prema onome što mijenjaju: znakovi, odlomci i umetnuti elementi, zatim uključivanje i isključivanje pregleda, dijeljenje i novi dokument. Prilagodite je s **Prikaz › Podesi alatnu traku…**.
 
 Povucite razdjelnik da jednoj strani date više prostora. **Prikaz › Sakrij pregled** (⌥⌘P) ostavlja samo izvorni kod; Splat to pamti za svaki prozor. Oba okna pomiču se zajedno, a odabir u jednom oknu istaknut je u drugom.
+
+U kutu prozora prikazuju se riječi i znakovi teksta i vrijeme čitanja, a dok postoji odabir, i isti podaci za odabir. Adrese linkova, HTML oznake, metapodaci, komentari, formule i dijagrami ne broje se. **Prikaz › Sakrij broj riječi** to uklanja.
 
 ### Dokumenti, kartice i verzije
 
@@ -214,7 +216,7 @@ Pregled se ponaša kao program za obradu teksta, ali sve što u njemu učinite z
 - **Formule i dijagrami** prikazuju se kao gotova grafika. Kliknite jednu, postavite kursor na nju ili pritisnite Return na njoj da biste otvorili njezin uređivač (vidi [Formule](#formule) i [Dijagrami](#dijagrami)).
 - **Ugrađeni HTML, ugrađene bilješke i front matter** prikazuju se, ali ih uređujete u izvornom kodu. Klik na njih postavlja kursor na odgovarajuće mjesto ondje.
 
-Sve što Markdown ne može izraziti u pregledu je blokirano: ploče Font i Boja, ravnalo te lijepljenje ili ispuštanje obogaćenog teksta i slika. Zalijepljeni HTML i RTF stižu kao običan tekst.
+Sve što Markdown ne može izraziti u pregledu je blokirano: ploče Font i Boja, ravnalo te lijepljenje ili ispuštanje obogaćenog teksta i slika. Zalijepljeni HTML i RTF stižu kao običan tekst, osim ako odaberete [Zalijepi kao Markdown](#lijepljenje-formatiranog-teksta).
 
 ### Naredbe za formatiranje
 
@@ -245,6 +247,21 @@ Podcrtano, istaknuto, eksponent i indeks zapisuju se kao `<ins>`, `<mark>`, `<su
 - U pregledu **Tab** prelazi u sljedeću ćeliju, **⇧Tab** u prethodnu, a **Return** u ćeliju ispod. Tab u posljednjoj ćeliji dodaje redak.
 - Izbornik **Tablica** umeće i briše retke i stupce te postavlja poravnavanje stupca (⌘{, ⌘|, ⌘}).
 - **Tablica › Poravnaj stupce tablice** nadopunjuje izvorni kod razmacima tako da se stupci poravnaju.
+
+### Lijepljenje formatiranog teksta
+
+**Uredi › Zalijepi kao Markdown** (⌃⌘V), također u kontekstualnom izborniku oba okna, pretvara sadržaj međuspremnika u Markdown na mjestu odabira, kao jedan korak poništavanja. ⌘V i dalje umeće običan tekst.
+
+- **Iz preglednika, Worda, Google Docsa, Confluencea, Bilješki ili Pagesa:** prenose se naslovi, podebljano, kurziv, podcrtano, precrtano, eksponent i indeks, linkovi, popisi s gniježđenjem, citati, kod i tablice.
+- **Iz proračunske tablice:** ćelije postaju tablica s retkom zaglavlja i stupcima brojeva poravnatima udesno. Isto vrijedi za tekst odvojen tabulatorima, točkama sa zarezom ili zarezima, ako svaki redak ima jednak broj stupaca.
+- **Slike** s web adresom ostaju linkovi. Slika unutar zalijepljenog HTML-a postaje datoteka pokraj dokumenta, koji za to mora biti barem jednom spremljen. Wordove privremene slikovne datoteke ne prenose se, ali njihov alternativni tekst ostaje.
+- **Linkovi** zadržavaju samo adrese `http`, `https`, `mailto`, relativne adrese i `#` adrese; od svih ostalih linkova ostaje samo tekst.
+
+### Metapodaci
+
+**Formatiraj › Uredi metapodatke…** ili klik na redak metapodataka na vrhu pregleda otvara obrazac s poljima YAML front mattera. Polja se mogu mijenjati, dodavati i uklanjati. Polje s popisom ostaje popis: njegove vrijednosti slijede jedna iza druge, odvojene zarezima, a vrijednost koja sadrži zarez nalazi se u navodnicima. Novo polje naziva `tags`, `aliases`, `keywords`, `categories`, `authors` ili `cssclasses` također postaje popis. Ugniježđena polja i višeredni tekst ondje se mogu vidjeti, a uređuju se u izvornom kodu.
+
+Ono što obrazac promijeni jedan je korak poništavanja i doseže samo retke polja koja ste promijenili: komentari, redoslijed, neobični razmaci, navodnici i završeci redaka svih ostalih ostaju bajt po bajt isti. Dokument bez metapodataka dobiva blok na svom početku.
 
 ## Podržani Markdown
 
@@ -315,7 +332,7 @@ Bez vlastitog sidra svaki naslov dobiva sidro izvedeno iz svog teksta, kao na Gi
 - **Wiki linkovi.** `[[Bilješka]]` povezuje na `Bilješka.md` u istoj mapi ili u mapi ispod nje. `[[Bilješka|Prikazani tekst]]` prikazuje vaš tekst, a `[[Bilješka#Naslov]]` otvara bilješku. ⌘-klik otvara je u Splatu.
 - **Ugradnje.** `![[Bilješka]]` prikazuje drugu bilješku unutar ove; bilješke ugrađene u nju prikazuju se kao linkovi. `![[dijagram.png]]` prikazuje sliku. Kao u Obsidianu, ugradnje navode bilješke i slike u mapi dokumenta ili ispod nje, nikad apsolutnom putanjom, a kao bilješke prikazuju se samo Markdown datoteke.
 - **Komentari.** `%%Samo u izvornom kodu%%` ostaje vidljiv u izvornom kodu, a izostavlja se iz pregleda i svakog izvoza, u retku kao i u zasebnim recima.
-- **Oznake.** `#ideja` ili `#projekt/splat` je istaknuto. ⌘-klik traži oznaku u dokumentu.
+- **Oznake.** `#ideja` ili `#projekt/splat` je istaknuto. ⌘-klik traži oznaku u dokumentu i, u bočnoj traci, u cijeloj mapi.
 - **Okviri koji se sažimaju.** Vidi [Okviri s napomenom](#okviri-s-napomenom).
 
 ### Citati i reference
@@ -439,6 +456,23 @@ U pregledu klik postavlja kursor kako biste mogli urediti tekst linka; **⌘-kli
 
 **Umetni › Kazalo sadržaja** umeće povezani popis svih naslova. Kad je kursor unutar njega, ista naredba ga ažurira. Bočna traka sa strukturom (⌃⌘S) skače na bilo koji naslov u oba okna.
 
+## Bilješke u mapi
+
+Gumbi na vrhu bočne trake prebacuju između strukture, datoteka i pretrage.
+
+- **Datoteke** (**Prikaz › Prikaži datoteke**, ⌃⌘E). Sve Markdown datoteke u mapi dokumenta ili, ako je dokument u Git repozitoriju, u cijelom repozitoriju. Klik ili Return otvara bilješku kao karticu ovog prozora; ako je već otvorena, dolazi u prvi plan. Gumb pokraj naziva mape prikazuje drugu mapu u ovom prozoru. Skrivene datoteke, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` i mape bez bilješki ostaju izvan popisa. Dokument izravno u vašoj početnoj mapi prikazuje samo bilješke pokraj sebe, kako Splat ne bi prolazio kroz sve vaše mape i pitao za svaku od njih.
+- **Pretraga** (**Uredi › Pronađi › Traži u svim bilješkama…**, ⇧⌘F). Pronalazi tekst u svim bilješkama, bez obzira na velika i mala slova i na to kako su kodirani naglasci. `#tag` pronalazi oznaku, `#project` i `#project/splat`, a ništa unutar koda. Klik na rezultat otvara bilješku na tom mjestu.
+- **Linkovi na bilješku.** Kontekstualni izbornik bilješke navodi bilješke koje vode na nju, wiki linkom, ugradnjom, relativnim linkom ili definicijom reference linka.
+- **Preimenovanje bilješke.** Isti izbornik je preimenuje i mijenja te linkove. Splat najprije kaže koliko je to linkova u koliko datoteka. U svakom se linku mijenja samo naziv, a svi ostali bajtovi datoteke ostaju. Otvoreni dokumenti primaju promjenu kao korak poništavanja; u drugim je datotekama može vratiti samo Git ili Verzije. Datoteka koju je u međuvremenu promijenio drugi program zaustavlja preimenovanje svih linkova, a Splat je navodi.
+
+Popis prati mapu kad prozor dođe u prvi plan. Pretraga radi s datotekama kakve su na disku, a tekst koji još niste spremili računa se od sljedećeg automatskog spremanja.
+
+## Promjene od zadnjeg commita
+
+U dokumentu u Git repozitoriju trake pokraj teksta označavaju ono što se razlikuje od zadnjeg commita, u izvornom kodu i u pregledu: zelena za dodane retke, plava za promijenjene retke i kratka crvena oznaka ondje gdje je nešto uklonjeno. Prate vaše tipkanje i pomicanje grane. **Prikaz › Promjene od zadnjeg commita** isključuje ih za sve prozore.
+
+Retci koji se razlikuju samo po završetku retka ne broje se, pa datoteka s CRLF-om prema commitu s LF-om ne prikazuje promjenu. Nova datoteka nema oznaka do svojeg prvog commita, a nema ih ni dokument veći od 32 MB.
+
 ## Izvoz, ispis i dijeljenje
 
 | Format | Kako | Što dobivate |
@@ -451,6 +485,19 @@ U pregledu klik postavlja kursor kako biste mogli urediti tekst linka; **⌘-kli
 
 Izbornik **Datoteka › Dijeli** nudi sve to na jednom mjestu. Izvozi koriste postavku tipografske interpunkcije i slike s weba koje ste dopustili; slike s weba u HTML-u ostaju linkovi.
 
+**Datoteka › Opcije eksportiranja…** određuje što PDF, ispis i Word dodaju tekstu, za sve dokumente:
+
+- **Brojevi stranica** u podnožju PDF-a i ispisa, u obliku `2 / 9`.
+- **Zaglavlje i podnožje** za PDF i ispis. `{title}`, `{author}`, `{date}`, `{page}` i `{pages}` označavaju svoje vrijednosti, prve tri iz metapodataka dokumenta.
+- **Naslovna stranica** za PDF, ispis i Word, s `title`, `subtitle`, `author` i `date` iz metapodataka ili nazivom dokumenta kao naslovom. Nema ni zaglavlja ni podnožja.
+- **Word predložak**, `.docx` ili `.dotx` čiji izgled izvoz preuzima: njegove stilove, uključujući lokalizirane nazive, temu, veličinu stranice, margine, zaglavlja i podnožja. Predložak koji se ne može pročitati zaustavlja izvoz i to kaže, umjesto da vam da dokument bez njega.
+
+## Uvoz Word dokumenata
+
+**Datoteka › Importiraj Word dokument…** pita za `.docx` ili `.dotx` datoteku i kamo ide njezin Markdown, a zatim otvara rezultat. Slike završavaju u mapi pokraj njega, nazvanoj po dokumentu s `-images`.
+
+Naslovi i popisi prenose se onako kako ih definiraju Wordovi stilovi i numeriranje, i u dokumentima čiji stilovi imaju lokalizirane nazive. Podebljano, kurziv, podcrtano, precrtano, isticanje, eksponent i indeks, linkovi, citati, kod, fusnote, završne bilješke i tablice prenose se, ćelije preko više stupaca kao HTML tablica. Formule postaju LaTeX. Praćene promjene računaju se kao prihvaćene, a kazalo sadržaja izostavlja se jer **Umetni › Kazalo sadržaja** izrađuje novo. Stare `.doc` datoteke i dokumenti zaštićeni lozinkom odbijaju se.
+
 ## Izgled i pristupačnost
 
 - **Tamni način rada** prati sustav. Formule i dijagrami prikazuju se za svaki izgled.
@@ -459,7 +506,7 @@ Izbornik **Datoteka › Dijeli** nudi sve to na jednom mjestu. Izvozi koriste po
 - **Prikaz preko cijelog zaslona, kartice i alatna traka koja se može podesiti**, kao u svakoj aplikaciji za Mac.
 - **VoiceOver.** Okna se zovu „Izvorni Markdown kod” i „Pregled”, formule se čitaju kao svoj kod, a dijagrami kao svoj naslov. Svaka je naredba dostupna s tipkovnice.
 
-Splat nema prozor s postavkama: nekoliko opcija nalazi se ondje gdje se primjenjuju, u izborniku **Prikaz** i **Uredi › Zamjene**.
+Splat nema prozor s postavkama: nekoliko opcija nalazi se ondje gdje se primjenjuju, u izborniku **Prikaz**, **Uredi › Zamjene** i **Datoteka › Opcije eksportiranja…**.
 
 ## Jezici
 
@@ -482,6 +529,9 @@ Hebrejski i arapski tekst čita se zdesna nalijevo gdje god se pojavi, bez obzir
 | Poravnaj stupac tablice lijevo, centrirano, desno | ⌘{, ⌘\|, ⌘} |
 | Sakrij ili prikaži pregled | ⌥⌘P |
 | Prikaži ili sakrij strukturu | ⌃⌘S |
+| Prikaži ili sakrij datoteke | ⌃⌘E |
+| Traži u svim bilješkama | ⇧⌘F |
+| Zalijepi kao Markdown | ⌃⌘V |
 | Uvećaj, umanji, stvarna veličina | ⌘+, ⌘−, ⌘0 |
 | Novi dokument, otvori, spremi, dupliciraj | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Podešavanje stranice, ispis | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ Markdown datoteka može doći od bilo koga, pa Splat svaki dokument smatra nepou
 - **Slike s weba** učitavaju se tek nakon vašeg dopuštenja, samo preko `https`, nikad s hostova u vašoj lokalnoj mreži, najviše 10 MB po slici i u privatnoj sesiji bez kolačića.
 - **Izolirano dekodiranje.** Slike te grafika formula i dijagrama dekodiraju se u pomoćnim procesima koji zatvaraju sve datoteke koje su naslijedili i zaključavaju se u sandbox prije čitanja prvog bajta: bez pristupa datotekama, bez mreže. Vraćaju samo piksele, čija se veličina provjerava, i zaustavljaju se nakon 10 sekundi. Appleovi vlastiti dekoderi slika vide samo HEIC, TIFF, AVIF i PDF, i to samo kad podaci doista jesu taj format; rade u vlastitom pomoćnom procesu, koji uz to smije čitati sistemske mape s fontovima i koristiti sistemski video dekoder. I SVG-ovi, formule i dijagrami prolaze kroz taj pomoćni proces, pa su u Splatu slike fiksne razlučivosti: četiri piksela po točki, do 2560 po duljoj stranici.
 - **Lokalne datoteke** dolaze do dokumenta samo putanjom koju on navodi. Ugradnje prikazuju Markdown bilješke iz mape dokumenta i ispod nje, a slika koje nema traži se samo ondje. Putanja slike drugdje, apsolutna ili koja počinje s `~`, i dalje se učitava u pregledu; HTML i Word izvozi, ispis i PDF-ovi uzimaju samo ono što je u mapi dokumenta ili u njegovu Git repozitoriju, osim ako taj repozitorij sadrži i vašu početnu mapu, pa tuđi dokument ne može uvući vaše datoteke u izvoz koji prosljeđujete.
+- **Mape bilješki** čitaju se samo dok ih bočna traka prikazuje, a preimenovanje bilješke mijenja druge datoteke tek nakon što potvrdite koliko ih je.
+- **Git repozitorije** čita sam Splat. Nikad ne pokreće program `git`, čija konfiguracija u tuđem repozitoriju može pokrenuti druge programe, i ne čita više od verzije otvorenog dokumenta u zadnjem commitu. Onamo ništa ne zapisuje i ne izlazi na mrežu.
+- **Word dokumente i zalijepljeni tekst** čitaju Splatovi vlastiti parseri, s ograničenjima veličine, gniježđenja i toga koliko se datoteka smije raspakirati. Linkovi u njima zadržavaju samo adrese koje Splat dopušta i drugdje, a nazivi slika u Word datoteci nikad ne odlučuju o tome kamo će se zapisati.
 - **Kopije nespremljenog teksta** ostaju na ovom Macu, u vašoj mapi Library, za oporavak nakon rušenja. Nestaju sa spremanjem ili normalnim završetkom Splata; kopije koje je rušenje ostavilo ostaju u mapi za oporavak dok ih ne obrišete.
 - **Linkovi** nikad klikom ne pokreću program. Web i mail linkovi otvaraju se kao i obično; linkovi prema drugim aplikacijama najprije pitaju.
 - **HTML u dokumentima** čita Splatov vlastiti parser. Skripte, stilovi, okviri i obrasci nikad se ne izvršavaju.
@@ -530,7 +583,7 @@ Neke se promjene obrađuju u cijelosti, oko 300 ms po pritisku tipke kod 10 MB: 
 ## Poznata ograničenja
 
 - **Jedna tilda znači indeks.** `~tekst~` je indeks kao u Pandocu; za precrtavanje treba `~~dvije~~`. GitHub precrtava i s jednom tildom.
-- **Samo za čitanje u pregledu:** ugrađeni HTML, ugrađene bilješke i front matter uređuju se u izvornom kodu.
+- **Samo za čitanje u pregledu:** ugrađeni HTML i ugrađene bilješke uređuju se u izvornom kodu, front matter u svom obrascu ili u izvornom kodu.
 - **Vrlo duboko gniježđenje:** HTML ugniježđen dublje od 64 razine i HTML u retku dublji od 16 ustupa mjesto svom sadržaju.
 - **Spojene ćelije tablice** postoje samo u HTML tablicama, i to samo preko stupaca (`colspan`, bez `rowspan`). MultiMarkdownova sintaksa tablica za spojene ćelije nije podržana.
 - **Bibliografije** čitaju se samo iz BibTeXa, ne iz CSL JSON-a ni YAML-a.
@@ -538,6 +591,11 @@ Neke se promjene obrađuju u cijelosti, oko 300 ms po pritisku tipke kod 10 MB: 
 - **Tipografska interpunkcija:** njemački zatvarajući jednostruki navodnik ne može se razlikovati od apostrofa i postavlja se kao ’.
 - **Formule, ne dokumenti:** bez LaTeX paketa, TikZa i potpunih dokumenata.
 - **Vizualni uređivač formula** piše LaTeX u MathLiveovu zapisu: razmaci nestaju (`E = mc^2` postaje `E=mc^2`), prikaz ostaje isti.
+- **Broj riječi:** tajski, laoski, kmerski i burmanski pišu se bez razmaka i broje se po nizovima teksta, a ne po riječima. `3.14` i `snake_case` po dvije su riječi.
+- **Preimenovanje bilješke** ne mijenja linkove u ugrađenom HTML-u, a wiki link ostaje kakav jest ako novi naziv sadrži `#`, `|`, `^`, `[`, `]` ili `\`.
+- **Oznake promjena** čitaju repozitorije s SHA-1 objektima i običnim ili pakiranim referencama; repozitorij sa SHA-256 ili reftableom ne prikazuje ih. Datoteka pod Git filtrom kao što je LFS uspoređuje se s onim što je filtar pohranio.
+- **Uvoz iz Worda** izostavlja tekst u zaglavljima, podnožjima i komentarima, a slike kao `.emz` ili SVG zadržavaju samo alternativni tekst.
+- **Zalijepi kao Markdown** čita RTF kao zapadni tekst, a naslove u njemu uzima samo iz veličina fonta. Većina programa nudi i HTML, kojem daje prednost.
 - **Namjerno:** bez brojeva redaka, bez prozora s postavkama, bez Help Booka, nije u App Storeu.
 - **Slabije testirano na Intelu.** Samoprovjere prozora rade samo na Apple Siliconu; na Intelu CI pokreće `cargo test`.
 
@@ -561,190 +619,7 @@ Neke se promjene obrađuju u cijelosti, oko 300 ms po pritisku tipke kod 10 MB: 
 
 ## Za programere
 
-Splat je Rust aplikacija koja izravno razgovara s AppKitom i WebKitom preko [objc2](https://github.com/madsmtm/objc2). Nema Swifta, nema Objective-C-a, nema Xcode projekta i nema datoteka Interface Buildera.
-
-### Izgradnja
-
-Preduvjeti:
-
-- macOS s Command Line Tools (`xcode-select --install`). Xcode nije potreban; Splat se gradi bez `actool`, `ibtool` i `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) navodi točnu verziju koju koristi CI; rustup je sam instalira, a Homebrewov Rust zanemaruje datoteku. Podizanjem verzije tamo nova upozorenja prevoditelja i clippyja dolaze u projekt.
-- rustup, za `make lint`, `make check` i `make universal`: `cargo xtask check-library` gradi biblioteku za Linux kako bi pokazao da joj ne treba macOS, a Homebrewov Rust nema druge ciljeve.
-
-[Makefile](../../../Makefile) sadrži kratke ulazne točke; `make help` ih sve navodi:
-
-```sh
-make build                  # target/release/Splat.app, isto kao cargo xtask bundle --release
-make universal              # target/splat-universal za Apple Silicon i Intel, kako ga nosi slika diska
-make check                  # formatiranje, clippy bez upozorenja, svi testovi, uključene biblioteke; što pokreće CI
-make test                   # make check, zatim samoprovjera bez prozora
-make test-gui               # samoprovjere s prozorom; zauzimaju Mac oko četiri minute
-make test-long              # dulje nasumično pretraživanje i provjera djelomičnog ažuriranja na 10 MB
-make fuzz                   # nasumičan unos za djelomično parsiranje i sve izlaze
-make coverage               # pokrivenost redaka svim testovima i samoprovjerama, s pragom po modulu
-make coverage-library       # isti pragovi za module bez prozora, kao u CI-ju
-make bench FILE=<file.md>   # mjerenja otvaranja, tipkanja i pomicanja velike datoteke
-make release                # najprije make test, zatim ovjerena (notarizirana) slika diska
-```
-
-Sama logika izgradnje živi u Rust paketu [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, potpisano s "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, zasebna aplikacija koja nikad ne otvara Markdown datoteke
-cargo xtask dmg                # dist/Splat-<version>.dmg za distribuciju, Developer ID, ovjereno (notarizirano)
-cargo xtask icon               # ponovno izgradi assets/AppIcon.icns i README ikonu iz assets/icon-1024.png
-cargo xtask vendor check       # provjeri priloženi JavaScript prema vendor.lock
-cargo xtask vendor fetch       # preuzmi ga ponovno nakon promjene verzije u vendor.lock
-```
-
-`bundle` zapisuje `Info.plist`, kopira resurse i lokalizacije te potpisuje aplikaciju certifikatom „Splat Local Signing”. Prva izgradnja stvara taj certifikat u vašem lančiću prijave, s valjanošću od 20 godina. Dok postoji, Splat kroz ponovne izgradnje zadržava nedavne dokumente i dopuštenja za mape; s ad hoc potpisom svaka bi izgradnja za macOS bila nova aplikacija. Debug izgradnje i izgradnje za samoprovjeru nose vlastite ID-ove paketa (`local.splat.debug`, `local.splat.selftest`) i ne registriraju se za Markdown datoteke, pa Finder nikad ne otvara dokument u zastarjeloj izgradnji, a postavke normalne aplikacije ostaju netaknute.
-
-Verzija živi u datoteci [VERSION](../../../VERSION) kao `major.minor.build` i to je ona koju dobiva sljedeća izgradnja. Svaka uspješna izgradnja izdanja (`make build`, `cargo xtask bundle --release`, `make release`) podiže broj izgradnje za jedan; debug izgradnje i izgradnje za samoprovjeru ne diraju ga. Major i minor podižu se ručno: postavite VERSION na, recimo, `1.1.0`, i sljedeća izgradnja dobiva upravo to.
-
-### Distribucija
-
-`cargo xtask dmg` (ili `make release`, koji najprije pokreće `make test`) gradi izdanje, potpisuje ga vašim Developer ID-om, ovjerava (notarizira) aplikaciju kod Applea i pričvršćuje potvrdu, pakira je u komprimiranu sliku diska samo za čitanje s linkom na Aplikacije, ovjerava i pričvršćuje potvrdu i na sliku te provjerava rezultat Gatekeeperom. Aplikacija nosi vlastitu potvrdu kako bi se kopija instalirana bez Findera, kao što radi Homebrew, pri prvom pokretanju otvorila i izvan mreže; dva kruga s uslugom ovjere traju po nekoliko minuta. Samo slika koja je prošla svaki korak postaje `dist/Splat-<version>.dmg`, kopija koja se commita, a broj izgradnje raste. Prethodna slika ostaje još jedno izdanje, jer GitHubov raw poslužitelj nekoliko minuta nakon pusha može isporučivati stari feed ažuriranja; starije se premještaju u smeće. Neuspjeli pokušaj ostavlja `dist/` i VERSION kakvi su bili.
-Svako izdanje u povijest repozitorija dodaje punu sliku, oko 16 MB. Pokreće se samo kad se pozove, nikad kao dio normalne izgradnje, a treba:
-
-- certifikat „Developer ID Application” u lančiću
-- spremljenu prijavu za Appleovu uslugu ovjere s lozinkom specifičnom za aplikaciju, stvorenu jednom s `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- privatni ključ koji potpisuje ažuriranja, u lančiću prijave. Stvorio ga je Sparkleov `generate_keys`; njegova javna polovica je `UPDATE_KEY` u [xtask/src/main.rs](../../../xtask/src/main.rs) i unutar svake instalirane kopije, koja prihvaća samo ažuriranja potpisana njime. Čuvajte sigurnosnu kopiju u upravitelju lozinki: `target/sparkle-2.10.1/bin/generate_keys -x <file>` ga izvozi, `-f <file>` uvozi na drugom Macu. Bez njega se instalirane kopije više nikad ne mogu ažurirati.
-- rustup (`brew install rustup`, koji ostavlja Homebrewov Rust na mjestu)
-- `RELEASE_NOTES.md` s onim što ovo izdanje donosi. Dijalog za ažuriranje prikazuje ga iznad retka o tome kako prijaviti problem, pa `dmg` staje ako je datoteka prazna ili još sadrži bilješke prethodnog izdanja
-
-Ako išta od toga nedostaje, `dmg` staje prije izgradnje. Pri prvom pokretanju macOS pita smije li Terminal upravljati Finderom; bez tog dopuštenja slika diska ne prikazuje ni pozadinu ni raspored ikona.
-
-Samo slika diska nosi program za ažuriranje, [Sparkle](https://sparkle-project.org), koji izgradnja jednom preuzima u `target/` iz njegova GitHub izdanja i provjerava prema kontrolnom zbroju u xtasku. Hardened runtime učitava framework samo kad nosi Team ID aplikacije, što Developer ID potpis ima, a lokalni certifikat nema; a ažuriranje ne smije zamijeniti vlastitu izgradnju. Izgradnja za samoprovjeru nosi i Sparkle, kako bi prema njemu provjerila izbornik ažuriranja: s feedom koji ne postoji, bez Sparkleova pitanja pri drugom pokretanju i s entitlementom koji lokalno potpisanoj aplikaciji dopušta učitati framework. `dmg` potpisuje novu sliku ključem za ažuriranja i zapisuje `dist/appcast.xml`, feed koji instalirane kopije čitaju s GitHuba. Commitajte i pushajte sliku i feed zajedno: od tada instalirane kopije nude ažuriranje. Linkovi za preuzimanje u ovom README-u i njegovim prijevodima vode na `Splat.dmg` u najnovijem izdanju na GitHubu, pa svako izdanje nosi kopiju pod tim imenom: `cp dist/Splat-<version>.dmg target/Splat.dmg`, zatim `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Slika diska je univerzalna binarna datoteka za Apple Silicon i Intel; ostale izgradnje namijenjene su samo procesoru računala na kojem se grade. Homebrewov Rust isporučuje standardnu biblioteku samo za procesor računala, pa `dmg` gradi preko rustupa, koji pri prvoj upotrebi instalira toolchain i ciljeve iz [rust-toolchain.toml](../../../rust-toolchain.toml), i staje ako programu ili Sparkleu nedostaje kod za bilo koji od dvaju procesora. `make universal` gradi samo program.
-Aplikacija u njoj nosi drugačiji potpis od lokalne izgradnje, pa macOS za njih dvije vodi zasebne nedavne dokumente i dopuštenja za mape.
-
-### Testiranje
-
-| Naredba | Provjerava |
-|---|---|
-| `cargo test --release` | jedinične, nasumične i testove prijevoda |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | dulje nasumično pretraživanje; `SPLAT_FUZZ_SEED` mijenja ulaze |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | jedan jezik, dok su drugi nepotpuni |
-| `cargo clippy --release --all-targets [--features selftest]` | upozorenja, uključujući obrazloženje svakog bloka `unsafe`, duljinu funkcija i, u biblioteci, pretvorbe brojeva |
-| `cargo xtask check-library` | biblioteka se gradi za Linux, pa ništa u njoj ne treba macOS |
-| `cargo xtask vendor check` | JavaScript biblioteke podudaraju se s `vendor.lock` bajt po bajt |
-| `cargo xtask selftest probe` | bez prozora, svaka sa svojim očekivanim rezultatom: formule, dijagrami, web slike prema poslužitelju unutar procesa, blokirane adrese, tekst koji piše svaka naredba, svaki format slike kroz oba izvoza, stranica koja prestane odgovarati i obrane web prikaza prema stranici bez njih. Traje oko pola minute. Ono što treba aplikaciju pred sobom preskače se na zaključanom zaslonu |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | pokrenuta aplikacija, klik po klik. Otvara prozor i tipka u njemu; Mac je zauzet oko četiri minute. `--scenarios` pokreće samo drugi dio, za oko minutu i pol. `--only` pokreće jednu grupu tog dijela, u vlastitom dokumentu, i na zaključanom zaslonu. `--in-back` izostavlja ono što traži aplikaciju u prvom planu; bez toga takva provjera ne uspijeva |
-| `cargo xtask selftest resize` | proširuje prozor nakon pomicanja razdjelnika: izvorni kod se ponovno prelama dok se prozoru mijenja veličina. Traje oko deset sekundi |
-| `cargo xtask selftest typing [--by-hand]` | tipka kroz spremanja, tipkama kroz red događaja aplikacije ili, uz `--by-hand`, ručno: utipkano ostaje i vodi se kao nespremljeno. Traje oko minutu |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | mjerenja otvaranja, tipkanja i pomicanja velike datoteke; `--keystroke-ms` ne uspijeva kad najbrži pritisak traje dulje |
-| `cargo test --release -- --ignored partial_updates` | pritisak tipke u 10 MB: djelomično prema potpunom ažuriranju, isti rezultat u najviše četvrtini vremena |
-| `cargo test --release --test hostile` | dokumenti izrađeni da preplave stog ili traju kvadratno dugo, svaki u dvije veličine čija vremena moraju rasti kao tekst, kroz parsiranje, slaganje, oba izvoza, pritiske tipki i naredbe |
-| `make mutants` | greške ugrađene u `crates/splat-markdown`, `crates/splat-preview` i `crates/splat-file-state` jedna po jedna, putem [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); kaže koje nijedan test ne primjećuje. Traje satima; `FILE=crates/splat-preview/src/bridge/mod.rs` sužava izbor |
-| `make fuzz` | nasumičan unos kroz [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz), kojem treba rustupov nightly: pritisci tipki koji se moraju čitati kao potpuno parsiranje, svi izlazi, uređivanja u pregledu, sve naredbe i datoteka koja se sprema onako kako se otvorila. `SECONDS=600` traži dulje |
-| `cargo test --release --test fuzz_seeds` | sjemena u `fuzz/seeds/` kroz provjere tih fuzz ciljeva, bez fuzzera; dio svakog `cargo test` |
-| `cargo test --profile checked --workspace` | testovi s onim što debug gradnja dodatno provjerava: nakon svakog djelomičnog parsiranja blokovi odgovaraju tekstu, a ono što nosi dalje je ono što tekst kaže. Dio `make test-long` |
-| `cargo test --release --test entry_points --test structure` | iz izvora: sve što sustav poziva zaštićeno je od panica, a moduli ovise samo prema dolje |
-| `cargo test --release --test decoder` | proces dekodera dekodira slike i ne doseže ni datoteke ni mrežu |
-| `make coverage` | pokrivenost redaka pomoću `cargo test` i svih samoprovjera, putem [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); pada ispod pragova. Zauzima Mac oko pet minuta |
-| `make coverage-library` | crateovi `splat-markdown`, `splat-preview`, `splat-file-state` i `splat-i18n` prema njihovim višim pragovima, koje mjeri samo `cargo test` |
-
-Jedinični testovi stoje pokraj koda koji testiraju. `crates/splat-testkit/tests/` sadrži ono što izvana doseže model i pregled: nasumične testove u `robustness.rs`, koji s onima iz `sync.rs` dijele generator iz `splat-testkit`, dokumente izrađene da naštete u `hostile.rs` te sjemena fuzz ciljeva u `fuzz_seeds.rs`. `tests/` sadrži ono što gleda cijeli program: njegove izvore, njegove prijevode i test dekodera, koji pokreće izgrađeni program. Odluke u `src/editor/` kojima ne treba prozor žive u slobodnim funkcijama s vlastitim testovima: sve što kontroler zna i kako se to mijenja u `state.rs`, pravila prikaza u `render_queue.rs`, kopija teksta u `sync.rs`, stilovi odlomaka, fontovi i boje kao vrijednosti u `render.rs`, što znače identifikatori alatne trake u `toolbar.rs`, što znači klik na link u `navigation.rs`.
-
-Korak samoprovjere prozora čeka imenovani uvjet, a ne vrijeme; samo ono što ne daje nikakav signal, poput izostanka nečega, zadržava stanku s razlogom. Uzaludno čekanje je neuspjela provjera koja imenuje što nikad nije stiglo, korak koji paničari također je neuspjela provjera, a pokretanje se u oba slučaja nastavlja. Provjera koja u ovom pokretanju ne može ništa reći javlja `SELFTEST SKIP`: xtask je navodi, a ona niti prolazi niti pada. xtask od svakog načina, a od `--scenarios` zasebno, traži oko devet desetina njegovih provjera. Samoprovjera prozora nakon glavnog klikanja pokreće drugi dio, u `src/editor/selftest/scenarios.rs`: svaku naredbu formatiranja i tablice, dijaloge, klikove na linkove, lijepljenje, ispuštanje, izvoze, datoteku koju je promijenio drugi program, veliku promjenu, slike koje se mijenjaju na disku, pritisak na memoriju, golem dokument i oporavak nakon rušenja. Svaka njegova grupa otvara vlastiti dokument, tako da neuspjeh u jednoj ne dopire do sljedeće, a svaka se može pokrenuti sama s `--only`. Samoprovjera bez prozora također namjerno kvari spremanje: mapa koja ništa ne prima, datoteka samo za čitanje, mapa koja je nestala, pun disk i panic u svakom callbacku spremanja, a ništa od toga ne smije stajati teksta.
-
-Pokrivenost ima dva praga: svaki modul najmanje 84 % svojih redaka, svi moduli zajedno najmanje 96 %. `make coverage` mjeri `cargo test` zajedno sa samoprovjerama i pada ispod bilo kojeg; `make coverage-library` drži ono čemu ne treba prozor na 90 % i 97 %. Pragovi i nekoliko iznimaka, poput panic hooka u `main.rs` koji radi samo pri rušenju, nalaze se u [xtask](../../../xtask/src/coverage.rs) uz svoje razloge. Izmjerene izgradnje idu u `target/coverage/`, pa mjerni kod nikad ne dospije u `target/release/` ni u sliku diska. Pomoćni proces dekodera otvara svoju datoteku mjerenja prije nego što se zaključa, pa se i on mjeri.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) pokreće `make check`, `make coverage-library` i univerzalnu izgradnju na Apple Siliconu te `cargo test` na Intelu za svaki push na `main` i svaki pull request. Svake noći [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) pokreće `make test-long` s novim nasumičnim ulazima. Samoprovjere i slika diska ostaju na razvojnom Macu: trebaju zaslon i certifikate za potpisivanje u lančiću.
-
-Izlaz samoprovjera ide u `target/selftest/`. Samoprovjera gradi zasebnu aplikaciju (`target/release/Splat Selftest.app`, ID paketa `local.splat.selftest`) i ostavlja netaknutima postavke, nedavne dokumente i povezivanja datoteka normalne aplikacije.
-
-### Struktura projekta
-
-Sve što ne treba prozor vlastiti je crate u `crates/`, koji se gradi bez macOS-a, pa prevoditelj provodi način na koji ovise jedni o drugima. Aplikacija u `src/` (paket `splat-app`, program `splat`) gradi se na njima.
-
-- `crates/splat-markdown/`: stablo koje čita svaki potrošač, `Doc` u `doc/`, koje posjeduje svoj tekst, i jedina veza s parserom u `reader/`: comrak se ne spominje nigdje drugdje, a `reader/assumptions.rs` bilježi što kod o njemu pretpostavlja. Boje sintakse i sve naredbe kao čiste izmjene teksta (`Edit`) u `commands/`. Također ponovno parsiranje nakon izmjene (`incremental.rs`), čitač ugrađenog HTML-a (`markup.rs`), tipografija, oznake, reference i citati u tekstu (`typography.rs`), kako tekst izgleda i koji ga Markdown i HTML tako oblikuju (`style.rs`), što adresa smije biti (`url.rs`) te HTML i Word izvoz (`html.rs`, `docx.rs` s `docx/html.rs` i `docx/xml.rs`). Položaj ima svoj tip: `Byte` u izvornom tekstu, `U16` u prikazu izvora, `Shown` u prikazu pregleda (`text.rs`).
-- `crates/splat-preview/`: raspored pregleda u `layout/`, s ugrađenim HTML-om u `layout/html.rs`, i preslikavanje između pregleda i izvornog koda (`Bridge`, `Index`). `Bridge` odbija raspored druge verzije dokumenta `Doc`.
-- `crates/splat-file-state/`: koji tekst datoteka sadrži, u kojem formatu i što znači pogled na nju.
-- `crates/splat-i18n/` s `resources/*.lproj`: 35 jezika; ključevi su njemački tekstovi, a aplikacija pri pokretanju instalira tablicu jezika sučelja.
-- `crates/splat-testkit/`: generator nasumičnih testova i provjere fuzz ciljeva.
-- `src/editor/`: prozor. Jedan objekt `EditorController` služi AppKitu kao delegat oba prikaza i prosljeđuje komponentama, malim structovima povrh kontrolera i stanja koje posjeduju, čijim poljima ostali moduli ne mogu pristupiti:
-
-| Modul | Odgovornost |
-|---|---|
-| `controller.rs` | klasa, metode delegata koje prosljeđuju, `invalidate` te ono što ostatak programa govori uređivaču; samo on doseže komponente |
-| `panes.rs` | `Panes`: tekstualni prikazi, struktura, prikazivanje i skrivanje okana i ono što daje pristup prikazima |
-| `controller/layers.rs` | tko smije do koga: komponenta dobiva pristup kontroleru koji nudi ono što je ispod nje, a prevoditelj to provodi |
-| `state.rs` | što kontroler zna o dokumentu i svaki način na koji se to mijenja; polja su privatna i ne dira nijedan prikaz |
-| `model.rs` | posuđuje stanje i kopiju teksta closureima koji ne mogu doseći nijedan prikaz |
-| `actions.rs` | registar naredbi: selektor, naslov, prečac, simbol, kada se naredba primjenjuje |
-| `editing.rs` | `Editing`: izvršavanje i provjera naredbi, tipkanje u pregledu |
-| `update.rs` | `Updater`: parsiranje, bojanje, ažuriranje pregleda; nakon izmjene samo zahvaćeni odlomci |
-| `sync.rs` | kopija teksta i vođenje blokova, bez AppKita i s nasumičnim testovima |
-| `progressive.rs` | `Progressive`: prikaz velikih pregleda korak po korak |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: odabir i položaj pomicanja oba okna usklađeni |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: uređivač formula i dijagrama |
-| `navigation.rs`, `links.rs` | `Links`: linkovi, wiki linkovi, oznake, kućice zadataka, sažimanje, fusnote |
-| `env.rs` | što pregled čita izvan teksta: tipografska interpunkcija, repozitorij za `@name` i `#12`, BibTeX datoteka, ugrađene bilješke |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | tekst pregleda, lokalne i udaljene slike; `Pictures` u `images.rs` |
-| `attributes.rs` | atributi teksta; svaki ključ dobiva samo vrijednost tipa koji očekuje |
-| `shadow.rs` | kopije nespremljenog teksta za oporavak nakon rušenja |
-| `decoder.rs` | pomoćni procesi u sandboxu koji dekodiraju slike i grafiku |
-| `export.rs`, `outline.rs` | `Sharing`: HTML i Word izvoz, datoteka za dijeljenje, ispis; bočna traka sa strukturom |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit za MathJax, Mermaid, Graphviz, PlantUML i vizualni uređivač formula; pravila što se kada prikazuje, odvojeno od WebKita |
-| `webkit.rs` | pozivi u WebKit; samo vijek trajanja navigacijskog delegata ostaje uz `js.rs` i `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | izgradnja prozora, alatna traka, tekstualni prikazi, dijalozi, boje |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: traka izbornika, delegat aplikacije, dokument (`MDDocument`, podklasa od `NSDocument`).
-- `src/util/`: radne niti (`lanes.rs`), volumeni koji mogu prestati odgovarati (`volumes.rs`), AppKit pomagala, datoteke i procesi. `src/diag.rs`: ono što pođe po zlu izvan korisnikova vida ide u sistemski dnevnik, bez ikakvog teksta dokumenta.
-- `src/large_alloc.rs`: velike alokacije dolaze ravno od jezgre i vraćaju se njoj kad se oslobode, pa se memorija vraća nakon velikih izmjena.
-- `resources/js/`: web stranice i biblioteke; verzije i kontrolni zbrojevi u [vendor.lock](../../../vendor.lock).
-- `xtask/`: pakiranje, potpisivanje, slika diska, ikona, uključivanje biblioteka, pokretač samoprovjera i pragovi pokrivenosti.
-
-### Tok podataka
-
-Izvorni tekst u lijevom tekstnom prikazu jedini je izvor istine.
-
-1. Svaka promjena znaka ondje na mjestu ažurira kopiju teksta (`Snapshot`), bez ponovnog čitanja teksta.
-2. Ažuriranje parsira kopiju, ponovno boji izvorni kod samo ondje gdje su se boje promijenile, slaže pregled i zamjenjuje samo blokove čiji se sadržaj promijenio.
-3. Nakon izmjene ponovno se parsiraju, boje i slažu samo zahvaćeni odlomci, sve dok susjedi ostaju isti; [docs/partial-parse.md](../../../docs/partial-parse.md) kaže zašto to daje isto što i potpuno parsiranje i što treba pogledati kad se comrak promijeni. Dokumenti s blokovima komentara `%%`, promjene front mattera i, u dokumentu s definicijama referenci linkova, promjene dijela koji sadrži zagradu obrađuju se u cijelosti. comrak prepoznaje referencu fusnote samo uz njezinu definiciju u istom parsiranju i premješta definicije iza teksta, pa se dio parsira s zamjenskom definicijom po oznaci i preuzima svoje brojeve iz starog stabla; promjena referenci ili definicija u dijelu, ili uz fusnotu u retku, obrađuje se u cijelosti.
-4. HTML blokovi koji otvore `<details>` ili `<div align>` i zatvore ga kasnije utječu na Markdown blokove između njih; blok koji se ponovno koristi mora imati isto okruženje.
-5. Dok tipkate u izvornom kodu dokumenta do 2 MB, djelomično ažuriranje radi odmah; kad se ne može primijeniti, ili u većem dokumentu, parsiranje i slaganje rade u pozadini. Dok tipkate u pregledu, rade odmah, jer kursor pregleda ovisi o rezultatu.
-6. Unos u pregledu `Bridge` prevodi u izmjenu izvornog koda i odatle ide istim putem. Markdown ima previše načina da tekst pretvori u sintaksu da bi pravila sama bila dovoljna, pa `preview/verify.rs` ponovno parsira promijenjeni dio i uspoređuje što prikazuje s onim što je utipkano; izmjena koja ne drži dodatno se escapea ili odbija.
-7. comrakove pozicije u retku na nekoliko su mjesta pogrešne, primjerice iza definicije reference linka. `reader/positions.rs` provjerava ih prema izvornom kodu pri čitanju bloka i ponovno ih čita iz izvornog koda tamo gdje se ne podudaraju.
-
-### Pravila u kontroleru
-
-1. Vlastite promjene kontrolera u prikazima izvršavaju se unutar `Panes::silently`; povratni pozivi delegata ih ignoriraju. Drugdje se prikazi mogu samo čitati, pa to provjerava prevoditelj. Ono što povratni pozivi trebaju čuti, ili ono što prikaz predaje AppKitu, to kaže prolazeći kroz `Panes::for_appkit`.
-2. Stanje se posuđuje samo za čitanje i računanje, nikad preko poziva koji mijenja, slaže ili pomiče prikaz: `Model` ga posuđuje `Send` closureima, a nijedan prikaz nije `Send`, pa to provjerava prevoditelj. Mijenja se samo vlastitim metodama, čiji testovi ne trebaju prozor.
-3. Poruke izvana (slika učitana, formula prikazana) stižu odgođeno preko `renders_arrived` i `image_arrived`, nikad usred ažuriranja.
-4. Ponovno crtanje bez promjene teksta ide samo preko `invalidate(reason)`.
-5. Kopija teksta ne drži se preko promjene izvornog koda, inače ta promjena kopira cijeli tekst: `with_text` je posuđuje samo na trajanje jednog `Send` closurea.
-6. Nova naredba treba unos u `actions.rs`, metodu u `controller.rs` i granu u `Editing::perform`.
-7. Svaki blok `unsafe` nosi svoje obrazloženje kao komentar `// SAFETY:`. Bajtovi do sistemskih dekodera slika stižu samo u pomoćnom procesu, preko `decoder::decode_native`; test pretražuje izvorni kod u potrazi za drugim pozivima.
-8. Ništa na glavnoj niti ne čeka korisnikove mape, jer mrežni volumen može prestati odgovarati: datoteke se razgledavaju na niti `DISK`, a pregled čita odgovore preko `Env::known`. Samo radnja koju korisnik čeka, poput izvoza ili spremanja, smije izravno dirati disk.
-9. Što mora završiti, završava i nakon panica, jer glavna nit preživljava panic: podignuta zastavica ide kroz `with_raised`, uređivanje spremišta teksta kroz `editing`, a ono za što poništavanje ne smije znati kroz `without_undo`. Test pronalazi ono što je od toga napisano ručno.
-10. Adresa u dokumentu ima jedno čitanje, u `splat_markdown::url`; test pronalazi sheme koje se uspoređuju ručno.
-
-### Dodavanje naredbe
-
-Traka izbornika, alatna traka i kontekstualni izbornik grade svoje stavke iz registra u [src/editor/actions.rs](../../../src/editor/actions.rs), a provjera izbornika ondje čita kada se naredba primjenjuje i prikazuje li kvačicu. Nova naredba treba:
-
-1. varijantu `Action` sa svojim `Spec`: selektor, naslov, oznaka na alatnoj traci, opis (počinje glagolom, najviše 75 znakova), prečac, SF Symbol i kada se primjenjuje
-2. metodu u `src/editor/controller.rs`
-3. granu u `Editing::perform`
-4. svoje tekstove u svakom `Localizable.strings`
-
-Test `every_command_has_a_method_and_every_method_a_command` provjerava da se registar i metode podudaraju. Appleovi standardni prečaci poput ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F i ⌘, ostaju netaknuti.
-
-### Prijevodi
-
-Kod koristi njemački tekst kao ključ: `t("Fett")` traži ga za vrijeme rada, `n("Fett")` označava konstantu za kasnije traženje. Svaki `resources/<language>.lproj/` sadrži:
-
-- `Localizable.strings`: svaki tekst sučelja, izrazi izbornika prema Appleovim glosarima
-- `InfoPlist.strings`: nazive koje macOS prikazuje za aplikaciju i njezinu vrstu dokumenta
-- `QuickReference.md`: kratki vodič za Markdown
-
-`cargo xtask bundle` navodi svaku mapu `.lproj` kao lokalizaciju, a `CFBundleDevelopmentRegion` je engleski, pa sistemski izbornici i dijalog za spremanje slijede isti jezik. Test i18n provjerava da svaki jezik ima svaki tekst i da svaki kratki vodič ima strukturu njemačkoga.
-
-`assets/readme/<language>/` sadrži ovaj README na tom jeziku, njegovu snimku zaslona i demo dokument koji snimka zaslona prikazuje. Promjena ovog README-a pripada i u te kopije.
+Izgradnja, testiranje, struktura koda i pravila koja slijedi opisani su u [docs/development.md](../../../docs/development.md) (na engleskom).
 
 ### Komponente trećih strana
 
@@ -757,6 +632,10 @@ Kod koristi njemački tekst kao ključ: `t("Fett")` traži ga za vrijeme rada, `
 | [image](https://github.com/image-rs/image) | 0.25 | dekodiranje PNG, JPEG, GIF, WebP i BMP | MIT ili Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | poravnavanje stupaca tablice | MIT ili Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | nazivi HTML znakovnih referenci | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | raspakiravanje Word datoteka i Git objekata | MIT, Zlib ili Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | čitanje XML-a Word datoteka | MIT ili Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nazivi i pretraga preko složenih i rastavljenih slova | MIT ili Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | zadržavanje teksta nalik `:shortcode:` doslovnim u uvezenom tekstu | MIT ili Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | prikaz formula | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | vizualni uređivač formula, s KaTeX fontovima | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid dijagrami | MIT |

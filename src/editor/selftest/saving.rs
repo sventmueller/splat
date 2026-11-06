@@ -16,8 +16,9 @@ use objc2_foundation::{NSError, NSURL};
 use super::controller::{next_turn, until};
 use super::documents::{opened, restored, untitled, url_of};
 use super::{check, type_in_source};
-use crate::document::{FAULT_AT, LOOKS_TAKEN, MdDocument, SAVES_ASKED_FOR, reload_changed_documents};
+use crate::document::{MdDocument, reload_changed_documents};
 use crate::editor::{EditorController, decoder};
+use crate::test_hooks::{FAULT_AT, LOOKS_TAKEN, SAVES_ASKED_FOR};
 use crate::util::ns;
 
 /// Saves to `url` and reports whether that worked: `saveDocument` would ask in a window after a failure.

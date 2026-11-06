@@ -20,8 +20,11 @@ pub fn read_regular_file(path: &Path, limit: u64) -> Option<Vec<u8>> {
 }
 
 pub fn stamp(path: &Path) -> Stamp {
-    let meta = std::fs::metadata(path).ok()?;
-    Some((meta.modified().ok()?, meta.len()))
+    let Ok(meta) = std::fs::metadata(path) else {
+        return Stamp::UNREACHABLE;
+    };
+    meta.modified()
+        .map_or(Stamp::UNREACHABLE, |modified| Stamp::new(modified, meta.len()))
 }
 
 /// A name for a file made from what a window shows, which may hold anything.

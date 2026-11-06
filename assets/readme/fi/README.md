@@ -4,7 +4,7 @@
 
 **Markdown-editori macOS:lle, jolla voit kirjoittaa lähdetekstiin tai suoraan esikatseluun.**
 
-Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävän, täysin muokattavan esikatselun oikealla. Voit kirjoittaa kumpaan tahansa: esikatseluun kirjoittamasi muuttuu lähdetekstiin mahdollisimman pienenä muutoksena, joten koskemattomat rivit pysyvät tavu tavulta samoina ja Git-diffit pysyvät siisteinä. Splat lukee jo käyttämääsi Markdownia: CommonMarkia ja GitHub Flavored Markdownia, GitHubin huomautuslaatikoita, Obsidianin wikilinkkejä, upotuksia ja huomautuslaatikoita, Pandocin ja Typoran laajennuksia, upotettua HTML:ää, LaTeX-kaavoja sekä Mermaid-, Graphviz- ja PlantUML-kaavioita, kaikki renderöitynä offline-tilassa. Viennin PDF:ksi, HTML:ksi tai Wordiksi hoitaa yksi napsautus. Se on kirjoitettu Rustilla aitojen AppKit-ohjainten päälle, puhuu 35 kieltä eikä lähetä mitään verkon yli, ellet pyydä.
+Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävän, täysin muokattavan esikatselun oikealla. Voit kirjoittaa kumpaan tahansa: esikatseluun kirjoittamasi muuttuu lähdetekstiin mahdollisimman pienenä muutoksena, joten koskemattomat rivit pysyvät tavu tavulta samoina ja Git-diffit pysyvät siisteinä. Splat lukee jo käyttämääsi Markdownia: CommonMarkia ja GitHub Flavored Markdownia, GitHubin huomautuslaatikoita, Obsidianin wikilinkkejä, upotuksia ja huomautuslaatikoita, Pandocin ja Typoran laajennuksia, upotettua HTML:ää, LaTeX-kaavoja sekä Mermaid-, Graphviz- ja PlantUML-kaavioita, kaikki renderöitynä offline-tilassa. Selaa kokonaista muistiinpanokansiota ja etsi siitä, katso, mikä on muuttunut viimeisimmän Git-commitin jälkeen, sijoita Wordista tai verkkosivulta Markdownina ja vie PDF:ksi, HTML:ksi tai Wordiksi yhdellä napsautuksella. Se on kirjoitettu Rustilla aitojen AppKit-ohjainten päälle, puhuu 35 kieltä eikä lähetä mitään verkon yli, ellet pyydä.
  
 
 
@@ -81,6 +81,8 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
   - [Muotoilukomennot](#muotoilukomennot)
   - [Luettelot ja tehtävät](#luettelot-ja-tehtävät)
   - [Taulukot](#taulukot)
+  - [Muotoillun tekstin sijoittaminen](#muotoillun-tekstin-sijoittaminen)
+  - [Metatiedot](#metatiedot)
 - [Tuettu Markdown](#tuettu-markdown)
   - [CommonMark ja GitHub Flavored Markdown](#commonmark-ja-github-flavored-markdown)
   - [Huomautuslaatikot](#huomautuslaatikot)
@@ -94,7 +96,10 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 - [Kaaviot](#kaaviot)
 - [Kuvat](#kuvat)
 - [Linkit ja siirtyminen](#linkit-ja-siirtyminen)
+- [Muistiinpanot kansiossa](#muistiinpanot-kansiossa)
+- [Muutokset viimeisimmän commitin jälkeen](#muutokset-viimeisimmän-commitin-jälkeen)
 - [Vienti, tulostus ja jakaminen](#vienti-tulostus-ja-jakaminen)
+- [Word-dokumenttien tuominen](#word-dokumenttien-tuominen)
 - [Ulkoasu ja saavutettavuus](#ulkoasu-ja-saavutettavuus)
 - [Kielet](#kielet)
 - [Pikanäppäimet](#pikanäppäimet)
@@ -103,14 +108,6 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 - [Tunnetut rajoitukset](#tunnetut-rajoitukset)
 - [Vianmääritys](#vianmääritys)
 - [Kehittäjille](#kehittäjille)
-  - [Rakentaminen](#rakentaminen)
-  - [Jakelu](#jakelu)
-  - [Testaus](#testaus)
-  - [Projektin rakenne](#projektin-rakenne)
-  - [Tietovirta](#tietovirta)
-  - [Säännöt controllerissa](#säännöt-controllerissa)
-  - [Komennon lisääminen](#komennon-lisääminen)
-  - [Käännökset](#käännökset)
   - [Kolmannen osapuolen komponentit](#kolmannen-osapuolen-komponentit)
 - [Lisenssi](#lisenssi)
 
@@ -120,7 +117,10 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 - **Jo käyttämäsi Markdown.** CommonMark, GitHub Flavored Markdown, GitHubin huomautuslaatikot, Obsidian, Pandocin ja Typoran laajennukset, emoji-lyhytkoodit, spoilerit, määritelmäluettelot, otsikkoankkurit ja HTML sellaisena kuin GitHubin README-tiedostoissa.
 - **Kaavat ja kaaviot sisäänrakennettuina.** LaTeX-kaavat MathJaxilla ja visuaalinen kaavaeditori. Mermaid-, Graphviz- ja PlantUML-kaaviot renderöidään Macillasi ilman Javaa, palvelinta tai verkkoyhteyttä.
 - **Painike kaikelle.** Jokaiselle Markdown-rakenteelle on työkalupalkin painike ja valikkokohta, yleisimmille myös pikanäppäin. Taulukoilla on oma valikkonsa riveille, sarakkeille ja tasaukselle.
-- **Vie menettämättä mitään.** PDF, yksittäinen itsenäinen HTML-tiedosto tai Word-dokumentti, jossa on aidot otsikot, luettelot, taulukot, alaviitteet ja kuvat.
+- **Kansio, ei vain tiedosto.** Sivupalkki luetteloi dokumentin ympärillä olevat muistiinpanot ja etsii niistä kaikista. Muistiinpanon uudelleennimeäminen muuttaa siihen osoittavat linkit, ja jokainen tavu niiden ympärillä säilyy.
+- **Muutokset yhdellä silmäyksellä.** Git-repositoriossa tekstin vieressä olevat palkit merkitsevät sen, mikä eroaa viimeisimmästä commitista, molemmissa ruuduissa.
+- **Wordista ja verkosta Markdowniksi.** Sijoita muotoiltu teksti Markdownina ja laskentataulukon solut taulukkona, ja tuo kokonaisia Word-dokumentteja kuvineen.
+- **Vie menettämättä mitään.** PDF, yksittäinen itsenäinen HTML-tiedosto tai Word-dokumentti, jossa on aidot otsikot, luettelot, taulukot, alaviitteet ja kuvat. Lisää sivunumerot, yläotsakkeet ja nimiösivu tai käytä yrityksesi Word-työpohjaa.
 - **Natiivi läpikotaisin.** Aidot AppKit-ikkunat, välilehdet, valikot, ponnahdusikkunat, versiot, automaattinen tallennus, jakovalikko, tumma tila, oikeinkirjoituksen tarkistus, sanelu ja VoiceOver. Ei Electronia, ei verkkonäkymää itse tekstille.
 - **Nopea suurillakin tiedostoilla.** Näppäinpainalluksen piirtäminen 10 Mt:n dokumentissa kestää noin 10 ms ennen näkymän omaa työtä.
 - **Yksityinen ja huolellinen.** Verkon kuvat latautuvat vasta luvallasi, linkit muihin appeihin kysyvät ensin, ja kaikki epäluotettavan kuvadatan purkaminen tapahtuu hiekkalaatikossa toimivissa apuprosesseissa.
@@ -146,7 +146,7 @@ brew install --cask sventmueller/tap/splat
 
 **Päivitykset.** Levykuvasta tai Homebrew'lla asennettu Splat päivittää itsensä [Sparklen](https://sparkle-project.org) avulla. Toisella käynnistyskerralla se kysyy, saako se etsiä päivityksiä itse kerran päivässä. **Splat › Etsi päivityksiä…** etsii heti; **Etsi päivityksiä automaattisesti** ja **Lataa ja asenna päivitykset automaattisesti** samassa valikossa muuttavat valintaasi myöhemmin. Splat asentaa päivityksen vain, jos siinä on kehittäjän allekirjoitus. Itse rakennetussa versiossa ei ole päivitysohjelmaa.
 
-**Lähdekoodista.** Katso esivaatimukset kohdasta [Rakentaminen](#rakentaminen) ja suorita sitten:
+**Lähdekoodista.** Katso esivaatimukset kohdasta [Rakentaminen](../../../docs/development.md#building) ja suorita sitten:
 
 ```sh
 make build
@@ -164,10 +164,12 @@ Jokainen dokumentti avautuu omaan ikkunaansa tai välilehteen, jos pidät välil
 
 - **Vasemmalla: lähdeteksti.** Markdownisi SF Monolla ja syntaksiväreillä.
 - **Oikealla: esikatselu.** Renderöity dokumentti, valmiina muokattavaksi.
-- **Jäsennyssivupalkki (valinnainen).** Kaikki otsikot puuna; otsikon napsautus näyttää sen molemmissa ruuduissa. Voit näyttää tai kätkeä sen valinnalla **Näytä › Näytä jäsennys** (⌃⌘S).
+- **Sivupalkki (valinnainen).** Kaikki otsikot puuna, otsikon napsautus näyttää sen molemmissa ruuduissa: **Näytä › Näytä jäsennys** (⌃⌘S). Kahdella muulla välilehdellä ovat [kansion muistiinpanot](#muistiinpanot-kansiossa) ja niiden haku.
 - **Työkalupalkki.** Painikkeet ryhmiteltyinä sen mukaan, mitä ne muuttavat: merkit, kappaleet ja lisättävät elementit, sitten esikatselun näyttö päälle tai pois, Jaa ja Uusi dokumentti. Muokkaa sitä valinnalla **Näytä › Muokkaa työkalupalkkia…**.
 
 Vedä jakajaa antaaksesi jommallekummalle puolelle enemmän tilaa. **Näytä › Kätke esikatselu** (⌥⌘P) jättää vain lähdetekstin; Splat muistaa tämän ikkunakohtaisesti. Molemmat ruudut vierittyvät yhdessä, ja toisessa ruudussa tehty valinta korostuu toisessa.
+
+Ikkunan kulmassa näkyvät tekstin sanat ja merkit ja sen lukuaika sekä valinnan vastaavat tiedot, kun valinta on olemassa. Linkkien osoitteita, HTML-tageja, metatietoja, kommentteja, kaavoja ja kaavioita ei lasketa. **Näytä › Kätke sanamäärä** poistaa sen näkyvistä.
 
 ### Dokumentit, välilehdet ja versiot
 
@@ -214,7 +216,7 @@ Esikatselu toimii kuin tekstinkäsittelyohjelma, mutta kaikesta, mitä siinä te
 - **Kaavat ja kaaviot** näkyvät valmiina grafiikkana. Napsauta sitä, siirrä kohdistin sen päälle tai paina sen kohdalla Return avataksesi sen editorin (katso [Kaavat](#kaavat) ja [Kaaviot](#kaaviot)).
 - **Upotettu HTML, upotetut muistiinpanot ja front matter** näytetään, mutta niitä muokataan lähdetekstissä. Niiden napsautus siirtää kohdistimen vastaavaan kohtaan siellä.
 
-Kaikki, mitä Markdown ei voi ilmaista, on estetty esikatselussa: Fontti- ja Väri-paneelit, viivoitin sekä muotoillun tekstin ja kuvien sijoittaminen tai pudottaminen. Sijoitettu HTML ja RTF tulevat pelkkänä tekstinä.
+Kaikki, mitä Markdown ei voi ilmaista, on estetty esikatselussa: Fontti- ja Väri-paneelit, viivoitin sekä muotoillun tekstin ja kuvien sijoittaminen tai pudottaminen. Sijoitettu HTML ja RTF tulevat pelkkänä tekstinä, ellet valitse kohtaa [Sijoita Markdownina](#muotoillun-tekstin-sijoittaminen).
 
 ### Muotoilukomennot
 
@@ -245,6 +247,21 @@ Alleviivaus, korostus, yläindeksi ja alaindeksi kirjoitetaan muodossa `<ins>`, 
 - Esikatselussa **Tab** siirtyy seuraavaan soluun, **⇧Tab** edelliseen ja **Return** alla olevaan soluun. Tab viimeisessä solussa lisää rivin.
 - **Taulukko**-valikko lisää ja poistaa rivejä ja sarakkeita sekä asettaa sarakkeen tasauksen (⌘{, ⌘|, ⌘}).
 - **Taulukko › Tasaa taulukon sarakkeet** täyttää lähdetekstiä välilyönneillä, jotta sarakkeet asettuvat riviin.
+
+### Muotoillun tekstin sijoittaminen
+
+**Muokkaa › Sijoita Markdownina** (⌃⌘V), joka on myös molempien ruutujen kontekstivalikossa, muuttaa leikepöydän sisällön Markdowniksi valinnan kohdalle yhtenä kumoamisvaiheena. ⌘V lisää edelleen pelkkää tekstiä.
+
+- **Selaimesta, Wordista, Google Docsista, Confluencesta, Muistiinpanoista tai Pagesista:** otsikot, lihavointi, kursivointi, alleviivaus, yliviivaus, ylä- ja alaindeksi, linkit, luettelot sisäkkäisyyksineen, lainaukset, koodi ja taulukot tulevat mukana.
+- **Laskentataulukosta:** soluista tulee taulukko, jossa on otsikkorivi ja numerosarakkeet tasattuna oikealle. Samoin käy sarkaimilla, puolipisteillä tai pilkuilla erotetulle tekstille, jos jokaisella rivillä on yhtä monta saraketta.
+- **Kuvat**, joilla on verkko-osoite, pysyvät linkkeinä. Sijoitetun HTML:n sisällä olevasta kuvasta tulee tiedosto dokumentin viereen, ja dokumentti täytyy tallentaa kerran, jotta tämä onnistuu. Wordin väliaikaiset kuvatiedostot eivät tule mukaan, mutta niiden vaihtoehtoinen teksti säilyy.
+- **Linkeistä** säilyvät vain osoitteet `http`, `https`, `mailto`, suhteelliset osoitteet ja `#`-osoitteet; muista linkeistä jää vain teksti.
+
+### Metatiedot
+
+**Muoto › Muokkaa metatietoja…** tai esikatselun yläreunan metatietorivin napsautus avaa lomakkeen, jossa on YAML-front matterin kentät. Kenttiä voi muuttaa, lisätä ja poistaa. Luettelon sisältävä kenttä säilyy luettelona: sen arvot ovat peräkkäin pilkuilla erotettuina, ja pilkun sisältävä arvo on lainausmerkeissä. Uudesta kentästä, jonka nimi on `tags`, `aliases`, `keywords`, `categories`, `authors` tai `cssclasses`, tulee myös luettelo. Sisäkkäiset kentät ja monirivinen teksti näkyvät siellä, ja niitä muokataan lähdetekstissä.
+
+Lomakkeen tekemä muutos on yksi kumoamisvaihe ja ulottuu vain muuttamiesi kenttien riveille: kaikkien muiden kommentit, järjestys, poikkeavat välit, lainausmerkit ja rivinvaihdot säilyvät tavu tavulta samoina. Dokumentti, jossa ei ole metatietoja, saa lohkon alkuunsa.
 
 ## Tuettu Markdown
 
@@ -315,7 +332,7 @@ Ilman omaa ankkuria jokainen otsikko saa sellaisen tekstistään johdettuna, kut
 - **Wikilinkit.** `[[Muistiinpano]]` linkittää tiedostoon `Muistiinpano.md` samassa tai alemmassa kansiossa. `[[Muistiinpano|Näytettävä teksti]]` näyttää oman tekstisi, ja `[[Muistiinpano#Otsikko]]` avaa muistiinpanon. ⌘-osoitus avaa sen Splatissa.
 - **Upotukset.** `![[Muistiinpano]]` näyttää toisen muistiinpanon tämän sisällä; siihen upotetut muistiinpanot näkyvät linkkeinä. `![[kaavio.png]]` näyttää kuvan. Kuten Obsidianissa, upotukset nimeävät muistiinpanoja ja kuvia dokumentin kansiossa tai sen alla, eivät koskaan absoluuttisella polulla, ja vain Markdown-tiedostot näkyvät muistiinpanoina.
 - **Kommentit.** `%%Vain lähdetekstissä%%` pysyy näkyvissä lähdetekstissä ja jätetään pois esikatselusta ja jokaisesta viennistä, sekä tekstin seassa että omilla riveillään.
-- **Tunnisteet.** `#idea` tai `#project/splat` korostetaan. ⌘-osoitus etsii tunnistetta dokumentista.
+- **Tunnisteet.** `#idea` tai `#project/splat` korostetaan. ⌘-osoitus etsii tunnistetta dokumentista ja sivupalkissa koko kansiosta.
 - **Laajennettavat huomautuslaatikot.** Katso [Huomautuslaatikot](#huomautuslaatikot).
 
 ### Lähde- ja kirjallisuusviitteet
@@ -439,6 +456,23 @@ Esikatselussa napsautus asettaa kohdistimen, jotta voit muokata linkin tekstiä;
 
 **Lisää › Sisällysluettelo** lisää linkitetyn luettelon kaikista otsikoista. Kun kohdistin on sen sisällä, sama komento päivittää sen. Jäsennyssivupalkki (⌃⌘S) siirtyy mihin tahansa otsikkoon molemmissa ruuduissa.
 
+## Muistiinpanot kansiossa
+
+Sivupalkin yläreunan painikkeet vaihtavat jäsennyksen, tiedostojen ja haun välillä.
+
+- **Tiedostot** (**Näytä › Näytä tiedostot**, ⌃⌘E). Kaikki Markdown-tiedostot dokumentin kansiossa tai, jos dokumentti on Git-repositoriossa, koko repositoriossa. Napsautus tai Return avaa muistiinpanon tämän ikkunan välilehdeksi; jos se on jo auki, se tulee eteen. Kansion nimen vieressä oleva painike näyttää toisen kansion tässä ikkunassa. Kätketyt tiedostot, `node_modules`, `target`, `Pods`, `DerivedData`, `__pycache__` ja kansiot, joissa ei ole muistiinpanoja, jäävät pois. Suoraan kotikansiossasi oleva dokumentti näyttää vain vieressään olevat muistiinpanot, jotta Splat ei kävisi läpi kaikkia kansioitasi ja kysyisi lupaa jokaiseen niistä.
+- **Haku** (**Muokkaa › Etsi › Etsi kaikista muistiinpanoista…**, ⇧⌘F). Löytää tekstin kaikista muistiinpanoista kirjainkoosta ja aksenttien koodaustavasta riippumatta. `#tag` löytää tunnisteen, `#project` myös tunnisteen `#project/splat`, eikä mitään koodin sisältä. Tuloksen napsautus avaa muistiinpanon siitä kohdasta.
+- **Linkit muistiinpanoon.** Muistiinpanon kontekstivalikko luetteloi muistiinpanot, jotka linkittävät siihen wikilinkillä, upotuksella, suhteellisella linkillä tai linkkiviitemääritelmällä.
+- **Muistiinpanon uudelleennimeäminen.** Sama valikko nimeää sen uudelleen ja muuttaa nuo linkit. Splat kertoo ensin, kuinka monesta linkistä kuinka monessa tiedostossa on kyse. Kussakin linkissä muuttuu vain nimi, ja tiedoston jokainen muu tavu säilyy. Avoimet dokumentit ottavat muutoksen kumoamisvaiheena; muissa tiedostoissa vain Git tai versiot voivat perua sen. Tiedosto, jota toinen ohjelma on sillä välin muuttanut, pysäyttää kaikkien linkkien uudelleennimeämisen, ja Splat kertoo, mistä tiedostosta on kyse.
+
+Luettelo seuraa kansiota, kun ikkuna tulee eteen. Haku käsittelee tiedostoja sellaisina kuin ne ovat levyllä, ja teksti, jota et ole vielä tallentanut, otetaan huomioon seuraavasta automaattisesta tallennuksesta alkaen.
+
+## Muutokset viimeisimmän commitin jälkeen
+
+Git-repositoriossa olevassa dokumentissa tekstin vieressä olevat palkit merkitsevät sen, mikä eroaa viimeisimmästä commitista, lähdetekstissä ja esikatselussa: vihreä lisätyille riveille, sininen muutetuille riveille ja lyhyt punainen merkki sinne, mistä jotain on poistettu. Ne seuraavat mukana kirjoittaessasi ja haaran siirtyessä. **Näytä › Muutokset viimeisimmän commitin jälkeen** poistaa ne käytöstä kaikista ikkunoista.
+
+Rivejä, jotka eroavat vain rivinvaihdoltaan, ei lasketa, joten CRLF-tiedosto LF-commitia vasten ei näytä muutosta. Uudessa tiedostossa ei ole merkkejä ennen sen ensimmäistä commitia, eikä niitä ole myöskään yli 32 Mt:n dokumentissa.
+
 ## Vienti, tulostus ja jakaminen
 
 | Muoto | Miten | Mitä saat |
@@ -451,6 +485,19 @@ Esikatselussa napsautus asettaa kohdistimen, jotta voit muokata linkin tekstiä;
 
 **Tiedosto › Jaa** -valikko tarjoaa kaikki nämä yhdessä paikassa. Viennit käyttävät typografisten välimerkkien asetusta ja verkosta sallimiasi kuvia; verkon kuvat pysyvät HTML:ssä linkkeinä.
 
+**Tiedosto › Vientivalinnat…** määrittää, mitä PDF, tulostus ja Word lisäävät tekstiin, kaikille dokumenteille:
+
+- **Sivunumerot** PDF:n ja tulosteen alaotsakkeessa, muodossa `2 / 9`.
+- **Yläotsake ja alaotsake** PDF:lle ja tulosteelle. `{title}`, `{author}`, `{date}`, `{page}` ja `{pages}` tarkoittavat arvojaan, kolme ensimmäistä dokumentin metatiedoista.
+- **Nimiösivu** PDF:lle, tulosteelle ja Wordille, ja siinä `title`, `subtitle`, `author` ja `date` metatiedoista tai otsikkona dokumentin nimi. Siinä ei ole ylä- eikä alaotsaketta.
+- **Word-työpohja**, `.docx` tai `.dotx`, jonka ulkoasun vienti ottaa käyttöön: sen tyylit, myös lokalisoidut nimet, teeman, sivukoon, marginaalit, ylä- ja alaotsakkeet. Työpohja, jota ei voi lukea, pysäyttää viennin ja kertoo siitä sen sijaan, että antaisi sinulle dokumentin ilman sitä.
+
+## Word-dokumenttien tuominen
+
+**Tiedosto › Tuo Word-dokumentti…** kysyy `.docx`- tai `.dotx`-tiedostoa ja sitä, minne sen Markdown menee, ja avaa sitten tuloksen. Kuvat päätyvät sen viereen kansioon, joka on nimetty dokumentin mukaan päätteellä `-images`.
+
+Otsikot ja luettelot siirtyvät sellaisina kuin Wordin tyylit ja numerointi ne määrittelevät, myös dokumenteissa, joiden tyyleillä on lokalisoidut nimet. Lihavointi, kursivointi, alleviivaus, yliviivaus, korostus, ylä- ja alaindeksi, linkit, lainaukset, koodi, alaviitteet, loppuviitteet ja taulukot tulevat mukana, useamman sarakkeen solut HTML-taulukkona. Kaavoista tulee LaTeXia. Jäljitetyt muutokset katsotaan hyväksytyiksi, ja sisällysluettelo jää pois, koska **Lisää › Sisällysluettelo** tekee uuden. Vanhat `.doc`-tiedostot ja salasanalla suojatut dokumentit hylätään.
+
 ## Ulkoasu ja saavutettavuus
 
 - **Tumma tila** seuraa järjestelmää. Kaavat ja kaaviot renderöidään kullekin ulkoasulle.
@@ -459,7 +506,7 @@ Esikatselussa napsautus asettaa kohdistimen, jotta voit muokata linkin tekstiä;
 - **Koko näyttö, välilehdet ja muokattava työkalupalkki**, kuten jokaisessa Mac-apissa.
 - **VoiceOver.** Ruudut on nimetty ”Markdown-lähdeteksti” ja ”Esikatselu”, kaavat luetaan koodinaan ja kaaviot otsikkonaan. Jokaiseen komentoon pääsee näppäimistöllä.
 
-Splatissa ei ole asetusikkunaa: harvat asetukset ovat siellä, missä niitä tarvitaan, kohdissa **Näytä** ja **Muokkaa › Korvaukset**.
+Splatissa ei ole asetusikkunaa: harvat asetukset ovat siellä, missä niitä tarvitaan, kohdissa **Näytä**, **Muokkaa › Korvaukset** ja **Tiedosto › Vientivalinnat…**.
 
 ## Kielet
 
@@ -482,6 +529,9 @@ Heprean ja arabian teksti luetaan oikealta vasemmalle kaikkialla, missä se esii
 | Tasaa taulukon sarake vasemmalle, keskelle, oikealle | ⌘{, ⌘\|, ⌘} |
 | Kätke tai näytä esikatselu | ⌥⌘P |
 | Näytä tai kätke jäsennys | ⌃⌘S |
+| Näytä tai kätke tiedostot | ⌃⌘E |
+| Etsi kaikista muistiinpanoista | ⇧⌘F |
+| Sijoita Markdownina | ⌃⌘V |
 | Lähennä, loitonna, todellinen koko | ⌘+, ⌘−, ⌘0 |
 | Uusi dokumentti, avaa, tallenna, monista | ⌘N, ⌘O, ⌘S, ⇧⌘S |
 | Arkin määritys, tulosta | ⇧⌘P, ⌘P |
@@ -507,6 +557,9 @@ Markdown-tiedosto voi tulla keneltä tahansa, joten Splat kohtelee jokaista doku
 - **Verkon kuvat** latautuvat vasta luvallasi, vain `https`-yhteydellä, eivät koskaan paikallisverkon isännistä, enintään 10 Mt kukin ja yksityisessä istunnossa ilman evästeitä.
 - **Eristetty purku.** Kuvat sekä kaavojen ja kaavioiden grafiikka puretaan apuprosesseissa, jotka sulkevat kaikki perimänsä tiedostot ja lukitsevat itsensä hiekkalaatikkoon ennen ensimmäisen tavun lukemista: ei tiedostojen käyttöä, ei verkkoa. Ne palauttavat vain pikseleitä, joiden koko tarkistetaan, ja ne pysäytetään 10 sekunnin jälkeen. Applen omat kuvanpurkajat näkevät vain HEIC-, TIFF-, AVIF- ja PDF-aineistoa, ja vain kun data todella on sitä muotoa; ne toimivat omassa apuprosessissaan, joka saa lisäksi lukea järjestelmän fonttikansioita ja käyttää järjestelmän videodekooderia. SVG:t, kaavat ja kaaviot kulkevat myös tämän apuprosessin kautta, joten ne ovat Splatissa kuvia, joilla on kiinteä erottelutarkkuus: neljä pikseliä pistettä kohti, enintään 2560 pidemmällä sivulla.
 - **Paikalliset tiedostot** tavoittavat dokumentin vain sen nimeämän polun kautta. Upotukset näyttävät Markdown-muistiinpanoja dokumentin kansiosta ja sen alta, ja puuttuvaa kuvaa etsitään vain sieltä. Muualla oleva kuvapolku, absoluuttinen tai `~`:lla alkava, latautuu esikatselussa silti; HTML- ja Word-viennit, tulostus ja PDF:t ottavat mukaan vain sen, mikä on dokumentin kansiossa tai sen Git-tietovarastossa, paitsi jos tämä tietovarasto sisältää myös kotikansiosi, joten toisen tekemä dokumentti ei voi vetää tiedostojasi vientiin, jonka annat eteenpäin.
+- **Muistiinpanokansiot** luetaan vain silloin, kun sivupalkki näyttää ne, ja muistiinpanon uudelleennimeäminen muuttaa muita tiedostoja vasta, kun olet vahvistanut, kuinka monta.
+- **Git-repositoriot** lukee Splat itse. Se ei koskaan suorita `git`-ohjelmaa, jonka asetukset toisen tekemässä repositoriossa voivat käynnistää muita ohjelmia, eikä se lue enempää kuin avoimen dokumentin version viimeisimmästä commitista. Se ei kirjoita sinne mitään eikä käytä verkkoa.
+- **Word-dokumentit ja sijoitettu teksti** luetaan Splatin omilla jäsentimillä, ja koolle, sisäkkäisyydelle ja tiedoston purkautumiselle on rajat. Niiden linkeistä säilyvät vain osoitteet, jotka Splat muutenkin sallii, eivätkä Word-tiedoston kuvien nimet koskaan ratkaise, minne ne kirjoitetaan.
 - **Tallentamattoman tekstin kopiot** pysyvät tällä Macilla Kirjasto-kansiossasi kaatumisen jälkeistä palautusta varten. Ne poistuvat tallennuksen tai Splatin normaalin päättymisen myötä; kaatumisen jättämät kopiot pysyvät palautuskansiossa, kunnes poistat ne.
 - **Linkit** eivät koskaan käynnistä ohjelmaa napsautuksella. Web- ja sähköpostilinkit avautuvat tavalliseen tapaan; linkit muihin appeihin kysyvät ensin.
 - **Dokumenttien HTML** luetaan Splatin omalla jäsentimellä. Skriptit, tyylit, kehykset ja lomakkeet eivät koskaan suoriteta.
@@ -530,7 +583,7 @@ Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti
 ## Tunnetut rajoitukset
 
 - **Yksittäinen aaltoviiva tarkoittaa alaindeksiä.** `~teksti~` on alaindeksi kuten Pandocissa; yliviivaus vaatii `~~kaksi~~`. GitHub yliviivaa myös yhdellä aaltoviivalla.
-- **Vain luku esikatselussa:** upotettua HTML:ää, upotettuja muistiinpanoja ja front matteria muokataan lähdetekstissä.
+- **Vain luku esikatselussa:** upotettua HTML:ää ja upotettuja muistiinpanoja muokataan lähdetekstissä, front matteria sen lomakkeessa tai lähdetekstissä.
 - **Hyvin syvä sisäkkäisyys:** yli 64 tasoa syvälle sisäkkäinen HTML ja yli 16 tasoa syvä tekstinsisäinen HTML väistyy sisältönsä tieltä.
 - **Yhdistetyt taulukkosolut** ovat olemassa vain HTML-taulukoissa ja vain sarakkeiden yli (`colspan`, ei `rowspan`). MultiMarkdownin taulukkosyntaksia yhdistetyille soluille ei tueta.
 - **Kirjallisuusluettelot** luetaan vain BibTeXistä, ei CSL JSONista eikä YAMLista.
@@ -538,6 +591,11 @@ Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti
 - **Typografiset välimerkit:** saksan sulkeva yksittäinen lainausmerkki ei erotu heittomerkistä, ja se asetetaan muodossa ’.
 - **Kaavat, ei dokumentit:** ei LaTeX-paketteja, TikZiä eikä kokonaisia dokumentteja.
 - **Visuaalinen kaavaeditori** kirjoittaa LaTeXia MathLiven merkinnöin: välilyönnit katoavat (`E = mc^2` muuttuu muotoon `E=mc^2`), renderöinti pysyy samana.
+- **Sanamäärä:** thai, lao, khmer ja burma kirjoitetaan ilman välilyöntejä, ja ne lasketaan tekstijaksoittain eikä sanoittain. `3.14` ja `snake_case` ovat kumpikin kaksi sanaa.
+- **Muistiinpanon uudelleennimeäminen** ei muuta linkkejä upotetussa HTML:ssä, ja wikilinkki pysyy ennallaan, jos uudessa nimessä on `#`, `|`, `^`, `[`, `]` tai `\`.
+- **Muutosmerkinnät** lukevat repositorioita, joissa on SHA-1-objekteja ja tavallisia tai pakattuja viitteitä; repositorio, jossa on SHA-256 tai reftable, ei näytä niitä. Git-suodattimen, kuten LFS:n, alaista tiedostoa verrataan siihen, minkä suodatin on tallentanut.
+- **Word-tuonti** jättää pois ylä- ja alaotsakkeiden sekä kommenttien tekstin, ja `.emz`- tai SVG-kuvista säilyy vain vaihtoehtoinen teksti.
+- **Sijoita Markdownina** lukee RTF:n länsimaisena tekstinä ja ottaa siinä otsikot vain fonttikoista. Useimmat ohjelmat tarjoavat myös HTML:ää, jota se suosii.
 - **Tarkoituksella:** ei rivinumeroita, ei asetusikkunaa, ei Help Bookia, ei App Storessa.
 - **Vähemmän testattu Intelillä.** Ikkunan itsetestit ajetaan vain Apple Siliconilla; Intelillä CI ajaa `cargo test`.
 
@@ -561,190 +619,7 @@ Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti
 
 ## Kehittäjille
 
-Splat on Rust-sovellus, joka puhuu AppKitille ja WebKitille suoraan [objc2:n](https://github.com/madsmtm/objc2) kautta. Swiftiä, Objective-C:tä, Xcode-projektia tai Interface Builder -tiedostoa ei ole.
-
-### Rakentaminen
-
-Esivaatimukset:
-
-- macOS ja Command Line Tools (`xcode-select --install`). Xcodea ei tarvita; Splat rakentuu ilman `actool`-, `ibtool`- ja `metal`-työkaluja.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../../../rust-toolchain.toml) nimeää tarkan version, jota CI käyttää; rustup asentaa sen itse, Homebrew'n Rust ohittaa tiedoston. Sen nostaminen siellä on tapa, jolla uudet kääntäjän ja clippyn varoitukset pääsevät projektiin.
-- rustup, komentoja `make lint`, `make check` ja `make universal` varten: `cargo xtask check-library` rakentaa kirjaston Linuxille osoittaakseen, ettei se tarvitse macOS:ää, eikä Homebrew'n Rustissa ole muita kohteita.
-
-[Makefile](../../../Makefile) sisältää lyhyet sisääntulokohdat; `make help` luettelee ne kaikki:
-
-```sh
-make build                  # target/release/Splat.app, sama kuin cargo xtask bundle --release
-make universal              # target/splat-universal Apple Siliconille ja Intelille, sellaisena kuin levykuva sen sisältää
-make check                  # muotoilu, clippy ilman varoituksia, kaikki testit, vendoroidut kirjastot; sen CI ajaa
-make test                   # make check, sitten itsetesti ilman ikkunaa
-make test-gui               # itsetestit ikkunalla; ne varaavat Macin noin neljäksi minuutiksi
-make test-long              # pidempi satunnaishaku ja 10 Mt:n osittaispäivityksen tarkistus
-make fuzz                   # satunnaissyöte osittaiselle jäsennykselle ja kaikille tulosteille
-make coverage               # kaikkien testien ja itsetestien rivikattavuus, moduulikohtaisella alarajalla
-make coverage-library       # samat alarajat ikkunattomille moduuleille, kuten CI:ssä
-make bench FILE=<file.md>   # ajoitukset suuren tiedoston avaamiselle, kirjoittamiselle ja vierittämiselle
-make release                # ensin make test, sitten notarisoitu levykuva
-```
-
-Rakennuslogiikka itse on Rust-paketissa [xtask](../../../xtask/src/main.rs):
-
-```sh
-cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, allekirjoitettu varmenteella "Splat Local Signing"
-cargo xtask bundle             # target/debug/Splat Debug.app, erillinen appi, joka ei koskaan avaa Markdown-tiedostoja
-cargo xtask dmg                # dist/Splat-<version>.dmg jakelua varten, Developer ID, notarisoitu
-cargo xtask icon               # rakenna assets/AppIcon.icns ja README-kuvake uudelleen tiedostosta assets/icon-1024.png
-cargo xtask vendor check       # tarkista mukana tuleva JavaScript tiedostoa vendor.lock vasten
-cargo xtask vendor fetch       # lataa se uudelleen, kun vendor.lockissa on muutettu versiota
-```
-
-`bundle` kirjoittaa tiedoston `Info.plist`, kopioi resurssit ja lokalisoinnit ja allekirjoittaa apin varmenteella ”Splat Local Signing”. Ensimmäinen rakennus luo sen kirjautumisavainnippuusi, voimassa 20 vuotta. Niin kauan kuin se säilyy, Splat pitää viimeisimmät dokumenttinsa ja kansioiden käyttöoikeutensa uudelleenrakennusten yli; ad hoc -allekirjoituksella jokainen rakennus olisi macOS:lle uusi appi. Debug- ja itsetestirakennuksilla on omat bundle ID:nsä (`local.splat.debug`, `local.splat.selftest`), eivätkä ne rekisteröidy Markdown-tiedostoille, joten Finder ei koskaan avaa dokumenttia vanhentuneessa rakennuksessa, ja ne jättävät normaalin apin asetukset rauhaan.
-
-Versio on tiedostossa [VERSION](../../../VERSION) muodossa `major.minor.build`, ja se on se, jonka seuraava rakennus saa. Jokainen onnistunut release-rakennus (`make build`, `cargo xtask bundle --release`, `make release`) nostaa build-numeroa yhdellä; debug- ja itsetestirakennukset jättävät sen ennalleen. Major ja minor nostetaan käsin: aseta VERSION vaikkapa arvoon `1.1.0`, ja seuraava rakennus saa täsmälleen sen.
-
-### Jakelu
-
-`cargo xtask dmg` (tai `make release`, joka ajaa ensin `make test`) rakentaa release-version, allekirjoittaa sen Developer ID:llä, notarisoi apin Applella ja liittää lipun siihen, pakkaa sen pakattuun, vain luettavaan levykuvaan, jossa on linkki Ohjelmat-kansioon, notarisoi levykuvankin ja liittää sen lipun sekä tarkistaa tuloksen Gatekeeperillä. Appi kantaa omaa lippuaan, jotta ilman Finderia asennettu kopio, kuten Homebrew tekee, aukeaa offline-tilassa myös ensimmäisellä käynnistyksellä; kaksi kierrosta notarisointipalvelun kanssa kestää kumpikin muutaman minuutin. Vain kaikki vaiheet läpäissyt kuva tulee tiedostoksi `dist/Splat-<version>.dmg`, kopioksi, joka commitoidaan, ja build-numero nousee. Edellinen kuva jää vielä yhdeksi julkaisuksi, koska GitHubin raw-palvelin voi jakaa vanhaa päivitysfeediä muutaman minuutin pushin jälkeen; vanhemmat siirretään roskakoriin. Epäonnistunut ajo jättää `dist/`-kansion ja VERSIONin ennalleen.
-Jokainen julkaisu lisää repositorion historiaan koko levykuvan, noin 16 Mt. Se ajetaan vain kutsuttaessa, ei koskaan osana normaalia rakennusta, ja se tarvitsee:
-
-- "Developer ID Application" -varmenteen avainnipussa
-- tallennetun kirjautumisen Applen notarisointipalveluun sovelluskohtaisella salasanalla, luotu kerran komennolla `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- päivitykset allekirjoittavan yksityisen avaimen kirjautumisavainnipussa. Sparklen `generate_keys` loi sen; sen julkinen puolisko on `UPDATE_KEY` tiedostossa [xtask/src/main.rs](../../../xtask/src/main.rs) ja jokaisen asennetun kopion sisällä, ja kopio hyväksyy vain sillä allekirjoitetut päivitykset. Pidä varmuuskopio salasanahallinnassa: `target/sparkle-2.10.1/bin/generate_keys -x <file>` vie sen, `-f <file>` tuo sen toiselle Macille. Ilman sitä asennettuja kopioita ei voi enää koskaan päivittää.
-- rustupin (`brew install rustup`, joka jättää Homebrew'n Rustin paikalleen)
-- tiedoston `RELEASE_NOTES.md`, jossa kerrotaan, mitä tämä julkaisu tuo. Päivitysikkuna näyttää sen rivin yllä, joka kertoo, miten ongelmasta ilmoitetaan, joten `dmg` pysähtyy, jos tiedosto on tyhjä tai siinä on yhä edellisen julkaisun tiedot
-
-Jos jokin niistä puuttuu, `dmg` pysähtyy ennen rakentamista. Ensimmäisellä ajolla macOS kysyy, saako Terminal ohjata Finderia; ilman lupaa levykuvassa ei näy taustaa eikä kuvakkeiden järjestystä.
-
-Vain levykuva sisältää päivitysohjelman, [Sparklen](https://sparkle-project.org), jonka rakennus lataa kerran hakemistoon `target/` sen GitHub-julkaisusta ja tarkistaa xtaskin tarkistussummaa vasten. Hardened runtime lataa kehyksen vain, kun siinä on apin Team ID, joka Developer ID -allekirjoituksessa on ja paikallisessa varmenteessa ei ole; ja päivitys ei saa korvata omaa rakennustasi. Itsetestirakennus sisältää myös Sparklen päivitysvalikon tarkistamiseksi sitä vasten: feedillä, jota ei ole olemassa, ilman Sparklen kysymystä toisella käynnistyksellä ja oikeudella, jonka avulla paikallisesti allekirjoitettu appi voi ladata kehyksen. `dmg` allekirjoittaa uuden kuvan päivitysavaimella ja kirjoittaa tiedoston `dist/appcast.xml`, feedin, jota asennetut kopiot lukevat GitHubista. Commitoi ja pushaa kuva ja feedi yhdessä: siitä hetkestä asennetut kopiot tarjoavat päivitystä. Tämän READMEn ja sen käännösten latauslinkit osoittavat uusimman GitHub-julkaisun tiedostoon `Splat.dmg`, joten jokaisessa julkaisussa on kopio tällä nimellä: `cp dist/Splat-<version>.dmg target/Splat.dmg` ja sitten `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
-
-Levykuva on universal-binääri Apple Siliconille ja Intelille; muut rakennukset ovat vain isäntäsuorittimelle. Homebrew'n Rust toimittaa standardikirjaston vain isäntäsuorittimelle, joten `dmg` rakentaa rustupin kautta, joka asentaa tiedoston [rust-toolchain.toml](../../../rust-toolchain.toml) työkaluketjun ja kohteet ensimmäisellä käytöllä, ja pysähtyy, jos ohjelmasta tai Sparklesta puuttuu koodi jommallekummalle suorittimelle. `make universal` rakentaa vain ohjelman.
-Sen sisältämällä apilla on eri allekirjoitus kuin paikallisella rakennuksella, joten macOS pitää kummallekin erilliset viimeisimmät dokumentit ja kansioiden käyttöoikeudet.
-
-### Testaus
-
-| Komento | Tarkistaa |
-|---|---|
-| `cargo test --release` | yksikkö-, satunnais- ja käännöstestit |
-| `SPLAT_FUZZ_ROUNDS=20000 cargo test --release` | pidempi satunnaishaku; `SPLAT_FUZZ_SEED` vaihtelee syötteitä |
-| `SPLAT_I18N_ONLY=fr cargo test --release i18n` | yksi kieli, kun muut ovat keskeneräisiä |
-| `cargo clippy --release --all-targets [--features selftest]` | lint-tarkistukset, mukaan lukien jokaisen `unsafe`-lohkon perustelu, funktioiden pituus ja kirjastossa lukumuunnokset |
-| `cargo xtask check-library` | kirjasto rakentuu Linuxille, joten mikään siinä ei tarvitse macOS:ää |
-| `cargo xtask vendor check` | JavaScript-kirjastot vastaavat tiedostoa `vendor.lock` tavu tavulta |
-| `cargo xtask selftest probe` | ilman ikkunaa, kukin odotetun tuloksensa kanssa: kaavat, kaaviot, verkkokuvat prosessin sisäistä palvelinta vasten, estetyt osoitteet, teksti, jonka jokainen komento kirjoittaa, jokainen kuvamuoto kummankin viennin läpi, sivu, joka lakkaa vastaamasta, ja verkkonäkymien puolustukset sivua vastaan, jolla niitä ei ole. Kestää noin puoli minuuttia. Mikä tarvitsee sovelluksen edessään, ohitetaan lukitulla näytöllä |
-| `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | käynnissä oleva appi, napsautus napsautukselta. Avaa ikkunan ja kirjoittaa siihen; Mac on varattu noin neljäksi minuutiksi. `--scenarios` ajaa vain toisen osan, noin puolessatoista minuutissa. `--only` ajaa yhden tämän osan ryhmän omassa dokumentissaan, myös lukitulla näytöllä. `--in-back` jättää pois sen, mikä tarvitsee apin edustalle; ilman sitä tällainen tarkistus epäonnistuu |
-| `cargo xtask selftest resize` | leventää ikkunaa jakajan siirtämisen jälkeen: lähdeteksti taittuu uudelleen ikkunan koon muuttuessa. Kestää noin kymmenen sekuntia |
-| `cargo xtask selftest typing [--by-hand]` | kirjoittaa tallennusten läpi näppäimillä sovelluksen tapahtumajonon kautta tai `--by-hand`-valinnalla käsin: kirjoitettu säilyy ja näkyy tallentamattomana. Kestää noin minuutin |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | ajoitukset suuren tiedoston avaamiselle, kirjoittamiselle ja vierittämiselle; `--keystroke-ms` epäonnistuu, kun nopein painallus kestää kauemmin |
-| `cargo test --release -- --ignored partial_updates` | näppäinpainallus 10 Mt:ssa: osittainen päivitys kokonaista vastaan, sama tulos enintään neljänneksessä ajasta |
-| `cargo test --release --test hostile` | dokumentit, jotka on tehty ylittämään pino tai vievät neliöllisen ajan, kukin kahdessa koossa, joiden aikojen on kasvettava tekstin mukana, jäsennyksen, taiton, molempien vientien, näppäinpainallusten ja komentojen läpi |
-| `make mutants` | `crates/splat-markdown`-, `crates/splat-preview`- ja `crates/splat-file-state`-hakemistoihin rakennetut viat yksi kerrallaan [cargo-mutantsin](https://mutants.rs) kautta (`cargo install cargo-mutants`); kertoo, mitkä niistä mikään testi ei huomaa. Kestää tunteja; `FILE=crates/splat-preview/src/bridge/mod.rs` rajaa |
-| `make fuzz` | satunnaissyöte [cargo-fuzzin](https://github.com/rust-fuzz/cargo-fuzz) kautta, joka tarvitsee rustupin nightlyn: näppäinpainallukset, joiden on luettava kuin täysi jäsennys, kaikki tulosteet, muokkaukset esikatselussa, kaikki komennot ja tiedosto, joka tallentuu sellaisena kuin se avattiin. `SECONDS=600` etsii pidempään |
-| `cargo test --release --test fuzz_seeds` | hakemiston `fuzz/seeds/` siemenet näiden fuzz-kohteiden tarkistusten läpi ilman fuzzeria; osa jokaista `cargo test`iä |
-| `cargo test --profile checked --workspace` | testit ja lisäksi se, mitä debug-käännös tarkistaa: jokaisen osittaisen jäsennyksen jälkeen lohkot sopivat tekstiinsä, ja se, mitä se kantaa mukanaan, on sitä, mitä teksti sanoo. Osa `make test-long`:ia |
-| `cargo test --release --test entry_points --test structure` | lähdekoodista: kaikki, mitä järjestelmä kutsuu, on suojattu paniikeilta, ja moduulit riippuvat vain alaspäin |
-| `cargo test --release --test decoder` | dekooderiprosessi purkaa kuvia eikä tavoita tiedostoja eikä verkkoa |
-| `make coverage` | `cargo test`in ja kaikkien itsetestien rivikattavuus [cargo-llvm-covin](https://github.com/taiki-e/cargo-llvm-cov) kautta (`brew install cargo-llvm-cov llvm`); epäonnistuu alarajojen alapuolella. Varaa Macin noin viideksi minuutiksi |
-| `make coverage-library` | cratet `splat-markdown`, `splat-preview`, `splat-file-state` ja `splat-i18n` korkeampia alarajojaan vasten, mitattuna pelkällä `cargo test`illä |
-
-Yksikkötestit sijaitsevat testaamansa koodin vieressä. Hakemisto `crates/splat-testkit/tests/` sisältää sen, mikä tavoittaa mallin ja esikatselun ulkopuolelta: satunnaistestit tiedostossa `robustness.rs`, jotka jakavat `splat-testkit`in generaattorin tiedoston `sync.rs` testien kanssa, vahingoittamaan tehdyt dokumentit tiedostossa `hostile.rs` ja fuzz-kohteiden siemenet tiedostossa `fuzz_seeds.rs`. Hakemisto `tests/` sisältää sen, mikä tarkastelee koko ohjelmaa: sen lähdekoodin, sen käännökset ja dekooderitestin, joka käynnistää rakennetun ohjelman. Päätökset hakemistossa `src/editor/`, jotka eivät tarvitse ikkunaa, ovat vapaissa funktioissa omine testeineen: kaikki, mitä controller tietää ja miten se muuttuu, tiedostossa `state.rs`, renderöinnin säännöt tiedostossa `render_queue.rs`, tekstikopio tiedostossa `sync.rs`, kappaletyylit, fontit ja värit arvoina tiedostossa `render.rs`, mitä työkalupalkin tunnisteet tarkoittavat, tiedostossa `toolbar.rs`, mitä linkin napsautus tarkoittaa, tiedostossa `navigation.rs`.
-
-Ikkunan itsetestin vaihe odottaa nimettyä ehtoa eikä aikaa; vain se, mikä ei anna mitään signaalia, kuten jonkin asian puuttuminen, säilyttää tauon perusteluineen. Turha odotus on epäonnistunut tarkistus, joka nimeää sen, mikä ei koskaan tullut, vaihe, joka panikoi, on myös epäonnistunut tarkistus, ja ajo jatkuu kummassakin tapauksessa. Tarkistus, joka ei tässä ajossa voi sanoa mitään, ilmoittaa `SELFTEST SKIP`: xtask listaa sen, eikä se läpäise eikä epäonnistu. xtask vaatii jokaiselta tilalta, ja `--scenarios`ilta erikseen, noin yhdeksän kymmenesosaa sen tarkistuksista. Ikkunan itsetesti ajaa pääläpikäyntinsä jälkeen toisen osan tiedostossa `src/editor/selftest/scenarios.rs`: jokaisen muotoilu- ja taulukkokomennon, dialogit, linkkien napsautukset, sijoittamisen, pudottamisen, viennit, tiedoston, jota toinen ohjelma on muuttanut, suuren muutoksen, levyllä muuttuvat kuvat, muistipaineen, valtavan dokumentin ja palautumisen kaatumisen jälkeen. Sen jokainen ryhmä avaa oman dokumenttinsa, jotta virhe yhdessä ei ulotu seuraavaan, ja jokaisen voi ajaa yksin valinnalla `--only`. Itsetesti ilman ikkunaa myös rikkoo tallennuksen tarkoituksella: kansio, joka ei ota mitään vastaan, vain luku -tiedosto, kadonnut kansio, täysi levy ja paniikki tallennuksen jokaisessa takaisinkutsussa, eikä mikään näistä saa maksaa tekstiä.
-
-Kattavuudella on kaksi alarajaa: jokaisen moduulin vähintään 84 % riveistä ja kaikkien moduulien yhteensä vähintään 96 %. `make coverage` mittaa `cargo test`in yhdessä itsetestien kanssa ja epäonnistuu kummankin alapuolella; `make coverage-library` pitää sen, mikä ei tarvitse ikkunaa, 90 prosentissa ja 97 prosentissa. Alarajat ja harvat poikkeukset, kuten tiedoston `main.rs` paniikkikoukku, joka ajetaan vain kaatumisessa, ovat paketissa [xtask](../../../xtask/src/coverage.rs) perusteineen. Mitatut rakennukset menevät hakemistoon `target/coverage/`, joten mittauskoodi ei koskaan päädy hakemistoon `target/release/` eikä levykuvaan. Dekooderin apuprosessi avaa mittaustiedostonsa ennen kuin se lukitsee itsensä, joten sekin mitataan.
-
-CI ([.github/workflows/ci.yml](../../../.github/workflows/ci.yml)) ajaa `make check`in, `make coverage-library`n ja universal-rakennuksen Apple Siliconilla sekä `cargo test`in Intelillä jokaiselle pushille haaraan `main` ja jokaiselle pull requestille. Joka yö [.github/workflows/nightly.yml](../../../.github/workflows/nightly.yml) ajaa `make test-long`in uusilla satunnaisilla syötteillä. Itsetestit ja levykuva pysyvät kehittäjän Macilla: ne tarvitsevat näytön ja allekirjoitusvarmenteet avainnipussa.
-
-Itsetestin tuloste menee hakemistoon `target/selftest/`. Itsetesti rakentaa erillisen apin (`target/release/Splat Selftest.app`, bundle ID `local.splat.selftest`) ja jättää normaalin apin asetukset, viimeisimmät dokumentit ja tiedostoliitokset koskematta.
-
-### Projektin rakenne
-
-Kaikki, mikä ei tarvitse ikkunaa, on oma crate hakemistossa `crates/` ja rakentuu ilman macOS:ää, joten kääntäjä pitää kiinni siitä, miten ne riippuvat toisistaan. Sovellus hakemistossa `src/` (paketti `splat-app`, ohjelma `splat`) rakentuu niiden päälle.
-
-- `crates/splat-markdown/`: puu, jota jokainen käyttäjä lukee, `Doc` hakemistossa `doc/`, joka omistaa tekstinsä, ja ainoa sidos jäsentimeen hakemistossa `reader/`: comrakia ei nimetä missään muualla, ja `reader/assumptions.rs` pitää sisällään sen, mitä koodi siitä olettaa. Syntaksivärit ja kaikki komennot puhtaina tekstimuokkauksina (`Edit`) hakemistossa `commands/`. Myös uudelleenjäsennys muokkauksen jälkeen (`incremental.rs`), upotetun HTML:n lukija (`markup.rs`), typografia, tunnisteet, viittaukset ja lähdeviitteet juoksevassa tekstissä (`typography.rs`), miltä teksti näyttää ja mikä Markdown ja HTML sen tekee (`style.rs`), mikä osoite voi olla (`url.rs`) sekä HTML- ja Word-vienti (`html.rs`, `docx.rs` ja `docx/html.rs` sekä `docx/xml.rs`). Sijainnilla on oma tyyppinsä: `Byte` lähdetekstissä, `U16` lähdenäkymässä, `Shown` esikatselunäkymässä (`text.rs`).
-- `crates/splat-preview/`: esikatselun taitto hakemistossa `layout/`, siinä oleva upotettu HTML tiedostossa `layout/html.rs` sekä esikatselun ja lähdetekstin välinen vastaavuus (`Bridge`, `Index`). `Bridge` hylkää `Doc`in toisen version taiton.
-- `crates/splat-file-state/`: mitä tekstiä tiedosto sisältää, missä muodossa ja mitä sen vilkaisu tarkoittaa.
-- `crates/splat-i18n/` ja `resources/*.lproj`: 35 kieltä; avaimet ovat saksankieliset tekstit, ja sovellus asentaa käyttöliittymän kielen taulukon käynnistyessään.
-- `crates/splat-testkit/`: satunnaistestien generaattori ja fuzz-kohteiden tarkistukset.
-- `src/editor/`: ikkuna. Yksi `EditorController`-olio palvelee AppKitia molempien näkymien delegaattina ja välittää komponenteille, pienille structeille controllerin ja niiden omistaman tilan päällä, joiden kenttiin muut moduulit eivät yllä:
-
-| Moduuli | Vastuu |
-|---|---|
-| `controller.rs` | luokka, delegaattimetodit, jotka välittävät eteenpäin, `invalidate` sekä se, mitä muu ohjelma kertoo editorille; vain se tavoittaa komponentit |
-| `panes.rs` | `Panes`: tekstinäkymät, jäsennys, ruutujen näyttäminen ja piilottaminen sekä se, mikä antaa pääsyn näkymiin |
-| `controller/layers.rs` | kuka saa tavoittaa kenet: komponentti saa ohjaimeen kahvan, joka tarjoaa sen, mikä on sen alapuolella, ja kääntäjä pitää siitä kiinni |
-| `state.rs` | mitä controller tietää dokumentista ja kaikki tavat, joilla se muuttuu; sen kentät ovat yksityisiä, eikä se koske mihinkään näkymään |
-| `model.rs` | lainaa tilan ja tekstikopion closureille, jotka eivät yllä mihinkään näkymään |
-| `actions.rs` | komentorekisteri: selektori, otsikko, pikanäppäin, symboli, milloin komento on käytettävissä |
-| `editing.rs` | `Editing`: komentojen ajaminen ja validointi, kirjoittaminen esikatselussa |
-| `update.rs` | `Updater`: jäsennys, väritys, esikatselun päivitys; muokkauksen jälkeen vain muuttuneet kappaleet |
-| `sync.rs` | tekstikopio ja lohkokirjanpito, ilman AppKitia ja satunnaistestein |
-| `progressive.rs` | `Progressive`: suurten esikatselujen renderöinti vaihe vaiheelta |
-| `selection.rs`, `scroll.rs` | `Selection`, `ScrollSync`: molempien ruutujen valinta ja vierityskohta samassa tahdissa |
-| `atom.rs`, `atom/edit.rs` | `AtomEditor`: kaava- ja kaavioeditori |
-| `navigation.rs`, `links.rs` | `Links`: linkit, wikilinkit, tunnisteet, tehtävien valintaruudut, taittaminen, alaviitteet |
-| `env.rs` | mitä esikatselu lukee tekstin ulkopuolelta: typografiset välimerkit, repositorio merkinnöille `@name` ja `#12`, BibTeX-tiedosto, upotetut muistiinpanot |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | esikatselun teksti, paikalliset ja etäkuvat; `Pictures` tiedostossa `images.rs` |
-| `attributes.rs` | tekstiattribuutit; kukin avain saa vain odottamansa tyyppisen arvon |
-| `shadow.rs` | tallentamattoman tekstin kopiot kaatumisen jälkeistä palautusta varten |
-| `decoder.rs` | hiekkalaatikossa toimivat apuprosessit, jotka purkavat kuvia ja grafiikkaa |
-| `export.rs`, `outline.rs` | `Sharing`: HTML- ja Word-vienti, jakotiedosto, tulostus; jäsennyssivupalkki |
-| `js.rs`, `mathfield.rs`, `render_queue.rs` | WebKit MathJaxille, Mermaidille, Graphvizille, PlantUML:lle ja visuaaliselle kaavaeditorille; säännöt siitä, mikä renderöidään milloin, erillään WebKitistä |
-| `webkit.rs` | kutsut WebKitiin; vain navigointidelegaatin elinikä jää tiedostoille `js.rs` ja `mathfield.rs` |
-| `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | ikkunan rakentaminen, työkalupalkki, tekstinäkymät, dialogit, värit |
-
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: valikkorivi, apin delegaatti, dokumentti (`MDDocument`, `NSDocument`-aliluokka).
-- `src/util/`: työsäikeet (`lanes.rs`), taltiot, jotka voivat lakata vastaamasta (`volumes.rs`), AppKit-apuohjelmat, tiedostot ja prosessit. `src/diag.rs`: se, mikä menee pieleen käyttäjän näkymättömissä, menee järjestelmälokiin ilman minkään dokumentin tekstiä.
-- `src/large_alloc.rs`: suuret varaukset tulevat suoraan ytimeltä ja palaavat sille vapautettaessa, joten muisti palautuu suurten muokkausten jälkeen.
-- `resources/js/`: verkkosivut ja kirjastot; versiot ja tarkistussummat tiedostossa [vendor.lock](../../../vendor.lock).
-- `xtask/`: paketointi, allekirjoitus, levykuva, kuvake, vendorointi, itsetestien ajaja ja kattavuuden alarajat.
-
-### Tietovirta
-
-Vasemman tekstinäkymän lähdeteksti on ainoa totuuden lähde.
-
-1. Jokainen siellä tehty merkin muutos päivittää tekstikopion (`Snapshot`) paikallaan lukematta tekstiä uudelleen.
-2. Päivitys jäsentää kopion, värittää lähdetekstin uudelleen vain siltä osin kuin värit muuttuivat, taittaa esikatselun ja korvaa vain ne lohkot, joiden sisältö muuttui.
-3. Muokkauksen jälkeen vain muuttuneet kappaleet jäsennetään, väritetään ja taitetaan uudelleen, kunhan niiden naapurit pysyvät samoina; [docs/partial-parse.md](../../../docs/partial-parse.md) kertoo, miksi tämä antaa saman kuin täysi jäsennys ja mitä on katsottava, kun comrak muuttuu. Dokumentit, joissa on `%%`-kommenttilohkoja, front matterin muutokset ja, dokumentissa, jossa on linkkiviitemääritelmiä, hakasulkeen sisältävän osan muutokset käsitellään kokonaan. comrak tunnistaa alaviiteviittauksen vain, kun sen määritelmä on samassa jäsennyksessä, ja siirtää määritelmät tekstin taakse, joten osa jäsennetään yhdellä sijaismääritelmällä per tunniste ja sen numerot otetaan vanhasta puusta; osan viittausten tai määritelmien muutos tai muutos tekstinsisäisen alaviitteen vieressä käsitellään kokonaan.
-4. HTML-lohkot, jotka avaavat `<details>`- tai `<div align>`-elementin ja sulkevat sen myöhemmin, vaikuttavat niiden välisiin Markdown-lohkoihin; uudelleenkäytetyllä lohkolla on oltava samat ympäristöt.
-5. Kun kirjoitat enintään 2 Mt:n dokumentin lähdetekstiin, osittainen päivitys ajetaan heti; kun se ei sovellu tai dokumentti on suurempi, jäsennys ja taitto ajetaan taustalla. Kun kirjoitat esikatseluun, ne ajetaan heti, koska esikatselun kohdistin riippuu tuloksesta.
-6. `Bridge` kääntää esikatseluun tehdyn syötteen lähdetekstin muokkaukseksi, ja siitä eteenpäin se kulkee samaa polkua. Markdownissa on liian monta tapaa muuttaa teksti syntaksiksi pelkille säännöille, joten `preview/verify.rs` jäsentää muuttuneen osan uudelleen ja vertaa sitä, mitä se näyttää, siihen, mitä kirjoitettiin; muokkaus, joka ei pidä, suojataan lisää tai hylätään.
-7. comrakin tekstinsisäiset sijainnit menevät muutamassa kohdassa väärin, esimerkiksi linkkiviitemääritelmän jälkeen. `reader/positions.rs` tarkistaa ne lähdetekstiä vasten lohkoa luettaessa ja lukee ne uudelleen lähdetekstistä, missä ne eivät täsmää.
-
-### Säännöt controllerissa
-
-1. Controllerin omat muutokset näkymiin ajetaan `Panes::silently`-kutsun sisällä; delegaattien takaisinkutsut ohittavat ne. Kaikkialla muualla näkymiä voi vain lukea, joten kääntäjä tarkistaa tämän. Se, minkä takaisinkutsujen on tarkoitus kuulla, tai se, mikä antaa näkymän AppKitille, kertoo sen kulkemalla kutsun `Panes::for_appkit` kautta.
-2. Tila lainataan vain lukemista ja laskemista varten, ei koskaan sellaisen kutsun yli, joka muuttaa, taittaa tai vierittää näkymää: `Model` lainaa sen `Send`-closureille, eikä mikään näkymä ole `Send`, joten kääntäjä tarkistaa tämän. Se muuttuu vain omien metodiensa kautta, joiden testit eivät tarvitse ikkunaa.
-3. Viestit ulkopuolelta (kuva latautui, kaava renderöitiin) saapuvat viiveellä kutsujen `renders_arrived` ja `image_arrived` kautta, eivät koskaan päivityksen keskellä.
-4. Uudelleenpiirto ilman tekstin muutosta kulkee vain kutsun `invalidate(reason)` kautta.
-5. Tekstikopiota ei pidetä lähdetekstin muutoksen yli, tai muutos kopioi koko tekstin: `with_text` lainaa sen vain `Send`-closuren keston ajaksi.
-6. Uusi komento tarvitsee merkinnän tiedostoon `actions.rs`, metodin tiedostoon `controller.rs` ja haaran kohtaan `Editing::perform`.
-7. Jokaisella `unsafe`-lohkolla on perustelunsa `// SAFETY:`-kommenttina. Tavut pääsevät järjestelmän kuvanpurkajille vain apuprosessissa, kutsun `decoder::decode_native` kautta; testi läpikäy lähdekoodin muiden kutsujen varalta.
-8. Mikään pääsäikeessä ei odota käyttäjän kansioita, koska verkkolevy voi lakata vastaamasta: tiedostoja tarkastellaan säikeellä `DISK`, ja esikatselu lukee vastaukset kutsulla `Env::known`. Vain toiminto, jota käyttäjä odottaa, kuten vienti tai tallennus, saa koskea levyyn suoraan.
-9. Minkä on päätyttävä, se päättyy myös paniikin jälkeen, koska pääsäie selviää siitä: nostettu lippu kulkee funktion `with_raised` kautta, tekstitallennustilan muokkaus funktion `editing` kautta ja se, mitä kumoamisen ei pidä tietää, funktion `without_undo` kautta. Testi löytää käsin kirjoitetut tapaukset.
-10. Dokumentin osoitteella on yksi luenta, moduulissa `splat_markdown::url`; testi löytää käsin verratut skeemat.
-
-### Komennon lisääminen
-
-Valikkorivi, työkalupalkki ja kontekstivalikko rakentavat kaikki kohtansa rekisteristä tiedostossa [src/editor/actions.rs](../../../src/editor/actions.rs), ja valikon validointi lukee sieltä, milloin komento on käytettävissä ja näyttääkö se valintamerkin. Uusi komento tarvitsee:
-
-1. `Action`-variantin ja sen `Spec`: selektori, otsikko, työkalupalkin nimiö, työkaluvihje (alkaa verbillä, enintään 75 merkkiä), pikanäppäin, SF Symbol ja milloin se on käytettävissä
-2. metodin tiedostoon `src/editor/controller.rs`
-3. haaran kohtaan `Editing::perform`
-4. tekstinsä jokaiseen `Localizable.strings`-tiedostoon
-
-Testi `every_command_has_a_method_and_every_method_a_command` tarkistaa, että rekisteri ja metodit täsmäävät. Applen vakiopikanäppäimet kuten ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F ja ⌘, jäävät koskematta.
-
-### Käännökset
-
-Koodi käyttää saksankielistä tekstiä avaimena: `t("Fett")` hakee sen ajon aikana, `n("Fett")` merkitsee vakion myöhempää hakua varten. Jokainen `resources/<language>.lproj/` sisältää:
-
-- `Localizable.strings`: jokainen käyttöliittymän teksti, valikkotermit Applen omien sanastojen mukaan
-- `InfoPlist.strings`: nimet, jotka macOS näyttää apille ja sen dokumenttityypille
-- `QuickReference.md`: Markdown-pikaopas
-
-`cargo xtask bundle` luettelee jokaisen `.lproj`-kansion lokalisointina, ja `CFBundleDevelopmentRegion` on englanti, joten järjestelmävalikot ja tallennusdialogi seuraavat samaa kieltä. i18n-testi tarkistaa, että jokaisella kielellä on jokainen teksti ja että jokaisen pikaoppaan jäsennys vastaa saksankielisen jäsennystä.
-
-`assets/readme/<language>/` sisältää tämän READMEn kyseisellä kielellä, sen kuvakaappauksen ja demodokumentin, jonka kuvakaappaus näyttää. Tämän READMEn muutos kuuluu myös näihin kopioihin.
+Rakentaminen, testaus, koodin rakenne ja sen noudattamat säännöt on kuvattu tiedostossa [docs/development.md](../../../docs/development.md) (englanniksi).
 
 ### Kolmannen osapuolen komponentit
 
@@ -757,6 +632,10 @@ Koodi käyttää saksankielistä tekstiä avaimena: `t("Fett")` hakee sen ajon a
 | [image](https://github.com/image-rs/image) | 0.25 | PNG-, JPEG-, GIF-, WebP- ja BMP-tiedostojen purku | MIT tai Apache-2.0 |
 | [unicode-width](https://github.com/unicode-rs/unicode-width) | 0.2 | taulukon sarakkeiden tasaus | MIT tai Apache-2.0 |
 | [entities](https://github.com/p-jackson/entities) | 1 | HTML-merkkiviitteiden nimet | MIT |
+| [miniz_oxide](https://github.com/Frommi/miniz_oxide) | 0.9 | Word-tiedostojen ja Git-objektien purku | MIT, Zlib tai Apache-2.0 |
+| [roxmltree](https://github.com/RazrFalcon/roxmltree) | 0.21 | Word-tiedostojen XML:n lukeminen | MIT tai Apache-2.0 |
+| [unicode-normalization](https://github.com/unicode-rs/unicode-normalization) | 0.1 | nimet ja haku yhdistettyjen ja hajotettujen kirjainten yli | MIT tai Apache-2.0, Unicode-3.0 |
+| [emojis](https://github.com/rossmacarthur/emojis) | 0.9 | pitää `:shortcode:`-tyyppisen tekstin kirjaimellisena tuodussa tekstissä | MIT tai Apache-2.0, Unicode-3.0 |
 | [MathJax](https://www.mathjax.org) | 4.1.3 | kaavojen renderöinti | Apache-2.0 |
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | visuaalinen kaavaeditori KaTeX-fonteilla | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid-kaaviot | MIT |

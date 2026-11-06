@@ -10,15 +10,19 @@ use super::doc::Align;
 /// An element or text, with byte ranges into the HTML it was read from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node {
+    /// An element with its attributes and what it holds.
     Element(Element),
     /// Text with entities decoded.
     Text {
+        /// What it reads.
         text: String,
+        /// Where it stands in the HTML, in bytes.
         range: Range<usize>,
     },
 }
 
 impl Node {
+    /// The element, if this node is one.
     pub fn element(&self) -> Option<&Element> {
         match self {
             Node::Element(e) => Some(e),
@@ -85,22 +89,28 @@ fn traits(name: &str) -> ElementTraits {
     }
 }
 
+/// Whether an element of this name has no content and no closing tag, as `<br>` and `<img>`.
 pub fn is_void(name: &str) -> bool {
     traits(name).void
 }
 
+/// Whether an element of this name makes paragraphs of its content, as `<p>`, `<div>` and `<section>` do.
 pub fn makes_paragraphs(name: &str) -> bool {
     traits(name).paragraphs
 }
 
-pub fn kept_in_exports(name: &str) -> bool {
+pub(crate) fn kept_in_exports(name: &str) -> bool {
     traits(name).kept
 }
 
+/// An HTML element with its attributes and content, and where it stands in the HTML it was read from, in bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
+    /// The tag name in lower case.
     pub name: String,
+    /// The attributes in source order, names in lower case and values with entities decoded.
     pub attrs: Vec<(String, String)>,
+    /// The elements and text inside it.
     pub children: Vec<Node>,
     /// The opening tag.
     pub tag: Range<usize>,
@@ -111,6 +121,7 @@ pub struct Element {
 }
 
 impl Element {
+    /// The value of the attribute `name`, the first if it is given twice.
     pub fn attr(&self, name: &str) -> Option<&str> {
         self.attrs.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
     }
@@ -171,7 +182,7 @@ impl Element {
 }
 
 /// A size in pixels as HTML writes it.
-pub fn pixels(value: &str) -> Option<u32> {
+pub(crate) fn pixels(value: &str) -> Option<u32> {
     let v = value.trim().trim_end_matches("px");
     v.parse::<f64>().ok().filter(|n| *n > 0.0 && *n < 100_000.0).map(|n| {
         #[allow(
@@ -185,7 +196,7 @@ pub fn pixels(value: &str) -> Option<u32> {
 }
 
 /// Elements dropped with everything inside them: they run code, load pages or ask for input.
-pub const DROPPED: [&str; 14] = [
+pub(crate) const DROPPED: [&str; 14] = [
     "script", "style", "iframe", "frame", "object", "embed", "form", "input", "button", "select", "textarea",
     "template", "noscript", "applet",
 ];
@@ -193,6 +204,8 @@ pub const DROPPED: [&str; 14] = [
 /// nested tags would otherwise overflow the stack.
 const MAX_DEPTH: usize = 64;
 
+/// The elements and text of an HTML fragment: comments and the dropped elements leave nothing, a closing tag without an
+/// opening one means nothing, and what is left open ends with the fragment.
 pub fn parse(html: &str) -> Vec<Node> {
     let mut stack: Vec<Element> = vec![Element {
         name: String::new(),
@@ -318,13 +331,20 @@ fn close_implicitly(stack: &mut Vec<Element>, name: &str, at: usize) {
     }
 }
 
+/// An opening or closing HTML tag.
 pub enum Tag {
+    /// `<name …>`, or `<name … />`.
     Open {
+        /// The tag name in lower case.
         name: String,
+        /// The attributes in source order, names in lower case and values with entities decoded.
         attrs: Vec<(String, String)>,
+        /// Whether it ends in `/>`.
         self_closing: bool,
     },
+    /// `</name>`.
     Close {
+        /// The tag name in lower case.
         name: String,
     },
 }
@@ -508,6 +528,7 @@ impl<T> Default for OpenElements<T> {
 }
 
 impl<T> OpenElements<T> {
+    /// Notes the element `name` as open, with what the caller keeps for it.
     pub fn open(&mut self, name: String, value: T) {
         *self.counts.entry(name.clone()).or_default() += 1;
         self.stack.push((name, value));
@@ -529,6 +550,7 @@ impl<T> OpenElements<T> {
         true
     }
 
+    /// What the caller keeps for the innermost open element.
     pub fn innermost(&self) -> Option<&T> {
         self.stack.last().map(|(_, value)| value)
     }

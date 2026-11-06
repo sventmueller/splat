@@ -4,7 +4,7 @@ use super::{ATTACHMENT, Atom, Builder, CharMap, ImageAtom, LINE_SEPARATOR, Link,
 use splat_markdown::doc::{Inline, Piece};
 use splat_markdown::style::{Baseline, TextStyle};
 use splat_markdown::text::{Byte, TextAt, count32, decode_entity};
-use splat_markdown::typography::{TextMark, before_text, citation_shown, marks, smarten, typographic_source};
+use splat_markdown::typography::{Running, TextMark, Within, citation_shown, typographic_source};
 
 impl Builder<'_> {
     pub(super) fn inlines(&self, inlines: &[Inline], style: &RunStyle) -> Vec<Run> {
@@ -92,22 +92,23 @@ impl Builder<'_> {
         if literal.is_empty() {
             return;
         }
-        let before = before_text(self.text, src.start);
-        let shown = match self.resolver.quotes() {
-            Some(quotes) if !style.text.code && !style.html => {
-                let mut open = self.open.get();
-                let shown = smarten(literal, before, quotes, &mut open);
-                self.open.set(open);
-                shown
-            }
-            _ => literal.to_string(),
+        let within = Within {
+            code: style.text.code,
+            link: style.link.is_some(),
+            html: style.html,
         };
+        let mut open = self.open.get();
+        let Running { shown, marks: found } = Running::of(
+            self.text,
+            literal,
+            src.start,
+            within,
+            self.resolver.quotes(),
+            &mut open,
+            self.resolver.references(),
+        );
+        self.open.set(open);
         let whole = self.aligned(&shown, src.clone(), style.clone());
-        let found = if style.link.is_some() || style.text.code || style.html {
-            Vec::new()
-        } else {
-            marks(&shown, before, self.resolver.references())
-        };
         if found.is_empty() {
             runs.push(whole);
             return;
@@ -229,7 +230,7 @@ pub(super) fn atom_styled(atom: Atom, shown: &str, src: Range<Byte>, style: &Run
 /// Source offset of every char of `literal` inside `text[src]`, past what only the source has: escapes, entities and
 /// container prefixes. `None` if the source does not spell the literal, as a position would then be a guess, and an
 /// edit made from it would land in the wrong place.
-pub fn align(literal: &str, text: &str, src: Range<Byte>) -> Option<CharMap> {
+pub(crate) fn align(literal: &str, text: &str, src: Range<Byte>) -> Option<CharMap> {
     let source = text.at(src.clone());
     if source == literal {
         return Some(CharMap::Verbatim(src.start));

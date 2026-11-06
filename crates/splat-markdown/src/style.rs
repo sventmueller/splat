@@ -5,9 +5,12 @@ use super::doc::InlineKind;
 /// Where text stands on its line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Baseline {
+    /// On the line, as running text stands.
     #[default]
     Normal,
+    /// Raised, as superscript `^x^` or `<sup>`.
     Super,
+    /// Lowered, as subscript `~x~` or `<sub>`.
     Sub,
 }
 
@@ -15,13 +18,21 @@ pub enum Baseline {
 /// field means to it.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct TextStyle {
+    /// Inside strong text, `**text**` or `<strong>`.
     pub bold: bool,
+    /// Inside emphasis, `*text*` or `<em>`.
     pub italic: bool,
+    /// Inside struck text, `~~text~~` or `<del>`.
     pub strike: bool,
+    /// Inside `<u>` or `<ins>`.
     pub underline: bool,
+    /// Inside marked text, `==text==` or `<mark>`.
     pub highlight: bool,
+    /// Inside a code span, or `<kbd>`, `<code>`, `<samp>` or `<tt>`.
     pub code: bool,
+    /// Raised or lowered by superscript or subscript, or on the line.
     pub baseline: Baseline,
+    /// Inside a spoiler, `||text||`, hidden until selected.
     pub spoiler: bool,
 }
 
@@ -57,7 +68,7 @@ impl TextStyle {
 }
 
 /// The HTML element that gives text the look of an inline, where one does.
-pub fn html_element(kind: &InlineKind) -> Option<&'static str> {
+pub(crate) fn html_element(kind: &InlineKind) -> Option<&'static str> {
     Some(match kind {
         InlineKind::Emph => "em",
         InlineKind::Strong => "strong",

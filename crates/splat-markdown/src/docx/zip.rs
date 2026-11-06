@@ -4,23 +4,25 @@ use super::TooLarge;
 
 /// A ZIP archive with uncompressed entries, which Office reads like any other.
 #[derive(Default)]
-pub(super) struct Zip {
+pub struct Zip {
     data: Vec<u8>,
     directory: Vec<u8>,
     count: usize,
 }
 
 /// The highest values the format allows: the next ones announce its 64-bit extension.
-pub(super) const MAX_ZIP_ENTRIES: usize = 0xFFFE;
-pub(super) const MAX_ZIP_BYTES: usize = 0xFFFF_FFFE;
+pub(crate) const MAX_ZIP_ENTRIES: usize = 0xFFFE;
+pub(crate) const MAX_ZIP_BYTES: usize = 0xFFFF_FFFE;
 
-pub(super) fn zip_holds(entries: usize, bytes: usize) -> bool {
+pub(crate) fn zip_holds(entries: usize, bytes: usize) -> bool {
     entries <= MAX_ZIP_ENTRIES && bytes <= MAX_ZIP_BYTES
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "`add` turns away what would not fit")]
 impl Zip {
-    pub(super) fn add(&mut self, name: &str, content: &[u8]) -> Result<(), TooLarge> {
+    /// Appends an entry `name` holding `content`; [`TooLarge`] when the archive would outgrow the format without its
+    /// 64-bit extension.
+    pub fn add(&mut self, name: &str, content: &[u8]) -> Result<(), TooLarge> {
         const HEADERS_AND_END: usize = 30 + 46 + 22;
         let bytes = self.data.len() + self.directory.len() + HEADERS_AND_END + 2 * name.len() + content.len();
         if !zip_holds(self.count + 1, bytes) {
@@ -61,7 +63,8 @@ impl Zip {
         Ok(())
     }
 
-    pub(super) fn finish(mut self) -> Vec<u8> {
+    /// The bytes of the archive, its central directory at the end.
+    pub fn finish(mut self) -> Vec<u8> {
         let start = self.data.len() as u32;
         let size = self.directory.len() as u32;
         self.data.append(&mut self.directory);
@@ -77,7 +80,8 @@ impl Zip {
     }
 }
 
-pub(super) fn crc32(bytes: &[u8]) -> u32 {
+/// The CRC-32 checksum ZIP stores for each entry.
+pub fn crc32(bytes: &[u8]) -> u32 {
     static TABLE: std::sync::OnceLock<[u32; 256]> = std::sync::OnceLock::new();
     let table = TABLE.get_or_init(|| {
         let mut t = [0u32; 256];

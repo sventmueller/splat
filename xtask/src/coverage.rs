@@ -41,9 +41,12 @@ pub(crate) const NO_FLOOR: [(&str, &str); 1] = [(
 )];
 
 /// The modules that need no window, which `cargo test` measures alone; CI holds them to the floors.
-pub(crate) const LIBRARY: [&str; 4] = [
+pub(crate) const LIBRARY: [&str; 7] = [
     "crates/splat-file-state/",
+    "crates/splat-git/",
+    "crates/splat-import/",
     "crates/splat-markdown/",
+    "crates/splat-notes/",
     "crates/splat-preview/",
     "crates/splat-i18n/",
 ];
@@ -52,9 +55,6 @@ pub(crate) const LIBRARY: [&str; 4] = [
 /// library modules, and fails when a module or the whole falls below its floor. The measured builds go to
 /// target/coverage, so measuring code never reaches target/release and a disk image.
 pub(crate) fn coverage(library: bool) -> Result<(), String> {
-    if !library && screen_locked() {
-        return Err("the screen is locked, and the window self-tests need it".into());
-    }
     let root = root();
     let target = root.join("target/coverage");
     let mut env = vec![("CARGO_TARGET_DIR".to_string(), target.display().to_string())];
@@ -91,6 +91,7 @@ pub(crate) fn coverage(library: bool) -> Result<(), String> {
     run(cargo(&["llvm-cov", "clean", "--workspace"], &env))?;
     run(cargo(&["test", "--release", "--workspace"], &env))?;
     if !library {
+        let _ = fs::remove_dir_all(crate::selftest::skipped_dir());
         for mode in [&["probe"][..], &["gui", "--in-back"], &["resize"], &["typing"]] {
             let args: Vec<&str> = ["xtask", "selftest"].iter().chain(mode).copied().collect();
             run(cargo(&args, &env))?;
@@ -114,11 +115,32 @@ pub(crate) fn coverage(library: bool) -> Result<(), String> {
     let root_prefix = format!("{}/", root.display());
     let (report, shortfalls) = judge(&measured_lines(&text, &root_prefix), library);
     print!("{report}");
+    if !library {
+        print!(
+            "{}",
+            skipped_report(&crate::selftest::skipped_by_mode(&["probe", "gui", "resize", "typing"]))
+        );
+    }
     if shortfalls.is_empty() {
         Ok(())
     } else {
         Err(format!("coverage below the floor: {}", shortfalls.join(", ")))
     }
+}
+
+/// The self-test checks that said nothing in this run: the verdict holds without them, so it names them.
+fn skipped_report(skipped: &[(String, Vec<String>)]) -> String {
+    let total: usize = skipped.iter().map(|(_, names)| names.len()).sum();
+    if total == 0 {
+        return "self-tests: no check skipped\n".to_string();
+    }
+    let mut out = format!("self-tests: {total} checks skipped, not part of this verdict\n");
+    for (mode, names) in skipped {
+        for name in names {
+            out.push_str(&format!("  {mode}: {name}\n"));
+        }
+    }
+    out
 }
 
 /// Whether the Rust toolchain brings its own `llvm-cov`, as rustup's llvm-tools component does.
@@ -251,6 +273,22 @@ mod tests {
             judged(window_code, true),
             ["no measured line in any module"],
             "the library measurement looks at nothing else"
+        );
+    }
+
+    #[test]
+    fn the_verdict_names_what_the_self_tests_skipped() {
+        assert_eq!(skipped_report(&[]), "self-tests: no check skipped\n");
+        let skipped = [
+            (
+                "gui".to_string(),
+                vec!["a: not active".to_string(), "b: no pdftotext".to_string()],
+            ),
+            ("typing".to_string(), vec!["c: not in front".to_string()]),
+        ];
+        assert_eq!(
+            skipped_report(&skipped),
+            "self-tests: 3 checks skipped, not part of this verdict\n  gui: a: not active\n  gui: b: no pdftotext\n  typing: c: not in front\n"
         );
     }
 }

@@ -9,6 +9,9 @@ use std::time::Duration;
 use splat_markdown::text::Byte;
 
 pub mod fuzz_checks;
+pub mod fuzz_git;
+pub mod fuzz_import;
+pub mod fuzz_notes;
 
 /// Rounds per test.
 pub fn rounds(default: usize) -> usize {

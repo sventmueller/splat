@@ -1,3 +1,6 @@
+//! Editing GitHub tables in the source: rows and columns added and removed, columns aligned, the caret moved from cell
+//! to cell, and the pipes lined up.
+
 use crate::text::{Byte, TextAt, line_end, line_start};
 use std::ops::Range;
 
@@ -8,7 +11,7 @@ use super::edit::Edit;
 use super::text::{Direction, continuation_of};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Table {
+pub(crate) struct Table {
     pub rows: Vec<Vec<String>>,
     pub aligns: Vec<Align>,
     /// Whole lines covered by the table, without the trailing newline.
@@ -18,31 +21,40 @@ pub struct Table {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Cell {
+pub(crate) struct Cell {
     pub row: usize,
     pub col: usize,
 }
 
+/// A change to the table at the caret.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TableOp {
+    /// An empty row above the caret's, but never above the header row.
     InsertRowAbove,
+    /// An empty row below the caret's.
     InsertRowBelow,
+    /// An empty column left of the caret's.
     InsertColumnLeft,
+    /// An empty column right of the caret's.
     InsertColumnRight,
+    /// The caret's row removed; the header row, or the only other row, is emptied instead.
     DeleteRow,
+    /// The caret's column removed, unless it is the only one.
     DeleteColumn,
+    /// The caret's column aligned.
     Align(Align),
+    /// Nothing but the pipes lined up, which every other change does as well.
     Format,
 }
 
-pub fn table_block(doc: &Doc, offset: Byte) -> Option<&Block> {
+pub(crate) fn table_block(doc: &Doc, offset: Byte) -> Option<&Block> {
     block_path(&doc.blocks, offset)
         .into_iter()
         .rev()
         .find(|b| matches!(b.kind, BlockKind::Table { .. }))
 }
 
-pub fn table_at(doc: &Doc, offset: Byte) -> Option<(Table, Cell)> {
+pub(crate) fn table_at(doc: &Doc, offset: Byte) -> Option<(Table, Cell)> {
     let text = doc.text();
     let block = table_block(doc, offset)?;
     let BlockKind::Table { alignments } = &block.kind else {
@@ -114,7 +126,7 @@ impl Table {
     }
 
     /// Renders the table with aligned pipes; returns the text and the content offset of every cell.
-    pub fn render(&self) -> (String, Vec<Vec<usize>>) {
+    pub(crate) fn render(&self) -> (String, Vec<Vec<usize>>) {
         let widths = self.widths();
         let following = continuation_of(&self.prefix);
         let mut out = String::new();
@@ -161,7 +173,7 @@ impl Table {
         (out, offsets)
     }
 
-    pub fn apply(&mut self, op: TableOp, at: Cell) -> Cell {
+    pub(crate) fn apply(&mut self, op: TableOp, at: Cell) -> Cell {
         let cols = self.aligns.len();
         match op {
             TableOp::InsertRowAbove => {
@@ -285,7 +297,7 @@ pub fn move_down(doc: &Doc, offset: Byte) -> Option<Edit> {
     ))
 }
 
-pub fn new_table(rows: usize, cols: usize) -> String {
+pub(crate) fn new_table(rows: usize, cols: usize) -> String {
     let rows = rows.max(2);
     let cols = cols.max(1);
     let mut table = Table {

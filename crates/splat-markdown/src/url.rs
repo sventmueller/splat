@@ -32,7 +32,7 @@ pub fn behind_file_scheme(url: &str) -> Option<&str> {
 }
 
 /// Whether the address leads to the web or to a mail app.
-pub fn is_web_or_mail(url: &str) -> bool {
+pub(crate) fn is_web_or_mail(url: &str) -> bool {
     matches!(scheme(url).as_deref(), Some("http" | "https" | "mailto"))
 }
 

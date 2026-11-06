@@ -1,4 +1,5 @@
-//! The main click-through: one document edited by every means the window offers, step by step.
+//! The main click-through: a document edited by every means the window offers, step by step, in groups that each start
+//! from the text the ones before them leave.
 
 use objc2::sel;
 use objc2_app_kit::{NSApplication, NSTextInputClient};
@@ -6,6 +7,184 @@ use objc2_foundation::{NSRange, NSString};
 
 use super::*;
 use crate::util::{ns, storage};
+
+/// The groups of the click-through by name, for `--only`, in the order a run takes them.
+pub(super) fn groups() -> Vec<(&'static str, Vec<Step>)> {
+    vec![
+        ("first edits", first_edits()),
+        ("toolbar and undo", toolbar_and_undo()),
+        ("selection", selection_steps()),
+        ("preview edits", preview_edit_steps()),
+        ("formula editor", formula_editor_steps()),
+        (
+            "scrolling, dark mode and web pictures",
+            scrolling_dark_mode_and_remote_steps(),
+        ),
+        ("tables and spaces", tables_and_spaces_steps()),
+        ("pending format", pending_format_steps()),
+        ("input method", input_method_steps()),
+        ("toolbar buttons", toolbar_steps()),
+        ("commands and links", command_and_link_steps()),
+        ("building blocks", building_block_steps()),
+        ("empty lines and caret", empty_line_and_caret_steps()),
+        ("reload and hidden preview", reload_and_hidden_preview_steps()),
+    ]
+}
+
+/// The name a group's files have below `xtask/checks/click-through`.
+fn entry_stem(group: &str) -> String {
+    group.replace([' ', ','], "-").replace("--", "-")
+}
+
+/// Where each group starts: the text the groups before it leave in a run of them all, and where the caret stood in
+/// either pane, written anew by `--record`, so that no failure in one group reaches the next and `--only` runs a group
+/// alone.
+fn starts_from(group: &str) -> Option<(&'static str, &'static str)> {
+    ENTRIES
+        .iter()
+        .find(|(name, _, _)| *name == group)
+        .map(|(_, text, caret)| (*text, *caret))
+}
+
+/// Where the caret stands in the source and the preview, and which of them has the keyboard, one per line.
+fn caret_of(c: &Ctx) -> String {
+    let at = |r: NSRange| format!("{} {}", r.location, r.length);
+    let preview: *const objc2::runtime::AnyObject = std::ptr::from_ref(c.e.preview()).cast();
+    let typing_in = c.e.window().and_then(|w| w.firstResponder()).map(|r| {
+        if std::ptr::eq(std::ptr::from_ref(&*r).cast(), preview) {
+            "preview"
+        } else {
+            "source"
+        }
+    });
+    format!(
+        "{}\n{}\n{}\n",
+        at(c.e.source().selectedRange()),
+        at(c.e.preview().selectedRange()),
+        typing_in.unwrap_or("source")
+    )
+}
+
+/// Puts the caret back where `caret_of` found it.
+fn put_caret(c: &Ctx, caret: &str) {
+    let mut lines = caret.lines();
+    let mut range = || {
+        let mut numbers = lines.next().unwrap_or("0 0").split(' ').filter_map(|n| n.parse().ok());
+        NSRange::new(numbers.next().unwrap_or(0), numbers.next().unwrap_or(0))
+    };
+    let (in_source, in_preview) = (range(), range());
+    let typing_in_preview = lines.next() == Some("preview");
+    if let Some(window) = c.e.window() {
+        if typing_in_preview {
+            window.makeFirstResponder(Some(c.e.preview()));
+        } else {
+            window.makeFirstResponder(Some(c.e.source()));
+        }
+    }
+    // A selection set in one pane moves the other one's along: the pane with the keyboard sets its own as a click would,
+    // and the other one gets its own back without telling anyone.
+    if typing_in_preview {
+        c.e.preview().setSelectedRange(in_preview);
+        c.e.panes().silently(|_| c.e.source().setSelectedRange(in_source));
+    } else {
+        c.e.source().setSelectedRange(in_source);
+        c.e.panes().silently(|_| c.e.preview().setSelectedRange(in_preview));
+    }
+}
+
+/// The steps that set up a group after the first: in a recording run the text it starts from and the caret are
+/// written down, otherwise it gets a document of its own holding that text, with the caret where it was.
+pub(super) fn entry(group: &'static str) -> Vec<Step> {
+    if std::env::var_os("SPLAT_SELFTEST_RECORD").is_some() {
+        return vec![applied(move |c| {
+            let dir = c.out.join("click-through");
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(dir.join(format!("{}.md", entry_stem(group))), source(&c.e));
+            let _ = std::fs::write(dir.join(format!("{}.caret", entry_stem(group))), caret_of(c));
+        })];
+    }
+    let Some((text, caret)) = starts_from(group) else {
+        return vec![applied(move |_| {
+            check(
+                &format!("the click-through group \"{group}\" knows the text it starts from"),
+                false,
+                "`cargo xtask selftest gui --record` writes it",
+            );
+        })];
+    };
+    let mut steps = super::scenarios::document_holding(group, move |_| text.to_string());
+    steps.push(settle(move |c| put_caret(c, caret)));
+    steps
+}
+
+/// The texts and carets of `starts_from`, per group; the first group starts from the template.
+const ENTRIES: [(&str, &str, &str); 13] = [
+    (
+        "toolbar and undo",
+        include_str!("../../../xtask/checks/click-through/toolbar-and-undo.md"),
+        include_str!("../../../xtask/checks/click-through/toolbar-and-undo.caret"),
+    ),
+    (
+        "selection",
+        include_str!("../../../xtask/checks/click-through/selection.md"),
+        include_str!("../../../xtask/checks/click-through/selection.caret"),
+    ),
+    (
+        "preview edits",
+        include_str!("../../../xtask/checks/click-through/preview-edits.md"),
+        include_str!("../../../xtask/checks/click-through/preview-edits.caret"),
+    ),
+    (
+        "formula editor",
+        include_str!("../../../xtask/checks/click-through/formula-editor.md"),
+        include_str!("../../../xtask/checks/click-through/formula-editor.caret"),
+    ),
+    (
+        "scrolling, dark mode and web pictures",
+        include_str!("../../../xtask/checks/click-through/scrolling-dark-mode-and-web-pictures.md"),
+        include_str!("../../../xtask/checks/click-through/scrolling-dark-mode-and-web-pictures.caret"),
+    ),
+    (
+        "tables and spaces",
+        include_str!("../../../xtask/checks/click-through/tables-and-spaces.md"),
+        include_str!("../../../xtask/checks/click-through/tables-and-spaces.caret"),
+    ),
+    (
+        "pending format",
+        include_str!("../../../xtask/checks/click-through/pending-format.md"),
+        include_str!("../../../xtask/checks/click-through/pending-format.caret"),
+    ),
+    (
+        "input method",
+        include_str!("../../../xtask/checks/click-through/input-method.md"),
+        include_str!("../../../xtask/checks/click-through/input-method.caret"),
+    ),
+    (
+        "toolbar buttons",
+        include_str!("../../../xtask/checks/click-through/toolbar-buttons.md"),
+        include_str!("../../../xtask/checks/click-through/toolbar-buttons.caret"),
+    ),
+    (
+        "commands and links",
+        include_str!("../../../xtask/checks/click-through/commands-and-links.md"),
+        include_str!("../../../xtask/checks/click-through/commands-and-links.caret"),
+    ),
+    (
+        "building blocks",
+        include_str!("../../../xtask/checks/click-through/building-blocks.md"),
+        include_str!("../../../xtask/checks/click-through/building-blocks.caret"),
+    ),
+    (
+        "empty lines and caret",
+        include_str!("../../../xtask/checks/click-through/empty-lines-and-caret.md"),
+        include_str!("../../../xtask/checks/click-through/empty-lines-and-caret.caret"),
+    ),
+    (
+        "reload and hidden preview",
+        include_str!("../../../xtask/checks/click-through/reload-and-hidden-preview.md"),
+        include_str!("../../../xtask/checks/click-through/reload-and-hidden-preview.caret"),
+    ),
+];
 
 pub(super) fn first_edits() -> Vec<Step> {
     vec![
@@ -1108,17 +1287,15 @@ pub(super) fn empty_line_and_caret_steps() -> Vec<Step> {
     ]
 }
 
-thread_local! {
-    /// Whether the preview and the outline showed before they were toggled.
-    static PANES_BEFORE: std::cell::Cell<(bool, bool)> = const { std::cell::Cell::new((false, false)) };
-}
-
-const PANES_STILL: &str = "the panes to stop moving";
-
 pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
     vec![
-        applied(|_| {
-            let path = std::env::var("SPLAT_SELFTEST_FILE").unwrap_or_default();
+        applied(|c| {
+            let path =
+                c.e.document()
+                    .and_then(|d| d.fileURL())
+                    .and_then(|u| u.path())
+                    .map(|p| p.to_string())
+                    .unwrap_or_default();
             let on_disk = std::fs::read_to_string(&path).unwrap_or_default();
             // Written without file coordination, as Git or a shell would.
             let _ = std::fs::write(&path, format!("{on_disk}\nVon außen geändert\n"));
@@ -1166,18 +1343,21 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 c.e.document().is_some_and(|d| !d.isDocumentEdited()),
                 "",
             );
-            c.e.toggle_preview();
+            c.e.panes().set_preview_collapsed(true);
         }),
         when(
-            PANES_STILL,
-            |c| !c.e.panes().is_moving(),
+            "the preview to hide",
+            |c| !c.e.panes().preview_visible(),
             |c| {
                 let e = &c.e;
                 set_source_caret(e, 0);
                 type_in_source(e, "Äußerst übersichtlich: ");
             },
         ),
-        applied(|c| c.e.toggle_preview()),
+        applied(|c| {
+            c.e.panes().set_preview_collapsed(false);
+            c.e.updater().update_now();
+        }),
         settle(|c| {
             let e = &c.e;
             let preview = storage(e.preview()).string().to_string();
@@ -1195,10 +1375,10 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 &format!("up to {reach} of {whole}"),
             );
         }),
-        applied(|c| c.e.toggle_preview()),
+        applied(|c| c.e.panes().set_preview_collapsed(true)),
         when(
-            PANES_STILL,
-            |c| !c.e.panes().is_moving(),
+            "the preview to hide again",
+            |c| !c.e.panes().preview_visible(),
             |c| {
                 let e = &c.e;
                 set_source_caret(e, 0);
@@ -1215,45 +1395,5 @@ pub(super) fn reload_and_hidden_preview_steps() -> Vec<Step> {
                 &head(&preview, 40),
             );
         }),
-        applied(|c| {
-            let e = &c.e;
-            PANES_BEFORE.set((e.panes().preview_visible(), e.panes().outline_visible()));
-            e.toggle_preview();
-            e.toggle_preview();
-            e.panes().toggle_outline();
-            e.panes().toggle_outline();
-        }),
-        when(
-            PANES_STILL,
-            |c| !c.e.panes().is_moving(),
-            |c| {
-                let now = (c.e.panes().preview_visible(), c.e.panes().outline_visible());
-                check(
-                    "panes toggled twice in a moment end as they were",
-                    now == PANES_BEFORE.get(),
-                    &format!("{:?} -> {now:?}", PANES_BEFORE.get()),
-                );
-                c.e.toggle_preview();
-            },
-        ),
-        pause(
-            0.05,
-            "the second request has to land while the first one's animation runs",
-            |c| {
-                c.e.toggle_preview();
-            },
-        ),
-        when(
-            PANES_STILL,
-            |c| !c.e.panes().is_moving(),
-            |c| {
-                let now = c.e.panes().preview_visible();
-                check(
-                    "a pane toggled twice during its animation ends as it was",
-                    now == PANES_BEFORE.get().0,
-                    "",
-                );
-            },
-        ),
     ]
 }

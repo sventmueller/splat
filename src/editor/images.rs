@@ -91,7 +91,7 @@ impl ImageFile {
         ImageFile {
             loaded: None,
             file,
-            seen: None,
+            seen: Stamp::UNREACHABLE,
             side: allowed_side(),
         }
     }
@@ -285,7 +285,7 @@ impl ImageStore {
         let mut failed: Vec<&PathBuf> = self
             .files
             .iter()
-            .filter(|(_, slot)| matches!(slot, ImageLoad::Done(done) if done.seen.is_none()))
+            .filter(|(_, slot)| matches!(slot, ImageLoad::Done(done) if !done.seen.is_reached()))
             .map(|(path, _)| path)
             .collect();
         failed.sort();
@@ -678,14 +678,17 @@ fn what_a_document_brings_along<'a>(doc_dir: &'a Path, home: Option<&Path>) -> &
 fn load(path: &Path, doc_dir: Option<&Path>, side: u32) -> ImageFile {
     let file = locate(path, doc_dir);
     let seen = stamp(&file);
-    let loaded = seen.and_then(|_| {
-        let bytes = crate::util::read_regular_file(&file, MAX_FILE_BYTES as u64)?;
-        super::decoder::decode(&bytes, side).or_else(|| {
-            native_only(&file, &bytes)
-                .then(|| super::decoder::decode_native(&bytes, side))
-                .flatten()
+    let loaded = seen
+        .is_reached()
+        .then(|| {
+            let bytes = crate::util::read_regular_file(&file, MAX_FILE_BYTES as u64)?;
+            super::decoder::decode(&bytes, side).or_else(|| {
+                native_only(&file, &bytes)
+                    .then(|| super::decoder::decode_native(&bytes, side))
+                    .flatten()
+            })
         })
-    });
+        .flatten();
     ImageFile {
         loaded,
         file,

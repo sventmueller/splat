@@ -1,3 +1,5 @@
+//! Formulas and diagrams in a document, which the preview shows as rendered images.
+
 use std::ops::Range;
 
 use super::{BlockKind, Doc, InlineKind, walk_blocks, walk_inlines};
@@ -27,14 +29,30 @@ pub fn is_image_name(name: &str) -> bool {
 
 /// A formula or diagram, which the preview shows as a rendered image.
 pub enum Figure<'a> {
-    Math { tex: &'a str, display: bool },
-    Diagram { source: &'a str, kind: DiagramKind },
+    /// A TeX formula, inline or on its own, from math syntax or a ` ```math ` block.
+    Math {
+        /// The TeX without its delimiters or fences.
+        tex: &'a str,
+        /// Whether it is set apart from the line rather than standing inside it.
+        display: bool,
+    },
+    /// A diagram in a code block whose info string names its language, such as ` ```mermaid `.
+    Diagram {
+        /// The text of the code block, in the diagram's language.
+        source: &'a str,
+        /// The language the info string names.
+        kind: DiagramKind,
+    },
 }
 
+/// The diagram languages a code block can name for the preview to draw it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiagramKind {
+    /// A ` ```mermaid ` block.
     Mermaid,
+    /// A ` ```dot ` or ` ```graphviz ` block.
     Graphviz,
+    /// A ` ```plantuml ` or ` ```puml ` block.
     PlantUml,
 }
 

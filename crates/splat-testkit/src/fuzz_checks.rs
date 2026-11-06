@@ -26,7 +26,7 @@ fn on_a_letter(text: &str, at: usize) -> usize {
 }
 
 /// The text of an input and the steps behind it.
-fn text_and_steps(data: &[u8]) -> Option<(String, impl Iterator<Item = &[u8]>)> {
+pub(crate) fn text_and_steps(data: &[u8]) -> Option<(String, impl Iterator<Item = &[u8]>)> {
     let mut parts = data.split(|&b| b == SEPARATOR);
     let text = std::str::from_utf8(parts.next()?).ok()?.to_string();
     Some((text, parts.take(MOST_STEPS)))
@@ -91,7 +91,7 @@ pub fn reparse(data: &[u8]) {
         let next = reparse_and_color(parsed.doc, &spans, &new);
         let full = parse_and_color(&new);
         let what = || format!("{text:?} -> {new:?}");
-        assert!(next.doc.blocks == full.doc.blocks, "blocks: {}", what());
+        assert!(next.doc.blocks() == full.doc.blocks(), "blocks: {}", what());
         assert!(next.spans == full.spans, "colors: {}", what());
         assert!(next.doc.facts() == full.doc.facts(), "facts: {}", what());
         assert!(
@@ -128,6 +128,7 @@ pub fn outputs(data: &[u8]) {
     let word = to_docx(
         &doc,
         &WordExport {
+            title: None,
             figure: &|_| None,
             image: &|_| None,
             quotes: None,

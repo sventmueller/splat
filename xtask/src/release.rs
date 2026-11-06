@@ -53,7 +53,7 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             key.trim()
         ));
     }
-    let app = assemble(true, false, &version, true)?;
+    let app = assemble(Build::Distribution, &version)?;
     // A coverage build, as a manual `cargo llvm-cov` run can leave, would write measurement files on users' Macs.
     let load_commands = stdout(
         Command::new("otool")

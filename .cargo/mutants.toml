@@ -1,6 +1,15 @@
-# `make mutants`: the tests of the model and the preview need no window.
-test_package = ["splat-markdown", "splat-preview", "splat-file-state", "splat-testkit"]
-additional_cargo_test_args = ["--lib", "--test", "robustness"]
+# `make mutants`: the tests of the libraries need no window. Every mutant runs the tests of all these packages, so each
+# package that `make mutants` mutates must be listed here, or its own tests never see its mutants.
+test_package = [
+    "splat-markdown",
+    "splat-preview",
+    "splat-file-state",
+    "splat-git",
+    "splat-import",
+    "splat-notes",
+    "splat-testkit",
+]
+additional_cargo_test_args = ["--lib", "--test", "robustness", "--test", "corpus"]
 timeout_multiplier = 3.0
 # A run of hours slows down from 5 to 20 s per test run, and the default floor of 20 s then reports every mutant as a hang.
 minimum_test_timeout = 60.0

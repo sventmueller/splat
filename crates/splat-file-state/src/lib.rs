@@ -1,16 +1,38 @@
 //! What a document knows about its file, without a window: how the file encodes the text, which text it holds, what a save
 //! under way writes, and what to do about a file that changed.
 
+#![warn(missing_docs, unreachable_pub)]
+
 use std::time::SystemTime;
 
-/// Modification time and size of a file; `None` when it cannot be reached.
-pub type Stamp = Option<(SystemTime, u64)>;
+/// Modification time and size of a file, or the mark of one that cannot be reached.
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub struct Stamp(Option<(SystemTime, u64)>);
 
+impl Stamp {
+    /// The stamp of a file that cannot be reached.
+    pub const UNREACHABLE: Stamp = Stamp(None);
+
+    /// The stamp of a file that was reached.
+    pub fn new(modified: SystemTime, size: u64) -> Stamp {
+        Stamp(Some((modified, size)))
+    }
+
+    /// Whether the file was reached.
+    pub fn is_reached(self) -> bool {
+        self.0.is_some()
+    }
+}
+
+/// How the bytes of a file encode its text.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub enum Encoding {
+    /// UTF-8, with or without a byte order mark.
     #[default]
     Utf8,
+    /// UTF-16, little-endian, behind its byte order mark.
     Utf16Le,
+    /// UTF-16, big-endian, behind its byte order mark.
     Utf16Be,
 }
 
@@ -51,9 +73,11 @@ impl Encoding {
 /// What the file had beyond its text, written back on save so that a save changes only what was edited.
 #[derive(Clone, Copy, Default, PartialEq, Debug)]
 pub struct FileFormat {
+    /// The text started with a byte order mark.
     pub bom: bool,
     /// Every line ended in CRLF; lines typed since then get CRLF as well.
     pub crlf: bool,
+    /// How the file encoded the text.
     pub encoding: Encoding,
 }
 
@@ -76,6 +100,7 @@ impl FileFormat {
         )
     }
 
+    /// The bytes of a file in this format that holds `text`.
     pub fn encode(self, text: &str) -> Vec<u8> {
         if !self.bom && !self.crlf {
             return self.encoding.write(text);
@@ -123,6 +148,7 @@ impl FailedReads {
         FailedReads { version: now, tries }
     }
 
+    /// Whether another read of the same version is worth it.
     pub fn try_again(self) -> bool {
         self.tries < READ_TRIES
     }
@@ -187,6 +213,7 @@ pub struct FileState {
 }
 
 impl FileState {
+    /// The text changed, by typing, undoing or any other way.
     pub fn text_changed(&mut self) {
         self.revision += 1;
         self.question_is_over();
@@ -214,6 +241,7 @@ impl FileState {
         self.from_elsewhere = true;
     }
 
+    /// A save starts, before it takes the text.
     pub fn begin_save(&mut self) {
         self.under_way += 1;
         self.saves_begun += 1;
@@ -271,6 +299,7 @@ impl FileState {
         self.asking = true;
     }
 
+    /// The bytes the newest save took, as long as a save may still write them.
     pub fn bytes(&self) -> Option<&[u8]> {
         self.bytes.as_deref()
     }
@@ -310,16 +339,22 @@ impl FileState {
 /// See `FileState::on_file`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OnFile {
+    /// No change of the text since the file held it.
     Yes,
+    /// No file holds the text, whatever it is.
     No,
+    /// Only if the text has this print.
     IfTextIs(Print),
 }
 
 /// What to do about the change mark.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ChangeMark {
+    /// Leave the mark as it is.
     Keep,
+    /// Mark the document as edited.
     Set,
+    /// Clear the mark.
     Clear,
 }
 
@@ -337,6 +372,7 @@ pub fn mark_for(edited: bool, text_on_file: bool, may_clear: bool) -> ChangeMark
 pub enum Reaction {
     /// The file holds the text, so only AppKit's idea of its date is out of date.
     TakeDate,
+    /// The file holds another text, which replaces the one shown.
     Reread,
 }
 
@@ -736,7 +772,7 @@ mod tests {
 
     #[test]
     fn a_file_that_stays_unreadable_is_not_read_forever() {
-        let version = |seconds| Some((std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds), 1));
+        let version = |seconds| Stamp::new(std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds), 1);
         let mut failed = FailedReads::default();
         for _ in 1..READ_TRIES {
             failed = failed.after_another(version(1));
