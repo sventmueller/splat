@@ -334,34 +334,282 @@
     toast("New document");
   }
 
+  function htmlEscape(value) {
+    return String(value).replace(/[&<>"']/g, (character) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[character]);
+  }
+
   async function exportHtml() {
     if (!ensureDesktopBridge()) return;
     try {
       const path = await dialog.save({
         title: "Export as HTML",
-        defaultPath: `${state.name.replace(/\.(md|markdown|mdown|mkd)$/i, "")}.html`,
+        defaultPath: state.name.replace(/\.(md|markdown|mdown|mkd)$/i, "") + ".html",
         filters: [{ name: "HTML document", extensions: ["html", "htm"] }],
       });
       if (!path) return;
-      const html = await invoke("render_markdown", {
-        markdown: editor.value,
-        title: state.name,
-        allowRemoteImages: true,
-      });
-      const destination = /\.html?$/i.test(path) ? path : `${path}.html`;
-      await invoke("save_html_file", { path: destination, html });
-      toast("HTML exported");
+      const rendered = await collectPreview();
+      const page = "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n" +
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n" +
+        "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; font-src data:\">\n" +
+        "<title>" + htmlEscape(rendered.title || state.name) + "</title>\n<style>" + (rendered.css || "") +
+        "</style>\n</head>\n<body><main id=\"out\">" + (rendered.body || "") + "</main></body>\n</html>";
+      const destination = /\.html?$/i.test(path) ? path : path + ".html";
+      await invoke("save_html_file", { path: destination, html: page });
+      toast("Self-contained HTML exported.");
     } catch (error) {
-      toast(`Export failed: ${String(error)}`);
+      toast("HTML export failed: " + String(error));
     }
   }
+
+  async function exportWord() {
+    if (!ensureDesktopBridge()) return;
+    try {
+      const path = await dialog.save({
+        title: "Export as Word document",
+        defaultPath: state.name.replace(/\.(md|markdown|mdown|mkd)$/i, "") + ".docx",
+        filters: [{ name: "Word document", extensions: ["docx"] }],
+      });
+      if (!path) return;
+      const rendered = await collectPreview();
+      await invoke("export_docx_file", {
+        path: /\.docx$/i.test(path) ? path : path + ".docx",
+        markdown: editor.value,
+        title: state.name.replace(/\.(md|markdown|mdown|mkd)$/i, ""),
+        documentPath: state.path,
+        figures: rendered.figures || [],
+      });
+      toast("Word document exported.");
+    } catch (error) {
+      toast("Word export failed: " + String(error));
+    }
+  }
+
+  async function exportPdf() {
+    if (!ensureDesktopBridge()) return;
+    try {
+      await collectPreview();
+      await postPreviewRequest("splat:print");
+      toast("Choose Microsoft Print to PDF in the Windows print dialog.");
+    } catch (error) {
+      toast("PDF print failed: " + String(error));
+    }
+  }
+
+  async function chooseNotesFolder() {
+    if (!ensureDesktopBridge()) return null;
+    try {
+      const folder = await dialog.open({
+        directory: true,
+        multiple: false,
+        title: "Choose a folder of Markdown notes",
+      });
+      if (typeof folder !== "string" || !folder) return null;
+      state.rootFolder = folder;
+      return folder;
+    } catch (error) {
+      toast("Folder selection failed: " + String(error));
+      return null;
+    }
+  }
+
+  async function loadNotes(root = state.rootFolder) {
+    if (!root) {
+      root = await chooseNotesFolder();
+      if (!root) return;
+    }
+    const tree = await invoke("scan_notes", { root });
+    state.rootFolder = root;
+    $("#notes-root-label").textContent = root;
+    const host = $("#notes-tree");
+    host.replaceChildren();
+    if (!tree.top || tree.top.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "empty-note";
+      empty.textContent = "No Markdown notes were found in this folder.";
+      host.append(empty);
+      return;
+    }
+    for (const node of tree.top) renderNoteNode(node, host);
+    if (tree.cut || tree.unreadable) {
+      const note = document.createElement("p");
+      note.className = "search-summary";
+      note.textContent = (tree.cut ? "Folder scan reached the safety limit. " : "") +
+        (tree.unreadable ? tree.unreadable + " folders or files could not be read." : "");
+      host.append(note);
+    }
+  }
+
+  function renderNoteNode(node, host) {
+    const wrapper = document.createElement("div");
+    wrapper.className = node.folder ? "note-folder" : "note-file";
+    const row = document.createElement("div");
+    row.className = "note-tree-row";
+    const main = document.createElement("button");
+    main.className = "note-node-main";
+    main.textContent = (node.folder ? "▸" : "M") + "  " + node.name;
+    main.title = node.path;
+    if (node.folder) {
+      const children = document.createElement("div");
+      children.className = "note-children hidden";
+      main.addEventListener("click", () => {
+        const opening = children.classList.contains("hidden");
+        children.classList.toggle("hidden", !opening);
+        main.textContent = (opening ? "▾" : "▸") + "  " + node.name;
+      });
+      for (const child of node.children || []) renderNoteNode(child, children);
+      row.append(main);
+      wrapper.append(row, children);
+    } else {
+      main.addEventListener("click", () => openNotePath(node.path));
+      const rename = document.createElement("button");
+      rename.className = "note-rename";
+      rename.textContent = "⋯";
+      rename.title = "Rename note and rewrite links";
+      rename.addEventListener("click", () => renameNote(node.path, node.name));
+      row.append(main, rename);
+      wrapper.append(row);
+    }
+    host.append(wrapper);
+  }
+
+  async function openNotePath(path) {
+    if (!askDiscardChanges()) return;
+    try {
+      const opened = await invoke("read_markdown_file", { path });
+      setDocument(opened);
+      state.rootFolder = opened.path.replace(/[\\/][^\\/]+$/, "");
+      toast("Opened " + opened.name);
+      showGitChanges();
+    } catch (error) {
+      toast("Open note failed: " + String(error));
+    }
+  }
+
+  async function renameNote(path, currentName) {
+    if (state.path === path && state.dirty) {
+      toast("Save the current note before renaming it.");
+      return;
+    }
+    const defaultName = currentName.replace(/\.(md|markdown|mdown|mkd)$/i, "");
+    const newName = window.prompt("New note name. Links to this note will be updated.", defaultName);
+    if (!newName || newName.trim() === defaultName) return;
+    try {
+      const result = await invoke("rename_note", { path, newName });
+      if (state.path === path) {
+        state.path = result.newPath;
+        state.name = result.newPath.split(/[\\/]/).pop() || state.name;
+        updateDocumentChrome();
+      }
+      await loadNotes(state.rootFolder);
+      toast("Renamed note and updated " + result.rewrittenFiles + " linked files.");
+    } catch (error) {
+      toast("Rename failed: " + String(error));
+    }
+  }
+
+  async function searchNotes() {
+    if (!state.rootFolder) {
+      const root = await chooseNotesFolder();
+      if (!root) return;
+    }
+    const query = $("#note-search-query").value.trim();
+    const summary = $("#note-search-summary");
+    const results = $("#note-search-results");
+    results.replaceChildren();
+    if (!query) {
+      summary.textContent = "Enter text, a tag, or a note path to search.";
+      return;
+    }
+    summary.textContent = "Searching Markdown notes…";
+    try {
+      const found = await invoke("search_notes", {
+        root: state.rootFolder,
+        query,
+        mode: $("#note-search-mode").value,
+      });
+      const hitCount = found.files.reduce((total, file) => total + file.hits.length, 0);
+      summary.textContent = found.files.length + " files · " + hitCount + " matches" +
+        (found.unreadable ? " · " + found.unreadable + " unreadable" : "");
+      if (!found.files.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-note";
+        empty.textContent = "No matches.";
+        results.append(empty);
+      }
+      for (const file of found.files) {
+        const card = document.createElement("section");
+        card.className = "search-file";
+        const title = document.createElement("button");
+        title.className = "search-file-title";
+        title.textContent = file.path.split(/[\\/]/).pop() || file.path;
+        title.title = file.path;
+        title.addEventListener("click", () => openSearchHit(file.path, file.hits[0]));
+        card.append(title);
+        for (const hit of file.hits.slice(0, 20)) {
+          const item = document.createElement("button");
+          item.className = "search-hit";
+          item.textContent = "L" + hit.line + ": " + hit.context;
+          item.title = "Open this match";
+          item.addEventListener("click", () => openSearchHit(file.path, hit));
+          card.append(item);
+        }
+        if (file.more) {
+          const more = document.createElement("p");
+          more.className = "search-summary";
+          more.textContent = "More matches in this file were omitted.";
+          card.append(more);
+        }
+        results.append(card);
+      }
+    } catch (error) {
+      summary.textContent = "Search failed: " + String(error);
+    }
+  }
+
+  async function openSearchHit(path, hit) {
+    await openNotePath(path);
+    if (!hit) return;
+    const lines = editor.value.split("\n");
+    let offset = 0;
+    for (let i = 0; i < Math.max(0, hit.line - 1); i++) offset += (lines[i] || "").length + 1;
+    const position = Math.min(editor.value.length, offset + hit.column);
+    editor.focus();
+    editor.setSelectionRange(position, position);
+    updateStatus();
+  }
+
+  function showPanel(name, title) {
+    $("#sidebar-title").textContent = title;
+    $("#outline-list").classList.toggle("hidden", name !== "outline");
+    $("#git-panel").classList.toggle("hidden", name !== "git");
+    $("#notes-panel").classList.toggle("hidden", name !== "notes");
+    $("#search-panel").classList.toggle("hidden", name !== "search");
+    document.querySelectorAll(".rail-button").forEach((button) => {
+      button.classList.toggle("active", button.id === name + "-tab");
+    });
+  }
+
+  async function showNotes() {
+    showPanel("notes", "FOLDER NOTES");
+    if (!state.rootFolder && state.path) state.rootFolder = state.path.replace(/[\\/][^\\/]+$/, "");
+    try { await loadNotes(); }
+    catch (error) { toast("Cannot scan notes: " + String(error)); }
+  }
+
+  async function showSearch() {
+    showPanel("search", "SEARCH NOTES");
+    if (!state.rootFolder && state.path) state.rootFolder = state.path.replace(/[\\/][^\\/]+$/, "");
+    if (!state.rootFolder) await chooseNotesFolder();
+  }
+
 
   async function showGitChanges() {
     const panel = $("#git-panel");
     const list = $("#git-change-list");
     const summary = $("#git-summary");
-    $("#sidebar-title").textContent = "GIT CHANGES";
-    $("#outline-list").classList.add("hidden");
+    showPanel("git", "GIT CHANGES");
     panel.classList.remove("hidden");
     list.replaceChildren();
     if (!state.path || !invoke) {
@@ -393,9 +641,7 @@
   }
 
   function showOutline() {
-    $("#sidebar-title").textContent = "OUTLINE";
-    $("#git-panel").classList.add("hidden");
-    $("#outline-list").classList.remove("hidden");
+    showPanel("outline", "OUTLINE");
     updateOutline();
   }
 
@@ -463,6 +709,18 @@
   $("#save-file").addEventListener("click", () => saveFile(false));
   $("#more-actions").addEventListener("click", () => saveFile(true));
   $("#export-html").addEventListener("click", exportHtml);
+  $("#export-word").addEventListener("click", exportWord);
+  $("#export-pdf").addEventListener("click", exportPdf);
+  $("#notes-tab").addEventListener("click", showNotes);
+  $("#search-tab").addEventListener("click", showSearch);
+  $("#choose-notes-folder").addEventListener("click", async () => { const root = await chooseNotesFolder(); if (root) await loadNotes(root); });
+  $("#note-search-button").addEventListener("click", searchNotes);
+  $("#note-search-query").addEventListener("keydown", (event) => { if (event.key === "Enter") searchNotes(); });
+  previewFrame.addEventListener("load", () => {
+    state.previewReady = true;
+    renderPreview().catch((error) => toast("Preview failed: " + String(error)));
+  });
+  window.addEventListener("message", onPreviewMessage);
   $("#outline-tab").addEventListener("click", () => { showOutline(); $("#outline-tab").classList.add("active"); $("#git-tab").classList.remove("active"); });
   $("#git-tab").addEventListener("click", () => { showGitChanges(); $("#git-tab").classList.add("active"); $("#outline-tab").classList.remove("active"); });
   $("#help-tab").addEventListener("click", () => toast("Splat for Windows · Early preview · Local-first Markdown editing"));
@@ -493,6 +751,5 @@
   updateHighlight();
   updateOutline();
   updateStatus();
-  renderPreview();
   if (invoke) invoke("app_version").then((version) => { $("#version-label").textContent = `Splat ${version}`; }).catch(() => {});
 })();
