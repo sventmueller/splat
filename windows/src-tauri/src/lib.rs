@@ -292,26 +292,15 @@ fn query_for(mode: &str, query: &str, root: &Path) -> Result<Query, String> {
     }
     match mode {
         "tag" => Ok(Query::Tag(query.trim_start_matches('#').to_string())),
-        "links" => Ok(Query::LinksTo(PathBuf::from(query))),
+        "links" => {
+            let path = PathBuf::from(query);
+            let target = if path.is_absolute() { path } else { root.join(path) };
+            Ok(Query::LinksTo(target))
+        }
         _ => Ok(Query::Text {
             needle: query.to_string(),
             case_sensitive: false,
         }),
-    }
-    .and_then(|query| {
-        if mode == "links" && !PathBuf::from(query_path(&query)).is_absolute() {
-            let target = root.join(query_path(&query));
-            Ok(Query::LinksTo(target))
-        } else {
-            Ok(query)
-        }
-    })
-}
-
-fn query_path(query: &Query) -> &str {
-    match query {
-        Query::LinksTo(path) => path.to_str().unwrap_or_default(),
-        Query::Text { needle, .. } | Query::Tag(needle) => needle,
     }
 }
 
@@ -344,7 +333,7 @@ fn new_note_path(from: &Path, requested_name: &str) -> Result<PathBuf, String> {
     if name.is_empty()
         || name == "."
         || name == ".."
-        || name.contains(['/', '\\', ':', '\0'])
+        || name.chars().any(|character| matches!(character, '/' | '\\' | ':' | '\0'))
         || name.starts_with('.')
     {
         return Err("Use a plain file name without a folder path.".to_string());
