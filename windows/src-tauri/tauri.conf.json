@@ -40,6 +40,20 @@
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
       }
-    }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown",
+          "mkd"
+        ],
+        "name": "Markdown document",
+        "description": "Markdown document opened with Splat",
+        "mimeType": "text/markdown",
+        "role": "Editor"
+      }
+    ]
   }
 }
