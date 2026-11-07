@@ -671,7 +671,17 @@
     const lines = editor.value.split("\n");
     let offset = 0;
     for (let i = 0; i < Math.max(0, hit.line - 1); i++) offset += (lines[i] || "").length + 1;
-    const position = Math.min(editor.value.length, offset + hit.column);
+    const lineText = lines[Math.max(0, hit.line - 1)] || "";
+    let byteColumn = 0;
+    let utf16Column = 0;
+    for (const character of lineText) {
+      if (byteColumn >= hit.column) break;
+      const width = new TextEncoder().encode(character).length;
+      if (byteColumn + width > hit.column) break;
+      byteColumn += width;
+      utf16Column += character.length;
+    }
+    const position = Math.min(editor.value.length, offset + utf16Column);
     editor.focus();
     editor.setSelectionRange(position, position);
     updateStatus();
