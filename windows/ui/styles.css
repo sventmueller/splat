@@ -148,3 +148,41 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   #preview-frame { background: #fff; }
   .toast { background: #273244; border-color: #46546b; color: #e2e9f5; }
 }
+
+
+/* Folder-wide notes and search */
+.notes-panel, .search-panel { display:flex; flex-direction:column; flex:1; min-height:0; }
+.panel-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 11px; border-bottom:1px solid var(--line); color:var(--muted); font-size:10px; }
+#notes-root-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.small-action { border:1px solid var(--line-strong); border-radius:6px; background:var(--panel); padding:6px 8px; color:var(--muted-strong); font-size:10px; font-weight:650; white-space:nowrap; }
+.small-action:hover { background:var(--panel-hover); }
+.primary-small { background:var(--accent); border-color:var(--accent); color:#fff; }
+.notes-tree, .note-search-results { flex:1; min-height:0; overflow:auto; padding:8px 8px 16px; }
+.note-tree-row { display:flex; align-items:center; gap:2px; min-width:0; }
+.note-node-main { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; border:0; border-radius:6px; padding:6px 7px; background:transparent; color:var(--muted-strong); font-size:11px; }
+.note-node-main:hover, .search-hit:hover { background:var(--panel-hover); color:var(--text); }
+.note-folder > .note-tree-row > .note-node-main { color:var(--text); font-weight:650; }
+.note-children { margin-left:12px; padding-left:7px; border-left:1px solid var(--line); }
+.note-rename { flex:0 0 24px; width:24px; height:25px; border:0; border-radius:5px; background:transparent; color:var(--muted); font-size:17px; }
+.note-rename:hover { background:var(--panel-hover); color:var(--text); }
+.search-controls { display:flex; flex-direction:column; gap:7px; padding:11px; border-bottom:1px solid var(--line); }
+.search-controls input, .search-controls select { width:100%; height:31px; border:1px solid var(--line-strong); border-radius:6px; padding:0 8px; background:var(--panel); color:var(--text); font:11px "Segoe UI",sans-serif; }
+.search-controls button { align-self:flex-end; }
+.search-summary { padding:9px 11px; color:var(--muted); font-size:10px; line-height:1.5; border-bottom:1px solid var(--line); }
+.search-file { margin:5px 0 10px; padding:7px 6px; border:1px solid var(--line); border-radius:7px; background:var(--panel); }
+.search-file-title { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; border:0; background:transparent; color:var(--accent); font-size:11px; font-weight:700; padding:3px 5px 7px; }
+.search-hit { display:block; width:100%; padding:6px 5px; border:0; border-radius:5px; background:transparent; color:var(--muted-strong); text-align:left; font:10px/1.45 "Segoe UI",sans-serif; overflow-wrap:anywhere; }
+.export-button { margin-left:2px; }
+.preview-pane { overflow:hidden; }
+#preview-frame { color-scheme:light; }
+@media (prefers-color-scheme: dark) {
+  .git-change, .search-file { background:#202938; }
+  .small-action, .search-controls input, .search-controls select { background:#202938; color:var(--text); border-color:var(--line-strong); }
+  .note-children { border-color:#394455; }
+  .search-hit { color:#b3bece; }
+}
+@media (max-width: 1080px) {
+  .edition-tag { display:none; }
+  .topbar { padding:0 12px; }
+  .export-button { padding:0 7px; }
+}
