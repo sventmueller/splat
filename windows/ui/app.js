@@ -25,6 +25,7 @@
 
   let renderTimer = null;
   let toastTimer = null;
+  let recoveryTimer = null;
 
   function toast(message) {
     const node = $("#toast");
@@ -234,9 +235,98 @@
     }, 110);
   }
 
+  function scheduleRecoverySnapshot() {
+    clearTimeout(recoveryTimer);
+    if (!state.dirty || !invoke) return;
+    recoveryTimer = setTimeout(() => {
+      invoke("save_recovery_snapshot", {
+        snapshot: {
+          path: state.path,
+          name: state.name,
+          content: editor.value,
+          format: state.format,
+          savedAt: Date.now(),
+        },
+      }).catch((error) => console.warn("Splat recovery snapshot failed:", error));
+    }, 1400);
+  }
+
+  async function clearRecoverySnapshot() {
+    if (!invoke) return;
+    clearTimeout(recoveryTimer);
+    try { await invoke("clear_recovery_snapshot"); }
+    catch (error) { console.warn("Could not clear recovery snapshot:", error); }
+  }
+
+  async function restoreRecoverySnapshot() {
+    if (!invoke) return;
+    try {
+      const snapshot = await invoke("load_recovery_snapshot");
+      if (!snapshot) return;
+      const age = Date.now() - Number(snapshot.savedAt || 0);
+      if (age > 30 * 24 * 60 * 60 * 1000) {
+        await clearRecoverySnapshot();
+        return;
+      }
+      const restore = window.confirm(
+        "Splat found a recovery draft from an earlier session. Restore " + snapshot.name + "?"
+      );
+      if (!restore) {
+        await clearRecoverySnapshot();
+        return;
+      }
+      setDocument(snapshot);
+      state.savedContent = "";
+      state.dirty = true;
+      updateDocumentChrome();
+      scheduleRecoverySnapshot();
+      toast("Recovered draft restored");
+    } catch (error) {
+      toast("Could not restore recovery draft: " + String(error));
+    }
+  }
+
+  async function openStartupFile() {
+    if (!invoke) return false;
+    try {
+      const path = await invoke("startup_file");
+      if (typeof path !== "string" || !path) return false;
+      const opened = await invoke("read_markdown_file", { path });
+      setDocument(opened);
+      state.rootFolder = opened.path.replace(/[\\/][^\\/]+$/, "");
+      await clearRecoverySnapshot();
+      toast("Opened " + opened.name);
+      return true;
+    } catch (error) {
+      toast("Could not open the file passed by Windows: " + String(error));
+      return false;
+    }
+  }
+
+  function handleNativeMenu(id) {
+    switch (id) {
+      case "new": newDocument(); break;
+      case "open": openFile(); break;
+      case "save": saveFile(false); break;
+      case "save-as": saveFile(true); break;
+      case "export-html": exportHtml(); break;
+      case "export-word": exportWord(); break;
+      case "export-pdf": exportPdf(); break;
+      case "notes": showNotes(); break;
+      case "search": showSearch(); break;
+      case "check-updates":
+        toast("Opening Splat releases. Signed automatic updates require a release-signing key.");
+        window.open("https://github.com/lipeilin375/splat/releases", "_blank", "noopener,noreferrer");
+        break;
+      case "about": toast("Splat for Windows · Feature parity preview"); break;
+      default: break;
+    }
+  }
+
   function documentChanged() {
     state.content = editor.value;
     state.dirty = state.content !== state.savedContent;
+    scheduleRecoverySnapshot();
     updateDocumentChrome();
     updateHighlight();
     updateOutline();
@@ -278,6 +368,7 @@
       const opened = await invoke("read_markdown_file", { path: selected });
       setDocument(opened);
       state.rootFolder = opened.path.replace(/[\\/][^\\/]+$/, "");
+      await clearRecoverySnapshot();
       toast(`Opened ${opened.name}`);
       showGitChanges();
     } catch (error) {
@@ -304,6 +395,7 @@
       state.dirty = false;
       updateDocumentChrome();
       updateStatus();
+      await clearRecoverySnapshot();
       toast("Saved on this device");
     } catch (error) {
       toast(`Save failed: ${String(error)}`);
@@ -333,6 +425,7 @@
       content: "",
       format: { bom: false, crlf: false, encoding: "utf-8" },
     });
+    clearRecoverySnapshot();
     toast("New document");
   }
 
@@ -482,6 +575,7 @@
       const opened = await invoke("read_markdown_file", { path });
       setDocument(opened);
       state.rootFolder = opened.path.replace(/[\\/][^\\/]+$/, "");
+      await clearRecoverySnapshot();
       toast("Opened " + opened.name);
       showGitChanges();
     } catch (error) {
@@ -754,5 +848,12 @@
   updateHighlight();
   updateOutline();
   updateStatus();
-  if (invoke) invoke("app_version").then((version) => { $("#version-label").textContent = `Splat ${version}`; }).catch(() => {});
+  if (invoke) {
+    invoke("app_version").then((version) => { $("#version-label").textContent = "Splat " + version; }).catch(() => {});
+    openStartupFile().then((opened) => { if (!opened) restoreRecoverySnapshot(); });
+  }
+  if (window.__TAURI__?.event?.listen) {
+    window.__TAURI__.event.listen("splat-menu", (event) => handleNativeMenu(String(event.payload || "")))
+      .catch((error) => console.warn("Could not listen for native menu events:", error));
+  }
 })();
