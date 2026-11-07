@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use tauri::menu::MenuBuilder;
+use tauri::{AppHandle, Emitter, Manager};
 use std::sync::atomic::AtomicBool;
 
 const MAX_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
@@ -264,6 +266,72 @@ fn image_picture(raw: &str, root: Option<&Path>) -> Option<Picture> {
         width: f64::from(width) * 0.75,
         height: f64::from(height) * 0.75,
     })
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RecoverySnapshot {
+    path: Option<String>,
+    name: String,
+    content: String,
+    format: FileFormatDto,
+    saved_at: u64,
+}
+
+fn recovery_file(app: &AppHandle) -> Result<PathBuf, String> {
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Cannot locate Splat's recovery folder: {error}"))?;
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Cannot create Splat's recovery folder: {error}"))?;
+    Ok(directory.join("recovery.json"))
+}
+
+#[tauri::command]
+fn save_recovery_snapshot(app: AppHandle, snapshot: RecoverySnapshot) -> Result<(), String> {
+    if snapshot.content.len() as u64 > MAX_DOCUMENT_BYTES {
+        return Err("The recovery draft is larger than the 50 MiB limit.".to_string());
+    }
+    let path = recovery_file(&app)?;
+    let bytes = serde_json::to_vec(&snapshot)
+        .map_err(|error| format!("Cannot serialize recovery draft: {error}"))?;
+    fs::write(path, bytes).map_err(|error| format!("Cannot write recovery draft: {error}"))
+}
+
+#[tauri::command]
+fn load_recovery_snapshot(app: AppHandle) -> Result<Option<RecoverySnapshot>, String> {
+    let path = recovery_file(&app)?;
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("Cannot read recovery draft: {error}")),
+    };
+    let snapshot: RecoverySnapshot = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("Recovery draft is damaged: {error}"))?;
+    if snapshot.content.len() as u64 > MAX_DOCUMENT_BYTES {
+        return Err("The stored recovery draft exceeds the 50 MiB limit.".to_string());
+    }
+    Ok(Some(snapshot))
+}
+
+#[tauri::command]
+fn clear_recovery_snapshot(app: AppHandle) -> Result<(), String> {
+    let path = recovery_file(&app)?;
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("Cannot clear recovery draft: {error}")),
+    }
+}
+
+#[tauri::command]
+fn startup_file() -> Option<String> {
+    std::env::args_os()
+        .skip(1)
+        .map(PathBuf::from)
+        .find(|path| is_markdown_path(path) && path.is_file())
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn tree_node(tree: &Tree, index: usize) -> Option<NoteNodeDto> {
@@ -718,8 +786,35 @@ pub fn run() {
             rename_note,
             git_changes,
             paste_html_as_markdown,
+            save_recovery_snapshot,
+            load_recovery_snapshot,
+            clear_recovery_snapshot,
+            startup_file,
             app_version,
         ])
+        .setup(|app| {
+            let menu = MenuBuilder::new(app)
+                .text("new", "New")
+                .text("open", "Open…")
+                .text("save", "Save")
+                .text("save-as", "Save As…")
+                .separator()
+                .text("export-html", "Export HTML…")
+                .text("export-word", "Export Word…")
+                .text("export-pdf", "Print / Export PDF…")
+                .separator()
+                .text("notes", "Folder Notes")
+                .text("search", "Search Notes")
+                .separator()
+                .text("check-updates", "Check for Updates")
+                .text("about", "About Splat")
+                .build()?;
+            app.set_menu(menu)?;
+            app.on_menu_event(|handle, event| {
+                let _ = handle.emit("splat-menu", event.id().0.clone());
+            });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running Splat for Windows");
 }
