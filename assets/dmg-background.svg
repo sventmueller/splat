@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="300" viewBox="0 0 500 300">
+  <rect width="500" height="300" fill="#ECECEC"/>
+  <text x="250" y="35" text-anchor="middle" font-family="Helvetica Neue" font-size="16" fill="#888888">Drag to Applications to install</text>
+  <path d="M211.5 150.5H290M275 135L290.5 150.5L275 166" fill="none" stroke="#CCCCCC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

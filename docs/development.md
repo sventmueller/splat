@@ -90,7 +90,8 @@ Each release adds the full image, about 16 MB, to the repository history. It run
   so `dmg` stops if the file is empty or still holds the previous release's notes
 
 If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
-Finder; without that permission, the disk image shows neither its background nor the icon arrangement.
+Finder, which lays out the disk image window. `dmg` then reads the icon positions Finder stored in the image and stops
+if they are not the intended ones, as when Finder shows hidden files (⇧⌘. hides them) or lacks the permission.
 
 Only the disk image carries the updater, [Sparkle](https://sparkle-project.org), which the build downloads once into
 `target/` from its GitHub release and checks against the checksum in xtask. The hardened runtime loads the framework
