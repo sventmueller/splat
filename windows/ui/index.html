@@ -26,6 +26,8 @@
     <main class="workspace">
       <aside class="rail">
         <button class="rail-button active" id="outline-tab" title="Document outline" aria-label="Document outline">☷</button>
+        <button class="rail-button" id="notes-tab" title="Folder notes" aria-label="Folder notes">▤</button>
+        <button class="rail-button" id="search-tab" title="Search notes" aria-label="Search notes">⌕</button>
         <button class="rail-button" id="git-tab" title="Git changes" aria-label="Git changes">⑂</button>
         <div class="rail-spacer"></div>
         <button class="rail-button" id="help-tab" title="About Splat" aria-label="About Splat">?</button>
@@ -34,6 +36,26 @@
       <aside class="sidebar" id="sidebar">
         <div class="sidebar-heading"><span id="sidebar-title">OUTLINE</span><button id="sidebar-collapse" class="subtle-icon" title="Hide sidebar">‹</button></div>
         <div id="outline-list" class="outline-list"><p class="empty-note">Headings in this document will appear here.</p></div>
+        <div id="notes-panel" class="notes-panel hidden">
+          <div class="panel-toolbar">
+            <span id="notes-root-label">Choose a folder to browse notes</span>
+            <button class="small-action" id="choose-notes-folder">Open folder</button>
+          </div>
+          <div id="notes-tree" class="notes-tree"><p class="empty-note">Markdown notes in the selected folder will appear here.</p></div>
+        </div>
+        <div id="search-panel" class="search-panel hidden">
+          <div class="search-controls">
+            <input id="note-search-query" type="search" placeholder="Search text or #tag" aria-label="Search notes">
+            <select id="note-search-mode" aria-label="Search type">
+              <option value="text">Text</option>
+              <option value="tag">Tag</option>
+              <option value="links">Links to path</option>
+            </select>
+            <button class="small-action primary-small" id="note-search-button">Search</button>
+          </div>
+          <div class="search-summary" id="note-search-summary">Choose a folder, then search across its Markdown notes.</div>
+          <div id="note-search-results" class="note-search-results"></div>
+        </div>
         <div id="git-panel" class="git-panel hidden">
           <div class="git-summary" id="git-summary">Open a file inside a Git repository to inspect changes.</div>
           <div id="git-change-list" class="git-change-list"></div>
@@ -78,7 +100,9 @@
             <button class="tool-button" id="insert-rule" title="Horizontal rule">―</button>
           </div>
           <div class="toolbar-spacer"></div>
-          <button class="export-button" id="export-html">Export HTML <span>↗</span></button>
+          <button class="export-button" id="export-html">HTML <span>↗</span></button>
+          <button class="export-button" id="export-word">Word <span>↓</span></button>
+          <button class="export-button" id="export-pdf">PDF <span>↓</span></button>
         </div>
 
         <div class="editor-stage" id="editor-stage" data-view="split">
@@ -92,7 +116,7 @@
           <div class="pane-splitter" aria-hidden="true"><span></span></div>
           <section class="preview-pane" aria-label="Live preview">
             <div class="pane-label"><span>LIVE PREVIEW</span><span class="preview-live"><span></span> LIVE</span></div>
-            <iframe id="preview-frame" title="Rendered Markdown preview" sandbox="allow-same-origin"></iframe>
+            <iframe id="preview-frame" src="./preview/index.html" title="Rendered Markdown preview" sandbox="allow-scripts allow-same-origin allow-modals"></iframe>
           </section>
         </div>
 
