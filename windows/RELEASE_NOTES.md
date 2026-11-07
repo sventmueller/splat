@@ -1,12 +1,12 @@
-# Splat for Windows (feature parity preview)
+# Splat for Windows 0.2.0 (feature parity preview)
 
-- Offline formula rendering through bundled MathJax 4.
-- Offline Mermaid, Graphviz and PlantUML diagram rendering.
+- MathJax 4 formula rendering and offline Mermaid, Graphviz and PlantUML diagrams.
 - Editable rendered preview with Markdown write-back.
-- Folder-wide note tree, text/tag/backlink search and safe rename with link rewriting.
-- Word (.docx) export using Splat's native OOXML writer; embedded images and rendered figures are included when available.
-- HTML export from the rendered page, including locally rendered figures.
-- Print dialog for PDF output (select Microsoft Print to PDF on Windows).
-- Reuses the existing file-format preservation, Git diff, Markdown renderer and HTML clipboard importer.
+- Folder note tree, text/tag/backlink search, and note renaming with link rewriting.
+- Word (.docx) export through Splat's OOXML writer, with local images and rendered figures where available.
+- Self-contained HTML export and Windows print-to-PDF workflow.
+- Native Windows menu, Markdown file associations and command-line file-open handling.
+- Local crash-recovery draft snapshots with an explicit restore prompt.
+- Reuses Splat's Markdown renderer, file-format preservation, safe Git diff and HTML clipboard importer.
 
-This remains a preview release. Formula/diagram editing in the source is supported; rendered figure objects are protected from direct inline edits. PDF output uses the system print dialog. The first Windows build is unsigned.
+This is a preview release. PDF output uses the Windows print dialog; choose Microsoft Print to PDF. The NSIS installer is currently unsigned. Automatic updater installation is disabled until a Tauri updater signing key and Windows code-signing certificate are configured securely.
