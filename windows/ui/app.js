@@ -404,6 +404,8 @@
   if (!ensureDesktopBridge()) {
     $("#status-message").textContent = "Preview UI · Tauri bridge unavailable";
   }
+  editor.value = state.content;
+  state.savedContent = state.content;
   updateDocumentChrome();
   updateHighlight();
   updateOutline();
