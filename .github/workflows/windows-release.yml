@@ -42,11 +42,14 @@ jobs:
           workspaces: windows/src-tauri -> target
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+        run: npm install --global @tauri-apps/cli@2.12.2
+
+      - name: Verify Tauri CLI
+        run: tauri --version
 
       - name: Generate Windows application icons
         working-directory: windows/src-tauri
-        run: cargo tauri icon icons/icon.png
+        run: tauri icon icons/icon.png
 
       - name: Check formatting and run Windows-core tests
         working-directory: windows/src-tauri
@@ -56,7 +59,7 @@ jobs:
 
       - name: Build NSIS installer
         working-directory: windows/src-tauri
-        run: cargo tauri build --bundles nsis
+        run: tauri build --bundles nsis
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
