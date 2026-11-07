@@ -15,6 +15,11 @@
     dirty: false,
     format: { bom: false, crlf: false, encoding: "utf-8" },
     renderSequence: 0,
+    previewRequestId: 0,
+    previewReady: false,
+    pendingRender: null,
+    pendingPreviewRequests: new Map(),
+    rootFolder: null,
     view: "split",
   };
 
@@ -131,20 +136,96 @@
     document.title = `${state.dirty ? "● " : ""}${state.name} · Splat`;
   }
 
+  function postPreviewRequest(type, payload = {}) {
+    if (!state.previewReady || !previewFrame.contentWindow) {
+      return Promise.reject(new Error("The preview frame is not ready."));
+    }
+    const id = ++state.previewRequestId;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        state.pendingPreviewRequests.delete(id);
+        reject(new Error("The preview did not respond in time."));
+      }, 45000);
+      state.pendingPreviewRequests.set(id, { resolve, reject, timer });
+      previewFrame.contentWindow.postMessage({ type, id, ...payload }, "*");
+    });
+  }
+
   async function renderPreview() {
-    if (!invoke) return;
+    if (!invoke || !state.previewReady) return null;
     const sequence = ++state.renderSequence;
-    try {
-      const html = await invoke("render_markdown", {
-        markdown: editor.value,
-        title: state.name,
-        allowRemoteImages: false,
-      });
-      if (sequence === state.renderSequence) previewFrame.srcdoc = html;
-    } catch (error) {
-      toast(`Preview error: ${String(error)}`);
+    const html = await invoke("render_markdown", {
+      markdown: editor.value,
+      title: state.name,
+      documentPath: state.path,
+      allowRemoteImages: false,
+    });
+    if (sequence !== state.renderSequence) return null;
+
+    if (state.pendingRender) {
+      clearTimeout(state.pendingRender.timer);
+      state.pendingRender.resolve(null);
+      state.pendingRender = null;
+    }
+    const id = ++state.previewRequestId;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (state.pendingRender && state.pendingRender.id === id) state.pendingRender = null;
+        reject(new Error("The preview did not finish rendering in time."));
+      }, 45000);
+      state.pendingRender = { id, resolve, reject, timer };
+      previewFrame.contentWindow.postMessage({
+        type: "splat:render",
+        id,
+        html,
+        editable: true,
+        dark: window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches,
+      }, "*");
+    });
+  }
+
+  async function collectPreview() {
+    await renderPreview();
+    return postPreviewRequest("splat:collect");
+  }
+
+  function onPreviewMessage(event) {
+    if (event.source !== previewFrame.contentWindow || !event.data || event.data.source !== "splat-preview") return;
+    const message = event.data;
+    if (message.type === "splat:rendered") {
+      const pending = state.pendingRender;
+      if (!pending || pending.id !== message.id) return;
+      clearTimeout(pending.timer);
+      state.pendingRender = null;
+      pending.resolve(message);
+      if (message.errors && message.errors.length) toast("Some formulas or diagrams could not be rendered.");
+      return;
+    }
+    if (message.type === "splat:collected" || message.type === "splat:printed") {
+      const pending = state.pendingPreviewRequests.get(message.id);
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      state.pendingPreviewRequests.delete(message.id);
+      pending.resolve(message);
+      return;
+    }
+    if (message.type === "splat:open-link") {
+      const href = String(message.href || "");
+      if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (message.type === "splat:preview-edit") {
+      invoke("paste_html_as_markdown", { html: String(message.html || "") })
+        .then((markdown) => {
+          if (typeof markdown !== "string") return;
+          editor.value = markdown;
+          documentChanged();
+          toast("Preview changes applied to Markdown.");
+        })
+        .catch((error) => toast("Could not convert preview edit: " + String(error)));
     }
   }
+
 
   function scheduleRender() {
     clearTimeout(renderTimer);
@@ -167,6 +248,7 @@
     state.content = document.content || "";
     state.savedContent = state.content;
     state.format = document.format || { bom: false, crlf: false, encoding: "utf-8" };
+    if (!state.rootFolder && state.path) state.rootFolder = state.path.replace(/[\\/][^\\/]+$/, "");
     state.dirty = false;
     editor.value = state.content;
     updateDocumentChrome();
@@ -193,6 +275,7 @@
       if (!selected) return;
       const opened = await invoke("read_markdown_file", { path: selected });
       setDocument(opened);
+      state.rootFolder = opened.path.replace(/[\\/][^\\/]+$/, "");
       toast(`Opened ${opened.name}`);
       showGitChanges();
     } catch (error) {
