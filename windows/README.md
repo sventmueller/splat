@@ -36,15 +36,18 @@ Prerequisites:
 From the repository root in PowerShell:
 
 ```powershell
-cargo install tauri-cli --version '^2' --locked
+./windows/prepare-preview.ps1
+npm install --global @tauri-apps/cli@2.12.2
 cd windows/src-tauri
-cargo tauri dev
+tauri dev
 ```
+
+The preparation script copies the repository's bundled MathJax, Mermaid, Graphviz and PlantUML engines into the Tauri frontend. It runs automatically in CI and from `windows/build.ps1`; run it once before starting the development server.
 
 Build the NSIS setup executable:
 
 ```powershell
-cargo tauri build --bundles nsis
+tauri build --bundles nsis
 ```
 
 The installer is written under `windows/src-tauri/target/release/bundle/nsis/`.
