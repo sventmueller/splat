@@ -1,9 +1,19 @@
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
+use image::GenericImageView;
 use serde::{Deserialize, Serialize};
 use splat_file_state::{Encoding, FileFormat};
+use splat_markdown::doc::{DiagramKind, Figure};
+use splat_markdown::docx::{Picture, TitlePage, WordExport};
+use splat_notes::{FileHits, Query, Rewrite, Tree};
+use std::collections::HashMap;
 use std::fs;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 const MAX_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_EXPORT_BYTES: usize = 100 * 1024 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,6 +80,66 @@ struct GitChange {
     text: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteNodeDto {
+    name: String,
+    path: String,
+    folder: bool,
+    children: Vec<NoteNodeDto>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteTreeDto {
+    root: String,
+    top: Vec<NoteNodeDto>,
+    cut: bool,
+    unreadable: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteHitDto {
+    line: usize,
+    column: usize,
+    context: String,
+    match_start: usize,
+    match_end: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteFileHitsDto {
+    path: String,
+    hits: Vec<NoteHitDto>,
+    more: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NoteSearchDto {
+    files: Vec<NoteFileHitsDto>,
+    unreadable: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenameResultDto {
+    old_path: String,
+    new_path: String,
+    rewritten_files: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FigureAssetDto {
+    key: String,
+    data: String,
+    width: f64,
+    height: f64,
+}
+
 fn is_markdown_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
@@ -101,12 +171,220 @@ fn validate_markdown_path(path: &str) -> Result<PathBuf, String> {
     Ok(candidate)
 }
 
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn hex_key(text: &str) -> String {
+    let mut out = String::with_capacity(text.len().saturating_mul(2));
+    for byte in text.as_bytes() {
+        use std::fmt::Write as _;
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    out
+}
+
+fn figure_key(figure: &Figure<'_>) -> String {
+    let raw = match figure {
+        Figure::Math { tex, display } => {
+            format!("math:{}:{tex}", if *display { "display" } else { "inline" })
+        }
+        Figure::Diagram { source, kind } => {
+            let kind = match kind {
+                DiagramKind::Mermaid => "mermaid",
+                DiagramKind::Graphviz => "graphviz",
+                DiagramKind::PlantUml => "plantuml",
+            };
+            format!("diagram:{kind}:{source}")
+        }
+    };
+    hex_key(&raw)
+}
+
+fn diagram_name(kind: DiagramKind) -> &'static str {
+    match kind {
+        DiagramKind::Mermaid => "mermaid",
+        DiagramKind::Graphviz => "graphviz",
+        DiagramKind::PlantUml => "plantuml",
+    }
+}
+
+fn is_safe_relative_path(raw: &str) -> bool {
+    !raw.trim().is_empty()
+        && !raw.contains("://")
+        && !raw.starts_with("file:")
+        && !Path::new(raw).is_absolute()
+        && !raw.split(['/', '\\']).any(|part| part == "..")
+}
+
+fn local_path(root: Option<&Path>, raw: &str) -> Option<PathBuf> {
+    let root = root?.canonicalize().ok()?;
+    let clean = raw.split(['?', '#']).next()?.trim();
+    if !is_safe_relative_path(clean) {
+        return None;
+    }
+    let path = root.join(clean).canonicalize().ok()?;
+    path.starts_with(&root).then_some(path)
+}
+
+fn image_mime(bytes: &[u8]) -> Option<&'static str> {
+    let format = image::guess_format(bytes).ok()?;
+    match format {
+        image::ImageFormat::Png => Some("image/png"),
+        image::ImageFormat::Jpeg => Some("image/jpeg"),
+        image::ImageFormat::Gif => Some("image/gif"),
+        image::ImageFormat::WebP => Some("image/webp"),
+        image::ImageFormat::Bmp => Some("image/bmp"),
+        _ => None,
+    }
+}
+
+fn image_data_url(raw: &str, root: Option<&Path>) -> Option<String> {
+    let path = local_path(root, raw)?;
+    let bytes = fs::read(path).ok()?;
+    let mime = image_mime(&bytes)?;
+    Some(format!("data:{mime};base64,{}", BASE64.encode(bytes)))
+}
+
+fn image_picture(raw: &str, root: Option<&Path>) -> Option<Picture> {
+    let path = local_path(root, raw)?;
+    let bytes = fs::read(path).ok()?;
+    let image = image::load_from_memory(&bytes).ok()?;
+    let (width, height) = image.dimensions();
+    let mut encoded = Cursor::new(Vec::new());
+    image.write_to(&mut encoded, image::ImageFormat::Png).ok()?;
+    Some(Picture {
+        data: encoded.into_inner(),
+        jpeg: false,
+        // CSS pixels to Word points at 96 DPI.
+        width: f64::from(width) * 0.75,
+        height: f64::from(height) * 0.75,
+    })
+}
+
+fn tree_node(tree: &Tree, index: usize) -> Option<NoteNodeDto> {
+    let node = tree.nodes.get(index)?;
+    Some(NoteNodeDto {
+        name: node.name.clone(),
+        path: node.path.to_string_lossy().into_owned(),
+        folder: node.folder,
+        children: node.children.iter().filter_map(|child| tree_node(tree, *child)).collect(),
+    })
+}
+
+fn tree_dto(tree: &Tree) -> NoteTreeDto {
+    NoteTreeDto {
+        root: tree.root.to_string_lossy().into_owned(),
+        top: tree.top.iter().filter_map(|index| tree_node(tree, *index)).collect(),
+        cut: tree.cut,
+        unreadable: tree.unreadable,
+    }
+}
+
+fn query_for(mode: &str, query: &str, root: &Path) -> Result<Query, String> {
+    let query = query.trim();
+    if query.is_empty() {
+        return Err("Enter text or a tag to search for.".to_string());
+    }
+    match mode {
+        "tag" => Ok(Query::Tag(query.trim_start_matches('#').to_string())),
+        "links" => Ok(Query::LinksTo(PathBuf::from(query))),
+        _ => Ok(Query::Text {
+            needle: query.to_string(),
+            case_sensitive: false,
+        }),
+    }
+    .and_then(|query| {
+        if mode == "links" && !PathBuf::from(query_path(&query)).is_absolute() {
+            let target = root.join(query_path(&query));
+            Ok(Query::LinksTo(target))
+        } else {
+            Ok(query)
+        }
+    })
+}
+
+fn query_path(query: &Query) -> &str {
+    match query {
+        Query::LinksTo(path) => path.to_str().unwrap_or_default(),
+        Query::Text { needle, .. } | Query::Tag(needle) => needle,
+    }
+}
+
+fn search_dto(files: Vec<FileHits>, unreadable: usize) -> NoteSearchDto {
+    NoteSearchDto {
+        files: files
+            .into_iter()
+            .map(|file| NoteFileHitsDto {
+                path: file.path.to_string_lossy().into_owned(),
+                hits: file
+                    .hits
+                    .into_iter()
+                    .map(|hit| NoteHitDto {
+                        line: hit.line + 1,
+                        column: hit.column,
+                        context: hit.context,
+                        match_start: hit.in_context.start,
+                        match_end: hit.in_context.end,
+                    })
+                    .collect(),
+                more: file.more,
+            })
+            .collect(),
+        unreadable,
+    }
+}
+
+fn new_note_path(from: &Path, requested_name: &str) -> Result<PathBuf, String> {
+    let name = requested_name.trim();
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.contains(['/', '\\', ':', '\0'])
+        || name.starts_with('.')
+    {
+        return Err("Use a plain file name without a folder path.".to_string());
+    }
+
+    let extension = from
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .filter(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "md" | "markdown" | "mdown" | "mkd"
+            )
+        })
+        .ok_or_else(|| "The source file is not a supported Markdown note.".to_string())?;
+
+    let file_name = if is_markdown_path(Path::new(name)) {
+        name.to_string()
+    } else {
+        format!("{name}.{extension}")
+    };
+    let target = from.with_file_name(file_name);
+    if target == from {
+        return Err("The new name is the same as the current name.".to_string());
+    }
+    if target.exists() {
+        return Err("A file with that name already exists.".to_string());
+    }
+    Ok(target)
+}
+
 #[tauri::command]
 fn read_markdown_file(path: String) -> Result<OpenedDocument, String> {
     let path = validate_markdown_path(&path)?;
     let metadata = fs::metadata(&path).map_err(|error| format!("Cannot inspect file: {error}"))?;
     if metadata.len() > MAX_DOCUMENT_BYTES {
-        return Err(format!("The file is larger than the {} MiB Windows MVP limit.", MAX_DOCUMENT_BYTES / 1024 / 1024));
+        return Err(format!(
+            "The file is larger than the {} MiB Windows MVP limit.",
+            MAX_DOCUMENT_BYTES / 1024 / 1024
+        ));
     }
     let bytes = fs::read(&path).map_err(|error| format!("Cannot read file: {error}"))?;
     let (content, format) = decode_document(bytes)?;
@@ -144,7 +422,7 @@ fn save_html_file(path: String, html: String) -> Result<(), String> {
     if !extension.eq_ignore_ascii_case("html") && !extension.eq_ignore_ascii_case("htm") {
         return Err("The export target must have an .html or .htm extension.".to_string());
     }
-    if html.len() as u64 > MAX_DOCUMENT_BYTES * 2 {
+    if html.len() > MAX_EXPORT_BYTES {
         return Err("The HTML export is too large.".to_string());
     }
     fs::write(path, html).map_err(|error| format!("Cannot write HTML export: {error}"))
@@ -154,26 +432,49 @@ fn save_html_file(path: String, html: String) -> Result<(), String> {
 fn render_markdown(
     markdown: String,
     title: Option<String>,
+    document_path: Option<String>,
     allow_remote_images: Option<bool>,
 ) -> Result<String, String> {
     if markdown.len() as u64 > MAX_DOCUMENT_BYTES {
         return Err("The document is larger than the 50 MiB Windows MVP limit.".to_string());
     }
 
-    // The platform-independent Splat renderer sanitizes embedded HTML, validates link schemes,
-    // and emits a restrictive Content Security Policy for the preview document.
     let title = title.unwrap_or_else(|| "Splat Preview".to_string());
-    let no_figure = |_figure: &splat_markdown::doc::Figure| None::<String>;
-    let no_embed = |_path: &str| None::<String>;
-    let keep_relative = |path: &str| path.to_string();
+    let doc_dir = document_path
+        .as_deref()
+        .and_then(|path| Path::new(path).parent().map(Path::to_path_buf));
+    let figure = |item: &Figure<'_>| -> Option<String> {
+        match item {
+            Figure::Math { tex, display } => {
+                let key = figure_key(item);
+                let display = if *display { "true" } else { "false" };
+                Some(format!(
+                    "<span class=\"splat-math-figure\" data-figure-key=\"{key}\" data-display=\"{display}\" data-tex=\"{}\">{}</span>",
+                    escape_html(tex),
+                    escape_html(tex)
+                ))
+            }
+            Figure::Diagram { source, kind } => {
+                let key = figure_key(item);
+                let kind = diagram_name(*kind);
+                Some(format!(
+                    "<div class=\"splat-diagram-figure\" data-figure-key=\"{key}\" data-kind=\"{kind}\" data-source=\"{}\"><pre>{}</pre></div>",
+                    escape_html(source),
+                    escape_html(source)
+                ))
+            }
+        }
+    };
+    let embed = |path: &str| image_data_url(path, doc_dir.as_deref());
+    let rebase = |path: &str| image_data_url(path, doc_dir.as_deref()).unwrap_or_else(|| path.to_string());
     let no_reference = |_reference: &str| None::<String>;
     let no_citation = |_key: &str| None::<String>;
 
     let export = splat_markdown::html::Export {
         title: &title,
-        figure: &no_figure,
-        embed: &no_embed,
-        rebase: &keep_relative,
+        figure: &figure,
+        embed: &embed,
+        rebase: &rebase,
         quotes: None,
         reference: &no_reference,
         citation: &no_citation,
@@ -182,13 +483,184 @@ fn render_markdown(
     if allow_remote_images.unwrap_or(false) {
         Ok(rendered)
     } else {
-        // The macOS shell has a permission flow for remote images. Until the Windows shell grows
-        // the same consent UI, keep the live preview fully offline and avoid file:// image access.
         Ok(rendered.replace(
             "img-src 'self' data: https: file:",
             "img-src data:",
         ))
     }
+}
+
+#[tauri::command]
+fn export_docx_file(
+    path: String,
+    markdown: String,
+    title: String,
+    document_path: Option<String>,
+    figures: Vec<FigureAssetDto>,
+) -> Result<(), String> {
+    let destination = PathBuf::from(path);
+    if !destination
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("docx"))
+    {
+        return Err("The Word export target must have a .docx extension.".to_string());
+    }
+    if markdown.len() as u64 > MAX_DOCUMENT_BYTES {
+        return Err("The document is larger than the 50 MiB Windows MVP limit.".to_string());
+    }
+
+    let mut pictures = HashMap::new();
+    for asset in figures {
+        let data = BASE64
+            .decode(asset.data.as_bytes())
+            .map_err(|_| "A rendered figure could not be decoded.".to_string())?;
+        if data.len() > 16 * 1024 * 1024 {
+            continue;
+        }
+        if !data.starts_with(b"\x89PNG\r\n\x1a\n") {
+            continue;
+        }
+        let width = if asset.width.is_finite() { asset.width.clamp(12.0, 600.0) } else { 96.0 };
+        let height = if asset.height.is_finite() { asset.height.clamp(12.0, 600.0) } else { 48.0 };
+        pictures.insert(
+            asset.key,
+            Picture {
+                data,
+                jpeg: false,
+                width,
+                height,
+            },
+        );
+    }
+
+    let doc_dir = document_path
+        .as_deref()
+        .and_then(|value| Path::new(value).parent().map(Path::to_path_buf));
+    let figure = |item: &Figure<'_>| pictures.get(&figure_key(item)).map(|picture| Picture {
+        data: picture.data.clone(),
+        jpeg: picture.jpeg,
+        width: picture.width,
+        height: picture.height,
+    });
+    let image = |url: &str| image_picture(url, doc_dir.as_deref());
+    let no_reference = |_reference: &str| None::<String>;
+    let no_citation = |_key: &str| None::<String>;
+    let title_page = (!title.trim().is_empty()).then(|| TitlePage {
+        title: title.clone(),
+        ..TitlePage::default()
+    });
+    let export = WordExport {
+        figure: &figure,
+        image: &image,
+        quotes: None,
+        reference: &no_reference,
+        citation: &no_citation,
+        title: title_page.as_ref(),
+    };
+    let doc = splat_markdown::reader::parse(&markdown);
+    let bytes = splat_markdown::docx::to_docx(&doc, &export)
+        .map_err(|_| "The document is too large to fit in a Word file.".to_string())?;
+    fs::write(destination, bytes).map_err(|error| format!("Cannot write Word document: {error}"))
+}
+
+#[tauri::command]
+async fn scan_notes(root: String) -> Result<NoteTreeDto, String> {
+    let root = PathBuf::from(root);
+    tauri::async_runtime::spawn_blocking(move || {
+        if !root.is_dir() {
+            return Err("Choose an existing folder to scan for Markdown notes.".to_string());
+        }
+        let stop = AtomicBool::new(false);
+        let tree = splat_notes::scan(&root, &stop);
+        Ok(tree_dto(&tree))
+    })
+    .await
+    .map_err(|error| format!("Note scan task failed: {error}"))?
+}
+
+#[tauri::command]
+async fn search_notes(root: String, query: String, mode: Option<String>) -> Result<NoteSearchDto, String> {
+    let root = PathBuf::from(root);
+    let mode = mode.unwrap_or_else(|| "text".to_string());
+    tauri::async_runtime::spawn_blocking(move || {
+        if !root.is_dir() {
+            return Err("Choose an existing folder to search.".to_string());
+        }
+        let stop = AtomicBool::new(false);
+        let tree = splat_notes::scan(&root, &stop);
+        let wanted = query_for(&mode, &query, &root)?;
+        let mut files = Vec::new();
+        let searched = splat_notes::search(&tree, &wanted, &stop, &mut |file| files.push(file));
+        Ok(search_dto(files, searched.unreadable))
+    })
+    .await
+    .map_err(|error| format!("Note search task failed: {error}"))?
+}
+
+#[tauri::command]
+async fn rename_note(path: String, new_name: String) -> Result<RenameResultDto, String> {
+    let from = validate_markdown_path(&path)?;
+    let to = new_note_path(&from, &new_name)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = from
+            .parent()
+            .ok_or_else(|| "The note has no parent folder.".to_string())?
+            .to_path_buf();
+        let stop = AtomicBool::new(false);
+        let tree = splat_notes::scan(&root, &stop);
+        let mut decoded: HashMap<PathBuf, (String, FileFormat)> = HashMap::new();
+        let rewrites: Vec<Rewrite> = splat_notes::renames(&tree, &from, &to, &stop, &mut |note| {
+            let bytes = fs::read(note).ok()?;
+            let (text, format) = decode_document(bytes).ok()?;
+            decoded.insert(note.to_path_buf(), (text.clone(), format));
+            Some(text)
+        });
+
+        let mut staged = Vec::new();
+        for rewrite in &rewrites {
+            let (text, format) = if let Some(decoded) = decoded.get(&rewrite.path) {
+                (decoded.0.clone(), decoded.1.clone())
+            } else {
+                let bytes = fs::read(&rewrite.path)
+                    .map_err(|error| format!("Cannot read {}: {error}", rewrite.path.display()))?;
+                decode_document(bytes)?
+            };
+            let updated = splat_notes::applied(&text, &rewrite.replacements);
+            if updated == text {
+                continue;
+            }
+            let original = fs::read(&rewrite.path)
+                .map_err(|error| format!("Cannot back up {}: {error}", rewrite.path.display()))?;
+            staged.push((rewrite.path.clone(), original, format.encode(&updated)));
+        }
+
+        let mut written: Vec<(PathBuf, Vec<u8>)> = Vec::new();
+        for (file, backup, updated) in &staged {
+            if let Err(error) = fs::write(file, updated) {
+                for (changed, original) in written.iter().rev() {
+                    let _ = fs::write(changed, original);
+                }
+                return Err(format!("Cannot update link in {}: {error}", file.display()));
+            }
+            written.push((file.clone(), backup.clone()));
+        }
+
+        if let Err(error) = fs::rename(&from, &to) {
+            for (changed, original) in written.iter().rev() {
+                let _ = fs::write(changed, original);
+            }
+            return Err(format!("Cannot rename note: {error}"));
+        }
+
+        Ok(RenameResultDto {
+            old_path: from.to_string_lossy().into_owned(),
+            new_path: to.to_string_lossy().into_owned(),
+            rewritten_files: staged.len(),
+        })
+    })
+    .await
+    .map_err(|error| format!("Note rename task failed: {error}"))?
 }
 
 #[tauri::command]
@@ -226,7 +698,6 @@ fn git_changes(path: String) -> Result<Vec<GitChange>, String> {
         .collect())
 }
 
-
 #[tauri::command]
 fn paste_html_as_markdown(html: String) -> Result<String, String> {
     let pasted = splat_import::Pasted {
@@ -251,7 +722,11 @@ pub fn run() {
             read_markdown_file,
             save_markdown_file,
             save_html_file,
+            export_docx_file,
             render_markdown,
+            scan_notes,
+            search_notes,
+            rename_note,
             git_changes,
             paste_html_as_markdown,
             app_version,
@@ -307,5 +782,35 @@ mod tests {
             encoding: "unknown".to_string(),
         };
         assert!(format.to_file_format().is_err());
+    }
+
+    #[test]
+    fn figure_keys_distinguish_formula_mode_and_diagram_language() {
+        let inline = Figure::Math { tex: "x^2", display: false };
+        let display = Figure::Math { tex: "x^2", display: true };
+        let mermaid = Figure::Diagram { source: "A-->B", kind: DiagramKind::Mermaid };
+        let graphviz = Figure::Diagram { source: "A-->B", kind: DiagramKind::Graphviz };
+        assert_ne!(figure_key(&inline), figure_key(&display));
+        assert_ne!(figure_key(&mermaid), figure_key(&graphviz));
+    }
+
+    #[test]
+    fn note_rename_rejects_paths_and_keeps_markdown_extension() {
+        let from = Path::new("notes/old.markdown");
+        assert_eq!(new_note_path(from, "new").expect("valid name"), Path::new("notes/new.markdown"));
+        assert!(new_note_path(from, "../outside").is_err());
+        assert!(new_note_path(from, "nested/name").is_err());
+    }
+
+    #[test]
+    fn html_escaping_protects_attributes_and_source_blocks() {
+        assert_eq!(escape_html("<x a=\"&\">'"), "&lt;x a=&quot;&amp;&quot;&gt;&#39;");
+    }
+
+    #[test]
+    fn local_path_rejects_traversal_and_urls() {
+        assert!(!is_safe_relative_path("../secret.png"));
+        assert!(!is_safe_relative_path("https://example.com/image.png"));
+        assert!(is_safe_relative_path("images/photo.png"));
     }
 }
