@@ -1,0 +1,35 @@
+[package]
+name = "splat-windows"
+version = "0.2.0"
+description = "Splat Markdown editor for Windows"
+authors = ["Splat contributors"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+# This is an independent Tauri application inside the upstream Cargo workspace.
+[workspace]
+
+[patch.crates-io]
+comrak = { path = "../../vendor/comrak" }
+
+[lib]
+name = "splat_windows_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+
+# Reuse Splat's platform-independent Rust core instead of forking the Markdown engine.
+splat-file-state = { path = "../../crates/splat-file-state" }
+splat-markdown = { path = "../../crates/splat-markdown" }
+splat-git = { path = "../../crates/splat-git" }
+splat-import = { path = "../../crates/splat-import" }
+splat-notes = { path = "../../crates/splat-notes" }

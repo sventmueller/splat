@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Splat Preview</title>
+  <style id="shell-style">
+    html, body { margin:0; padding:0; min-height:100%; background:transparent; color:#202632; font:15px/1.65 "Segoe UI",system-ui,sans-serif; }
+    #out { max-width:100%; min-height:100vh; padding:24px 28px 52px; box-sizing:border-box; outline:none; overflow-wrap:anywhere; }
+    #out > :first-child { margin-top:0; }
+    #out > :last-child { margin-bottom:0; }
+    #out img { max-width:100%; }
+    #out svg { max-width:100%; height:auto; }
+    #out .splat-diagram-figure { margin:1.25em 0; overflow:auto; text-align:center; }
+    #out .splat-math-figure { display:inline-block; vertical-align:middle; max-width:100%; }
+    #out .splat-math-figure[data-display="true"] { display:block; text-align:center; margin:1.1em auto; overflow-x:auto; }
+    #out .splat-diagram-figure svg { display:block; margin:0 auto; }
+    #out .splat-figure-error { color:#b42318; border:1px solid #efb4b0; background:#fff4f2; border-radius:8px; padding:9px 12px; text-align:left; white-space:pre-wrap; font:12px/1.5 Consolas,monospace; }
+    #out [contenteditable="true"] { outline:none; }
+    #out [contenteditable="true"]:focus { outline:none; }
+    #out .splat-math-figure, #out .splat-diagram-figure { user-select:none; }
+    #out .splat-math-figure[contenteditable="false"], #out .splat-diagram-figure[contenteditable="false"] { cursor:default; }
+    #out a { cursor:pointer; }
+    #splat-diagram-work { position:absolute; left:-100000px; top:0; visibility:hidden; pointer-events:none; }
+    @media print {
+      html,body { background:#fff !important; color:#111 !important; }
+      #out { padding:0; overflow:visible; }
+      #out .splat-diagram-figure, #out .splat-math-figure { break-inside:avoid; }
+      a { color:inherit !important; text-decoration:none !important; }
+    }
+  </style>
+  <script src="./js/render-config.js"></script>
+  <script src="./js/render.js"></script>
+  <script defer src="./runtime.js"></script>
+</head>
+<body>
+  <main id="out" aria-label="Markdown preview"></main>
+  <div id="splat-diagram-work" aria-hidden="true"></div>
+</body>
+</html>
