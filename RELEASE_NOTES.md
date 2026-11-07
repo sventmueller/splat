@@ -1,5 +1,4 @@
-- **A sidebar button** beside the window's title shows and hides the sidebar on the tab it showed last. New windows and the next launch open it as it was left.
-- Showing or hiding the sidebar keeps source and preview at their share of the window.
-- **Code** has a shortcut, ⌥⇧⌘C, and moved into the code block menu of the toolbar, so the whole toolbar fits a new window.
-- The **word count** in the corner now starts hidden; **View › Show Word Count** turns it on.
-- **About Splat** shows the version once, with the copyright and the license.
+- **Paste as Markdown** reads rich text in the code page it was written in, so Cyrillic, Greek, Central European, Hebrew, Arabic, Thai, Chinese, Japanese or Korean text no longer arrives as the wrong letters.
+- **Import Word Document…** leaves out a picture too large to read instead of stopping, and documents with many styles take far less memory.
+- A pasted picture never replaces a file of the same name beside the document.
+- Pictures from the web load in the preview only from addresses on the public internet, now also when an IPv6 address leads to a local one.
