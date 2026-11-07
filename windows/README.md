@@ -10,7 +10,7 @@ The Windows shell reuses the platform-independent Rust crates from the repositor
 - `splat-import` for converting rich HTML clipboard content to Markdown.
 - `splat-preview` and `splat-notes` remain the next core libraries to integrate for two-way preview mapping and folder navigation; they are intentionally not pulled into this first binary yet.
 
-## Current Windows MVP
+## Windows feature parity work\n\nThe Windows shell now reuses the upstream local preview engines and core libraries. `windows/prepare-preview.ps1` stages the licensed, bundled JavaScript engines from `resources/js` before a local or CI build; the Windows installer does not use a CDN.\n\n- MathJax 4 formula rendering (inline and display math)\n- Mermaid, Graphviz and PlantUML diagrams, including the bundled PlantUML themes\n- Editable rendered preview; edited HTML is converted back into Markdown through Splat's HTML import pipeline\n- Folder note tree, text/tag/backlink search, and safe note rename with in-folder link rewriting\n- Native Word `.docx` export using Splat's OOXML writer, with preview figures rasterized and local images embedded\n- Print-to-PDF through the Windows WebView2 print dialog (choose Microsoft Print to PDF)\n- Self-contained HTML export from the rendered preview\n\n## Current Windows MVP
 
 - Native Windows window powered by Tauri 2 / Microsoft Edge WebView2.
 - Split source and live preview, plus source-only and preview-only layouts.
