@@ -36,6 +36,17 @@ jobs:
       - name: Install NSIS
         run: choco install nsis --yes --no-progress
 
+      - name: Stage bundled offline preview engines
+        shell: pwsh
+        run: ./windows/prepare-preview.ps1
+
+      - name: Validate Windows frontend JavaScript
+        shell: pwsh
+        run: |
+          node --check windows/ui/app.js
+          node --check windows/ui/preview/runtime.js
+          node --check windows/ui/preview/js/render.js
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
