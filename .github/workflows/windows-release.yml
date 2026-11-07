@@ -2,7 +2,7 @@ name: Windows Release
 
 on:
   push:
-    branches: [main, windows-port]
+    branches: [main, windows-port, windows-feature-parity]
     tags: ["windows-v*"]
   pull_request:
     paths:
