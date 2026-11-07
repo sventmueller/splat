@@ -490,19 +490,20 @@
   }
 
   async function renameNote(path, currentName) {
-    if (state.path === path && state.dirty) {
-      toast("Save the current note before renaming it.");
+    if (state.dirty) {
+      toast("Save the open note before renaming another note or rewriting its links.");
       return;
     }
     const defaultName = currentName.replace(/\.(md|markdown|mdown|mkd)$/i, "");
     const newName = window.prompt("New note name. Links to this note will be updated.", defaultName);
     if (!newName || newName.trim() === defaultName) return;
+    const openPath = state.path;
     try {
       const result = await invoke("rename_note", { path, newName });
-      if (state.path === path) {
-        state.path = result.newPath;
-        state.name = result.newPath.split(/[\\/]/).pop() || state.name;
-        updateDocumentChrome();
+      if (openPath) {
+        const refreshedPath = openPath === path ? result.newPath : openPath;
+        const refreshed = await invoke("read_markdown_file", { path: refreshedPath });
+        setDocument(refreshed);
       }
       await loadNotes(state.rootFolder);
       toast("Renamed note and updated " + result.rewrittenFiles + " linked files.");
