@@ -1,6 +1,6 @@
 [package]
 name = "splat-windows"
-version = "0.1.0"
+version = "0.2.0"
 description = "Splat Markdown editor for Windows"
 authors = ["Splat contributors"]
 edition = "2024"
