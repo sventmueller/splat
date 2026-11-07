@@ -84,7 +84,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    if: startsWith(github.ref, 'refs/tags/windows-v') || github.ref == 'refs/heads/windows-port'
+    if: startsWith(github.ref, 'refs/tags/windows-v') || github.ref == 'refs/heads/windows-port' || github.ref == 'refs/heads/windows-feature-parity'
     needs: build-windows-x64
     runs-on: windows-latest
     permissions:
@@ -103,7 +103,7 @@ jobs:
         run: |
           $installer = Get-ChildItem -Path "release-assets" -Filter "*.exe" -Recurse | Select-Object -First 1
           if (-not $installer) { throw "NSIS installer was not generated." }
-          if ($env:GITHUB_REF -eq "refs/heads/windows-port") {
+          if ($env:GITHUB_REF -eq "refs/heads/windows-port" -or $env:GITHUB_REF -eq "refs/heads/windows-feature-parity") {
             $shortSha = $env:GITHUB_SHA.Substring(0, 7)
             $tag = "windows-preview-$shortSha"
             gh release create $tag $installer.FullName `
@@ -114,7 +114,8 @@ jobs:
               --prerelease
           } else {
             gh release create $env:GITHUB_REF_NAME $installer.FullName `
-              --title "Splat for Windows $env:GITHUB_REF_NAME" `
+              --title "Splat for Windows $($env:GITHUB_REF_NAME -replace '^windows-v', '')" `
               --notes-file release-assets/RELEASE_NOTES.md `
-              --verify-tag
+              --verify-tag `
+              --prerelease
           }

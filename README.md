@@ -23,6 +23,21 @@ nothing over the network unless you ask it to.
  
  
 
+## Windows (preview)
+
+**Splat for Windows 0.2.0** is available as an x64 preview. It uses a Tauri 2 desktop shell and the same Rust Markdown engine as the macOS app, while keeping the Windows implementation under `windows/`.
+
+[![Download Splat for Windows](https://img.shields.io/badge/Download-Windows_x64_preview-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/lipeilin375/splat/releases)
+
+- Editable split source and preview, plus folder notes and text/tag/backlink search.
+- Offline MathJax 4, Mermaid, Graphviz and PlantUML rendering using bundled local resources.
+- Export to Word (.docx) and self-contained HTML; PDF uses the Windows print dialog (choose **Microsoft Print to PDF**).
+- Windows menus, Markdown file associations, command-line file opening and crash-recovery drafts.
+
+**Requirements:** Windows 10/11 x64. The installer uses the Microsoft Edge WebView2 bootstrapper when the runtime is missing.
+
+**Preview notice:** the installer is currently unsigned and Windows may display an unknown-publisher warning. Review the release and its notes before installing; do not disable Windows Defender or SmartScreen. The Windows port does not yet include every macOS feature. See the [Windows build, security notes and known limitations](windows/README.md) and [Windows release notes](windows/RELEASE_NOTES.md).
+
 [![Rust 2024 edition](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![macOS 14 or later](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 ![Universal: Apple Silicon and Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white)
