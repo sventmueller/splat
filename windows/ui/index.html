@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <title>Splat</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="brand-copy"><strong>Splat</strong><span>Markdown, in two directions</span></div>
+        <span class="edition-tag">WINDOWS PREVIEW</span>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="new-file" title="New document (Ctrl+N)" aria-label="New document">＋</button>
+        <button class="action-button" id="open-file"><span class="button-icon">↗</span> Open <kbd>Ctrl O</kbd></button>
+        <button class="action-button primary" id="save-file"><span class="button-icon">↓</span> Save <kbd>Ctrl S</kbd></button>
+        <button class="icon-button" id="more-actions" title="Save as (Ctrl+Shift+S)" aria-label="Save as">↥</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="rail">
+        <button class="rail-button active" id="outline-tab" title="Document outline" aria-label="Document outline">☷</button>
+        <button class="rail-button" id="git-tab" title="Git changes" aria-label="Git changes">⑂</button>
+        <div class="rail-spacer"></div>
+        <button class="rail-button" id="help-tab" title="About Splat" aria-label="About Splat">?</button>
+      </aside>
+
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-heading"><span id="sidebar-title">OUTLINE</span><button id="sidebar-collapse" class="subtle-icon" title="Hide sidebar">‹</button></div>
+        <div id="outline-list" class="outline-list"><p class="empty-note">Headings in this document will appear here.</p></div>
+        <div id="git-panel" class="git-panel hidden">
+          <div class="git-summary" id="git-summary">Open a file inside a Git repository to inspect changes.</div>
+          <div id="git-change-list" class="git-change-list"></div>
+        </div>
+        <div class="sidebar-footer"><span class="online-dot"></span> Offline-first workspace</div>
+      </aside>
+
+      <section class="main-area">
+        <div class="document-bar">
+          <div class="document-identity">
+            <span class="markdown-icon">M↓</span>
+            <span class="document-name" id="document-name">Untitled.md</span>
+            <span class="dirty-indicator hidden" id="dirty-indicator" title="Unsaved changes">●</span>
+            <span class="document-path" id="document-path">New document</span>
+          </div>
+          <div class="view-actions">
+            <button class="view-button active" data-view="split" title="Source and preview">▥ <span>Split</span></button>
+            <button class="view-button" data-view="source" title="Source only">☰ <span>Source</span></button>
+            <button class="view-button" data-view="preview" title="Preview only">▤ <span>Preview</span></button>
+          </div>
+        </div>
+
+        <div class="format-toolbar" role="toolbar" aria-label="Markdown formatting">
+          <div class="toolbar-group">
+            <button class="tool-button" data-wrap="**" title="Bold (Ctrl+B)"><b>B</b></button>
+            <button class="tool-button italic-tool" data-wrap="*" title="Italic (Ctrl+I)">I</button>
+            <button class="tool-button" data-wrap="~~" title="Strikethrough"><s>S</s></button>
+            <button class="tool-button code-tool" data-wrap="`" title="Inline code">{ }</button>
+          </div>
+          <span class="toolbar-divider"></span>
+          <div class="toolbar-group">
+            <button class="tool-button heading-tool" data-prefix="# " title="Heading 1">H1</button>
+            <button class="tool-button heading-tool" data-prefix="## " title="Heading 2">H2</button>
+            <button class="tool-button" data-prefix="&gt; " title="Quote">❞</button>
+            <button class="tool-button" data-prefix="- " title="Bulleted list">☷</button>
+            <button class="tool-button" data-prefix="1. " title="Numbered list">1.</button>
+          </div>
+          <span class="toolbar-divider"></span>
+          <div class="toolbar-group">
+            <button class="tool-button" id="insert-link" title="Insert link">↗</button>
+            <button class="tool-button" id="insert-image" title="Insert image">▧</button>
+            <button class="tool-button" id="insert-rule" title="Horizontal rule">―</button>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <button class="export-button" id="export-html">Export HTML <span>↗</span></button>
+        </div>
+
+        <div class="editor-stage" id="editor-stage" data-view="split">
+          <section class="source-pane" aria-label="Markdown source">
+            <div class="pane-label"><span>MARKDOWN SOURCE</span><span class="pane-hint">UTF-8 · UTF-16</span></div>
+            <div class="editor-shell">
+              <pre id="highlight-layer" aria-hidden="true"></pre>
+              <textarea id="source-editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Markdown source editor" placeholder="# Start with an idea...\n\nWrite Markdown here. Your preview updates as you type."></textarea>
+            </div>
+          </section>
+          <div class="pane-splitter" aria-hidden="true"><span></span></div>
+          <section class="preview-pane" aria-label="Live preview">
+            <div class="pane-label"><span>LIVE PREVIEW</span><span class="preview-live"><span></span> LIVE</span></div>
+            <iframe id="preview-frame" title="Rendered Markdown preview" sandbox="allow-same-origin"></iframe>
+          </section>
+        </div>
+
+        <footer class="statusbar">
+          <div class="status-left"><span id="status-message">Ready</span><span class="status-separator">·</span><span id="encoding-label">UTF-8</span><span class="status-separator">·</span><span id="line-ending-label">LF</span></div>
+          <div class="status-right"><span id="cursor-position">Ln 1, Col 1</span><span id="word-count">0 words</span><span id="character-count">0 characters</span><span class="version-label" id="version-label">Splat 0.1.0</span></div>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

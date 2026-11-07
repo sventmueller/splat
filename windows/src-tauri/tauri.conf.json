@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Splat",
+  "version": "0.1.0",
+  "identifier": "org.sventmueller.splat.windows",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Splat",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 960,
+        "minHeight": 640,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "A focused Markdown editor with live preview",
+    "longDescription": "Splat for Windows reuses the platform-independent Splat Rust Markdown engine in a native Windows desktop shell.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
+  }
+}
