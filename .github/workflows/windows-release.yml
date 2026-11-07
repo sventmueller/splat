@@ -99,6 +99,7 @@ jobs:
               --title "Splat for Windows preview ($shortSha)" `
               --notes-file release-assets/RELEASE_NOTES.md `
               --target $env:GITHUB_SHA `
+              --repo $env:GITHUB_REPOSITORY `
               --prerelease
           } else {
             gh release create $env:GITHUB_REF_NAME $installer.FullName `
