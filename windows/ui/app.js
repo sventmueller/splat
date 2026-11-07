@@ -229,7 +229,9 @@
 
   function scheduleRender() {
     clearTimeout(renderTimer);
-    renderTimer = setTimeout(renderPreview, 110);
+    renderTimer = setTimeout(() => {
+      renderPreview().catch((error) => toast("Preview failed: " + String(error)));
+    }, 110);
   }
 
   function documentChanged() {
@@ -255,7 +257,7 @@
     updateHighlight();
     updateOutline();
     updateStatus();
-    renderPreview();
+    renderPreview().catch((error) => toast("Preview failed: " + String(error)));
     editor.focus();
     editor.setSelectionRange(0, 0);
   }
@@ -721,8 +723,8 @@
     renderPreview().catch((error) => toast("Preview failed: " + String(error)));
   });
   window.addEventListener("message", onPreviewMessage);
-  $("#outline-tab").addEventListener("click", () => { showOutline(); $("#outline-tab").classList.add("active"); $("#git-tab").classList.remove("active"); });
-  $("#git-tab").addEventListener("click", () => { showGitChanges(); $("#git-tab").classList.add("active"); $("#outline-tab").classList.remove("active"); });
+  $("#outline-tab").addEventListener("click", showOutline);
+  $("#git-tab").addEventListener("click", showGitChanges);
   $("#help-tab").addEventListener("click", () => toast("Splat for Windows · Early preview · Local-first Markdown editing"));
   $("#sidebar-collapse").addEventListener("click", () => $("#sidebar").classList.toggle("collapsed"));
   document.querySelectorAll(".view-button").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
