@@ -564,7 +564,7 @@ Plik Markdown może pochodzić od kogokolwiek, więc Splat traktuje każdy dokum
 - **Kopie niezachowanego tekstu** zostają na tym Macu, w folderze Biblioteka, na potrzeby odzyskiwania po awarii. Znikają wraz z zachowaniem dokumentu lub normalnym zakończeniem Splata; kopie, które pozostawiła awaria, zostają w folderze odzyskiwania, dopóki ich nie usuniesz.
 - **Łącza** nigdy nie uruchamiają programu jednym kliknięciem. Łącza do stron i poczty otwierają się jak zwykle; łącza do innych aplikacji najpierw pytają.
 - **HTML w dokumentach** czyta własny parser Splata. Skrypty, style, ramki i formularze nigdy się nie uruchamiają.
-- **Eksporty** nie zawierają skryptów. Strony HTML zachowują tylko ustaloną listę nieszkodliwych znaczników i atrybutów, jak GitHub, oraz politykę bezpieczeństwa treści. Pliki Word łączą tylko adresy `http`, `https` i `mailto`.
+- **Eksporty** nie zawierają skryptów. Strony HTML zachowują tylko ustaloną listę nieszkodliwych znaczników i atrybutów, jak GitHub, oraz politykę bezpieczeństwa treści. Pliki Word łączą tylko adresy `http`, `https` i `mailto`, poza łączami, które wnosi wybrany przez Ciebie szablon Word.
 - **Podpisanie kodu** z Hardened Runtime. Splat działa bez App Sandbox, by mógł pokazywać obrazki obok Twoich dokumentów bez pytania o każdy folder; izolacja całego dekodowania to równoważy.
 
 ## Duże dokumenty
@@ -579,7 +579,7 @@ Splat pozostaje responsywny przy dokumentach o rozmiarze kilku megabajtów:
 - Od około 200 KB dokument otwiera okno, zanim zostanie sparsowany; przy 5 MB kolory i podgląd pojawiają się około ćwierć sekundy później.
 - Wszystkie obrazy razem, łącznie ze wzorami i diagramami, zajmują najwyżej ćwierć pamięci Maca, a połowę tego, gdy pamięci brakuje. Powyżej tej granicy kolejne obrazy są pokazywane jako symbole zastępcze, dopóki znów nie będzie miejsca.
 
-Niektóre zmiany są przetwarzane w całości, przy około 300 ms na naciśnięcie klawisza w 10 MB: zmiany definicji lub odwołań przypisu, obok przypisu w tekście, na samym końcu dokumentu obok przypisu, we front matter lub w definicjach łączy referencyjnych, a także każda zmiana w dokumencie z blokami komentarzy `%%` albo z przypisem zdefiniowanym dwa razy lub wewnątrz cytatu czy listy. Pamięć rośnie wraz z plikiem, do około 115–160 MB dla 1 MB Markdown i 340–510 MB dla 10 MB.
+Niektóre zmiany są przetwarzane w całości, przy około 300 ms na naciśnięcie klawisza w 10 MB: zmiany definicji lub odwołań przypisu, obok przypisu w tekście, na samym końcu dokumentu obok przypisu, we front matter lub w definicjach łączy referencyjnych, a także każda zmiana w dokumencie z blokami komentarzy `%%`, z przypisem zdefiniowanym dwa razy lub wewnątrz cytatu czy listy albo z ponad 1000 przypisów w tekście lub niezamkniętych znaczników wzorów. Pamięć rośnie wraz z plikiem, do około 115–160 MB dla 1 MB Markdown i 340–510 MB dla 10 MB.
 
 ## Znane ograniczenia
 

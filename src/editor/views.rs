@@ -16,7 +16,7 @@ use objc2_foundation::{
 use super::EditorController;
 use super::attributes::{Attribute, Attributes, attributed};
 use super::export_options::{ExportOptions, TitleFacts, filled_in, footer_text};
-use crate::util::{constant, guarded};
+use crate::util::{constant, guarded, text_container};
 
 /// What printed pages show beside the text.
 pub struct PageLook {
@@ -87,9 +87,11 @@ define_class!(
         /// Images are readable too, or AppKit would disable Paste while the pasteboard holds only a picture.
         #[unsafe(method_id(readablePasteboardTypes))]
         fn readable_types(&self) -> Retained<NSArray<NSPasteboardType>> {
-            // SAFETY: The superclass's implementation, with this method's signature.
-            let own: Retained<NSArray<NSPasteboardType>> = unsafe { msg_send![super(self), readablePasteboardTypes] };
-            let mut types = own.to_vec();
+            let mut types = guarded(vec![constant!(NSPasteboardTypeString).retain()], || {
+                // SAFETY: The superclass's implementation, with this method's signature.
+                let own: Retained<NSArray<NSPasteboardType>> = unsafe { msg_send![super(self), readablePasteboardTypes] };
+                own.to_vec()
+            });
             types.extend([constant!(NSPasteboardTypePNG).retain(), constant!(NSPasteboardTypeTIFF).retain()]);
             NSArray::from_retained_slice(&types)
         }
@@ -101,9 +103,8 @@ define_class!(
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), setFrameSize: size] };
             guarded((), || {
-                // SAFETY: `owner` keeps the container alive; reading it does not switch the view to TextKit 1, unlike its
-                // layout manager.
-                let Some(container) = (unsafe { self.textContainer() }) else {
+                // Reading the container does not switch the view to TextKit 1, unlike its layout manager.
+                let Some(container) = text_container(self) else {
                     return;
                 };
                 if self.inLiveResize()

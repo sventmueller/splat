@@ -734,7 +734,8 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
 - **Links** never start a program by a click. Web and mail links open as usual; links to other apps ask first.
 - **HTML in documents** is read by Splat's own parser. Scripts, styles, frames and forms never run.
 - **Exports** carry no scripts. HTML pages keep only a fixed list of harmless tags and attributes, as GitHub does, plus
-  a content security policy. Word files link only `http`, `https` and `mailto` addresses.
+  a content security policy. Word files link only `http`, `https` and `mailto` addresses, apart from the links a Word
+  template you chose brings along.
 - **Code signing** with the Hardened Runtime. Splat runs without the App Sandbox so that it can show images next to
   your documents without asking for every folder; the isolation of all decoding offsets this.
 
@@ -759,8 +760,9 @@ Splat stays responsive with documents of several megabytes:
 
 Some changes are processed in full, at around 300 ms per keystroke at 10 MB: those to a footnote's definition or
 references, next to an inline footnote, at the very end of a document next to a footnote, to the front matter or to
-link reference definitions, and every change in a document with `%%` comment blocks or with a footnote defined twice
-or inside a quote or list. Memory grows with the file, to roughly 115–160 MB for 1 MB of Markdown and 340–510 MB for 10 MB.
+link reference definitions, and every change in a document with `%%` comment blocks, with a footnote defined twice or
+inside a quote or list, or with more than 1000 inline footnotes or unclosed formula marks. Memory grows with the file,
+to roughly 115–160 MB for 1 MB of Markdown and 340–510 MB for 10 MB.
 
 ## Known limitations
 

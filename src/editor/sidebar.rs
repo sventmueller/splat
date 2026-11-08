@@ -9,11 +9,10 @@ use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
 use objc2_app_kit::{
-    NSAccessibility, NSButton, NSColor, NSControlSize, NSControlTextEditingDelegate, NSEvent, NSFont,
-    NSFontWeightSemibold, NSImage, NSImageView, NSLayoutConstraint, NSLineBreakMode, NSMenu, NSOutlineView,
-    NSOutlineViewDataSource, NSOutlineViewDelegate, NSScrollView, NSSearchField, NSSegmentSwitchTracking,
-    NSSegmentedControl, NSStackView, NSTableColumn, NSTableViewStyle, NSTextField, NSUserInterfaceLayoutOrientation,
-    NSView, NSViewController,
+    NSAccessibility, NSColor, NSControlSize, NSControlTextEditingDelegate, NSEvent, NSFont, NSFontWeightSemibold,
+    NSImage, NSImageView, NSLayoutConstraint, NSLineBreakMode, NSMenu, NSOutlineView, NSOutlineViewDataSource,
+    NSOutlineViewDelegate, NSScrollView, NSSearchField, NSSegmentSwitchTracking, NSSegmentedControl, NSStackView,
+    NSTableColumn, NSTableViewStyle, NSTextField, NSUserInterfaceLayoutOrientation, NSView, NSViewController,
 };
 use objc2_foundation::{NSArray, NSNotification, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize};
 
@@ -21,7 +20,7 @@ use super::EditorController;
 use super::attributes::{Attribute, Attributes, add_attribute, attributed_mut};
 use super::outline::{Outline, RowItems};
 use crate::i18n::t;
-use crate::util::{guarded, ns};
+use crate::util::{constant, guarded, ns};
 use splat_editor_state::notes::chain_to;
 pub(super) use splat_editor_state::notes::{Row, RowKind};
 
@@ -275,12 +274,8 @@ impl NotesList {
             (t("Verweise auf diese Notiz suchen"), sel!(noteLinks:)),
         ] {
             let item = crate::util::item(mtm, title, Some(action), "");
-            // SAFETY: The target is this list, which the sidebar keeps as long as the menu's view exists; the represented
-            // object is the row's item, which the menu item retains.
-            unsafe {
-                item.setTarget(Some(self));
-                item.setRepresentedObject(Some(&row_item));
-            }
+            crate::util::set_target(&item, self);
+            crate::util::set_represented(&item, &row_item);
             menu.addItem(&item);
         }
         Some(menu)
@@ -351,8 +346,7 @@ fn row_view(mtm: MainThreadMarker, row: &Row) -> Retained<NSView> {
             );
             let start = crate::markdown::text::utf16_len(&row.title[..range.start]);
             let length = crate::markdown::text::utf16_len(&row.title[range.clone()]);
-            // SAFETY: A constant of AppKit, read as a value of its type.
-            let semibold = unsafe { NSFontWeightSemibold };
+            let semibold = constant!(NSFontWeightSemibold);
             add_attribute(
                 &text,
                 &Attribute::font(&NSFont::systemFontOfSize_weight(
@@ -427,10 +421,8 @@ impl List {
         unsafe {
             view.setDataSource(Some(ProtocolObject::from_ref(&*source)));
             view.setDelegate(Some(ProtocolObject::from_ref(&*source)));
-            view.setTarget(Some(&source));
         }
-        // SAFETY: The method takes the sender, which AppKit passes.
-        unsafe { view.setAction(Some(sel!(rowClicked:))) };
+        crate::util::set_action(&view, &source, sel!(rowClicked:));
         let scroll = NSScrollView::initWithFrame(NSScrollView::alloc(mtm), frame);
         scroll.setHasVerticalScroller(true);
         scroll.setAutohidesScrollers(true);
@@ -588,7 +580,6 @@ fn row_below(view: &NSView, parent: &NSView, top: &objc2_app_kit::NSLayoutYAxisA
 }
 
 impl Sidebar {
-    #[expect(clippy::too_many_lines, reason = "one flat list of the sidebar's views")]
     pub(super) fn new(mtm: MainThreadMarker, controller: &EditorController) -> (Sidebar, Retained<NSViewController>) {
         let actions: Retained<SidebarActions> = {
             let this = SidebarActions::alloc(mtm).set_ivars(ActionIvars {
@@ -612,16 +603,17 @@ impl Sidebar {
                 NSImage::imageWithSystemSymbolName_accessibilityDescription(&ns(tab.symbol()), Some(&ns(tab.title())))
             })
             .collect();
-        // SAFETY: The target is `actions`, which `Sidebar` keeps as long as the control exists.
+        // SAFETY: Without a target and an action the control sends nothing until `set_action` gives it both.
         let tabs = unsafe {
             NSSegmentedControl::segmentedControlWithImages_trackingMode_target_action(
                 &NSArray::from_retained_slice(&images),
                 NSSegmentSwitchTracking::SelectOne,
-                Some(&actions),
-                Some(sel!(sidebarTabChosen:)),
+                None,
+                None,
                 mtm,
             )
         };
+        crate::util::set_action(&tabs, &actions, sel!(sidebarTabChosen:));
         tabs.setSegmentDistribution(objc2_app_kit::NSSegmentDistribution::FillEqually);
         for tab in SidebarTab::ALL {
             tabs.setToolTip_forSegment(Some(&ns(tab.title())), tab.segment());
@@ -651,12 +643,7 @@ impl Sidebar {
             &ns("folder.badge.gearshape"),
             Some(&ns(t("Ordner wählen …"))),
         )
-        .map(|image| {
-            // SAFETY: The target is `actions`, which `Sidebar` keeps as long as the button exists.
-            unsafe {
-                NSButton::buttonWithImage_target_action(&image, Some(&actions), Some(sel!(sidebarChooseFolder:)), mtm)
-            }
-        });
+        .map(|image| crate::util::image_button(mtm, &image, &actions, sel!(sidebarChooseFolder:)));
         let header_views: Vec<Retained<NSView>> = {
             let mut views = vec![Retained::into_super(Retained::into_super(folder.clone()))];
             if let Some(button) = &choose {
@@ -675,10 +662,7 @@ impl Sidebar {
         let search_page = page(&hits_scroll);
         let field = NSSearchField::new(mtm);
         field.setPlaceholderString(Some(&ns(t("In allen Notizen suchen"))));
-        // SAFETY: The target is `actions`, which `Sidebar` keeps as long as the field exists.
-        unsafe { field.setTarget(Some(&actions)) };
-        // SAFETY: The method takes the sender, which AppKit passes.
-        unsafe { field.setAction(Some(sel!(sidebarSearch:))) };
+        crate::util::set_action(&field, &actions, sel!(sidebarSearch:));
         row_below(&field, &search_page, &search_page.topAnchor(), 0.0);
         let status = NSTextField::labelWithString(&ns(""), mtm);
         status.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));

@@ -36,7 +36,7 @@ pub fn find_repository(dir: &Path) -> Option<Repository> {
     let git = dir.ancestors().map(|d| d.join(".git")).find(|g| g.exists())?;
     let git_dir = if git.is_file() {
         // A worktree or submodule names its real Git folder in a file.
-        let text = std::fs::read_to_string(&git).ok()?;
+        let text = git_file(&git)?;
         let target = PathBuf::from(text.trim().strip_prefix("gitdir:")?.trim());
         let target = if target.is_absolute() {
             target
@@ -44,15 +44,27 @@ pub fn find_repository(dir: &Path) -> Option<Repository> {
             git.parent()?.join(target)
         };
         let common = target.join("commondir");
-        match std::fs::read_to_string(&common) {
-            Ok(rel) => target.join(rel.trim()),
-            Err(_) => target,
+        match git_file(&common) {
+            Some(rel) => target.join(rel.trim()),
+            None => target,
         }
     } else {
         git
     };
-    let config = std::fs::read_to_string(git_dir.join("config")).ok()?;
+    let config = git_file(&git_dir.join("config"))?;
     remote_repository(&config)
+}
+
+/// Far more than any Git configuration holds.
+const MAX_GIT_FILE: u64 = 1 << 20;
+
+/// The text of a small regular file: opening a named pipe from an unpacked archive would wait for a writer for good.
+fn git_file(path: &Path) -> Option<String> {
+    let meta = std::fs::metadata(path).ok()?;
+    if !meta.is_file() || meta.len() > MAX_GIT_FILE {
+        return None;
+    }
+    std::fs::read_to_string(path).ok()
 }
 
 /// The repository the `origin` remote of a Git configuration points to.
@@ -144,6 +156,20 @@ mod tests {
             find_repository(&root.join("main")).and_then(|r| r.url("@a")).as_deref(),
             Some("https://github.com/a")
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_pipe_in_place_of_a_git_file_is_not_opened() {
+        let root = std::env::temp_dir().join(format!("splat-git-pipe-{}", std::process::id()));
+        let git = root.join(".git");
+        std::fs::create_dir_all(&git).unwrap();
+        let Ok(status) = std::process::Command::new("mkfifo").arg(git.join("config")).status() else {
+            eprintln!("mkfifo is absent: skipped");
+            return;
+        };
+        assert!(status.success());
+        assert!(find_repository(&root).is_none());
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -11,15 +11,15 @@ use objc2::rc::{Retained, Weak};
 use objc2::runtime::{NSObject, ProtocolObject};
 use objc2::{AnyThread, define_class, msg_send};
 use objc2_foundation::{
-    NSData, NSError, NSHTTPURLResponse, NSObjectProtocol, NSURL, NSURLRequest, NSURLResponse, NSURLSession,
-    NSURLSessionConfiguration, NSURLSessionDataDelegate, NSURLSessionDataTask, NSURLSessionDelegate,
+    NSData, NSError, NSHTTPCookieAcceptPolicy, NSHTTPURLResponse, NSObjectProtocol, NSURL, NSURLRequest, NSURLResponse,
+    NSURLSession, NSURLSessionConfiguration, NSURLSessionDataDelegate, NSURLSessionDataTask, NSURLSessionDelegate,
     NSURLSessionResponseDisposition, NSURLSessionTask, NSURLSessionTaskDelegate,
 };
 
 use super::EditorController;
 use super::picture::{Rendered, Sizing};
 use super::safe_image::{Decoded, MAX_BYTES};
-use crate::util::{guarded, main_soon, ns};
+use crate::util::{Lane, guarded, main_soon, ns};
 
 #[derive(Default)]
 struct Remote {
@@ -44,6 +44,9 @@ struct Stored {
 }
 
 const MAX_RUNNING: usize = 6;
+
+/// A resolver that stops answering holds its thread for as long as it waits.
+static NAMES: Lane = Lane::new("splat-names").with_workers(MAX_RUNNING);
 const FIRST_RETRY: Duration = crate::test_hooks::FIRST_RETRY;
 const LAST_RETRY: Duration = Duration::from_secs(15 * 60);
 
@@ -67,9 +70,8 @@ pub fn is_remote(url: &str) -> bool {
     crate::markdown::url::is_https(url)
 }
 
-/// A host on the public internet: requests to `localhost`, `.local` names or addresses that are not public would let a
-/// document send requests to routers and local services. This reads the address only: a public name that resolves to a
-/// private address passes, and then still needs a certificate for that name to get an answer.
+/// A host on the public internet as written: requests to `localhost`, `.local` names or addresses that are not public would
+/// let a document send requests to routers and local services. What a name resolves to is [`lookup`]'s part.
 fn public_host(url: &NSURL) -> bool {
     if url
         .scheme()
@@ -100,6 +102,45 @@ fn public_host(url: &NSURL) -> bool {
                     .next()
                     .is_some_and(|last| last.bytes().all(|b| b.is_ascii_digit()) || last.starts_with("0x"))
         }
+    }
+}
+
+/// Where a download to a name would go.
+#[derive(Debug, PartialEq, Eq)]
+enum Lookup {
+    Public,
+    /// At least one address is not public: a public name can point at a router in the local network.
+    Private,
+    /// The name does not resolve, as when the Mac is offline; the download would ask again and could hear otherwise.
+    Unknown,
+}
+
+/// What the name of `url` resolves to now. A name whose answer changes before the download looks it up again still gets
+/// through.
+fn lookup(url: &NSURL) -> Lookup {
+    let Some(host) = url.host().map(|h| h.to_string().to_ascii_lowercase()) else {
+        return Lookup::Unknown;
+    };
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    let addresses: Vec<IpAddr> = crate::test_hooks::addresses_of(host).unwrap_or_else(|| {
+        (host, 443)
+            .to_socket_addrs()
+            .map(|found| found.map(|a| a.ip()).collect())
+            .unwrap_or_default()
+    });
+    if addresses.is_empty() {
+        Lookup::Unknown
+    } else if addresses.into_iter().all(public_address) {
+        Lookup::Public
+    } else {
+        Lookup::Private
+    }
+}
+
+fn public_address(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => public_v4(ip),
+        IpAddr::V6(ip) => public_v6(ip),
     }
 }
 
@@ -318,22 +359,43 @@ pub(super) fn load(url: &str) {
 }
 
 fn start(url: &str) {
-    let Some(nsurl) = NSURL::URLWithString(&ns(url)).filter(|u| public_host(u)) else {
-        let url = url.to_string();
+    let url = url.to_string();
+    if !NSURL::URLWithString(&ns(&url)).is_some_and(|u| public_host(&u)) {
         main_soon(move || finish(url, None, Failure::Final));
+        return;
+    }
+    NAMES.run(move || {
+        let found = NSURL::URLWithString(&ns(&url)).map_or(Lookup::Unknown, |u| lookup(&u));
+        main_soon(move || match found {
+            Lookup::Public => begin(url),
+            Lookup::Private => finish(url, None, Failure::Final),
+            Lookup::Unknown => finish(url, None, Failure::Passing),
+        });
+    });
+}
+
+fn begin(url: String) {
+    // The documents that asked may have closed while the name was looked up.
+    let asked = REMOTE.with(|r| r.borrow().askers.contains_key(&url));
+    let Some(nsurl) = NSURL::URLWithString(&ns(&url)).filter(|_| asked) else {
+        finish(url, None, Failure::Final);
         return;
     };
     let task = SESSION.with(|s| s.dataTaskWithURL(&nsurl));
     if let Ok(mut d) = DOWNLOADS.lock() {
         d.get_or_insert_with(HashMap::new)
-            .insert(task.taskIdentifier(), (url.to_string(), Vec::new()));
+            .insert(task.taskIdentifier(), (url.clone(), Vec::new()));
     }
     task.resume();
-    REMOTE.with(|r| r.borrow_mut().tasks.insert(url.to_string(), task));
+    REMOTE.with(|r| r.borrow_mut().tasks.insert(url, task));
 }
 
 fn session() -> Retained<NSURLSession> {
     let config = NSURLSessionConfiguration::ephemeralSessionConfiguration();
+    // An ephemeral session still keeps cookies until the app quits, which lets a server tell documents apart.
+    config.setHTTPCookieAcceptPolicy(NSHTTPCookieAcceptPolicy::Never);
+    config.setHTTPShouldSetCookies(false);
+    config.setHTTPCookieStorage(None);
     config.setTimeoutIntervalForRequest(20.0);
     config.setTimeoutIntervalForResource(60.0);
     crate::test_hooks::serve_the_web_inside(&config);
@@ -368,7 +430,11 @@ define_class!(
             request: &NSURLRequest,
             completion: &block2::DynBlock<dyn Fn(*mut NSURLRequest)>,
         ) {
-            let allowed = guarded(false, || request.URL().is_some_and(|u| public_host(&u)));
+            let allowed = guarded(false, || {
+                request
+                    .URL()
+                    .is_some_and(|u| public_host(&u) && lookup(&u) == Lookup::Public)
+            });
             let next = if allowed {
                 request as *const NSURLRequest as *mut NSURLRequest
             } else {
@@ -682,6 +748,16 @@ mod tests {
         for (address, kind) in blocked {
             assert!(!is_public(address), "{address}: {kind}");
         }
+    }
+
+    #[test]
+    fn a_name_counts_by_where_it_leads() {
+        let of = |s: &str| lookup(&NSURL::URLWithString(&ns(s)).unwrap());
+        assert_eq!(of("https://localhost/x.png"), Lookup::Private);
+        assert_eq!(of("https://93.184.216.34/x.png"), Lookup::Public);
+        assert_eq!(of("https://[2606:4700::1111]/x.png"), Lookup::Public);
+        assert_eq!(of("https://[::ffff:192.168.0.1]/x.png"), Lookup::Private);
+        assert_eq!(of("https://nicht-da.invalid/x.png"), Lookup::Unknown);
     }
 
     #[test]

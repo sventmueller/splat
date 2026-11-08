@@ -3,7 +3,6 @@
 //! unsaved. `--by-hand` leaves the keys to a person at the keyboard.
 
 use std::cell::{Cell, RefCell};
-use std::ffi::{c_ulong, c_void};
 use std::ptr::NonNull;
 use std::rc::Rc;
 
@@ -12,43 +11,27 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{NSApplication, NSEvent, NSEventMask, NSEventModifierFlags, NSTextInputClient, NSWindow};
+use objc2_core_graphics::{CGEvent, CGEventFlags};
 use objc2_foundation::NSRange;
 
 use super::super::EditorController;
 use super::{after, check, check_in_front, editor, finish};
 
-#[link(name = "CoreGraphics", kind = "framework")]
-unsafe extern "C" {
-    fn CGEventCreateKeyboardEvent(source: *const c_void, key: u16, key_down: bool) -> *mut c_void;
-    fn CGEventKeyboardSetUnicodeString(event: *mut c_void, length: c_ulong, string: *const u16);
-    fn CGEventSetFlags(event: *mut c_void, flags: u64);
-    fn CGEventPostToPid(pid: i32, event: *mut c_void);
-}
-
-#[link(name = "CoreFoundation", kind = "framework")]
-unsafe extern "C" {
-    fn CFRelease(object: *const c_void);
-}
-
-const COMMAND: u64 = 1 << 20;
 const S_KEY: u16 = 1;
 
 /// A key press for this process alone, which no other app can get whatever is in front.
-fn post_key(key: u16, flags: u64, character: Option<u16>) {
+fn post_key(key: u16, flags: CGEventFlags, character: Option<u16>) {
+    let pid = i32::try_from(std::process::id()).unwrap_or(i32::MAX);
     for down in [true, false] {
-        // SAFETY: Creating an event takes no source and plain values; it is released right after being posted.
-        unsafe {
-            let event = CGEventCreateKeyboardEvent(std::ptr::null(), key, down);
-            if event.is_null() {
-                continue;
-            }
-            CGEventSetFlags(event, flags);
-            if let Some(unit) = character {
-                CGEventKeyboardSetUnicodeString(event, 1, &raw const unit);
-            }
-            CGEventPostToPid(i32::try_from(std::process::id()).unwrap_or(i32::MAX), event);
-            CFRelease(event);
+        let Some(event) = CGEvent::new_keyboard_event(None, key, down) else {
+            continue;
+        };
+        CGEvent::set_flags(Some(&event), flags);
+        if let Some(unit) = character {
+            // SAFETY: The string is the one unit said, which lives on the stack for the length of the call.
+            unsafe { CGEvent::keyboard_set_unicode_string(Some(&event), 1, &raw const unit) };
         }
+        CGEvent::post_to_pid(pid, Some(&event));
     }
 }
 
@@ -144,10 +127,10 @@ impl Run {
             if n >= SAVE_AT_KEY && !self.save_posted.get() && in_front(self.e.mtm()) {
                 self.save_posted.set(true);
                 // A letter first: an autosave a moment ago leaves nothing for the save to write.
-                post_key(0, 0, Some(letter));
-                post_key(S_KEY, COMMAND, None);
+                post_key(0, CGEventFlags::empty(), Some(letter));
+                post_key(S_KEY, CGEventFlags::MaskCommand, None);
             }
-            post_key(0, 0, Some(letter));
+            post_key(0, CGEventFlags::empty(), Some(letter));
         }
         // Whoever watches a run for a stall sees that it goes on.
         if n.is_multiple_of(25) {

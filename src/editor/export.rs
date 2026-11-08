@@ -119,7 +119,7 @@ impl Sharing<'_> {
         let for_layout = macros.clone();
         let print_layout = self.host.on_source_text(|text| {
             // Printing runs on the main thread, and what the disk thread knows does not wait for a volume.
-            let env = super::env::Env::known(dir, text);
+            let env = super::env::Env::known(dir, text).sendable();
             let images = Images {
                 dark: false,
                 env,
@@ -412,7 +412,7 @@ impl ExportSource {
         let figure = |f: &Figure| on_main(|| figure_image(f, &self.macros)).flatten();
         let embed = |url: &str| embedded(url, doc_dir);
         let rebase = |link: &str| rebased(link, doc_dir, export_dir.as_deref());
-        let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
+        let env = super::env::Env::now(self.doc_dir.clone(), &self.text).sendable();
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         to_html(
@@ -473,7 +473,7 @@ impl ExportSource {
                 ..picture
             })
         };
-        let env = super::env::Env::now(self.doc_dir.clone(), &self.text);
+        let env = super::env::Env::now(self.doc_dir.clone(), &self.text).sendable();
         let reference = |r: &str| env.repository.as_ref()?.url(r);
         let citation = |k: &str| env.citations.as_ref()?.get(k).cloned();
         let doc = parse(&self.text);
@@ -540,9 +540,9 @@ fn described(e: &std::io::Error) -> String {
     let Some(code) = e.raw_os_error().and_then(|code| isize::try_from(code).ok()) else {
         return e.to_string();
     };
-    // SAFETY: The domain is a constant of Foundation, and an error needs no user info.
-    let error = unsafe { NSError::errorWithDomain_code_userInfo(objc2_foundation::NSPOSIXErrorDomain, code, None) };
-    error.localizedDescription().to_string()
+    NSError::new(code, constant!(objc2_foundation::NSPOSIXErrorDomain))
+        .localizedDescription()
+        .to_string()
 }
 
 /// A rendered formula or diagram as embedded PNG, at twice its size for sharp display.
@@ -598,7 +598,7 @@ fn png_of_pixels(width: u32, height: u32, pixels: Vec<u8>) -> Option<Vec<u8>> {
 /// A local image for Word: PNG and JPEG as they are, other formats converted to PNG.
 fn local_picture(path: &Path, doc_dir: Option<&Path>) -> Option<Picture> {
     let path = &super::links::locate(path, doc_dir);
-    if !super::images::may_carry_along(path, doc_dir) {
+    if !super::env::may_carry_along(path, doc_dir) {
         return None;
     }
     let bytes = crate::util::read_regular_file(path, MAX_FILE_BYTES as u64)?;
@@ -636,7 +636,7 @@ fn embedded(url: &str, doc_dir: Option<&Path>) -> Option<String> {
         return None;
     }
     let path = super::links::locate(&resolve_path(url, doc_dir)?, doc_dir);
-    if !super::images::may_carry_along(&path, doc_dir) {
+    if !super::env::may_carry_along(&path, doc_dir) {
         return None;
     }
     let bytes = crate::util::read_regular_file(&path, MAX_FILE_BYTES as u64)?;

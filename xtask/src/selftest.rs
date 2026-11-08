@@ -35,6 +35,21 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("{}: {e}", binary.display()))?;
     let output = child.stderr.take().ok_or("the selftest has no output")?;
+    let profile = work.join("profile.txt");
+    let mut sampler = if mode == "bench" && args.iter().any(|a| a == "--profile") {
+        // A millisecond between samples; `-mayDie` keeps what it has when the app quits before the ten minutes.
+        let sampler = Command::new("sample")
+            .arg(child.id().to_string())
+            .args(["600", "1", "-mayDie", "-file"])
+            .arg(&profile)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("sample: {e}"))?;
+        Some(sampler)
+    } else {
+        None
+    };
     let report = std::thread::spawn(move || {
         let mut report = Report::default();
         for line in std::io::BufRead::lines(std::io::BufReader::new(output)).map_while(Result::ok) {
@@ -53,6 +68,10 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         }
         if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
             println!("output in {}", work.display());
+            if let Some(sampler) = sampler.as_mut() {
+                sampler.wait().map_err(|e| format!("sample: {e}"))?;
+                println!("call tree of the run in {}", profile.display());
+            }
             let report = report.join().map_err(|_| "reading the selftest's output failed")?;
             let part = Part::of(args);
             if listed_checks(mode, part).is_some() {

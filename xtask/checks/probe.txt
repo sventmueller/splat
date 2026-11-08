@@ -72,6 +72,7 @@ a panic in the start of a save ends the save and keeps the text
 a panic in the text a save takes ends the save and keeps the text
 a panic saves the text of an edited document
 a pasted picture lies next to the document and is linked
+a public name that leads into the local network is not asked
 a quote is undone in one step
 a quote writes exactly its text
 a redirect to a private host is not followed
@@ -211,6 +212,7 @@ the help menu leads to the problem form, the feature form and the repository
 the help menu's commands lead where they say
 the helper for the system's decoders reads no files and reaches no network
 the look after a panic in a reload reads the file
+the offline rules keep a page without a policy from loading anything
 the outline lists two nested headings
 the page answers a diagram with the fields the app reads
 the page answers a formula with the fields the app reads
@@ -232,6 +234,7 @@ the word behind that space is bold as well
 those saves were asked for while an autosave was under way
 underline is undone in one step
 underline writes exactly its text
+undo is back on when what ran without it panics
 undoing back to the text of a restored draft keeps the mark
 undoing in the document with the editor open closes it
 undoing marks a document after a copy just when the text is not the one on file
@@ -242,4 +245,5 @@ what is typed after a panic in a reload marks the document
 what is typed after a save marks the document at once
 what is typed marks the document
 what is typed while a look is on its way stays
+without the offline rules, a page without a policy loads what it names
 without the policy, injected content can fetch and run its handler

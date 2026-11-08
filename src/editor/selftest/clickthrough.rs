@@ -6,7 +6,7 @@ use objc2_app_kit::{NSApplication, NSTextInputClient};
 use objc2_foundation::{NSRange, NSString};
 
 use super::*;
-use crate::util::{ns, storage};
+use crate::util::{constant, ns, storage};
 
 /// The groups of the click-through by name, for `--only`, in the order a run takes them.
 pub(super) fn groups() -> Vec<(&'static str, Vec<Step>)> {
@@ -701,7 +701,7 @@ pub(super) fn scrolling_dark_mode_and_remote_steps() -> Vec<Step> {
                 check_link_dialog(e.mtm(), &c.out.join("13-link-dialog.png"));
                 let app = NSApplication::sharedApplication(e.mtm());
                 app.setAppearance(
-                    objc2_app_kit::NSAppearance::appearanceNamed(unsafe { objc2_app_kit::NSAppearanceNameDarkAqua })
+                    objc2_app_kit::NSAppearance::appearanceNamed(constant!(objc2_app_kit::NSAppearanceNameDarkAqua))
                         .as_deref(),
                 );
             },

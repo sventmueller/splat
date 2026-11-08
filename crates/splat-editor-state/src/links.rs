@@ -82,10 +82,13 @@ pub fn find_note(dir: &Path, name: &str) -> Option<PathBuf> {
     if name.is_empty() || name.contains("..") || Path::new(name).has_root() {
         return None;
     }
+    let root = dir.canonicalize().ok()?;
     let candidates = |base: &Path| {
         let plain = base.join(name);
         let with_md = base.join(format!("{name}.md"));
-        [plain, with_md].into_iter().find(|p| p.is_file())
+        [plain, with_md]
+            .into_iter()
+            .find(|p| p.is_file() && lies_within(p, &root))
     };
     if let Some(found) = candidates(dir) {
         return Some(found);
@@ -120,6 +123,12 @@ pub fn find_note(dir: &Path, name: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Whether `path` is in the canonical folder `root` once its links are followed: a link named like a note may point at a
+/// key in the home folder.
+fn lies_within(path: &Path, root: &Path) -> bool {
+    path.canonicalize().is_ok_and(|real| real.starts_with(root))
 }
 
 /// The file an image link names; a picture Obsidian embeds as `![[name.png]]` may sit in any folder below the
@@ -290,6 +299,23 @@ mod tests {
             docs.join("../x/bild.png")
         );
         assert_eq!(locate(&deep.join("bild.png"), None), deep.join("bild.png"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_link_named_like_a_note_leads_nowhere_outside_the_folder() {
+        let root = std::env::temp_dir().join(format!("splat-linked-{}", std::process::id()));
+        let docs = root.join("docs");
+        std::fs::create_dir_all(docs.join("a")).unwrap();
+        std::fs::write(root.join("id_ed25519"), "PRIVATE KEY").unwrap();
+        std::fs::write(docs.join("a/Notiz.md"), "# Notiz").unwrap();
+        std::os::unix::fs::symlink(root.join("id_ed25519"), docs.join("Schlüssel.md")).unwrap();
+        std::os::unix::fs::symlink(&root, docs.join("oben")).unwrap();
+        std::os::unix::fs::symlink(docs.join("a/Notiz.md"), docs.join("Kurz.md")).unwrap();
+        assert_eq!(find_note(&docs, "Schlüssel"), None);
+        assert_eq!(find_note(&docs, "oben/id_ed25519"), None);
+        assert_eq!(find_note(&docs, "Kurz"), Some(docs.join("Kurz.md")));
+        assert_eq!(find_note(&root.join("fehlt"), "Notiz"), None);
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

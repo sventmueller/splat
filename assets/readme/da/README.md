@@ -564,7 +564,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 - **Kopier af ugemt tekst** bliver på denne Mac, i din mappe Library, til genopretning efter et nedbrud. De forsvinder ved arkivering eller ved Splats normale afslutning; de kopier, et nedbrud har efterladt, bliver i genopretningsmappen, til du sletter dem.
 - **Links** starter aldrig et program ved et klik. Web- og maillinks åbner som sædvanlig; links til andre apps spørger først.
 - **HTML i dokumenter** læses af Splats egen parser. Scripts, typografier, frames og formularer kører aldrig.
-- **Eksporter** indeholder ingen scripts. HTML-sider beholder kun en fast liste over harmløse tags og attributter, som GitHub gør, plus en content security policy. Word-filer linker kun til `http`-, `https`- og `mailto`-adresser.
+- **Eksporter** indeholder ingen scripts. HTML-sider beholder kun en fast liste over harmløse tags og attributter, som GitHub gør, plus en content security policy. Word-filer linker kun til `http`-, `https`- og `mailto`-adresser, bortset fra de links, der følger med en Word-skabelon, du har valgt.
 - **Kodesignering** med Hardened Runtime. Splat kører uden App Sandbox, så det kan vise billeder ved siden af dine dokumenter uden at spørge om hver mappe; isoleringen af al afkodning opvejer det.
 
 ## Store dokumenter
@@ -579,7 +579,7 @@ Splat forbliver responsivt med dokumenter på flere megabyte:
 - Fra cirka 200 KB åbner et dokument sit vindue, før det er parset; ved 5 MB følger farverne og eksemplet cirka et kvart sekund senere.
 - Alle billeder tilsammen, inklusive formler og diagrammer, fylder højst en fjerdedel af Mac'ens hukommelse og det halve, mens hukommelsen er knap. Derudover vises yderligere billeder som pladsholdere, indtil der igen er plads.
 
-Nogle ændringer behandles i fuld, med omkring 300 ms pr. tastetryk ved 10 MB: ændringer af en fodnotes definition eller henvisninger, ved siden af en fodnote i teksten, helt til sidst i et dokument ved siden af en fodnote, af front matter eller af definitioner af linkreferencer, og enhver ændring i et dokument med `%%`-kommentarblokke eller med en fodnote, der er defineret to gange eller inde i et citat eller en liste. Hukommelsen vokser med filen, til cirka 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
+Nogle ændringer behandles i fuld, med omkring 300 ms pr. tastetryk ved 10 MB: ændringer af en fodnotes definition eller henvisninger, ved siden af en fodnote i teksten, helt til sidst i et dokument ved siden af en fodnote, af front matter eller af definitioner af linkreferencer, og enhver ændring i et dokument med `%%`-kommentarblokke, med en fodnote, der er defineret to gange eller inde i et citat eller en liste, eller med mere end 1000 fodnoter i teksten eller uafsluttede formelmarkeringer. Hukommelsen vokser med filen, til cirka 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
 
 ## Kendte begrænsninger
 

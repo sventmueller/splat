@@ -564,7 +564,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 - **Kopier av ulagret tekst** blir på denne Macen, i Bibliotek-mappen din, for gjenopprettingen etter et krasj. De forsvinner ved lagring eller når Splat avsluttes normalt; kopiene et krasj etterlot, blir liggende i gjenopprettingsmappen til du sletter dem.
 - **Lenker** starter aldri et program ved et klikk. Web- og e-postlenker åpnes som vanlig; lenker til andre apper spør først.
 - **HTML i dokumenter** leses av Splats egen parser. Skript, stiler, rammer og skjemaer kjører aldri.
-- **Eksporter** inneholder ingen skript. HTML-sider beholder bare en fast liste over harmløse tagger og attributter, som GitHub, pluss en content security policy. Word-filer lenker bare til adresser med `http`, `https` og `mailto`.
+- **Eksporter** inneholder ingen skript. HTML-sider beholder bare en fast liste over harmløse tagger og attributter, som GitHub, pluss en content security policy. Word-filer lenker bare til adresser med `http`, `https` og `mailto`, bortsett fra lenkene som følger med en Word-mal du har valgt.
 - **Kodesignering** med Hardened Runtime. Splat kjører uten App Sandbox, slik at appen kan vise bilder ved siden av dokumentene dine uten å spørre om hver mappe; isolasjonen av all dekoding veier opp for dette.
 
 ## Store dokumenter
@@ -579,7 +579,7 @@ Splat holder seg responsiv med dokumenter på flere megabyte:
 - Fra rundt 200 KB åpner et dokument vinduet sitt før det er tolket; ved 5 MB følger fargene og forhåndsvisningen om lag et kvart sekund senere.
 - Alle bilder til sammen, inkludert formler og diagrammer, tar høyst en fjerdedel av minnet til Macen og halvparten av det mens det er lite minne. Utover det vises flere bilder som plassholdere til det igjen er plass.
 
-Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB: endringer i definisjonen av en fotnote eller i referansene til den, ved siden av en fotnote i teksten, helt på slutten av et dokument ved siden av en fotnote, i front matter eller i lenkereferansedefinisjoner, og hver endring i et dokument med `%%`-kommentarblokker eller med en fotnote som er definert to ganger eller inne i et sitat eller en liste. Minnebruken vokser med filen, til omtrent 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
+Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB: endringer i definisjonen av en fotnote eller i referansene til den, ved siden av en fotnote i teksten, helt på slutten av et dokument ved siden av en fotnote, i front matter eller i lenkereferansedefinisjoner, og hver endring i et dokument med `%%`-kommentarblokker, med en fotnote som er definert to ganger eller inne i et sitat eller en liste, eller med mer enn 1000 fotnoter i teksten eller formelmerker som ikke er lukket. Minnebruken vokser med filen, til omtrent 115–160 MB for 1 MB Markdown og 340–510 MB for 10 MB.
 
 ## Kjente begrensninger
 

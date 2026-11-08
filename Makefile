@@ -1,6 +1,6 @@
 # Entry points only; the build logic lives in xtask/src/main.rs.
 .DEFAULT_GOAL := help
-.PHONY: help build universal lint check test test-gui test-long mutants fuzz coverage coverage-library bench release
+.PHONY: help build universal lint check test test-gui test-long mutants fuzz coverage coverage-library bench profile release
 
 ROUNDS ?= 20000
 
@@ -56,6 +56,10 @@ coverage-library: ## The modules without a window, measured by cargo test alone,
 bench: ## Open, type and scroll timings: make bench FILE=<file.md>
 	@test -n "$(FILE)" || { echo "usage: make bench FILE=<file.md>"; exit 2; } $(if $(KEYSTROKE_MS),--keystroke-ms $(KEYSTROKE_MS))
 	cargo xtask selftest bench "$(FILE)"
+
+profile: ## The bench with a call tree of the whole run in target/selftest/profile.txt: make profile FILE=<file.md>
+	@test -n "$(FILE)" || { echo "usage: make profile FILE=<file.md>"; exit 2; }
+	cargo xtask selftest bench "$(FILE)" --profile
 
 release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
 	cargo xtask dmg

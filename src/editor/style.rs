@@ -59,9 +59,12 @@ pub fn token_color(token: Token) -> Retained<NSColor> {
             .entry(token)
             .or_insert_with(|| {
                 let block = RcBlock::new(move |appearance: NonNull<NSAppearance>| -> NonNull<NSColor> {
-                    // SAFETY: `NonNull` rules out null, and AppKit keeps the appearance alive while it asks for its color.
-                    let appearance = unsafe { appearance.as_ref() };
-                    let color = srgb(palette::color(token, appearance_of(appearance)));
+                    let color = crate::util::guarded(NSColor::labelColor(), || {
+                        // SAFETY: `NonNull` rules out null, and AppKit keeps the appearance alive while it asks for its
+                        // color.
+                        let appearance = unsafe { appearance.as_ref() };
+                        srgb(palette::color(token, appearance_of(appearance)))
+                    });
                     NonNull::new(Retained::autorelease_return(color)).unwrap()
                 });
                 // SAFETY: The provider only reads the appearance it is given and returns a color.
@@ -126,10 +129,18 @@ pub fn apply_highlight_changes(
     spans: &[(std::ops::Range<Byte>, Style)],
     fonts: &SourceFonts,
 ) {
-    let (start, end) = {
-        let r = changed_region(old_text, old, text, spans);
-        (r.start, r.end)
-    };
+    apply_highlight_in(storage, text, spans, changed_region(old_text, old, text, spans), fonts);
+}
+
+/// Gives `region` of the source the colours `spans` say, whatever it had before.
+pub fn apply_highlight_in(
+    storage: &NSTextStorage,
+    text: &str,
+    spans: &[(std::ops::Range<Byte>, Style)],
+    region: std::ops::Range<Byte>,
+    fonts: &SourceFonts,
+) {
+    let (start, end) = (region.start, region.end);
     let (region, styled) = styled_ranges(text, spans, start..end);
     crate::util::editing(storage, || {
         let base = base_source_attributes(fonts);

@@ -271,11 +271,10 @@ define_class!(
             }
             let handler = handler.copy();
             let save = Cell::new(save);
-            let ended = RcBlock::new(move |error: *mut NSError| {
+            let ended = crate::util::error_handler(move |error| {
+                // AppKit's own handler has to run also after a panic in what ends the save.
                 guarded((), || {
                     let save = save.take();
-                    // SAFETY: AppKit passes a valid error or null for the length of the call.
-                    let error = unsafe { error.as_ref() };
                     let code = error.map(|e| e.code());
                     test_hooks::note(|| format!("a save ends, error {code:?}"));
                     test_hooks::fault_at("the end of a save");
@@ -284,7 +283,7 @@ define_class!(
                         save.end(asks);
                     }
                 });
-                handler.call((error,));
+                handler.call((error.map_or(std::ptr::null_mut(), |e| std::ptr::from_ref(e).cast_mut()),));
             });
             // SAFETY: NSDocument's implementation, with this method's signature; it copies the block.
             let _: () = unsafe {
@@ -580,9 +579,7 @@ fn documents(mtm: MainThreadMarker) -> Vec<Retained<MdDocument>> {
 
 /// AppKit words the message for a failed save itself.
 fn write_error() -> Retained<NSError> {
-    let info = NSDictionary::<objc2_foundation::NSErrorUserInfoKey, AnyObject>::new();
-    // SAFETY: An empty user info, as the Cocoa error domain accepts.
-    unsafe { NSError::errorWithDomain_code_userInfo(objc2_foundation::NSCocoaErrorDomain, 512, Some(&info)) }
+    NSError::new(512, constant!(objc2_foundation::NSCocoaErrorDomain))
 }
 
 fn read_error() -> Retained<NSError> {

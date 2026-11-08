@@ -16,6 +16,19 @@ use crate::util::ns;
 
 pub const HOST: &str = "https://bilder.splat-test.example";
 
+/// A public name whose address lies in the local network, as a router's can.
+pub const HOME_HOST: &str = "https://router.splat-test.example";
+
+/// What the hosts of this server resolve to.
+pub fn addresses_of(host: &str) -> Option<Vec<std::net::IpAddr>> {
+    let address = match host {
+        "bilder.splat-test.example" => [93, 184, 216, 34],
+        "router.splat-test.example" => [192, 168, 178, 1],
+        _ => return None,
+    };
+    Some(vec![std::net::IpAddr::from(address)])
+}
+
 /// Every address requested so far, and how often.
 static REQUESTS: Mutex<Option<HashMap<String, usize>>> = Mutex::new(None);
 

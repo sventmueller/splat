@@ -741,7 +741,8 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
 - **Länkar** startar aldrig ett program med ett klick. Webb- och e-postlänkar öppnas som vanligt; länkar till andra appar frågar först.
 - **HTML i dokument** läses av Splats egen parser. Skript, stilar, ramar och formulär körs aldrig.
 - **Exporter** innehåller inga skript. HTML-sidor behåller bara en fast lista över ofarliga taggar och attribut, som GitHub gör, plus
-  en innehållssäkerhetspolicy. Word-filer länkar bara adresser med `http`, `https` och `mailto`.
+  en innehållssäkerhetspolicy. Word-filer länkar bara adresser med `http`, `https` och `mailto`, utom länkar som följer
+  med en Word-mall du har valt.
 - **Kodsignering** med Hardened Runtime. Splat körs utan App Sandbox så att appen kan visa bilder bredvid
   dina dokument utan att fråga om varje mapp; isoleringen av all avkodning väger upp det.
 
@@ -766,8 +767,9 @@ Splat förblir responsivt med dokument på flera megabyte:
 
 Vissa ändringar behandlas i sin helhet, med cirka 300 ms per tangenttryckning vid 10 MB: ändringar i en fotnots definition eller
 hänvisningar, intill en fotnot i texten, allra sist i ett dokument intill en fotnot, i front matter eller i
-definitioner av länkreferenser, och varje ändring i ett dokument med `%%`-kommentarsblock eller med en fotnot som definierats två gånger
-eller inuti ett citat eller en lista. Minnet växer med filen, till ungefär 115–160 MB för 1 MB Markdown och 340–510 MB för 10 MB.
+definitioner av länkreferenser, och varje ändring i ett dokument med `%%`-kommentarsblock, med en fotnot som definierats två gånger
+eller inuti ett citat eller en lista, eller med fler än 1000 fotnoter i texten eller oavslutade formelmarkeringar. Minnet växer
+med filen, till ungefär 115–160 MB för 1 MB Markdown och 340–510 MB för 10 MB.
 
 ## Kända begränsningar
 

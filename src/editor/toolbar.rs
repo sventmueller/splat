@@ -157,11 +157,7 @@ fn segmented_group(
         overflow.addItem(&entry);
     }
     control.setIdentifier(Some(&ns(id)));
-    // SAFETY: The target is the window's controller, which owns the toolbar; the action takes the sender.
-    unsafe {
-        control.setTarget(Some(target));
-        control.setAction(Some(sel!(mdToolbarSegment:)));
-    }
+    crate::util::set_action(&control, target, sel!(mdToolbarSegment:));
     let item = NSToolbarItem::initWithItemIdentifier(NSToolbarItem::alloc(mtm), &ns(id));
     item.setView(Some(&control));
     item.setLabel(&ns(label));
@@ -248,8 +244,7 @@ fn button(
     item.setPaletteLabel(&ns(label));
     item.setToolTip(Some(&ns(tip)));
     item.setImage(symbol(image, label).as_deref());
-    // SAFETY: Toolbar actions are command selectors that take the sender as their only argument.
-    unsafe { item.setAction(Some(action)) };
+    crate::util::set_toolbar_action(&item, action);
     item.setBordered(true);
     item
 }

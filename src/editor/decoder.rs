@@ -183,8 +183,6 @@ const VECTOR_SCALE: f64 = 4.0;
 
 unsafe extern "C" {
     fn sandbox_init(profile: *const std::ffi::c_char, flags: u64, errorbuf: *mut *mut std::ffi::c_char) -> i32;
-    fn close(fd: i32) -> i32;
-    fn fcntl(fd: i32, command: i32, ...) -> i32;
 }
 
 /// Runs the helper: loads the system fonts, closes itself off and then answers requests until its input ends.
@@ -381,7 +379,7 @@ fn close_inherited_descriptors() {
         .collect();
     for fd in inherited {
         // SAFETY: no Rust object owns these descriptors; the one of the directory listing is already closed again.
-        unsafe { close(fd) };
+        unsafe { libc::close(fd) };
     }
 }
 
@@ -390,8 +388,7 @@ fn close_inherited_descriptors() {
 #[cfg(coverage)]
 fn open_measurement_file() {
     unsafe extern "C" {
-        fn fopen(path: *const std::ffi::c_char, mode: *const std::ffi::c_char) -> *mut std::ffi::c_void;
-        fn __llvm_profile_set_file_object(file: *mut std::ffi::c_void, enable_merge: i32);
+        fn __llvm_profile_set_file_object(file: *mut libc::FILE, enable_merge: i32);
     }
     let Some(pattern) = std::env::var("LLVM_PROFILE_FILE").ok() else {
         return;
@@ -400,7 +397,7 @@ fn open_measurement_file() {
         return;
     };
     // SAFETY: A NUL-terminated path and mode.
-    let file = unsafe { fopen(path.as_ptr(), c"wb".as_ptr()) };
+    let file = unsafe { libc::fopen(path.as_ptr(), c"wb".as_ptr()) };
     if !file.is_null() {
         // SAFETY: An open file the profile runtime keeps and writes once, at exit.
         unsafe { __llvm_profile_set_file_object(file, 0) };
@@ -446,8 +443,9 @@ fn mapped_system_fonts() -> Arc<fontdb::Database> {
     }
     let ids: Vec<_> = db.faces().map(|f| f.id).collect();
     for id in ids {
-        // SAFETY: fontdb requires that the mapped file is not changed meanwhile; system fonts sit on the read-only
-        // system volume, and a user font cut short while mapped ends only this helper, with SIGBUS.
+        // SAFETY: fontdb needs the mapped files unchanged, which only the read-only system volume ensures; a font in
+        // /Library/Fonts or ~/Library/Fonts changed meanwhile is an accepted risk that stays in this sandboxed helper,
+        // whose answers `read_answer` checks.
         let _ = unsafe { db.make_shared_face_data(id) };
     }
     Arc::new(db)
@@ -465,9 +463,8 @@ fn escapes(path: &[u8]) -> bool {
 
 /// Whether nothing the app left open is left, asked before the helper opens anything itself.
 fn holds_no_descriptor() -> bool {
-    const F_GETFD: i32 = 1;
     // SAFETY: asking for the flags of a descriptor number has no effect, whether it is open or not.
-    cfg!(coverage) || (3..256).all(|fd| unsafe { fcntl(fd, F_GETFD) } == -1)
+    cfg!(coverage) || (3..256).all(|fd| unsafe { libc::fcntl(fd, libc::F_GETFD) } == -1)
 }
 
 /// A request as the helper reads it. A request it does not know ends it, as the app sends none.

@@ -764,7 +764,8 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
 - **HTML in documenten** wordt gelezen door de eigen parser van Splat. Scripts, stijlen, frames en formulieren worden
   nooit uitgevoerd.
 - **Exports** bevatten geen scripts. HTML-pagina's behouden alleen een vaste lijst onschuldige tags en attributen, zoals
-  GitHub, plus een contentbeveiligingsbeleid. Word-bestanden linken alleen `http`-, `https`- en `mailto`-adressen.
+  GitHub, plus een contentbeveiligingsbeleid. Word-bestanden linken alleen `http`-, `https`- en `mailto`-adressen,
+  afgezien van de links die een door jou gekozen Word-sjabloon meebrengt.
 - **Codeondertekening** met de Hardened Runtime. Splat draait zonder de App Sandbox, zodat het afbeeldingen naast je
   documenten kan tonen zonder voor elke map om toestemming te vragen; de isolatie van al het decoderen compenseert dit.
 
@@ -791,8 +792,9 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
 
 Sommige wijzigingen worden volledig verwerkt, met ongeveer 300 ms per toetsaanslag bij 10 MB: die aan de definitie of
 de verwijzingen van een voetnoot, naast een inline voetnoot, helemaal aan het eind van een document naast een voetnoot, aan de
-front matter of aan definities van linkverwijzingen, en elke wijziging in een document met `%%`-opmerkingsblokken of met een
-tweemaal gedefinieerde voetnoot of een voetnoot binnen een citaat of lijst. Het geheugen groeit met het bestand, tot ongeveer 115–160 MB voor 1 MB Markdown en 340–510 MB voor 10 MB.
+front matter of aan definities van linkverwijzingen, en elke wijziging in een document met `%%`-opmerkingsblokken, met een
+tweemaal gedefinieerde voetnoot of een voetnoot binnen een citaat of lijst, of met meer dan 1000 inline voetnoten of
+niet-afgesloten formulemarkeringen. Het geheugen groeit met het bestand, tot ongeveer 115–160 MB voor 1 MB Markdown en 340–510 MB voor 10 MB.
 
 ## Bekende beperkingen
 

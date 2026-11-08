@@ -73,7 +73,7 @@ fn main() -> ExitCode {
     }
 }
 
-const FLAGS: [&str; 10] = [
+const FLAGS: [&str; 11] = [
     "--only",
     "--release",
     "--selftest",
@@ -84,11 +84,12 @@ const FLAGS: [&str; 10] = [
     "--in-back",
     "--by-hand",
     "--keystroke-ms",
+    "--profile",
 ];
 
 pub(crate) const USAGE: &str =
     "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | check-library | icon | vendor [check|fetch]
-       cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] [--only <group>] [--in-back] | resize | typing [--by-hand] | bench <file.md> [--keystroke-ms <n>], with --record to write what a run made into xtask/checks
+       cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] [--only <group>] [--in-back] | resize | typing [--by-hand] | bench <file.md> [--keystroke-ms <n>] [--profile], with --record to write what a run made into xtask/checks
        cargo xtask coverage [--library]";
 
 pub(crate) fn root() -> PathBuf {

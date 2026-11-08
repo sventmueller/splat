@@ -14,7 +14,8 @@ use objc2_foundation::{
 };
 
 use super::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
-use super::images::{ImageStore, may_carry_along, resolve_path};
+use super::env::may_carry_along;
+use super::images::{ImageStore, resolve_path};
 use super::layers::Object;
 use super::links::locate;
 use super::picture::{Rendered, Sizing};

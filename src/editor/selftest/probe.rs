@@ -3,17 +3,19 @@
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::Bool;
-use objc2::{AnyThread, MainThreadMarker, MainThreadOnly};
+use objc2::runtime::{NSObject, ProtocolObject};
+use objc2::{AnyThread, MainThreadMarker, MainThreadOnly, define_class, msg_send};
 use objc2_app_kit::{
-    NSApplication, NSAttachmentAttributeName, NSBitmapImageFileType, NSBitmapImageRep, NSDocument,
-    NSDocumentChangeType, NSDocumentController, NSImage, NSPasteboard, NSPasteboardTypePNG, NSTextAttachment,
+    NSApplication, NSAttachmentAttributeName, NSBitmapImageFileType, NSBitmapImageRep, NSDocumentChangeType,
+    NSDocumentController, NSImage, NSPasteboard, NSPasteboardTypePNG, NSTextAttachment,
 };
-use objc2_foundation::{NSData, NSDictionary, NSError, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL};
-use objc2_web_kit::WKWebView;
+use objc2_foundation::{
+    NSData, NSDictionary, NSError, NSObjectProtocol, NSPoint, NSRange, NSRect, NSSize, NSString, NSURL,
+};
+use objc2_web_kit::{WKURLSchemeHandler, WKURLSchemeTask, WKWebView};
 
 use super::super::EditorController;
 use super::super::decoder;
@@ -51,6 +53,10 @@ fn url_in_probe(path: &str) -> String {
 }
 
 /// A scheme in capitals is the same scheme.
+fn at_home() -> String {
+    format!("{}/router.png", super::mock_web::HOME_HOST)
+}
+
 fn in_capitals() -> String {
     url_in_probe("/badge.svg").replacen("https", "HTTPS", 1)
 }
@@ -144,6 +150,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
 
 pub(super) fn run(mtm: MainThreadMarker) {
     rendering_takes_what_it_is_given(mtm);
+    undo_is_back_on_after_a_panic(mtm);
     another_thread_gets_an_answer_from_the_main_thread();
     let name = "a document without formulas or diagrams starts no web view";
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
@@ -189,6 +196,28 @@ pub(super) fn run(mtm: MainThreadMarker) {
                 },
             );
         },
+    );
+}
+
+/// An undo manager belongs to the main thread, so this runs here and not in a unit test.
+fn undo_is_back_on_after_a_panic(mtm: MainThreadMarker) {
+    let undo = objc2_foundation::NSUndoManager::new(mtm);
+    let off_inside = Cell::new(false);
+    let panicked = crate::util::contained(|| {
+        crate::util::without_undo(Some(&undo), || {
+            off_inside.set(!undo.isUndoRegistrationEnabled());
+            panic!("a panic the checks provoke");
+        });
+    })
+    .is_none();
+    let back_on = undo.isUndoRegistrationEnabled();
+    check(
+        "undo is back on when what ran without it panics",
+        panicked && off_inside.get() && back_on && crate::util::without_undo(None, || 1) == 1,
+        &format!(
+            "panicked {panicked}, off inside {}, on after {back_on}",
+            off_inside.get()
+        ),
     );
 }
 
@@ -243,6 +272,7 @@ fn with_web_views_started(mtm: MainThreadMarker) {
         super::super::remote::get(&url_in_probe(path), editor.as_deref());
     }
     super::super::remote::get(&in_capitals(), editor.as_deref());
+    super::super::remote::get(&at_home(), editor.as_deref());
     let documents = NSDocumentController::sharedDocumentController(mtm);
     let recent = std::env::temp_dir().join("splat-probe-recent.md");
     let _ = std::fs::write(&recent, "# Recent\n");
@@ -352,7 +382,7 @@ fn blocked_addresses() {
 fn open_and_change_after_saving(mtm: MainThreadMarker) -> (PathBuf, Retained<NSURL>) {
     let changed = std::env::temp_dir().join(format!("splat-probe-reload-{}.md", std::process::id()));
     let _ = std::fs::write(&changed, "# Vorher\n");
-    let done = RcBlock::new(|_: *mut NSDocument, _: Bool, _: *mut NSError| {});
+    let done = crate::util::open_handler(|_, _, _| {});
     let url = NSURL::fileURLWithPath(&ns(changed.to_str().unwrap_or_default()));
     NSDocumentController::sharedDocumentController(mtm)
         .openDocumentWithContentsOfURL_display_completionHandler(&url, false, &done);
@@ -561,6 +591,12 @@ fn remote_answers() {
     check(
         "nothing reaches the private host a redirect names",
         requests_of("https://127.0.0.1/heimlich.png") == 0,
+        "",
+    );
+    check(
+        "a public name that leads into the local network is not asked",
+        matches!(super::super::remote::get(&at_home(), None), Some(None))
+            && super::mock_web::requests_holding("router.splat-test.example") == 0,
         "",
     );
     check(
@@ -966,8 +1002,70 @@ fn the_same_attack_without_a_policy(mtm: MainThreadMarker) {
                 text == "fetch allowed / image failed / inline handler ran / violated ",
                 &text,
             );
-            formula_text(mtm);
+            offline_rules_without_a_policy(mtm, false);
         });
+    });
+}
+
+/// A page without a policy that asks a scheme of its own for a picture: only the offline rules stand in its way.
+const ASKS_ITS_SCHEME: &str = "<!doctype html><body><img src=\"splat-probe:/bild.png\"></body>";
+
+static SCHEME_ASKED: AtomicUsize = AtomicUsize::new(0);
+
+define_class!(
+    #[unsafe(super(NSObject))]
+    #[thread_kind = MainThreadOnly]
+    #[name = "MDProbeScheme"]
+    struct ProbeScheme;
+
+    unsafe impl NSObjectProtocol for ProbeScheme {}
+
+    unsafe impl WKURLSchemeHandler for ProbeScheme {
+        #[unsafe(method(webView:startURLSchemeTask:))]
+        fn start(&self, _web: &WKWebView, task: &ProtocolObject<dyn WKURLSchemeTask>) {
+            SCHEME_ASKED.fetch_add(1, Ordering::SeqCst);
+            // SAFETY: The task is running, and failing it is its last callback.
+            unsafe { task.didFailWithError(&NSError::new(-1, &ns("splat-probe"))) };
+        }
+
+        #[unsafe(method(webView:stopURLSchemeTask:))]
+        fn stop(&self, _web: &WKWebView, _task: &ProtocolObject<dyn WKURLSchemeTask>) {}
+    }
+);
+
+/// The positive control first: without the rules the page's picture is asked for, so where it is not, the rules held.
+fn offline_rules_without_a_policy(mtm: MainThreadMarker, rules: bool) {
+    let config = webkit::configuration(mtm);
+    // SAFETY: NSObject's initializer, called once on the newly allocated object.
+    let scheme: Retained<ProbeScheme> = unsafe { msg_send![ProbeScheme::alloc(mtm), init] };
+    // SAFETY: A scheme WebKit does not handle itself, set before the configuration is used.
+    unsafe { config.setURLSchemeHandler_forURLScheme(Some(ProtocolObject::from_ref(&*scheme)), &ns("splat-probe")) };
+    let frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(100.0, 100.0));
+    let web = webkit::new_view(mtm, frame, &config);
+    let before = SCHEME_ASKED.load(Ordering::SeqCst);
+    let page = web.clone();
+    // SAFETY: A constant page without a base address.
+    let load = move || drop(unsafe { page.loadHTMLString_baseURL(&ns(ASKS_ITS_SCHEME), None) });
+    if rules {
+        webkit::when_offline(&web, load);
+    } else {
+        load();
+    }
+    let watched = web.clone();
+    // SAFETY: Reading whether the view is loading asks for nothing.
+    let loaded = move || !unsafe { watched.isLoading() };
+    once(0.5, "the page that asks its own scheme to load", loaded, move || {
+        let _ = (&web, &scheme);
+        let asked = SCHEME_ASKED.load(Ordering::SeqCst) - before;
+        if rules {
+            let name = "the offline rules keep a page without a policy from loading anything";
+            check(name, asked == 0, &format!("{asked} requests"));
+            formula_text(mtm);
+        } else {
+            let name = "without the offline rules, a page without a policy loads what it names";
+            check(name, asked == 1, &format!("{asked} requests"));
+            offline_rules_without_a_policy(mtm, true);
+        }
     });
 }
 

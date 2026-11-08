@@ -145,8 +145,10 @@ pub fn memory_pressure_changed(low: bool) {
 fn dimmed(image: &NSImage) -> Retained<NSImage> {
     let source = image.retain();
     let block = RcBlock::new(move |rect: NSRect| -> Bool {
-        source.drawInRect_fromRect_operation_fraction(rect, NSRect::ZERO, NSCompositingOperation::SourceOver, 0.82);
-        Bool::YES
+        crate::util::guarded(Bool::NO, || {
+            source.drawInRect_fromRect_operation_fraction(rect, NSRect::ZERO, NSCompositingOperation::SourceOver, 0.82);
+            Bool::YES
+        })
     });
     NSImage::imageWithSize_flipped_drawingHandler(image.size(), false, &block)
 }
@@ -523,15 +525,12 @@ impl<'a> Pictures<'a> {
         );
         banner.setHidden(true);
         let content = banner.contentView().expect("box content view");
-        // SAFETY: the target is this controller, which owns the window the button sits in.
-        let button = unsafe {
-            objc2_app_kit::NSButton::buttonWithTitle_target_action(
-                &ns(t("Bilder laden")),
-                Some(self.host.object().target()),
-                Some(sel!(mdLoadRemoteImages:)),
-                mtm,
-            )
-        };
+        let button = crate::util::button(
+            mtm,
+            t("Bilder laden"),
+            self.host.object().target(),
+            sel!(mdLoadRemoteImages:),
+        );
         button.setControlSize(objc2_app_kit::NSControlSize::Small);
         button.setFont(Some(&objc2_app_kit::NSFont::systemFontOfSize(
             objc2_app_kit::NSFont::smallSystemFontSize(),
@@ -615,27 +614,6 @@ fn rendered(loaded: Decoded) -> Option<Rendered> {
 /// How long the main thread waits for a picture to print; printing goes on without one from a volume that hangs.
 const PAPER_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// Whether what leaves the Mac as a file may take this one along: a document from someone else must not pull what it names
-/// from the user's folders into a file that gets sent on. Its own folder and its repository are what a document brings along.
-pub(super) fn may_carry_along(path: &Path, doc_dir: Option<&Path>) -> bool {
-    let Some(doc_dir) = doc_dir else {
-        return false;
-    };
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let root = what_a_document_brings_along(doc_dir, home.as_deref());
-    match (path.canonicalize(), root.canonicalize()) {
-        (Ok(file), Ok(root)) => file.starts_with(root),
-        _ => false,
-    }
-}
-
-/// A repository that holds the home folder, as one for dotfiles does, says nothing about what belongs to the document.
-fn what_a_document_brings_along<'a>(doc_dir: &'a Path, home: Option<&Path>) -> &'a Path {
-    super::env::repository_root(doc_dir)
-        .filter(|root| !home.is_some_and(|home| home.starts_with(root)))
-        .unwrap_or(doc_dir)
-}
-
 /// Reads and decodes an image file in a decoder helper; only formats Rust cannot decode go to the system.
 fn load(path: &Path, doc_dir: Option<&Path>, side: u32) -> ImageFile {
     let file = locate(path, doc_dir);
@@ -692,58 +670,6 @@ mod tests {
         assert_eq!(resolve_path("/docs/text/../d/a.png", None), plain);
         assert_eq!(resolve_path("../../../../a.png", dir), Some(PathBuf::from("/a.png")));
         assert_eq!(resolve_path("../a.png", None), None);
-    }
-
-    #[test]
-    fn a_file_leaves_with_a_document_only_from_where_the_document_lies() {
-        let root = std::env::temp_dir().join(format!("splat-carry-{}", std::process::id()));
-        let repo = root.join("repo");
-        let docs = repo.join("docs");
-        let plain = root.join("plain");
-        for dir in [&repo.join(".git"), &docs, &plain] {
-            std::fs::create_dir_all(dir).unwrap();
-        }
-        let file = |at: &Path| {
-            std::fs::write(at, b"x").unwrap();
-            at.to_path_buf()
-        };
-        let (beside, in_repo, elsewhere) = (
-            file(&docs.join("a.png")),
-            file(&repo.join("b.png")),
-            file(&root.join("c.png")),
-        );
-        let in_plain = file(&plain.join("d.png"));
-        let through = plain.join("durch.png");
-        std::os::unix::fs::symlink(&elsewhere, &through).unwrap();
-        assert!(may_carry_along(&beside, Some(&docs)));
-        assert!(
-            may_carry_along(&in_repo, Some(&docs)),
-            "a repository keeps its pictures anywhere inside"
-        );
-        assert!(!may_carry_along(&elsewhere, Some(&docs)));
-        assert!(may_carry_along(&in_plain, Some(&plain)));
-        assert!(!may_carry_along(&elsewhere, Some(&plain)));
-        assert!(!may_carry_along(&plain.join("../c.png"), Some(&plain)), "up and out");
-        assert!(!may_carry_along(&through, Some(&plain)), "a link that points out");
-        assert!(!may_carry_along(&beside, None), "a document without a place");
-        assert!(!may_carry_along(&docs.join("missing.png"), Some(&docs)));
-        let _ = std::fs::remove_dir_all(&root);
-    }
-
-    #[test]
-    fn a_repository_around_the_home_folder_opens_nothing() {
-        let root = std::env::temp_dir().join(format!("splat-carry-home-{}", std::process::id()));
-        let (home, docs) = (root.join("home"), root.join("home/docs"));
-        std::fs::create_dir_all(home.join(".git")).unwrap();
-        std::fs::create_dir_all(&docs).unwrap();
-        assert_eq!(
-            what_a_document_brings_along(&docs, Some(&home)),
-            docs,
-            "a repository of dotfiles"
-        );
-        assert_eq!(what_a_document_brings_along(&docs, Some(&root.join("other"))), home);
-        assert_eq!(what_a_document_brings_along(&docs, None), home);
-        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

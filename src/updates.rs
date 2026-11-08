@@ -62,8 +62,7 @@ pub fn menu_items(mtm: MainThreadMarker) -> Vec<Retained<NSMenuItem>> {
         return Vec::new();
     };
     let check = item(mtm, t("Nach Updates suchen …"), Some(sel!(checkForUpdates:)), "");
-    // SAFETY: the controller stays alive in CONTROLLER for the life of the app; menu items hold targets weakly.
-    unsafe { check.setTarget(Some(&controller)) };
+    crate::util::set_target(&check, &controller);
     vec![
         check,
         item(

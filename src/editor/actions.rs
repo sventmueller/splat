@@ -274,8 +274,7 @@ fn choice_item(mtm: MainThreadMarker, action: Action, title: &str, key: &str, ch
 pub fn item_at(mtm: MainThreadMarker, action: Action, title: &str, at: Byte) -> Retained<NSMenuItem> {
     let item = crate::util::item(mtm, title, Some(action.spec().selector), "");
     let at = NSNumber::new_usize(at.get());
-    // SAFETY: Any object can be represented; the item retains it.
-    unsafe { item.setRepresentedObject(Some(&at)) };
+    crate::util::set_represented(&item, &at);
     item
 }
 

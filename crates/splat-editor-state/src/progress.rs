@@ -1,5 +1,5 @@
 //! When an update runs and which blocks of a large preview render when: around a change at once, around what shows while
-//! the app is idle.
+//! the app is idle. Also which parts of a large source get their colours when.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
@@ -106,6 +106,121 @@ pub fn window_around(top: usize, bottom: usize, count: usize) -> Range<usize> {
     top.min(bottom).saturating_sub(2).min(end)..end
 }
 
+/// Colouring a whole source text longer than this colours what shows at once and the rest in steps: at 10 MB, colouring it
+/// all held the main thread for a quarter of a second.
+pub const COLOR_AT_ONCE: usize = 1 << 20;
+/// Bytes coloured in one step, a few milliseconds of work.
+pub const COLOR_STEP: usize = 128 * 1024;
+
+/// The parts of the source, in bytes of the text it holds, that do not have the colours of that text yet.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Uncolored(Vec<Range<usize>>);
+
+impl Uncolored {
+    /// All of a text of `len` bytes but `done`.
+    pub fn all_but(len: usize, done: Range<usize>) -> Uncolored {
+        let (start, end) = (done.start.min(len), done.end.min(len));
+        Uncolored([0..start, end..len].into_iter().filter(|r| !r.is_empty()).collect())
+    }
+
+    /// Whether all of the text has its colours.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Follows an edit that put `inserted` bytes in place of the bytes `removed`; the edit's own colouring covers what it
+    /// wrote.
+    pub fn edited(&mut self, removed: Range<usize>, inserted: usize) {
+        let moved = |at: usize| {
+            if at <= removed.start {
+                at
+            } else if at >= removed.end {
+                at - removed.end + removed.start + inserted
+            } else {
+                removed.start + inserted
+            }
+        };
+        self.0 = self
+            .0
+            .iter()
+            .map(|r| moved(r.start)..moved(r.end))
+            .filter(|r| !r.is_empty())
+            .collect();
+    }
+
+    /// Takes the next part to colour, at most about `most` bytes of `text` from the one nearest to `near` on, in whole
+    /// lines, so that no span and no line direction is cut.
+    pub fn take_near(&mut self, text: &str, near: usize, most: usize) -> Option<Range<usize>> {
+        self.within(text.len());
+        let distance = |r: &Range<usize>| {
+            if near < r.start {
+                r.start - near
+            } else {
+                near.saturating_sub(r.end - 1)
+            }
+        };
+        // Of two as near, the one below, where reading goes on.
+        let left = self.0.iter().min_by_key(|r| (distance(r), r.end <= near))?.clone();
+        let from = if near >= left.end {
+            left.end.saturating_sub(most).max(left.start)
+        } else {
+            near.clamp(left.start, left.end)
+        };
+        let piece = lines_around(text, from..(from + most).min(left.end));
+        self.cut(piece.clone());
+        Some(piece)
+    }
+
+    /// Takes the parts within `window` of `text`, in whole lines.
+    pub fn take_within(&mut self, text: &str, window: Range<usize>) -> Vec<Range<usize>> {
+        self.within(text.len());
+        let pieces: Vec<Range<usize>> = self
+            .0
+            .iter()
+            .filter(|r| r.start < window.end && window.start < r.end)
+            .map(|r| lines_around(text, r.start.max(window.start)..r.end.min(window.end)))
+            .collect();
+        for piece in &pieces {
+            self.cut(piece.clone());
+        }
+        pieces
+    }
+
+    /// Nothing beyond the text is left to colour.
+    fn within(&mut self, len: usize) {
+        for r in &mut self.0 {
+            r.end = r.end.min(len);
+        }
+        self.0.retain(|r| r.start < r.end);
+    }
+
+    fn cut(&mut self, piece: Range<usize>) {
+        self.0 = self
+            .0
+            .iter()
+            .flat_map(|r| [r.start..r.end.min(piece.start), r.start.max(piece.end)..r.end])
+            .filter(|r| !r.is_empty())
+            .collect();
+    }
+}
+
+/// `range` widened to the start of its first line and the end of its last, within `text`.
+pub fn lines_around(text: &str, range: Range<usize>) -> Range<usize> {
+    let bytes = text.as_bytes();
+    let end = range.end.min(bytes.len());
+    let start = range.start.min(end);
+    let start = bytes[..start].iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
+    let end = if end == 0 || bytes.get(end - 1) == Some(&b'\n') {
+        end
+    } else {
+        bytes[end..]
+            .iter()
+            .position(|&b| b == b'\n')
+            .map_or(bytes.len(), |i| end + i + 1)
+    };
+    start..end
+}
+
 /// Where the background parse of a document stands. Each one holds a copy of the text, so while keys come faster than a
 /// parse only the newest waits.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
@@ -138,6 +253,59 @@ impl Parsing {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_large_source_is_coloured_from_what_shows_outwards() {
+        let text = "eins\nzwei\ndrei\nvier\nfünf\nsechs\n";
+        let mut left = Uncolored::all_but(text.len(), 10..15);
+        assert_eq!(left, Uncolored(vec![0..10, 15..text.len()]));
+        let mut order = Vec::new();
+        while let Some(piece) = left.take_near(text, 12, 4) {
+            assert!(text.is_char_boundary(piece.start) && text.is_char_boundary(piece.end));
+            assert!(
+                piece.start == 0 || text.as_bytes()[piece.start - 1] == b'\n',
+                "{piece:?} starts a line"
+            );
+            order.push(piece);
+        }
+        assert!(left.is_empty());
+        assert_eq!(order.first(), Some(&(15..20)), "the line after what shows comes first");
+        let covered: usize = order.iter().map(|p| p.len()).sum();
+        assert!(covered >= text.len() - 5, "{order:?}");
+        assert!(
+            order.iter().any(|p| p.start == 0),
+            "the part above comes last: {order:?}"
+        );
+    }
+
+    #[test]
+    fn what_is_left_to_colour_moves_with_an_edit() {
+        let mut left = Uncolored(vec![0..4, 10..20, 30..40]);
+        left.edited(12..15, 1);
+        assert_eq!(left, Uncolored(vec![0..4, 10..18, 28..38]));
+        left.edited(0..4, 0);
+        assert_eq!(
+            left,
+            Uncolored(vec![6..14, 24..34]),
+            "the removed part went with the edit"
+        );
+        let mut beyond = Uncolored::all_but(50, 0..2);
+        assert_eq!(beyond.take_near("ab\ncd", 0, 100), Some(0..5));
+        assert!(beyond.is_empty(), "nothing is left past the end of the text");
+        assert_eq!(beyond.take_near("ab", 0, 10), None);
+    }
+
+    #[test]
+    fn what_scrolls_into_view_is_taken_in_whole_lines() {
+        let text = "aa\nbb\ncc\ndd\n";
+        let mut left = Uncolored::all_but(text.len(), 0..3);
+        assert_eq!(left.take_within(text, 4..7), vec![3..9]);
+        assert_eq!(left, Uncolored::all_but(text.len(), 0..9));
+        assert!(left.take_within(text, 0..2).is_empty());
+        assert_eq!(lines_around(text, 0..0), 0..0);
+        assert_eq!(lines_around(text, 4..4), 3..6);
+        assert_eq!(lines_around("ohne Ende", 2..4), 0..9);
+    }
 
     #[test]
     fn only_the_newest_parse_waits_behind_the_one_running() {

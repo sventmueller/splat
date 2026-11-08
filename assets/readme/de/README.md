@@ -564,7 +564,7 @@ Eine Markdown-Datei kann von jedem stammen, deshalb behandelt Splat jedes Dokume
 - **Kopien ungesicherten Textes** bleiben für die Wiederherstellung nach einem Absturz auf diesem Mac, in deinem Ordner „Library“. Sie verschwinden mit dem Sichern oder dem normalen Beenden von Splat; die Kopien, die ein Absturz hinterlassen hat, bleiben im Wiederherstellungsordner, bis du sie löschst.
 - **Links** starten nie per Klick ein Programm. Web- und Mail-Links öffnen wie gewohnt; Links zu anderen Apps fragen vorher nach.
 - **HTML in Dokumenten** wird vom eigenen Parser von Splat gelesen. Skripte, Stile, Frames und Formulare laufen nie.
-- **Exporte** enthalten keine Skripte. HTML-Seiten behalten wie bei GitHub nur eine feste Liste harmloser Tags und Attribute, dazu eine Content Security Policy. Word-Dateien verlinken nur `http`-, `https`- und `mailto`-Adressen.
+- **Exporte** enthalten keine Skripte. HTML-Seiten behalten wie bei GitHub nur eine feste Liste harmloser Tags und Attribute, dazu eine Content Security Policy. Word-Dateien verlinken nur `http`-, `https`- und `mailto`-Adressen, abgesehen von den Links, die eine von dir gewählte Word-Vorlage mitbringt.
 - **Codesignatur** mit der Hardened Runtime. Splat läuft ohne die App Sandbox, damit es Bilder neben deinen Dokumenten anzeigen kann, ohne für jeden Ordner zu fragen; die Isolation des gesamten Dekodierens gleicht das aus.
 
 ## Große Dokumente
@@ -579,7 +579,7 @@ Splat bleibt auch mit Dokumenten von mehreren Megabyte reaktionsschnell:
 - Ab etwa 200 KB öffnet ein Dokument sein Fenster, bevor es geparst wird; bei 5 MB folgen die Farben und die Vorschau etwa eine Viertelsekunde später.
 - Alle Bilder zusammen, einschließlich Formeln und Diagrammen, belegen höchstens ein Viertel des Arbeitsspeichers des Mac und die Hälfte davon, solange der Speicher knapp ist. Darüber hinaus erscheinen weitere Bilder als Platzhalter, bis wieder Platz ist.
 
-Manche Änderungen werden vollständig verarbeitet, bei 10 MB mit etwa 300 ms pro Tastendruck: Änderungen an der Definition oder den Verweisen einer Fußnote, neben einer Inline-Fußnote, ganz am Ende eines Dokuments neben einer Fußnote, am Front Matter oder an Link-Referenzdefinitionen sowie jede Änderung in einem Dokument mit `%%`-Kommentarblöcken oder mit einer doppelt oder in einem Zitat oder einer Liste definierten Fußnote. Der Speicherbedarf wächst mit der Datei, auf etwa 115–160 MB für 1 MB Markdown und 340–510 MB für 10 MB.
+Manche Änderungen werden vollständig verarbeitet, bei 10 MB mit etwa 300 ms pro Tastendruck: Änderungen an der Definition oder den Verweisen einer Fußnote, neben einer Inline-Fußnote, ganz am Ende eines Dokuments neben einer Fußnote, am Front Matter oder an Link-Referenzdefinitionen sowie jede Änderung in einem Dokument mit `%%`-Kommentarblöcken, mit einer doppelt oder in einem Zitat oder einer Liste definierten Fußnote oder mit mehr als 1000 Inline-Fußnoten oder nicht geschlossenen Formelmarkierungen. Der Speicherbedarf wächst mit der Datei, auf etwa 115–160 MB für 1 MB Markdown und 340–510 MB für 10 MB.
 
 ## Bekannte Einschränkungen
 

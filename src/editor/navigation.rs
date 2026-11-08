@@ -2,7 +2,6 @@
 
 use std::path::Path;
 
-use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{NSApplication, NSBeep, NSDocumentController, NSEventModifierFlags, NSTextView, NSWorkspace};
 use objc2_foundation::{NSArray, NSRange, NSString, NSURL};
@@ -31,22 +30,17 @@ fn open_place(mtm: objc2::MainThreadMarker, place: Option<(std::path::PathBuf, b
         return;
     };
     if markdown {
-        let done = block2::RcBlock::new(
-            |_: *mut objc2_app_kit::NSDocument, _: objc2::runtime::Bool, error: *mut objc2_foundation::NSError| {
-                crate::util::guarded((), || {
-                    // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
-                    let Some(error) = (unsafe { Retained::retain(error) }) else {
-                        return;
-                    };
-                    crate::diag::report("opening a linked document failed", error.code());
-                    crate::util::main_soon(move || {
-                        if let Some(mtm) = objc2::MainThreadMarker::new() {
-                            objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
-                        }
-                    });
-                });
-            },
-        );
+        let done = crate::util::open_handler(|_, _, error| {
+            let Some(error) = error else {
+                return;
+            };
+            crate::diag::report("opening a linked document failed", error.code());
+            crate::util::main_soon(move || {
+                if let Some(mtm) = objc2::MainThreadMarker::new() {
+                    objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
+                }
+            });
+        });
         NSDocumentController::sharedDocumentController(mtm)
             .openDocumentWithContentsOfURL_display_completionHandler(&url, true, &done);
     } else {

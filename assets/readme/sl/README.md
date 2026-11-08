@@ -564,7 +564,7 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 - **Kopije neshranjenega besedila** ostanejo na tem Macu, v vaši mapi Knjižnica, za obnovitev po zrušitvi. Odidejo s shranjevanjem ali običajnim koncem Splata; kopije, ki jih je pustila zrušitev, ostanejo v mapi za obnovitev, dokler jih ne izbrišete.
 - **Povezave** nikoli ne zaženejo programa s klikom. Spletne in poštne povezave se odprejo kot običajno; povezave do drugih aplikacij najprej vprašajo.
 - **HTML v dokumentih** bere Splatov lastni razčlenjevalnik. Skripte, slogi, okvirji in obrazci se nikoli ne izvedejo.
-- **Izvozi** ne vsebujejo skript. Strani HTML obdržijo le določen seznam neškodljivih oznak in atributov, kot to počne GitHub, ter politiko varnosti vsebine. Datoteke Word povezujejo samo naslove `http`, `https` in `mailto`.
+- **Izvozi** ne vsebujejo skript. Strani HTML obdržijo le določen seznam neškodljivih oznak in atributov, kot to počne GitHub, ter politiko varnosti vsebine. Datoteke Word povezujejo samo naslove `http`, `https` in `mailto`, razen povezav, ki jih prinese predloga Word po vaši izbiri.
 - **Podpisovanje kode** s Hardened Runtime. Splat teče brez App Sandboxa, da lahko prikaže slike poleg vaših dokumentov, ne da bi vprašal za vsako mapo; izolacija vsega dekodiranja to odtehta.
 
 ## Veliki dokumenti
@@ -579,7 +579,7 @@ Splat ostaja odziven tudi pri dokumentih z več megabajti:
 - Od približno 200 KB naprej dokument odpre okno, preden je razčlenjen; pri 5 MB barve in predogled sledijo približno četrt sekunde pozneje.
 - Vse slike skupaj, vključno s formulami in diagrami, zasedejo največ četrtino pomnilnika Maca in polovico tega, dokler je pomnilnika malo. Nad tem se nadaljnje slike prikažejo kot nadomestni znaki, dokler spet ni prostora.
 
-Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 10 MB: spremembe definicije ali sklicev sprotne opombe, ob opombi v vrstici, čisto na koncu dokumenta ob sprotni opombi, spremembe front matterja ali definicij sklicev na povezave ter vsaka sprememba v dokumentu z bloki komentarjev `%%` ali s sprotno opombo, definirano dvakrat ali znotraj citata ali seznama. Pomnilnik raste z datoteko, na približno 115–160 MB za 1 MB Markdowna in 340–510 MB za 10 MB.
+Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 10 MB: spremembe definicije ali sklicev sprotne opombe, ob opombi v vrstici, čisto na koncu dokumenta ob sprotni opombi, spremembe front matterja ali definicij sklicev na povezave ter vsaka sprememba v dokumentu z bloki komentarjev `%%`, s sprotno opombo, definirano dvakrat ali znotraj citata ali seznama, ali z več kot 1000 opombami v vrstici ali nezaprtimi oznakami formul. Pomnilnik raste z datoteko, na približno 115–160 MB za 1 MB Markdowna in 340–510 MB za 10 MB.
 
 ## Znane omejitve
 

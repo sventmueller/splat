@@ -1,22 +1,11 @@
 //! Large blocks come straight from the kernel and go back to it when freed.
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::ffi::c_void;
 
 /// The size from which the system allocator also hands out separate large blocks.
 const LARGE: usize = 128 * 1024;
 /// mmap guarantees page alignment; Intel Macs have 4 KB pages, Apple silicon 16 KB.
 const PAGE: usize = 4 * 1024;
-
-const PROT_READ: i32 = 1;
-const PROT_WRITE: i32 = 2;
-const MAP_PRIVATE: i32 = 0x0002;
-const MAP_ANON: i32 = 0x1000;
-
-unsafe extern "C" {
-    fn mmap(addr: *mut c_void, len: usize, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut c_void;
-    fn munmap(addr: *mut c_void, len: usize) -> i32;
-}
 
 pub struct LargeAlloc;
 
@@ -27,16 +16,16 @@ fn is_large(layout: &Layout) -> bool {
 fn map(size: usize) -> *mut u8 {
     // SAFETY: An anonymous mapping without address hint; failure is checked below.
     let p = unsafe {
-        mmap(
+        libc::mmap(
             std::ptr::null_mut(),
             size,
-            PROT_READ | PROT_WRITE,
-            MAP_PRIVATE | MAP_ANON,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_PRIVATE | libc::MAP_ANON,
             -1,
             0,
         )
     };
-    if p as isize == -1 {
+    if p == libc::MAP_FAILED {
         std::ptr::null_mut()
     } else {
         p.cast()
@@ -68,7 +57,7 @@ unsafe impl GlobalAlloc for LargeAlloc {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if is_large(&layout) {
             // SAFETY: Large blocks come from `map` with this size, so the whole mapping goes back.
-            unsafe { munmap(ptr.cast(), layout.size()) };
+            unsafe { libc::munmap(ptr.cast(), layout.size()) };
         } else {
             // SAFETY: Small blocks come from the system allocator with this layout.
             unsafe { System.dealloc(ptr, layout) }

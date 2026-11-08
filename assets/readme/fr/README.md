@@ -564,7 +564,7 @@ Un fichier Markdown peut venir de n’importe qui, c’est pourquoi Splat traite
 - **Les copies du texte non enregistré** restent sur ce Mac, dans votre dossier Bibliothèque, pour la récupération après un plantage. Elles disparaissent avec l’enregistrement ou la fermeture normale de Splat ; les copies qu’un plantage a laissées restent dans le dossier de récupération jusqu’à ce que vous les supprimiez.
 - **Les liens** ne lancent jamais un programme par un clic. Les liens web et de messagerie s’ouvrent comme d’habitude ; les liens vers d’autres apps demandent d’abord confirmation.
 - **Le HTML des documents** est lu par l’analyseur de Splat. Les scripts, les styles, les cadres et les formulaires ne s’exécutent jamais.
-- **Les exports** ne contiennent aucun script. Les pages HTML ne gardent qu’une liste fixe de balises et d’attributs inoffensifs, comme le fait GitHub, ainsi qu’une politique de sécurité du contenu. Les fichiers Word ne créent de liens que pour les adresses `http`, `https` et `mailto`.
+- **Les exports** ne contiennent aucun script. Les pages HTML ne gardent qu’une liste fixe de balises et d’attributs inoffensifs, comme le fait GitHub, ainsi qu’une politique de sécurité du contenu. Les fichiers Word ne créent de liens que pour les adresses `http`, `https` et `mailto`, en dehors des liens qu’apporte un modèle Word que vous avez choisi.
 - **Signature du code** avec le Hardened Runtime. Splat s’exécute sans l’App Sandbox pour pouvoir afficher les images situées à côté de vos documents sans demander l’accès à chaque dossier ; l’isolation de tout le décodage compense cela.
 
 ## Documents volumineux
@@ -579,7 +579,7 @@ Splat reste réactif avec des documents de plusieurs mégaoctets :
 - À partir d’environ 200 Ko, un document ouvre sa fenêtre avant d’être analysé ; à 5 Mo, les couleurs et l’aperçu suivent environ un quart de seconde plus tard.
 - Toutes les images ensemble, formules et diagrammes compris, occupent au plus un quart de la mémoire du Mac, et la moitié de cela quand la mémoire manque. Au-delà, les images suivantes s’affichent comme des espaces réservés jusqu’à ce qu’il y ait de nouveau de la place.
 
-Certaines modifications sont traitées en entier, à environ 300 ms par frappe pour 10 Mo : celles apportées à la définition ou aux références d’une note de bas de page, à côté d’une note en ligne, tout à la fin d’un document à côté d’une note de bas de page, au front matter ou aux définitions de références de liens, ainsi que toute modification dans un document avec des blocs de commentaires `%%` ou avec une note de bas de page définie deux fois ou à l’intérieur d’une citation ou d’une liste. La mémoire augmente avec le fichier, jusqu’à environ 115–160 Mo pour 1 Mo de Markdown et 340–510 Mo pour 10 Mo.
+Certaines modifications sont traitées en entier, à environ 300 ms par frappe pour 10 Mo : celles apportées à la définition ou aux références d’une note de bas de page, à côté d’une note en ligne, tout à la fin d’un document à côté d’une note de bas de page, au front matter ou aux définitions de références de liens, ainsi que toute modification dans un document avec des blocs de commentaires `%%`, avec une note de bas de page définie deux fois ou à l’intérieur d’une citation ou d’une liste, ou avec plus de 1000 notes en ligne ou marques de formule non fermées. La mémoire augmente avec le fichier, jusqu’à environ 115–160 Mo pour 1 Mo de Markdown et 340–510 Mo pour 10 Mo.
 
 ## Limites connues
 

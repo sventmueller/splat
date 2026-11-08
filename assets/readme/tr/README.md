@@ -564,7 +564,7 @@ Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenil
 - **Kaydedilmemiş metnin kopyaları**, bir çökmeden sonra kurtarma için Mac’inizde, Library klasörünüzde kalır. Kaydetmeyle ya da Splat’ın normal sonlanmasıyla giderler; bir çökmenin geride bıraktığı kopyalar siz silene kadar kurtarma klasöründe kalır.
 - **Bağlantılar** bir tıklamayla asla bir program başlatmaz. Web ve posta bağlantıları olağan şekilde açılır; diğer uygulamalara giden bağlantılar önce sorar.
 - **Belgelerdeki HTML**, Splat’ın kendi ayrıştırıcısı tarafından okunur. Betikler, stiller, çerçeveler ve formlar asla çalışmaz.
-- **Dışa aktarmalar** betik taşımaz. HTML sayfaları, GitHub’ın yaptığı gibi yalnızca sabit bir zararsız etiket ve öznitelik listesini ve ek olarak bir içerik güvenlik politikasını korur. Word dosyaları yalnızca `http`, `https` ve `mailto` adreslerine bağlanır.
+- **Dışa aktarmalar** betik taşımaz. HTML sayfaları, GitHub’ın yaptığı gibi yalnızca sabit bir zararsız etiket ve öznitelik listesini ve ek olarak bir içerik güvenlik politikasını korur. Word dosyaları, seçtiğiniz bir Word şablonunun beraberinde getirdiği bağlantılar dışında yalnızca `http`, `https` ve `mailto` adreslerine bağlanır.
 - **Kod imzalama**, Hardened Runtime ile. Splat, belgelerinizin yanındaki görüntüleri her klasör için sormadan gösterebilmek amacıyla App Sandbox olmadan çalışır; tüm çözme işlemlerinin yalıtılması bunu dengeler.
 
 ## Büyük belgeler
@@ -579,7 +579,7 @@ Splat, birkaç megabaytlık belgelerde de duyarlı kalır:
 - Yaklaşık 200 KB’tan itibaren bir belge, ayrıştırılmadan önce penceresini açar; 5 MB’ta renkler ve önizleme yaklaşık çeyrek saniye sonra gelir.
 - Formüller ve diyagramlar dahil tüm görüntüler birlikte, Mac’in belleğinin en fazla dörtte birini, bellek azken de bunun yarısını kaplar. Bunun ötesinde, diğer görüntüler yeniden yer açılana kadar yer tutucu olarak gösterilir.
 
-Bazı değişiklikler tümüyle işlenir; 10 MB’ta tuş vuruşu başına yaklaşık 300 ms sürer: bir dipnotun tanımında ya da başvurularında, satır içi bir dipnotun yanında, belgenin en sonunda bir dipnotun yanında, front matter’da ya da bağlantı başvuru tanımlarında yapılanlar ve `%%` yorum blokları olan ya da iki kez ya da bir alıntı veya liste içinde tanımlanmış dipnotu olan bir belgedeki her değişiklik. Bellek dosyayla birlikte büyür: 1 MB’lık Markdown için kabaca 115–160 MB, 10 MB için 340–510 MB.
+Bazı değişiklikler tümüyle işlenir; 10 MB’ta tuş vuruşu başına yaklaşık 300 ms sürer: bir dipnotun tanımında ya da başvurularında, satır içi bir dipnotun yanında, belgenin en sonunda bir dipnotun yanında, front matter’da ya da bağlantı başvuru tanımlarında yapılanlar ve `%%` yorum blokları olan, iki kez ya da bir alıntı veya liste içinde tanımlanmış dipnotu olan ya da 1000’den fazla satır içi dipnotu veya kapatılmamış formül işareti olan bir belgedeki her değişiklik. Bellek dosyayla birlikte büyür: 1 MB’lık Markdown için kabaca 115–160 MB, 10 MB için 340–510 MB.
 
 ## Bilinen sınırlamalar
 

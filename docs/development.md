@@ -31,6 +31,7 @@ make fuzz                   # random input for the partial parse and every outpu
 make coverage               # line coverage of all tests and self-tests, with a floor per module
 make coverage-library       # the same floors for the modules without a window, as in CI
 make bench FILE=<file.md>   # timings for opening, typing and scrolling a large file
+make profile FILE=<file.md> # the same with a call tree of the whole run, from macOS's sample tool
 make release                # make test and coverage-library first, then the notarized disk image
 ```
 
@@ -127,7 +128,7 @@ permissions for the two.
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | the running app, click by click. Opens a window and types into it; the Mac is busy for about four minutes. `--scenarios` runs only the second part, in about a minute and a half. `--only` runs one group of that part, in its own document. On a locked screen it all runs as well, and what needs an unlocked one reports as skipped. `--in-back` leaves out what needs the app in front while another app is there; without it such a check fails |
 | `cargo xtask selftest resize` | widens the window after moving the divider: the source re-wraps while the window is resized. Then shows and hides the sidebar: source and preview keep their share, and a new window opens the sidebar as the last one left it. Takes about ten seconds |
 | `cargo xtask selftest typing [--by-hand]` | types through saves, with keys through the app's event queue or, with `--by-hand`, from a person: what is typed stays and shows as unsaved. Takes about a minute. On a locked screen the keys go straight to the window, and what needs the app in front reports as skipped |
-| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>]` | timings for opening, typing and scrolling a large file; `--keystroke-ms` fails when the fastest keystroke takes longer |
+| `cargo xtask selftest bench <file.md> [--keystroke-ms <n>] [--profile]` | timings for opening, typing and scrolling a large file; `--keystroke-ms` fails when the fastest keystroke takes longer; `--profile` samples the app every millisecond into `target/selftest/profile.txt`, which slows it, so take shares from it rather than times |
 | `cargo test --release -- --ignored partial_updates` | a keystroke in 10 MB: partial against full update, the same result in a quarter of the time at most |
 | `cargo test --release --test hostile --test hostile_import` | documents built to overflow the stack or take quadratic time or memory, each at two sizes whose time and peak memory must grow as the text does, through parsing, layout, both exports, keystrokes and commands, and the same for repositories, notes and foreign formats, also a ZIP bomb and a Word file full in every part. Time counts only with `--release` on Apple Silicon, one measurement at a time; memory counts in every build |
 | `make mutants` | faults built into `crates/splat-markdown`, `crates/splat-preview`, `crates/splat-file-state`, `crates/splat-git`, `crates/splat-import` and `crates/splat-notes` one by one, through [cargo-mutants](https://mutants.rs) (`cargo install cargo-mutants`); says which ones no test notices. Takes hours; `FILE=crates/splat-preview/src/bridge/mod.rs` narrows it |
@@ -205,13 +206,13 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `crates/splat-editor-state/`: what the editor window knows and decides without a window. Everything the controller
   knows about the document and every way that changes in `state.rs`, whose fields are private; `model.rs`, which lends
   the state and the text copy to closures that cannot reach a view; the text copy and the block bookkeeping in
-  `sync.rs`, with randomised tests; the rules of what WebKit renders when in `render_queue.rs`, and when an update runs
-  and which blocks of a large preview render when in `progress.rs`. Also what a link click means and where opening a
-  link leads (`navigation.rs`, `links.rs`), the BibTeX file (`bibtex.rs`) and the code host of the repository
-  (`repository.rs`), the sidebar's rows, searches and renames (`notes.rs`), the outline (`outline.rs`), the marks for
-  what changed since the last commit (`changes.rs`), what an edit in the preview changed and what a drop inserts
-  (`editing.rs`), new files beside a document (`files.rs`), the metadata form (`metadata.rs`), the word count
-  (`word_count.rs`), and the worker threads and `contained` (`lanes.rs`).
+  `sync.rs`, with randomised tests; the rules of what WebKit renders when in `render_queue.rs`, and when an update runs,
+  which blocks of a large preview render when and when the parts of a large source get their colours in `progress.rs`.
+  Also what a link click means and where opening a link leads (`navigation.rs`, `links.rs`), the BibTeX file
+  (`bibtex.rs`) and the code host of the repository (`repository.rs`), the sidebar's rows, searches and renames
+  (`notes.rs`), the outline (`outline.rs`), the marks for what changed since the last commit (`changes.rs`), what an
+  edit in the preview changed and what a drop inserts (`editing.rs`), new files beside a document (`files.rs`), the
+  metadata form (`metadata.rs`), the word count (`word_count.rs`), and the worker threads and `contained` (`lanes.rs`).
 - `crates/splat-i18n/` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table
   of the interface language at its start.
 - `crates/splat-testkit/`: the generator of the randomised tests and the checks of the fuzz targets.

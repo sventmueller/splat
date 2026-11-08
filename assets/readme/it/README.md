@@ -564,7 +564,7 @@ Un file Markdown può arrivare da chiunque, quindi Splat tratta ogni documento c
 - **Le copie del testo non salvato** restano su questo Mac, nella tua cartella Libreria, per il ripristino dopo un arresto anomalo. Spariscono con il salvataggio o con la normale chiusura di Splat; le copie lasciate da un arresto anomalo restano nella cartella di ripristino finché non le elimini.
 - **I link** non avviano mai un programma con un clic. I link web e di posta si aprono come al solito; i link verso altre app chiedono prima conferma.
 - **L’HTML nei documenti** viene letto dal parser di Splat. Script, stili, frame e moduli non vengono mai eseguiti.
-- **Le esportazioni** non contengono script. Le pagine HTML mantengono solo un elenco fisso di tag e attributi innocui, come fa GitHub, più una content security policy. I file Word collegano solo indirizzi `http`, `https` e `mailto`.
+- **Le esportazioni** non contengono script. Le pagine HTML mantengono solo un elenco fisso di tag e attributi innocui, come fa GitHub, più una content security policy. I file Word collegano solo indirizzi `http`, `https` e `mailto`, a parte i link che porta con sé un modello Word che hai scelto.
 - **Firma del codice** con Hardened Runtime. Splat funziona senza App Sandbox per poter mostrare le immagini accanto ai tuoi documenti senza chiedere per ogni cartella; l’isolamento di tutta la decodifica compensa questa scelta.
 
 ## Documenti grandi
@@ -579,7 +579,7 @@ Splat resta reattivo con documenti di diversi megabyte:
 - A partire da circa 200 KB, un documento apre la sua finestra prima di essere analizzato; a 5 MB, i colori e l’anteprima seguono circa un quarto di secondo dopo.
 - Tutte le immagini insieme, comprese formule e diagrammi, occupano al massimo un quarto della memoria del Mac, e la metà di questo quando la memoria scarseggia. Oltre questo limite, le altre immagini appaiono come segnaposto finché non c’è di nuovo spazio.
 
-Alcune modifiche vengono elaborate per intero, con circa 300 ms per battuta di tasto a 10 MB: quelle alla definizione o ai riferimenti di una nota a piè di pagina, accanto a una nota in linea, alla fine del documento accanto a una nota a piè di pagina, al front matter o alle definizioni di riferimenti dei link, e ogni modifica in un documento con blocchi di commento `%%` o con una nota a piè di pagina definita due volte o all’interno di una citazione o di un elenco. La memoria cresce con il file, fino a circa 115–160 MB per 1 MB di Markdown e 340–510 MB per 10 MB.
+Alcune modifiche vengono elaborate per intero, con circa 300 ms per battuta di tasto a 10 MB: quelle alla definizione o ai riferimenti di una nota a piè di pagina, accanto a una nota in linea, alla fine del documento accanto a una nota a piè di pagina, al front matter o alle definizioni di riferimenti dei link, e ogni modifica in un documento con blocchi di commento `%%`, con una nota a piè di pagina definita due volte o all’interno di una citazione o di un elenco, o con più di 1000 note in linea o segni di formula non chiusi. La memoria cresce con il file, fino a circa 115–160 MB per 1 MB di Markdown e 340–510 MB per 10 MB.
 
 ## Limiti noti
 

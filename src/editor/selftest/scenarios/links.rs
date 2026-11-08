@@ -56,8 +56,7 @@ fn footnote_in_view(c: &Ctx) -> bool {
 
 /// What the shared find pasteboard asks for and whether the find bar shows.
 fn find_bar(c: &Ctx) -> (Option<String>, bool) {
-    // SAFETY: Reading AppKit's constant for the shared find pasteboard.
-    let board = NSPasteboard::pasteboardWithName(unsafe { objc2_app_kit::NSPasteboardNameFind });
+    let board = NSPasteboard::pasteboardWithName(constant!(objc2_app_kit::NSPasteboardNameFind));
     let searched = board
         .stringForType(constant!(NSPasteboardTypeString))
         .map(|s| s.to_string());

@@ -99,7 +99,7 @@ impl EditorController {
         let this = Self::alloc(mtm).set_ivars(ivars);
         // SAFETY: NSWindowController's initializer, called once on the newly allocated object.
         let this: Retained<Self> = unsafe { msg_send![super(this), initWithWindow: Some(&*window)] };
-        build(&this, &window, text);
+        crate::test_hooks::timed("building the window", || build(&this, &window, text));
         OPEN_EDITORS.with(|e| {
             let mut e = e.borrow_mut();
             e.retain(|w| w.load().is_some());

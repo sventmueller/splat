@@ -276,8 +276,7 @@ pub fn export_options(window: &NSWindow, current: ExportOptions, done: impl Fn(E
     };
     options.show_template(current.word_template.clone());
     let action_button = |title: &str, action: objc2::runtime::Sel| {
-        // SAFETY: The target is `options`, which the sheet's completion handler keeps until the sheet has ended.
-        let b = unsafe { NSButton::buttonWithTitle_target_action(&ns(title), Some(&*options), Some(action), mtm) };
+        let b = crate::util::button(mtm, title, &options, action);
         b.setControlSize(objc2_app_kit::NSControlSize::Small);
         b.sizeToFit();
         b

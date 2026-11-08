@@ -36,7 +36,7 @@ pub(super) fn resize_probe(mtm: MainThreadMarker) {
             }
             let source = e.source();
             let expected = source.frame().size.width - 2.0 * source.textContainerInset().width;
-            let actual = unsafe { source.textContainer() }.map_or(0.0, |c| c.size().width);
+            let actual = crate::util::text_container(source).map_or(0.0, |c| c.size().width);
             steps.set(steps.get() + 1);
             lag.set(lag.get().max((expected - actual).abs()));
         })
