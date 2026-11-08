@@ -646,6 +646,9 @@ pub(super) fn formula_editor_steps() -> Vec<Step> {
                 source(e) == before,
                 &tail(&source(e), 60),
             );
+            // The undos end the caret one place apart as the background parse of an edit beside the closing footnote
+            // happens to land, so the next group starts from the end instead.
+            set_source_caret(e, before.len());
         }),
         applied(|c| check_context_menu(&c.e)),
         applied(|c| check_about_window(c.e.mtm())),
