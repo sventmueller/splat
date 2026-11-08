@@ -61,6 +61,7 @@ a look at the file after a save leaves what was typed since
 a look at the file leaves the undo steps
 a look that came too late leaves the other program's file alone
 a lost connection passes: the picture loads on the next try
+a name that is slow to resolve after a redirect holds up no other download
 a numbered list is undone in one step
 a numbered list writes exactly its text
 a panic does not copy a document without changes
@@ -75,7 +76,10 @@ a pasted picture lies next to the document and is linked
 a public name that leads into the local network is not asked
 a quote is undone in one step
 a quote writes exactly its text
+a redirect to a name that does not resolve passes: the picture loads on the next try
 a redirect to a private host is not followed
+a redirect to a public host is followed
+a redirect to a public name that leads into the local network is not followed
 a remote answer that is no picture counts as failed
 a remote picture loads
 a remote picture over the size limit is not loaded

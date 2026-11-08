@@ -37,12 +37,16 @@ use crate::util::{constant, ns};
 /// How long rendering, the reload and the downloads may take together.
 const PATIENCE: f64 = 45.0;
 
-const REMOTE_PICTURES: [&str; 8] = [
+const REMOTE_PICTURES: [&str; 12] = [
     "/badge.svg",
     "/fehlt.png",
     "/kein-bild.png",
     "/zu-gross.png",
     "/umleitung.png",
+    "/umleitung-nach-hause.png",
+    "/umleitung-weiter.svg",
+    "/umleitung-ins-leere.svg",
+    "/umleitung-zaeh.svg",
     "/wackelig.svg",
     "/ohne-netz.svg",
     "/nicht-gezeigt.svg",
@@ -258,9 +262,10 @@ fn with_web_views_started(mtm: MainThreadMarker) {
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
     let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
     document.set_initial_text(&format!(
-        "# Probe\n\n## Teil\n\n![a](https://192.168.0.1/x.png) ![b](https://localhost/y.png)\n\n![c](https://intranet/z.png)\n\n![w]({0}) ![n]({1})\n\n![lokal](<{2}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+        "# Probe\n\n## Teil\n\n![a](https://192.168.0.1/x.png) ![b](https://localhost/y.png)\n\n![c](https://intranet/z.png)\n\n![w]({0}) ![n]({1}) ![u]({2})\n\n![lokal](<{3}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
         url_in_probe("/wackelig.svg"),
         url_in_probe("/ohne-netz.svg"),
+        url_in_probe("/umleitung-ins-leere.svg"),
         local.display()
     ));
     document.makeWindowControllers();
@@ -450,6 +455,7 @@ impl Probe {
             && super::super::remote::idle()
             && answered("/wackelig.svg")
             && answered("/ohne-netz.svg")
+            && answered("/umleitung-ins-leere.svg")
     }
 }
 
@@ -459,7 +465,20 @@ fn answered(path: &str) -> bool {
     matches!(super::super::remote::get(&url_in_probe(path), None), Some(Some(_)))
 }
 
+/// Asks for a picture while the slow name is being looked up, and ends the lookup once that picture is in.
+fn meanwhile_another_download(editor: Option<&EditorController>) {
+    if super::mock_web::slow_name_asked()
+        && matches!(
+            super::super::remote::get(&url_in_probe("/waehrend-der-suche.svg"), editor),
+            Some(Some(_))
+        )
+    {
+        super::mock_web::free_slow_name();
+    }
+}
+
 fn wait_until_done(probe: std::rc::Rc<Probe>, started: std::time::Instant) {
+    meanwhile_another_download(probe.editor.as_deref());
     if probe.done() || started.elapsed().as_secs_f64() > PATIENCE {
         report(&probe);
     } else {
@@ -591,6 +610,28 @@ fn remote_answers() {
     check(
         "nothing reaches the private host a redirect names",
         requests_of("https://127.0.0.1/heimlich.png") == 0,
+        "",
+    );
+    check(
+        "a redirect to a public name that leads into the local network is not followed",
+        failed("/umleitung-nach-hause.png"),
+        "",
+    );
+    check(
+        "a redirect to a public host is followed",
+        shown("/umleitung-weiter.svg"),
+        "",
+    );
+    check(
+        "a name that is slow to resolve after a redirect holds up no other download",
+        !super::mock_web::slow_name_waited_in_vain()
+            && shown("/waehrend-der-suche.svg")
+            && shown("/umleitung-zaeh.svg"),
+        "",
+    );
+    check(
+        "a redirect to a name that does not resolve passes: the picture loads on the next try",
+        shown("/umleitung-ins-leere.svg"),
         "",
     );
     check(

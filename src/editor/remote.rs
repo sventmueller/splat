@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{NSObject, ProtocolObject};
-use objc2::{AnyThread, define_class, msg_send};
+use objc2::{AnyThread, Message, define_class, msg_send};
 use objc2_foundation::{
     NSData, NSError, NSHTTPCookieAcceptPolicy, NSHTTPURLResponse, NSObjectProtocol, NSURL, NSURLRequest, NSURLResponse,
     NSURLSession, NSURLSessionConfiguration, NSURLSessionDataDelegate, NSURLSessionDataTask, NSURLSessionDelegate,
@@ -55,8 +55,15 @@ thread_local! {
     static SESSION: Retained<NSURLSession> = session();
 }
 
-/// URL and bytes received so far of each running download, keyed by task identifier.
-type Downloads = HashMap<usize, (String, Vec<u8>)>;
+struct Download {
+    url: String,
+    bytes: Vec<u8>,
+    /// A redirect named a host that did not resolve, which the network may be to blame for.
+    unresolved: bool,
+}
+
+/// Keyed by task identifier.
+type Downloads = HashMap<usize, Download>;
 
 static DOWNLOADS: Mutex<Option<Downloads>> = Mutex::new(None);
 
@@ -383,8 +390,13 @@ fn begin(url: String) {
     };
     let task = SESSION.with(|s| s.dataTaskWithURL(&nsurl));
     if let Ok(mut d) = DOWNLOADS.lock() {
+        let download = Download {
+            url: url.clone(),
+            bytes: Vec::new(),
+            unresolved: false,
+        };
         d.get_or_insert_with(HashMap::new)
-            .insert(task.taskIdentifier(), (url.clone(), Vec::new()));
+            .insert(task.taskIdentifier(), download);
     }
     task.resume();
     REMOTE.with(|r| r.borrow_mut().tasks.insert(url, task));
@@ -412,6 +424,26 @@ fn session() -> Retained<NSURLSession> {
     }
 }
 
+/// A redirect waiting for the lookup of the host it names.
+struct Redirect {
+    request: Retained<NSURLRequest>,
+    completion: block2::RcBlock<dyn Fn(*mut NSURLRequest)>,
+}
+
+// SAFETY: NSURLSession takes the completion handler on any thread, and the request goes back to it unread.
+unsafe impl Send for Redirect {}
+
+impl Redirect {
+    fn answer(self, follow: bool) {
+        let next = if follow {
+            Retained::as_ptr(&self.request).cast_mut()
+        } else {
+            std::ptr::null_mut()
+        };
+        self.completion.call((next,));
+    }
+}
+
 define_class!(
     #[unsafe(super(NSObject))]
     #[name = "MDImageLoader"]
@@ -425,28 +457,38 @@ define_class!(
         fn redirect(
             &self,
             _session: &NSURLSession,
-            _task: &NSURLSessionTask,
+            task: &NSURLSessionTask,
             _response: &NSHTTPURLResponse,
             request: &NSURLRequest,
             completion: &block2::DynBlock<dyn Fn(*mut NSURLRequest)>,
         ) {
-            let allowed = guarded(false, || {
-                request
-                    .URL()
-                    .is_some_and(|u| public_host(&u) && lookup(&u) == Lookup::Public)
-            });
-            let next = if allowed {
-                request as *const NSURLRequest as *mut NSURLRequest
-            } else {
-                std::ptr::null_mut()
+            let pending = Redirect {
+                request: request.retain(),
+                completion: completion.copy(),
             };
-            completion.call((next,));
+            let Some(target) = guarded(None, || request.URL().filter(|u| public_host(u))) else {
+                pending.answer(false);
+                return;
+            };
+            let task = task.taskIdentifier();
+            // This queue delivers the callbacks of all downloads one after another, and a resolver that stops answering
+            // would hold them all.
+            NAMES.run(move || {
+                let found = crate::util::contained(|| lookup(&target));
+                if found == Some(Lookup::Unknown)
+                    && let Ok(mut d) = DOWNLOADS.lock()
+                    && let Some(download) = d.as_mut().and_then(|d| d.get_mut(&task))
+                {
+                    download.unresolved = true;
+                }
+                pending.answer(found == Some(Lookup::Public));
+            });
         }
 
         #[unsafe(method(URLSession:task:didCompleteWithError:))]
         fn completed(&self, _session: &NSURLSession, task: &NSURLSessionTask, error: Option<&NSError>) {
             guarded((), || {
-                let Some((url, bytes)) = DOWNLOADS
+                let Some(Download { url, bytes, unresolved }) = DOWNLOADS
                     .lock()
                     .ok()
                     .and_then(|mut d| d.as_mut()?.remove(&task.taskIdentifier()))
@@ -457,7 +499,12 @@ define_class!(
                     .response()
                     .and_then(|r| r.downcast::<NSHTTPURLResponse>().ok())
                     .map(|r| r.statusCode());
-                let failure = failure_of(error.map(NSError::code), status);
+                // A refused redirect ends with the redirect's own answer and no error.
+                let failure = if unresolved {
+                    Failure::Passing
+                } else {
+                    failure_of(error.map(NSError::code), status)
+                };
                 if error.is_some() || bytes.len() > MAX_BYTES || !status.is_some_and(|s| (200..300).contains(&s)) {
                     main_soon(move || finish(url, None, failure));
                     return;
@@ -503,9 +550,9 @@ define_class!(
                 DOWNLOADS.lock().ok().is_none_or(|mut d| {
                     d.as_mut()
                         .and_then(|d| d.get_mut(&task.taskIdentifier()))
-                        .is_none_or(|(_, bytes)| {
-                            bytes.extend_from_slice(&data.to_vec());
-                            bytes.len() > MAX_BYTES
+                        .is_none_or(|download| {
+                            download.bytes.extend_from_slice(&data.to_vec());
+                            download.bytes.len() > MAX_BYTES
                         })
                 })
             });
