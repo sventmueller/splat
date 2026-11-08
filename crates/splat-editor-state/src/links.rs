@@ -54,9 +54,9 @@ pub fn classify(target: &str, doc_dir: Option<&Path>) -> LinkTarget {
             if path.is_absolute() {
                 local(path)
             } else if let Some(rest) = decoded.strip_prefix("~/")
-                && let Some(home) = std::env::var_os("HOME")
+                && let Some(home) = crate::markdown::url::home()
             {
-                local(PathBuf::from(home).join(rest))
+                local(home.join(rest))
             } else {
                 doc_dir.map_or(LinkTarget::Nothing, |dir| local(dir.join(path)))
             }

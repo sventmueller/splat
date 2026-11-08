@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Eksport sebagai Dokumen Word…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Imej dari internet disekat: apabila dimuatkan, pelayannya akan mengetahui bahawa dan bila anda membuka dokumen ini.";
 "Bilder laden" = "Muatkan Imej";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat hanya boleh membaca imej, nota dan data Git di sebelah dokumen ini selepas anda memberikan akses kepada foldernya.";
+"Ordner freigeben …" = "Beri Akses kepada Folder…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat kemudian boleh membaca imej, nota dan data Git dalam folder ini dan semua subfoldernya, juga selepas mula semula.";
+"Freigeben" = "Beri Akses";
 "Dokument zuerst sichern" = "Simpan Dokumen Dahulu";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Imej yang ditampal disimpan sebagai fail di sebelah dokumen. Simpan dokumen, kemudian tampal imej sekali lagi.";
 "Export fehlgeschlagen" = "Eksport Gagal";

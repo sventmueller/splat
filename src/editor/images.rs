@@ -11,10 +11,10 @@ use objc2_app_kit::{NSAutoresizingMaskOptions, NSCompositingOperation, NSImage, 
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSUserDefaults};
 
 use super::EditorController;
+use super::decoder::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
 use super::layers::{ForPictures, Message, Messenger};
 use super::links::locate;
 use super::picture::{LOADERS, Rendered, Sizing, allowed_side, count_decoded, room_for_more, set_low_memory};
-use super::safe_image::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
 use crate::i18n::t;
 use crate::markdown::url;
 use crate::util::{BusyVolumes, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
@@ -191,9 +191,9 @@ fn local_path(raw: &str, doc_dir: Option<&Path>) -> Option<PathBuf> {
         return Some(path);
     }
     if let Some(stripped) = decoded.strip_prefix("~/")
-        && let Some(home) = std::env::var_os("HOME")
+        && let Some(home) = crate::markdown::url::home()
     {
-        return Some(PathBuf::from(home).join(stripped));
+        return Some(home.join(stripped));
     }
     doc_dir.map(|d| d.join(path))
 }
@@ -302,6 +302,20 @@ impl ImageStore {
         if let Some(ImageLoad::Done(done)) = self.files.get_mut(path) {
             done.seen = seen;
         }
+    }
+
+    /// How many images are shown, and whether one is still being read.
+    #[cfg(feature = "selftest")]
+    pub fn shown_and_loading(&self) -> (usize, bool) {
+        let shown = self
+            .files
+            .values()
+            .filter(|slot| matches!(slot, ImageLoad::Done(done) if done.found.is_some()))
+            .count();
+        (
+            shown,
+            self.files.values().any(|slot| matches!(slot, ImageLoad::Loading)),
+        )
     }
 
     /// Whether the image at `path` loaded and could be shown; `None` while it is not done.
@@ -440,8 +454,39 @@ struct LookAtEditor {
 pub(super) struct PictureState {
     images: RefCell<ImageStore>,
     remote_allowed: Cell<bool>,
-    /// The bar above the preview offering to load images from the web.
+    /// The bar above the preview, which offers to grant the document's folder or to load images from the web.
     remote_banner: OnceCell<Retained<NSView>>,
+    banner_parts: OnceCell<(Retained<objc2_app_kit::NSTextField>, Retained<objc2_app_kit::NSButton>)>,
+}
+
+/// What the bar above the preview offers.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Offer {
+    /// The sandbox keeps the folder around the document closed, and the document names files in it.
+    GrantFolder,
+    /// The document shows images from the web, which load only once allowed.
+    RemoteImages,
+}
+
+impl Offer {
+    fn wording(self) -> (&'static str, &'static str, objc2::runtime::Sel) {
+        match self {
+            Offer::GrantFolder => (
+                t(
+                    "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst.",
+                ),
+                t("Ordner freigeben …"),
+                sel!(mdGrantFolder:),
+            ),
+            Offer::RemoteImages => (
+                t(
+                    "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest.",
+                ),
+                t("Bilder laden"),
+                sel!(mdLoadRemoteImages:),
+            ),
+        }
+    }
 }
 
 pub(super) struct Pictures<'a> {
@@ -459,6 +504,12 @@ impl<'a> Pictures<'a> {
 impl Pictures<'_> {
     pub(super) fn banner_shown(&self) -> Option<bool> {
         self.state.remote_banner.get().map(|b| !b.isHidden())
+    }
+
+    pub(super) fn banner_offers(&self) -> Option<String> {
+        let shown = self.state.remote_banner.get().is_some_and(|b| !b.isHidden());
+        let (_, button) = self.state.banner_parts.get()?;
+        shown.then(|| button.title().to_string())
     }
 }
 
@@ -560,6 +611,7 @@ impl<'a> Pictures<'a> {
         ));
         label.setAutoresizingMask(NSAutoresizingMaskOptions::ViewWidthSizable);
         content.addSubview(&label);
+        let _ = self.state.banner_parts.set((label.clone(), button.clone()));
         let line = objc2_app_kit::NSBox::initWithFrame(
             objc2_app_kit::NSBox::alloc(mtm),
             NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(size.width, 1.0)),
@@ -570,11 +622,23 @@ impl<'a> Pictures<'a> {
         Retained::into_super(banner)
     }
 
-    /// Shows or hides the bar for images from the web and gives the preview the room that is left.
-    pub(super) fn show_remote_banner(&self, show: bool) {
+    /// Shows the bar with what it offers, or hides it, and gives the preview the room that is left.
+    pub(super) fn show_banner(&self, offer: Option<Offer>) {
         let Some(banner) = self.state.remote_banner.get() else {
             return;
         };
+        if let (Some(offer), Some((label, button))) = (offer, self.state.banner_parts.get()) {
+            let (text, title, action) = offer.wording();
+            label.setStringValue(&ns(text));
+            button.setTitle(&ns(title));
+            crate::util::set_action(button, self.host.object().target(), action);
+            button.sizeToFit();
+            let width = banner.frame().size.width;
+            let b = button.frame().size;
+            button.setFrameOrigin(NSPoint::new(width - b.width - 12.0, (BANNER_HEIGHT - b.height) / 2.0));
+            label.setFrameSize(NSSize::new((width - b.width - 36.0).max(40.0), BANNER_HEIGHT - 8.0));
+        }
+        let show = offer.is_some();
         if banner.isHidden() != show {
             return;
         }
@@ -584,10 +648,18 @@ impl<'a> Pictures<'a> {
             .leave_room_above_preview(if show { BANNER_HEIGHT } else { 0.0 });
     }
 
+    /// The images of files, read again: a folder granted just now holds those that failed before.
+    pub(super) fn read_all_again(&self) {
+        self.state
+            .images
+            .borrow_mut()
+            .keep_only(&std::collections::HashSet::new());
+    }
+
     /// The user allowed images from the web for this document; it is remembered for the file.
     pub(super) fn allow_remote_images(&self) {
         self.state.remote_allowed.set(true);
-        self.show_remote_banner(false);
+        self.show_banner(None);
         if let Some(path) = self.document_path() {
             let paths = allowing(allowed_documents(), path);
             let list = NSArray::from_retained_slice(&paths.iter().map(|p| ns(p)).collect::<Vec<_>>());

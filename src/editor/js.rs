@@ -13,9 +13,9 @@ use objc2_foundation::{NSDictionary, NSNumber, NSObjectProtocol, NSPoint, NSRect
 use objc2_web_kit::{WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKWebView};
 
 use super::EditorController;
+use super::decoder::Decoded;
 use super::picture::{Rendered, Sizing, allowed_side, count_decoded, room_for_more};
 use super::render_queue::{Owner, RenderQueue};
-use super::safe_image::Decoded;
 use super::webkit::{self, ScriptValue};
 use crate::markdown::doc::DiagramKind;
 use crate::util::{Process, guarded, main_after, main_soon, ns, to_isize};
@@ -195,16 +195,18 @@ const WEB_CONTENT: &str = "com.apple.WebKit.WebContent";
 
 /// Ends the web process of `web` at once. WebKit has no public way to stop a page's process, and its private
 /// `_killWebContentProcess` leaves a busy one running; the private process number is used where it exists, and only for
-/// the process it named, as that is no child of the app and its number may go to another.
+/// the process it named, as that is no child of the app and its number may go to another. The App Sandbox lets no signal
+/// reach that process, so there WebKit's own way has to do.
 pub(super) fn end_web_process(web: &WKWebView) {
-    if !web.respondsToSelector(objc2::sel!(_webProcessIdentifier)) {
-        return;
-    }
-    let asked = std::time::SystemTime::now();
-    // SAFETY: A WKWebView method without arguments that returns a pid_t, present as just checked.
-    let pid: i32 = unsafe { msg_send![web, _webProcessIdentifier] };
-    if let Some(process) = Process::named(pid, asked, WEB_CONTENT) {
-        process.end();
+    let ended = web.respondsToSelector(objc2::sel!(_webProcessIdentifier)) && {
+        let asked = std::time::SystemTime::now();
+        // SAFETY: A WKWebView method without arguments that returns a pid_t, present as just checked.
+        let pid: i32 = unsafe { msg_send![web, _webProcessIdentifier] };
+        Process::named(pid, asked, WEB_CONTENT).is_some_and(Process::end)
+    };
+    if !ended && web.respondsToSelector(objc2::sel!(_killWebContentProcess)) {
+        // SAFETY: A WKWebView method without arguments or result, present as just checked.
+        let () = unsafe { msg_send![web, _killWebContentProcess] };
     }
 }
 
@@ -762,13 +764,5 @@ mod tests {
     fn no_two_documents_ask_as_the_same_owner() {
         let owners: HashSet<Owner> = (0..1000).map(|_| Owner::unique()).collect();
         assert_eq!(owners.len(), 1000);
-    }
-
-    #[test]
-    fn mathjax_like_svg_converts() {
-        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 -750 1000 1000" color="#1D1D1F"><defs><path id="g" d="M10 10L500 10L500 -500Z"/></defs><g fill="currentColor"><use xlink:href="#g"/></g></svg>"##;
-        let pdf =
-            super::super::safe_image::svg_to_pdf(svg, std::sync::Arc::new(usvg::fontdb::Database::new())).expect("pdf");
-        assert!(pdf.starts_with(b"%PDF"));
     }
 }

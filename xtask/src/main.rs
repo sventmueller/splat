@@ -23,6 +23,8 @@ pub(crate) const PACKAGE: &str = "splat-app";
 
 /// The program the package builds.
 pub(crate) const PROGRAM: &str = "splat";
+/// The program of the decoding service.
+pub(crate) const DECODER: &str = "splat-decoder";
 
 pub(crate) const APP: &str = "Splat";
 
@@ -52,7 +54,9 @@ fn main() -> ExitCode {
             bundle(build).map(|p| println!("{}", p.display()))
         }
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
-        Some("universal") => universal_program().map(|p| println!("{}", p.display())),
+        Some("universal") => {
+            universal_programs().map(|(app, decoder)| println!("{}\n{}", app.display(), decoder.display()))
+        }
         Some("check-library") => check_library(),
         Some("icon") => icon(),
         Some("vendor") => match args.get(1).map(String::as_str) {

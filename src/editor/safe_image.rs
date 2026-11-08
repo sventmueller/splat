@@ -10,43 +10,12 @@ use krilla::page::PageSettings;
 use krilla::{Document, SerializeSettings};
 use krilla_svg::{SurfaceExt, SvgSettings};
 
-/// Larger downloads and SVG sources are not shown.
-pub const MAX_BYTES: usize = 10 << 20;
-/// Larger image files are not shown; camera photos stay well below.
-pub const MAX_FILE_BYTES: usize = 64 << 20;
+use super::decoder::protocol::{Decoded, MAX_BYTES, MAX_FILE_BYTES, MAX_SIDE};
+
 /// Pixels an SVG filter may be rasterised to.
 const MAX_PIXELS: f64 = 16_000_000.0;
 /// Memory an image may decode to.
 const MAX_DECODED_BYTES: u64 = 512 << 20;
-/// Larger images are not decoded at all.
-pub const MAX_SIDE: u32 = 16_384;
-/// Longest side of a decoded image in the preview and on paper, where 2480 pixels fill an A4 page at 300 dpi; larger
-/// ones are scaled down.
-pub const SHOWN_SIDE: u32 = 2560;
-/// Longest side of an image converted for an export, which outlives the screen it is first seen on.
-pub const EXPORT_SIDE: u32 = 4096;
-
-pub enum Decoded {
-    Pdf(Vec<u8>),
-    /// A picture from the pasteboard as a file to keep, with its full size and colors.
-    Png(Vec<u8>),
-    Rgba {
-        width: u32,
-        height: u32,
-        pixels: Vec<u8>,
-        /// The size the file gives, upright: the preview shows an image scaled down for memory no smaller.
-        natural: (u32, u32),
-    },
-}
-
-impl Decoded {
-    /// How much memory it holds.
-    pub fn bytes(&self) -> usize {
-        match self {
-            Decoded::Pdf(bytes) | Decoded::Png(bytes) | Decoded::Rgba { pixels: bytes, .. } => bytes.len(),
-        }
-    }
-}
 
 /// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`; anything else is
 /// refused.
@@ -171,6 +140,7 @@ fn filter_scale(tree: &usvg::Tree) -> Option<f32> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::decoder::protocol::{EXPORT_SIDE, SHOWN_SIDE};
     use super::*;
 
     fn fonts() -> Arc<usvg::fontdb::Database> {
@@ -329,5 +299,12 @@ mod tests {
         big[16..20].copy_from_slice(&100_000u32.to_be_bytes());
         big[20..24].copy_from_slice(&100_000u32.to_be_bytes());
         assert!(decode(&big, fonts(), SHOWN_SIDE).is_none());
+    }
+
+    #[test]
+    fn mathjax_like_svg_converts() {
+        let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="20" viewBox="0 -750 1000 1000" color="#1D1D1F"><defs><path id="g" d="M10 10L500 10L500 -500Z"/></defs><g fill="currentColor"><use xlink:href="#g"/></g></svg>"##;
+        let pdf = svg_to_pdf(svg, Arc::new(usvg::fontdb::Database::new())).expect("pdf");
+        assert!(pdf.starts_with(b"%PDF"));
     }
 }

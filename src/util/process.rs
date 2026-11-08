@@ -2,16 +2,6 @@ use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-/// Ends a child of this app that has not been waited for yet, a decoder helper that stopped answering, at once.
-pub fn end_child(pid: i32) {
-    // Zero and negative numbers name whole groups of processes.
-    if pid > 0 {
-        // SAFETY: Plain signal delivery to a child that has not been waited for, whose number names no other process
-        // until it is.
-        unsafe { libc::kill(pid, libc::SIGKILL) };
-    }
-}
-
 /// A process that is not a child of this app, told apart from a later one under the same number by when it started.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Process {
@@ -139,12 +129,5 @@ mod tests {
             None,
             "gone, and whatever has its number now started later"
         );
-    }
-
-    #[test]
-    fn a_child_ends_at_once() {
-        let (mut child, pid) = sleeper();
-        end_child(pid);
-        assert_eq!(child.wait().expect("its end").signal(), Some(libc::SIGKILL));
     }
 }

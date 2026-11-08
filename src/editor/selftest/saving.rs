@@ -542,41 +542,13 @@ fn a_folder_that_has_gone_costs_nothing(mtm: MainThreadMarker, dir: &Path) {
     document.close();
 }
 
-/// A disk that runs full in the middle of a save, on a small disk image of its own.
-fn a_full_disk_leaves_the_file_whole(mtm: MainThreadMarker, dir: &Path) {
+/// A disk that runs full in the middle of a save, on a small disk image the runner made: the sandbox lets no app make one.
+fn a_full_disk_leaves_the_file_whole(mtm: MainThreadMarker, _dir: &Path) {
     const NAME: &str = "a full disk leaves the file whole and the text unsaved";
-    let hdiutil = |args: &[&std::ffi::OsStr]| {
-        std::process::Command::new("/usr/bin/hdiutil")
-            .args(args)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
-    };
-    let os = std::ffi::OsStr::new;
-    let image = dir.join("Klein.dmg");
-    let mount = dir.join("Klein");
-    let made = hdiutil(&[
-        os("create"),
-        os("-size"),
-        os("2m"),
-        os("-fs"),
-        os("HFS+"),
-        os("-volname"),
-        os("SplatProbe"),
-        image.as_os_str(),
-    ]) && hdiutil(&[
-        os("attach"),
-        image.as_os_str(),
-        os("-nobrowse"),
-        os("-noautoopen"),
-        os("-mountpoint"),
-        mount.as_os_str(),
-    ]);
-    if !made {
-        super::skip(NAME, "no disk image could be made here");
+    let Some(mount) = std::env::var_os("SPLAT_FULL_DISK").map(std::path::PathBuf::from) else {
+        super::skip(NAME, "the runner made no full disk for this run");
         return;
-    }
+    };
     let path = mount.join("Text.md");
     std::fs::write(&path, "Alt\n").expect("a test file");
     let (document, e) = opened(mtm, &path);
@@ -599,7 +571,6 @@ fn a_full_disk_leaves_the_file_whole(mtm: MainThreadMarker, dir: &Path) {
         "",
     );
     document.close();
-    hdiutil(&[os("detach"), mount.as_os_str(), os("-force")]);
 }
 
 /// Save As moves the document, and its old file stays what it was.

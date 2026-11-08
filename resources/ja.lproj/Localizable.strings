@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Word書類として書き出す…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "インターネット上の画像はブロックされています。読み込むと、この書類を開いたことと開いた日時が画像のサーバに伝わります。";
 "Bilder laden" = "画像を読み込む";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "この書類と同じ場所にある画像、ノート、Gitデータは、そのフォルダへのアクセスを許可するまでSplatで読み込めません。";
+"Ordner freigeben …" = "フォルダへのアクセスを許可…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "許可すると、Splatはこのフォルダとそのすべてのサブフォルダにある画像、ノート、Gitデータを読み込めるようになります。再起動後も有効です。";
+"Freigeben" = "アクセスを許可";
 "Dokument zuerst sichern" = "先に書類を保存してください";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "ペーストした画像は、ファイルとして書類と同じ場所に保存されます。書類を保存してから、もう一度画像をペーストしてください。";
 "Export fehlgeschlagen" = "書き出しに失敗しました";

@@ -139,8 +139,8 @@ skickar ingenting över nätverket om du inte ber om det.
 - **Native in i märgen.** Äkta AppKit-fönster, flikar, menyer, popovers, Versioner, Spara automatiskt, delningsmenyn, mörkt läge,
   stavningskontroll, diktering och VoiceOver. Inget Electron, ingen webbvy för själva texten.
 - **Snabb med stora filer.** Att rendera en tangenttryckning i ett dokument på 10 MB tar cirka 10 ms, före vyns eget arbete.
-- **Privat och försiktig.** Bilder från webben läses in först när du tillåter det, länkar till andra appar frågar först, och
-  allt som avkodar opålitliga bilddata körs i hjälpprocesser i en sandlåda.
+- **Privat och försiktig.** Splat körs i App Sandbox, bilder från webben läses in först när du tillåter det, länkar till
+  andra appar frågar först, och allt som avkodar opålitliga bilddata körs i en egen tjänst i en sandlåda.
 - **På ditt språk.** Gränssnittet och den inbyggda Markdown-snabbreferensen finns på 35 språk: arabiska, katalanska,
   kinesiska (förenklad), kinesiska (traditionell), kroatiska, tjeckiska, danska, nederländska, engelska, finska, franska,
   tyska, grekiska, hebreiska, hindi, ungerska, indonesiska, italienska, japanska, koreanska, malajiska, norska, polska, portugisiska (Brasilien),
@@ -715,18 +715,20 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
   Formler och diagram renderas lokalt; webbvyerna som gör det kan inte nå nätverket. **Hjälp › Rapportera ett problem…** öppnar ett formulär på GitHub i webbläsaren; adressen innehåller versionen av Splat och macOS och typen av Mac, inget från dina dokument.
 - **Bilder från webben** läses in först efter ditt tillstånd, bara över `https`, aldrig från värdar i ditt lokala nätverk,
   högst 10 MB vardera och i en privat session utan cookies.
-- **Isolerad avkodning.** Bilder och grafiken i formler och diagram avkodas i hjälpprocesser som stänger
-  varje fil de ärvt och låser in sig i en sandlåda innan de läser den första byten: ingen filåtkomst, inget
-  nätverk. De lämnar bara tillbaka pixlar, vars storlek kontrolleras, och stoppas efter 10 sekunder. Apples egna bildavkodare
-  får bara se HEIC, TIFF, AVIF och PDF, och bara när datan verkligen har det formatet; de körs i en egen hjälpprocess, som dessutom får
-  läsa systemets typsnittsmappar och använda systemets videoavkodare. SVG-filer, formler
-  och diagram passerar också den hjälpprocessen, så de är bilder med fast upplösning i Splat: fyra pixlar per punkt,
-  upp till 2560 på den längre sidan.
-- **Lokala filer** når ett dokument bara via den sökväg det anger. Inbäddningar visar Markdown-anteckningar från dokumentets mapp
-  och längre ned, och en saknad bild eftersöks bara där. En bildsökväg någon annanstans, absolut eller med början på
-  `~`, läses fortfarande in i förhandsvisningen; HTML- och Word-exporter, utskrifter och PDF:er tar bara med det som
-  finns i dokumentets mapp eller dess Git-arkiv, såvida inte det arkivet också innehåller din hemmapp, så att ett
-  dokument från någon annan inte kan dra in dina filer i en export som du skickar vidare.
+- **Isolerad avkodning.** Bilder och grafiken i formler och diagram avkodas i en egen tjänst, som macOS startar i en
+  egen sandlåda: inga av dina filer, inget nätverk. Den lämnar bara tillbaka pixlar, vars storlek kontrolleras, och
+  avslutar sig själv när en avkodning tar mer än 10 sekunder eller för mycket minne. Apples egna bildavkodare får bara
+  se HEIC, TIFF, AVIF och PDF, och bara när datan verkligen har det formatet. SVG-filer, formler och diagram passerar
+  också den tjänsten, så de är bilder med fast upplösning i Splat: fyra pixlar per punkt, upp till 2560 på den längre
+  sidan.
+- **Lokala filer** når ett dokument bara via den sökväg det anger, och bara från en mapp som du har gett åtkomst till:
+  Splat får läsa ett dokument som du öppnar, men bilderna, anteckningarna, litteraturlistan och arkivet runt det först
+  när du ger åtkomst till deras mapp med **Ge åtkomst till mapp…** i fältet ovanför förhandsvisningen. En åtkomst gäller
+  alla undermappar och sparas. Inbäddningar visar Markdown-anteckningar från dokumentets mapp och längre ned, och en
+  saknad bild eftersöks bara där. En bildsökväg någon annanstans, absolut eller med början på `~`, läses in i
+  förhandsvisningen från en mapp som du har gett åtkomst till; HTML- och Word-exporter, utskrifter och PDF:er tar bara
+  med det som finns i dokumentets mapp eller dess Git-arkiv, såvida inte det arkivet också innehåller din hemmapp, så
+  att ett dokument från någon annan inte kan dra in dina filer i en export som du skickar vidare.
 - **Mappar med anteckningar** läses bara medan sidofältet visar dem, och ett namnbyte på en anteckning ändrar andra
   filer först efter att du har bekräftat hur många.
 - **Git-arkiv** läses av Splat självt. Appen kör aldrig programmet `git`, vars konfiguration i ett arkiv från någon
@@ -743,8 +745,9 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
 - **Exporter** innehåller inga skript. HTML-sidor behåller bara en fast lista över ofarliga taggar och attribut, som GitHub gör, plus
   en innehållssäkerhetspolicy. Word-filer länkar bara adresser med `http`, `https` och `mailto`, utom länkar som följer
   med en Word-mall du har valt.
-- **Kodsignering** med Hardened Runtime. Splat körs utan App Sandbox så att appen kan visa bilder bredvid
-  dina dokument utan att fråga om varje mapp; isoleringen av all avkodning väger upp det.
+- **Kodsignering** med Hardened Runtime och App Sandbox. Splat får läsa och skriva de dokument som du öppnar och de
+  mappar som du ger åtkomst till, använda nätverket för bilder från webben som du har tillåtit och för uppdateringar,
+  och skriva ut; inget annat.
 
 ## Stora dokument
 

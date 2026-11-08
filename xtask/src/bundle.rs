@@ -28,17 +28,128 @@ pub(crate) const UNIVERSAL: [(&str, &str); 2] = [("aarch64-apple-darwin", "arm64
 /// touching any other association.
 pub(crate) const PROBE_TYPE: &str = "local.splat.selftest.probe";
 
-/// The self-test signs with the local certificate, which has no Team ID; without this, the hardened runtime refuses
-/// to load Sparkle.
-pub(crate) const SELFTEST_ENTITLEMENTS: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+/// What the app may do in its sandbox: files the user chose and folders granted once, the network for pictures from the
+/// web and for updates, and printing. No file access beyond what the user grants, as in the Mac App Store.
+pub(crate) fn app_entitlements(build: Build) -> String {
+    let flag = |key: &str| format!("\t<key>{key}</key>\n\t<true/>\n");
+    let list = |key: &str, values: &[String]| {
+        let values: String = values.iter().map(|v| format!("\t\t<string>{v}</string>\n")).collect();
+        format!("\t<key>{key}</key>\n\t<array>\n{values}\t</array>\n")
+    };
+    let mut keys = [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.network.client",
+        "com.apple.security.print",
+    ]
+    .map(flag)
+    .concat();
+    if build.updates() != Updates::Off {
+        // Sparkle installs through services of its own, which the sandbox lets the app reach by name only.
+        let id = bundle_id(build.variant());
+        keys += &list(
+            "com.apple.security.temporary-exception.mach-lookup.global-name",
+            &[format!("{id}-spks"), format!("{id}-spki")],
+        );
+    }
+    if build.selftest() {
+        // The local certificate has no Team ID; without this, the hardened runtime refuses to load Sparkle.
+        keys += &flag("com.apple.security.cs.disable-library-validation");
+        // The runner puts the documents of a run under target/.
+        keys += &list(
+            "com.apple.security.temporary-exception.files.absolute-path.read-write",
+            &[format!("{}/target/", root().display())],
+        );
+    }
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n{keys}</dict>\n</plist>\n"
+    )
+}
+
+/// The copies of unsaved text that Splat kept before it ran in a sandbox move into its container on the first start
+/// there; only the app itself takes them, not a debug or self-test build.
+const CONTAINER_MIGRATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>com.apple.security.cs.disable-library-validation</key>
-	<true/>
+	<key>Move</key>
+	<array>
+		<string>${ApplicationSupport}/Splat</string>
+	</array>
 </dict>
 </plist>
 "#;
+
+/// The decoding service gets a sandbox and nothing else: no network, and no file the user chose. The self-test's may
+/// write under target/, where a measured build keeps what ran.
+pub(crate) fn decoder_entitlements(build: Build) -> String {
+    let measured = if build.selftest() {
+        format!(
+            "\t<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>\n\t<array>\n\t\t<string>{}/target/</string>\n\t</array>\n",
+            root().display()
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n\t<key>com.apple.security.app-sandbox</key>\n\t<true/>\n{measured}</dict>\n</plist>\n"
+    )
+}
+
+/// The bundle of the decoding service inside the app's, which macOS starts it from.
+pub(crate) const DECODER_BUNDLE: &str = "Contents/XPCServices/SplatDecoder.xpc";
+
+/// The identifier of a build of the app; the decoding service's adds `.decoder`, which the app looks for.
+fn bundle_id(variant: Option<&str>) -> String {
+    match variant {
+        Some(variant) => format!("{BUNDLE_ID}.{}", variant.to_lowercase()),
+        None => BUNDLE_ID.to_string(),
+    }
+}
+
+/// The property list of the decoding service. launchd starts it with nothing of the app's environment, so a measured
+/// build names its measurement file here.
+pub(crate) fn decoder_plist(version: &str, variant: Option<&str>, measured: Option<&str>) -> String {
+    let bundle_id = bundle_id(variant);
+    let environment = measured.map_or_else(String::new, |file| {
+        format!(
+            "\t\t<key>EnvironmentVariables</key>\n\t\t<dict>\n\t\t\t<key>LLVM_PROFILE_FILE</key>\n\t\t\t<string>{file}</string>\n\t\t</dict>\n"
+        )
+    });
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>{DECODER}</string>
+	<key>CFBundleIdentifier</key>
+	<string>{bundle_id}.decoder</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>SplatDecoder</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>{version}</string>
+	<key>CFBundleVersion</key>
+	<string>{version}</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>{MINIMUM_SYSTEM}</string>
+	<key>XPCService</key>
+	<dict>
+{environment}		<key>ServiceType</key>
+		<string>Application</string>
+	</dict>
+</dict>
+</plist>
+"#
+    )
+}
 
 /// Whether a build carries Sparkle, and which feed it reads.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -57,17 +168,14 @@ pub(crate) enum Updates {
 /// association alone, and macOS cannot mistake an outdated debug build for Splat when it opens a document.
 #[expect(clippy::too_many_lines, reason = "the property list, as it reads in the file")]
 pub(crate) fn info_plist(version: &str, languages: &[String], variant: Option<&str>, updates: Updates) -> String {
-    let (bundle_id, rank) = match variant {
-        Some(variant) => (format!("{BUNDLE_ID}.{}", variant.to_lowercase()), "None"),
-        None => (BUNDLE_ID.to_string(), "Default"),
-    };
+    let (bundle_id, rank) = (bundle_id(variant), if variant.is_some() { "None" } else { "Default" });
     let localizations: String = languages
         .iter()
         .map(|l| format!("\t\t<string>{l}</string>\n"))
         .collect();
     let feed = |url: &str| {
         format!(
-            "\t<key>SUFeedURL</key>\n\t<string>{url}</string>\n\t<key>SUPublicEDKey</key>\n\t<string>{UPDATE_KEY}</string>\n"
+            "\t<key>SUFeedURL</key>\n\t<string>{url}</string>\n\t<key>SUPublicEDKey</key>\n\t<string>{UPDATE_KEY}</string>\n\t<key>SUEnableInstallerLauncherService</key>\n\t<true/>\n"
         )
     };
     let updates = match updates {
@@ -245,14 +353,7 @@ impl Build {
 pub(crate) fn bundle(build: Build) -> Result<PathBuf, String> {
     let version = version()?;
     let app = assemble(build, &version)?;
-    let entitlements = if build.selftest() {
-        let path = target_dir().join("selftest.entitlements");
-        files::write(&path, SELFTEST_ENTITLEMENTS)?;
-        Some(path)
-    } else {
-        None
-    };
-    sign(&app, signing_identity()?, false, entitlements.as_deref())?;
+    sign(&app, signing_identity()?, false, build)?;
     if build == Build::Release {
         next_build(&version)?;
     }
@@ -264,8 +365,8 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     let root = root();
     let profile = if build.release() { "release" } else { "debug" };
     let target = target_dir().join(profile);
-    let program = if build == Build::Distribution {
-        universal_program()?
+    let (program, decoder) = if build == Build::Distribution {
+        universal_programs()?
     } else {
         let mut cargo = Command::new(env!("CARGO"));
         cargo.current_dir(&root).args(["build", "--package", PACKAGE]);
@@ -276,7 +377,7 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
             cargo.args(["--features", "selftest"]);
         }
         run(&mut cargo)?;
-        target.join(PROGRAM)
+        (target.join(PROGRAM), target.join(DECODER))
     };
     let variant = build.variant();
     let updates = build.updates();
@@ -292,6 +393,18 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     let resources = contents.join("Resources");
     files::create_dir_all(&macos)?;
     files::copy(&program, macos.join(APP))?;
+    let service = app.join(DECODER_BUNDLE).join("Contents");
+    files::create_dir_all(service.join("MacOS"))?;
+    files::copy(&decoder, service.join("MacOS").join(DECODER))?;
+    let measured = std::env::var("LLVM_PROFILE_FILE").ok().filter(|_| build.selftest());
+    files::write(
+        service.join("Info.plist"),
+        decoder_plist(version, variant, measured.as_deref()),
+    )?;
+    run(Command::new("plutil")
+        .arg("-lint")
+        .arg("-s")
+        .arg(service.join("Info.plist")))?;
     let plist = contents.join("Info.plist");
     // Every resources/<language>.lproj is a localization; macOS picks one from the user's preferred languages.
     let mut languages: Vec<String> = files::read_dir(root.join("resources"))?
@@ -307,6 +420,9 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
         files::copy(&icns, resources.join("AppIcon.icns"))?;
     }
     files::write(contents.join("PkgInfo"), "APPL????")?;
+    if variant.is_none() {
+        files::write(resources.join("container-migration.plist"), CONTAINER_MIGRATION)?;
+    }
     let mut bundled_sparkle = None;
     if updates != Updates::Off {
         let frameworks = contents.join("Frameworks");
@@ -317,9 +433,8 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
             .arg(sparkle.join("Sparkle.framework"))
             .arg(&framework))?;
         files::copy(sparkle.join("LICENSE"), resources.join("LICENSE-sparkle"))?;
-        // Only a sandboxed app needs Sparkle's XPC services.
-        files::remove_dir_all(framework.join("Versions/B/XPCServices"))?;
-        files::remove_file(framework.join("XPCServices"))?;
+        // The sandboxed app installs through Sparkle's installer service; it downloads with its own network access.
+        files::remove_dir_all(framework.join("Versions/B/XPCServices/Downloader.xpc"))?;
         bundled_sparkle = Some(sparkle);
     }
     files::write(
@@ -329,21 +444,27 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     Ok(app)
 }
 
-/// The release program for Apple Silicon and Intel in one file, through rustup with the toolchain rust-toolchain.toml
-/// names, since Homebrew's Rust ships the standard library for the host processor alone.
-pub(crate) fn universal_program() -> Result<PathBuf, String> {
+/// The release programs, the app's and the decoding service's, for Apple Silicon and Intel in one file each, through
+/// rustup with the toolchain rust-toolchain.toml names, since Homebrew's Rust ships the standard library for the host
+/// processor alone.
+pub(crate) fn universal_programs() -> Result<(PathBuf, PathBuf), String> {
     let mut build = rustup_cargo()?;
     build.args(["build", "--package", PACKAGE, "--release"]);
-    let mut join = Command::new("lipo");
-    join.arg("-create");
     for (target, _) in UNIVERSAL {
         build.args(["--target", target]);
-        join.arg(target_dir().join(target).join("release").join(PROGRAM));
     }
     run(&mut build)?;
-    let program = target_dir().join(format!("{PROGRAM}-universal"));
-    run(join.arg("-output").arg(&program))?;
-    Ok(program)
+    let join = |name: &str| -> Result<PathBuf, String> {
+        let mut join = Command::new("lipo");
+        join.arg("-create");
+        for (target, _) in UNIVERSAL {
+            join.arg(target_dir().join(target).join("release").join(name));
+        }
+        let program = target_dir().join(format!("{name}-universal"));
+        run(join.arg("-output").arg(&program))?;
+        Ok(program)
+    };
+    Ok((join(PROGRAM)?, join(DECODER)?))
 }
 
 /// That the library builds for a system without AppKit, through rustup for the same reason.
@@ -417,6 +538,7 @@ pub(crate) fn check_universal(app: &Path) -> Result<(), String> {
     let sparkle = app.join("Contents/Frameworks/Sparkle.framework/Versions/B");
     for program in [
         app.join("Contents/MacOS").join(APP),
+        app.join(DECODER_BUNDLE).join("Contents/MacOS").join(DECODER),
         sparkle.join("Sparkle"),
         sparkle.join("Autoupdate"),
         sparkle.join("Updater.app/Contents/MacOS/Updater"),
@@ -463,11 +585,16 @@ pub(crate) fn sparkle() -> Result<PathBuf, String> {
 
 /// Notarization requires the secure timestamp; local builds skip it, since it needs a request to Apple. Sparkle's
 /// helpers are signed first, inside out, as its documentation prescribes instead of `--deep`.
-pub(crate) fn sign(app: &Path, identity: &str, timestamp: bool, entitlements: Option<&Path>) -> Result<(), String> {
+pub(crate) fn sign(app: &Path, identity: &str, timestamp: bool, build: Build) -> Result<(), String> {
     let sparkle = app.join("Contents/Frameworks/Sparkle.framework");
-    let mut parts = Vec::new();
+    let entitlements = target_dir().join(format!("{}.entitlements", build.variant().unwrap_or(APP)));
+    files::write(&entitlements, app_entitlements(build))?;
+    let service_entitlements = target_dir().join("decoder.entitlements");
+    files::write(&service_entitlements, decoder_entitlements(build))?;
+    let mut parts = vec![app.join(DECODER_BUNDLE)];
     if sparkle.exists() {
         parts.extend([
+            sparkle.join("Versions/B/XPCServices/Installer.xpc"),
             sparkle.join("Versions/B/Autoupdate"),
             sparkle.join("Versions/B/Updater.app"),
             sparkle,
@@ -480,8 +607,11 @@ pub(crate) fn sign(app: &Path, identity: &str, timestamp: bool, entitlements: Op
         codesign
             .args(["--force", "--sign", identity, "--options", "runtime"])
             .arg(if timestamp { "--timestamp" } else { "--timestamp=none" });
-        if let Some(entitlements) = entitlements.filter(|_| part == app) {
-            codesign.arg("--entitlements").arg(entitlements);
+        if part == app {
+            codesign.arg("--entitlements").arg(&entitlements);
+        }
+        if part == app.join(DECODER_BUNDLE) {
+            codesign.arg("--entitlements").arg(&service_entitlements);
         }
         run(codesign.arg(&part))?;
     }

@@ -120,7 +120,7 @@ fn on_own_thread(messenger: Messenger, work: impl FnOnce() -> Option<NoteAnswer>
 }
 
 fn home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
+    crate::markdown::url::home()
 }
 
 impl Notes<'_> {
@@ -272,6 +272,9 @@ impl Notes<'_> {
             guarded((), || {
                 if response != objc2_app_kit::NSModalResponseOK {
                     return;
+                }
+                if let Some(url) = chosen.URL() {
+                    crate::grants::remember(&url);
                 }
                 let path = chosen
                     .URL()

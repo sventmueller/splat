@@ -47,6 +47,7 @@ a formula renders
 a formula renders in a new page after the old one stopped answering
 a formula with a tag is as wide as it needs to be
 a full disk leaves the file whole and the text unsaved
+a granted folder is kept, taken up again at the next start, and the panel asks for it
 a graph behind a comment with a brace takes the colors of the page
 a heading is undone in one step
 a heading writes exactly its text
@@ -73,6 +74,7 @@ a panic in the start of a save ends the save and keeps the text
 a panic in the text a save takes ends the save and keeps the text
 a panic saves the text of an edited document
 a pasted picture lies next to the document and is linked
+a picture in a closed folder offers to grant the folder, and the grant takes the offer away
 a public name that leads into the local network is not asked
 a quote is undone in one step
 a quote writes exactly its text

@@ -130,3 +130,15 @@ pub(crate) fn serve_the_web_inside(config: &objc2_foundation::NSURLSessionConfig
     #[cfg(not(feature = "selftest"))]
     let _ = config;
 }
+
+static CLOSED_FOLDERS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Plays a sandbox that keeps folders named `Gesperrt` closed, which a run cannot make: its own exception opens them.
+#[cfg(feature = "selftest")]
+pub(crate) fn play_closed_folders(on: bool) {
+    CLOSED_FOLDERS.store(on, Ordering::SeqCst);
+}
+
+pub(crate) fn plays_closed(dir: &std::path::Path) -> bool {
+    SELFTEST && CLOSED_FOLDERS.load(Ordering::SeqCst) && dir.file_name().is_some_and(|name| name == "Gesperrt")
+}

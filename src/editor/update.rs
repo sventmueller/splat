@@ -525,12 +525,8 @@ impl Updater<'_> {
             self.host.word_counter().text_changed();
             self.host.change_marks().text_changed();
         }
-        if text_changed && !self.host.pictures().remote_allowed() {
-            let remote = self
-                .host
-                .model()
-                .read(|st| crate::markdown::remote::has_remote_images(st.doc()));
-            self.host.pictures().show_remote_banner(remote);
+        if text_changed {
+            self.update_offer();
         }
         if !shown {
             return;
@@ -542,6 +538,36 @@ impl Updater<'_> {
         if self.host.scroll_sync().take_undo_happened() {
             self.host.selection().reveal_selection_in_preview();
         }
+    }
+
+    /// What the bar above the preview offers: the document's folder while the sandbox keeps it closed and something needs
+    /// it, else images from the web while they are blocked.
+    pub(super) fn update_offer(&self) {
+        let (remote, local) = self.host.model().read(|st| {
+            (
+                crate::markdown::remote::has_remote_images(st.doc()),
+                crate::markdown::remote::has_local_files(st.doc()),
+            )
+        });
+        let env = super::env::Env::known(self.host.doc_dir(), "");
+        let needs_folder = local || env.repository_around || self.host.panes().sidebar_visible();
+        let pictures = self.host.pictures();
+        let offer = if env.folder_closed && needs_folder {
+            Some(super::images::Offer::GrantFolder)
+        } else if remote && !pictures.remote_allowed() {
+            Some(super::images::Offer::RemoteImages)
+        } else {
+            None
+        };
+        pictures.show_banner(offer);
+    }
+
+    /// The user granted the folder of the document: what failed to load from it loads now.
+    pub(super) fn folder_granted(&self) {
+        super::env::forget_known();
+        self.host.pictures().read_all_again();
+        self.update_offer();
+        self.host.invalidate(Invalidate::Preview);
     }
 
     /// Recolors the source where its colors changed, or all of it when the colors are stale; of a large text, what shows

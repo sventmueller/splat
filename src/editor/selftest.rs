@@ -68,6 +68,22 @@ fn skip(name: &str, reason: &str) {
     reported(name);
 }
 
+/// What `command` writes in `dir` when the runner runs it, if it succeeded: the sandbox lets the app start no program
+/// that is not its own. The runner answers in a file in `dir`, which lies where both may write.
+fn by_the_runner(dir: &Path, command: &[&str]) -> Option<String> {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let answer = dir.join(format!(".runner-{}-{id}", std::process::id()));
+    eprintln!("SELFTEST RUN {}\u{1f}{}", answer.display(), command.join("\u{1f}"));
+    if !controller::until(|| answer.exists()) {
+        return None;
+    }
+    let text = std::fs::read_to_string(&answer).ok();
+    let _ = std::fs::remove_file(&answer);
+    let (status, output) = text?.split_once('\n').map(|(s, o)| (s.to_string(), o.to_string()))?;
+    (status == "0").then_some(output)
+}
+
 /// Whether the screen is locked right now, as it can become during a run.
 fn screen_is_locked() -> bool {
     std::process::Command::new("ioreg")

@@ -21,6 +21,7 @@ pub(super) fn after_first_render(mtm: MainThreadMarker, opened: std::time::Insta
             opened.elapsed().as_secs_f64() * 1000.0
         );
         if std::env::var_os("SPLAT_BENCH_IDLE").is_some() {
+            until_settled(mtm, opened);
             after(12.0, || std::process::exit(0));
         } else {
             after(2.0, move || bench(mtm));
@@ -30,6 +31,21 @@ pub(super) fn after_first_render(mtm: MainThreadMarker, opened: std::time::Insta
         std::process::exit(1);
     } else {
         after(0.01, move || after_first_render(mtm, opened));
+    }
+}
+
+/// Times from `opened` until pictures, formulas and diagrams are in place. Only an idle run tells it, as the timings of
+/// `bench` hold up the main thread that takes them in.
+fn until_settled(mtm: MainThreadMarker, opened: std::time::Instant) {
+    let Some(e) = editor(mtm) else { return };
+    let (shown, loading) = e.pictures().store().borrow().shown_and_loading();
+    if settled(&e) && !loading {
+        eprintln!(
+            "BENCH pictures, formulas and diagrams in place: {:.0} ms, {shown} pictures shown",
+            opened.elapsed().as_secs_f64() * 1000.0
+        );
+    } else {
+        after(0.01, move || until_settled(mtm, opened));
     }
 }
 

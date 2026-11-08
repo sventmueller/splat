@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Exportálás Word-dokumentumként…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Az internetes képek le vannak tiltva: betöltéskor a szervereik megtudják, hogy és mikor nyitja meg ezt a dokumentumot.";
 "Bilder laden" = "Képek betöltése";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "A Splat csak akkor tudja olvasni az e dokumentum melletti képeket, jegyzeteket és Git-adatokat, ha hozzáférést ad a mappájukhoz.";
+"Ordner freigeben …" = "Hozzáférés megadása a mappához…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "A Splat ezután olvashatja a képeket, jegyzeteket és Git-adatokat ebben a mappában és minden almappájában, újraindítás után is.";
+"Freigeben" = "Hozzáférés megadása";
 "Dokument zuerst sichern" = "Előbb mentse a dokumentumot";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "A beillesztett képek fájlként a dokumentum mellé kerülnek. Mentse a dokumentumot, majd illessze be újra a képet.";
 "Export fehlgeschlagen" = "Az exportálás sikertelen";

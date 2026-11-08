@@ -423,6 +423,12 @@ impl EditorController {
             Message::Perform(action) => self.perform(action),
             Message::Notes(answer) => self.note_answer(answer),
             Message::NotesFolder(folder) => self.use_notes_folder(folder),
+            Message::FolderGranted => {
+                self.updater().folder_granted();
+                self.editing().folder_granted();
+                self.notes().rescan();
+                self.change_marks().look();
+            }
             Message::RenameChosen { from, to } => self.note_rename_chosen(from, to),
             Message::RenameConfirmed(request, rewrites) => self.notes().rename(request, rewrites),
             Message::RevealPlace { line, column } => self.links().reveal_place(line, column),

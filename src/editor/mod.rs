@@ -27,7 +27,6 @@ mod picture;
 mod progressive;
 mod remote;
 mod render;
-mod safe_image;
 mod scroll;
 mod selection;
 #[cfg(feature = "selftest")]

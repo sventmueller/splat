@@ -310,7 +310,7 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
 
 /// Half transparent white over black, as the decoder's straight alpha asks for it.
 fn a_translucent_pixel_stays_translucent() {
-    let image = crate::editor::decoder::image(crate::editor::safe_image::Decoded::Rgba {
+    let image = crate::editor::decoder::image(crate::editor::decoder::Decoded::Rgba {
         width: 1,
         height: 1,
         pixels: vec![255, 255, 255, 128],

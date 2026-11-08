@@ -65,7 +65,7 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
     }
     check_universal(&app)?;
     println!("signing {version} with {name}");
-    sign(&app, &identity, true, None)?;
+    sign(&app, &identity, true, Build::Distribution)?;
     run(Command::new("codesign").args(["--verify", "--strict"]).arg(&app))?;
     // The image's ticket reaches Gatekeeper only when the image is opened in the Finder; a copy taken out otherwise,
     // as Homebrew installs it, would need a network connection on first launch.

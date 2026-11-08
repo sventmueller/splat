@@ -143,8 +143,9 @@ dat vraagt.
   deelmenu, donkere modus, spellingcontrole, dicteren en VoiceOver. Geen Electron en geen webweergave voor de tekst
   zelf.
 - **Snel met grote bestanden.** Het renderen van een toetsaanslag in een document van 10 MB kost ongeveer 10 ms, vóór het eigen werk van de weergave.
-- **Privé en zorgvuldig.** Afbeeldingen van internet laden pas nadat je dat toestaat, links naar andere apps vragen
-  eerst om bevestiging en alles wat onbetrouwbare afbeeldingsdata decodeert, draait in hulpprocessen in een sandbox.
+- **Privé en zorgvuldig.** Splat draait in de App Sandbox, afbeeldingen van internet laden pas nadat je dat toestaat,
+  links naar andere apps vragen eerst om bevestiging en alles wat onbetrouwbare afbeeldingsdata decodeert, draait in een
+  eigen dienst in een sandbox.
 - **In jouw taal.** De interface en de ingebouwde beknopte Markdown-naslag zijn er in 35 talen: Arabisch, Catalaans,
   Chinees (vereenvoudigd), Chinees (traditioneel), Kroatisch, Tsjechisch, Deens, Nederlands, Engels, Fins, Frans, Duits,
   Grieks, Hebreeuws, Hindi, Hongaars, Indonesisch, Italiaans, Japans, Koreaans, Maleis, Noors, Pools, Portugees
@@ -735,19 +736,20 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
   hebben geen toegang tot het netwerk. **Help › Meld een probleem…** opent een formulier op GitHub in je browser; het adres bevat de versie van Splat en macOS en het type Mac, niets uit je documenten.
 - **Afbeeldingen van het web** laden pas na jouw toestemming, alleen via `https`, nooit van hosts in je lokale
   netwerk, hooguit 10 MB per stuk en in een privésessie zonder cookies.
-- **Geïsoleerd decoderen.** Afbeeldingen en de afbeeldingen van formules en diagrammen worden gedecodeerd in
-  hulpprocessen die elk bestand sluiten dat ze hebben geërfd en zichzelf in een sandbox opsluiten voordat ze de eerste
-  byte lezen: geen toegang tot bestanden, geen netwerk. Ze geven alleen pixels terug, waarvan de afmeting wordt
-  gecontroleerd, en worden na 10 seconden gestopt. De eigen afbeeldingsdecoders van Apple zien alleen HEIC, TIFF, AVIF
-  en pdf, en alleen als de data echt dat formaat heeft; ze draaien in een eigen hulpproces, dat bovendien de
-  lettertypemappen van het systeem mag lezen en de videodecoder van het systeem mag gebruiken. SVG's, formules en
-  diagrammen lopen ook door dat hulpproces, dus ze zijn in Splat afbeeldingen met een vaste resolutie: vier pixels per
-  punt, tot 2560 langs de langste zijde.
-- **Lokale bestanden** bereiken een document alleen via het pad dat het noemt. Insluitingen tonen Markdown-notities uit
-  de map van het document en daaronder, en een ontbrekende afbeelding wordt alleen daar gezocht. Een afbeeldingspad
-  elders, absoluut of beginnend met `~`, laadt in de voorvertoning nog steeds; HTML- en Word-exports, afdrukken en pdf's
-  nemen alleen mee wat in de map van het document of in zijn Git-repository staat, tenzij die repository ook je thuismap
-  bevat, zodat een document van iemand anders je bestanden niet in een export kan trekken die je doorgeeft.
+- **Geïsoleerd decoderen.** Afbeeldingen en de afbeeldingen van formules en diagrammen worden gedecodeerd in een eigen
+  dienst, die macOS in een eigen sandbox start: geen van je bestanden, geen netwerk. Die dienst geeft alleen pixels
+  terug, waarvan de afmeting wordt gecontroleerd, en stopt zichzelf als een decodering langer dan 10 seconden duurt of
+  te veel geheugen vraagt. De eigen afbeeldingsdecoders van Apple zien alleen HEIC, TIFF, AVIF en pdf, en alleen als de
+  data echt dat formaat heeft. SVG's, formules en diagrammen lopen ook door die dienst, dus ze zijn in Splat
+  afbeeldingen met een vaste resolutie: vier pixels per punt, tot 2560 langs de langste zijde.
+- **Lokale bestanden** bereiken een document alleen via het pad dat het noemt, en alleen uit een map waartoe je toegang
+  hebt gegeven: Splat mag een document lezen dat je opent, maar de afbeeldingen, notities, bibliografie en repository
+  eromheen pas als je toegang geeft tot hun map met **Geef toegang tot map…** in de balk boven de voorvertoning. Toegang
+  geldt voor alle submappen en wordt onthouden. Insluitingen tonen Markdown-notities uit de map van het document en
+  daaronder, en een ontbrekende afbeelding wordt alleen daar gezocht. Een afbeeldingspad elders, absoluut of beginnend
+  met `~`, laadt in de voorvertoning uit een map waartoe je toegang hebt gegeven; HTML- en Word-exports, afdrukken en
+  pdf's nemen alleen mee wat in de map van het document of in zijn Git-repository staat, tenzij die repository ook je
+  thuismap bevat, zodat een document van iemand anders je bestanden niet in een export kan trekken die je doorgeeft.
 - **Mappen met notities** worden alleen gelezen zolang de zijbalk ze toont, en de naam van een notitie wijzigen
   verandert andere bestanden pas nadat je hebt bevestigd hoeveel.
 - **Git-repository's** leest Splat zelf. Het voert nooit het programma `git` uit, waarvan de configuratie in een
@@ -766,8 +768,9 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
 - **Exports** bevatten geen scripts. HTML-pagina's behouden alleen een vaste lijst onschuldige tags en attributen, zoals
   GitHub, plus een contentbeveiligingsbeleid. Word-bestanden linken alleen `http`-, `https`- en `mailto`-adressen,
   afgezien van de links die een door jou gekozen Word-sjabloon meebrengt.
-- **Codeondertekening** met de Hardened Runtime. Splat draait zonder de App Sandbox, zodat het afbeeldingen naast je
-  documenten kan tonen zonder voor elke map om toestemming te vragen; de isolatie van al het decoderen compenseert dit.
+- **Codeondertekening** met de Hardened Runtime en de App Sandbox. Splat mag de documenten die je opent en de mappen
+  waartoe je toegang geeft lezen en schrijven, het netwerk gebruiken voor afbeeldingen van het web die je hebt
+  toegestaan en voor updates, en afdrukken; verder niets.
 
 ## Grote documenten
 

@@ -188,7 +188,7 @@ impl MockWeb {
                 client.URLProtocolDidFinishLoading(this);
             }
             Answer::TooLarge => {
-                let length = (super::super::safe_image::MAX_BYTES + 1).to_string();
+                let length = (super::super::decoder::MAX_BYTES + 1).to_string();
                 let headers = [("Content-Length", length.as_str())];
                 client.URLProtocol_didReceiveResponse_cacheStoragePolicy(this, &response(200, &headers), not_cached);
                 client.URLProtocolDidFinishLoading(this);

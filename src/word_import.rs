@@ -11,7 +11,7 @@ use objc2_app_kit::{
 use objc2_foundation::{NSArray, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 use splat_import::WordError;
-use splat_import::docx::import;
+use splat_import::docx::{Imported, import};
 
 use crate::i18n::t;
 use crate::util::{contained, guarded, main_soon, ns, read_regular_file};
@@ -65,12 +65,23 @@ fn images_folder(target: &Path) -> String {
 }
 
 /// Writes the Markdown file at `target` for the Word document at `word`, with its images in a folder beside it.
+#[cfg(any(test, feature = "selftest"))]
 pub(crate) fn import_file(word: &Path, target: &Path) -> Result<(), ImportFailure> {
+    write_imported(convert(word, target)?, target)
+}
+
+/// The Markdown of the Word document at `word` and its pictures, for a file at `target`.
+fn convert(word: &Path, target: &Path) -> Result<Imported, ImportFailure> {
     let bytes = read_regular_file(word, MOST_BYTES).ok_or(ImportFailure::NotRead)?;
     let folder = images_folder(target);
-    let imported = contained(|| import(&bytes, &folder))
+    contained(|| import(&bytes, &folder))
         .ok_or(ImportFailure::NotConverted)?
-        .map_err(ImportFailure::Refused)?;
+        .map_err(ImportFailure::Refused)
+}
+
+/// Writes what `convert` made: the Markdown at `target`, its pictures in a folder beside it.
+fn write_imported(imported: Imported, target: &Path) -> Result<(), ImportFailure> {
+    let folder = images_folder(target);
     if !imported.missing.is_empty() {
         let reasons: Vec<String> = imported
             .missing
@@ -151,9 +162,36 @@ pub(crate) fn ask_where(mtm: MainThreadMarker, word: PathBuf) -> Retained<NSSave
 }
 
 /// Makes the Markdown file on a thread of its own, as it reads from one volume and writes to another and either may hang.
+/// Pictures go into a folder beside it, which the sandbox lets Splat write only once the user granted the folder.
 pub(crate) fn import_and_open(word: PathBuf, target: PathBuf) {
     std::thread::spawn(move || {
-        let result = import_file(&word, &target);
+        let converted = convert(&word, &target);
+        let closed = converted.as_ref().is_ok_and(|imported| !imported.media.is_empty())
+            && target.parent().is_some_and(|dir| !crate::grants::reaches(dir));
+        main_soon(move || {
+            let Some(mtm) = MainThreadMarker::new() else { return };
+            match converted {
+                Ok(imported) if closed => {
+                    let Some(dir) = target.parent().map(Path::to_path_buf) else {
+                        return;
+                    };
+                    let pending = std::cell::RefCell::new(Some(imported));
+                    crate::grants::ask(mtm, None, &dir, move |granted| {
+                        if let Some(imported) = pending.borrow_mut().take().filter(|_| granted) {
+                            write_and_open(imported, target.clone());
+                        }
+                    });
+                }
+                Ok(imported) => write_and_open(imported, target),
+                Err(failure) => report(mtm, &failure),
+            }
+        });
+    });
+}
+
+fn write_and_open(imported: Imported, target: PathBuf) {
+    std::thread::spawn(move || {
+        let result = write_imported(imported, &target);
         main_soon(move || {
             let Some(mtm) = MainThreadMarker::new() else { return };
             match result {
