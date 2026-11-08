@@ -564,7 +564,7 @@ Markdown-tiedosto voi tulla keneltä tahansa, joten Splat kohtelee jokaista doku
 - **Tallentamattoman tekstin kopiot** pysyvät tällä Macilla Kirjasto-kansiossasi kaatumisen jälkeistä palautusta varten. Ne poistuvat tallennuksen tai Splatin normaalin päättymisen myötä; kaatumisen jättämät kopiot pysyvät palautuskansiossa, kunnes poistat ne.
 - **Linkit** eivät koskaan käynnistä ohjelmaa napsautuksella. Web- ja sähköpostilinkit avautuvat tavalliseen tapaan; linkit muihin appeihin kysyvät ensin.
 - **Dokumenttien HTML** luetaan Splatin omalla jäsentimellä. Skriptit, tyylit, kehykset ja lomakkeet eivät koskaan suoriteta.
-- **Viennit** eivät sisällä skriptejä. HTML-sivuille jää vain kiinteä luettelo vaarattomia tageja ja attribuutteja, kuten GitHubissa, sekä sisältöturvakäytäntö. Word-tiedostoissa linkitetään vain osoitteet `http`, `https` ja `mailto`.
+- **Viennit** eivät sisällä skriptejä. HTML-sivuille jää vain kiinteä luettelo vaarattomia tageja ja attribuutteja, kuten GitHubissa, sekä sisältöturvakäytäntö. Word-tiedostoissa linkitetään vain osoitteet `http`, `https` ja `mailto`, lukuun ottamatta linkkejä, jotka valitsemasi Word-työpohja tuo mukanaan.
 - **Koodiallekirjoitus** Hardened Runtimella. Splat toimii ilman App Sandboxia, jotta se voi näyttää dokumenttiesi vieressä olevat kuvat kysymättä jokaista kansiota; kaiken purkamisen eristys kompensoi tämän.
 
 ## Suuret dokumentit
@@ -579,7 +579,7 @@ Splat pysyy vastaavana useiden megatavujen dokumenteillakin:
 - Noin 200 kt:stä alkaen dokumentti avaa ikkunansa ennen kuin se jäsennetään; 5 Mt:n kohdalla värit ja esikatselu seuraavat noin neljännessekunnin kuluttua.
 - Kaikki kuvat yhteensä, kaavat ja kaaviot mukaan lukien, vievät enintään neljänneksen Macin muistista ja puolet siitä, kun muistia on vähän. Sen ylittävät kuvat näkyvät paikkamerkkeinä, kunnes tilaa taas on.
 
-Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti 10 Mt:n dokumentissa: alaviitteen määritelmän tai viittausten muutokset, muutokset tekstinsisäisen alaviitteen vieressä, dokumentin aivan lopussa alaviitteen vieressä, front matterissa tai linkkiviitemääritelmissä sekä jokainen muutos dokumentissa, jossa on `%%`-kommenttilohkoja tai kahdesti määritelty alaviite tai alaviite lainauksen tai luettelon sisällä. Muisti kasvaa tiedoston mukana, noin 115–160 Mt:iin 1 Mt:n Markdownille ja 340–510 Mt:iin 10 Mt:lle.
+Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti 10 Mt:n dokumentissa: alaviitteen määritelmän tai viittausten muutokset, muutokset tekstinsisäisen alaviitteen vieressä, dokumentin aivan lopussa alaviitteen vieressä, front matterissa tai linkkiviitemääritelmissä sekä jokainen muutos dokumentissa, jossa on `%%`-kommenttilohkoja, kahdesti määritelty alaviite tai alaviite lainauksen tai luettelon sisällä taikka yli 1000 tekstinsisäistä alaviitettä tai sulkematonta kaavamerkkiä. Muisti kasvaa tiedoston mukana, noin 115–160 Mt:iin 1 Mt:n Markdownille ja 340–510 Mt:iin 10 Mt:lle.
 
 ## Tunnetut rajoitukset
 

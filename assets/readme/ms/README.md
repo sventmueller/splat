@@ -563,7 +563,7 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 - **Salinan teks yang belum disimpan** kekal pada Mac ini, dalam folder Library anda, untuk pemulihan selepas ranap. Ia hilang dengan penyimpanan atau penamatan biasa Splat; salinan yang ditinggalkan ranap kekal dalam folder pemulihan sehingga anda memadamnya.
 - **Pautan** tidak pernah memulakan program dengan satu klik. Pautan web dan mel dibuka seperti biasa; pautan ke app lain bertanya dahulu.
 - **HTML dalam dokumen** dibaca oleh penghurai Splat sendiri. Skrip, gaya, bingkai dan borang tidak pernah dijalankan.
-- **Eksport** tidak membawa skrip. Halaman HTML hanya mengekalkan senarai tetap teg dan atribut yang tidak berbahaya, seperti GitHub, serta dasar keselamatan kandungan. Fail Word hanya memaut alamat `http`, `https` dan `mailto`.
+- **Eksport** tidak membawa skrip. Halaman HTML hanya mengekalkan senarai tetap teg dan atribut yang tidak berbahaya, seperti GitHub, serta dasar keselamatan kandungan. Fail Word hanya memaut alamat `http`, `https` dan `mailto`, kecuali pautan yang dibawa oleh templat Word yang anda pilih.
 - **Penandatanganan kod** dengan Hardened Runtime. Splat berjalan tanpa App Sandbox supaya ia dapat menunjukkan imej di sebelah dokumen anda tanpa bertanya untuk setiap folder; pengasingan semua penyahkodan mengimbanginya.
 
 ## Dokumen besar
@@ -578,7 +578,7 @@ Splat kekal responsif dengan dokumen beberapa megabait:
 - Mulai kira-kira 200 KB, dokumen membuka tetingkapnya sebelum dihuraikan; pada 5 MB, warna dan pratonton menyusul kira-kira suku saat kemudian.
 - Semua imej bersama-sama, termasuk formula dan rajah, mengambil paling banyak satu perempat memori Mac, dan separuh daripadanya semasa memori kurang. Selebihnya, imej seterusnya dipaparkan sebagai pemegang tempat sehingga ada ruang semula.
 
-Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan kekunci pada 10 MB: perubahan pada takrifan atau rujukan nota kaki, di sebelah nota kaki sebaris, di hujung dokumen sebelah nota kaki, pada front matter atau pada takrifan rujukan pautan, dan setiap perubahan dalam dokumen dengan blok ulasan `%%` atau dengan nota kaki yang ditakrifkan dua kali atau di dalam petikan atau senarai. Memori bertambah bersama fail, kepada kira-kira 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
+Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan kekunci pada 10 MB: perubahan pada takrifan atau rujukan nota kaki, di sebelah nota kaki sebaris, di hujung dokumen sebelah nota kaki, pada front matter atau pada takrifan rujukan pautan, dan setiap perubahan dalam dokumen dengan blok ulasan `%%`, dengan nota kaki yang ditakrifkan dua kali atau di dalam petikan atau senarai, atau dengan lebih daripada 1000 nota kaki sebaris atau tanda formula yang tidak ditutup. Memori bertambah bersama fail, kepada kira-kira 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
 
 ## Had yang diketahui
 

@@ -62,9 +62,9 @@ fn mounted_elsewhere() -> Vec<PathBuf> {
     unsafe { all.set_len(usize::try_from(filled).unwrap_or(0).min(count)) };
     all.iter()
         .filter_map(|fs| {
-            // SAFETY: The kernel ends the name of a mount point with a zero inside its fixed field.
-            let name = unsafe { std::ffi::CStr::from_ptr(fs.f_mntonname.as_ptr()) };
-            name.to_str().ok()
+            let bytes = fs.f_mntonname.map(|c| u8::from_ne_bytes(c.to_ne_bytes()));
+            let name = std::ffi::CStr::from_bytes_until_nul(&bytes).ok()?;
+            name.to_str().ok().map(str::to_owned)
         })
         .filter(|mount| *mount != "/" && !mount.starts_with("/System/Volumes/"))
         .map(PathBuf::from)

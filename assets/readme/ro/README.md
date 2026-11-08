@@ -564,7 +564,7 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 - **Copiile textului nesalvat** rămân pe acest Mac, în dosarul Bibliotecă, pentru recuperarea după o închidere forțată. Ele dispar odată cu salvarea sau cu închiderea normală a Splat; copiile lăsate de o închidere forțată rămân în dosarul de recuperare până le ștergeți.
 - **Linkurile** nu pornesc niciodată un program printr-un clic. Linkurile web și de e-mail se deschid ca de obicei; linkurile către alte aplicații întreabă mai întâi.
 - **HTML-ul din documente** este citit de parserul propriu al Splat. Scripturile, stilurile, cadrele și formularele nu rulează niciodată.
-- **Exporturile** nu conțin scripturi. Paginile HTML păstrează doar o listă fixă de etichete și atribute inofensive, ca GitHub, plus o politică de securitate a conținutului. Fișierele Word leagă doar adrese `http`, `https` și `mailto`.
+- **Exporturile** nu conțin scripturi. Paginile HTML păstrează doar o listă fixă de etichete și atribute inofensive, ca GitHub, plus o politică de securitate a conținutului. Fișierele Word leagă doar adrese `http`, `https` și `mailto`, în afară de linkurile aduse de un șablon Word pe care l-ați ales.
 - **Semnarea codului** cu Hardened Runtime. Splat rulează fără App Sandbox, pentru a putea afișa imagini de lângă documentele dumneavoastră fără a cere acces pentru fiecare dosar; izolarea întregii decodări compensează acest lucru.
 
 ## Documente mari
@@ -579,7 +579,7 @@ Splat rămâne receptiv cu documente de câțiva megaocteți:
 - De la circa 200 KB, un document își deschide fereastra înainte de a fi analizat; la 5 MB, culorile și previzualizarea urmează după circa un sfert de secundă.
 - Toate imaginile la un loc, inclusiv formulele și diagramele, ocupă cel mult un sfert din memoria Mac-ului și jumătate din atât cât timp memoria este insuficientă. Peste această limită, celelalte imagini apar ca substituenți până când există din nou loc.
 
-Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă la 10 MB: cele la definiția sau la referințele unei note de subsol, lângă o notă de subsol în linie, chiar la sfârșitul unui document lângă o notă de subsol, la front matter sau la definițiile de referințe pentru linkuri, precum și orice modificare într-un document cu blocuri de comentarii `%%` sau cu o notă de subsol definită de două ori sau în interiorul unui citat sau al unei liste. Memoria crește odată cu fișierul, până la circa 115–160 MB pentru 1 MB de Markdown și 340–510 MB pentru 10 MB.
+Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă la 10 MB: cele la definiția sau la referințele unei note de subsol, lângă o notă de subsol în linie, chiar la sfârșitul unui document lângă o notă de subsol, la front matter sau la definițiile de referințe pentru linkuri, precum și orice modificare într-un document cu blocuri de comentarii `%%`, cu o notă de subsol definită de două ori sau în interiorul unui citat sau al unei liste ori cu peste 1000 de note de subsol în linie sau marcaje de formulă neînchise. Memoria crește odată cu fișierul, până la circa 115–160 MB pentru 1 MB de Markdown și 340–510 MB pentru 10 MB.
 
 ## Limitări cunoscute
 

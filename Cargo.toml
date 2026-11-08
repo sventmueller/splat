@@ -32,6 +32,7 @@ libc = "0.2"
 miniz_oxide = "0.9"
 objc2 = "0.6.5"
 objc2-app-kit = "0.3.2"
+objc2-core-graphics = { version = "0.3.2", default-features = false }
 objc2-foundation = "0.3.2"
 objc2-uniform-type-identifiers = "0.3.2"
 objc2-web-kit = "0.3.2"
@@ -94,6 +95,7 @@ dispatch2.workspace = true
 libc.workspace = true
 objc2 = { workspace = true, features = ["catch-all"] }
 objc2-app-kit = { workspace = true, features = ["objc2-uniform-type-identifiers"] }
+objc2-core-graphics = { workspace = true, optional = true, features = ["CGEvent", "CGEventTypes", "CGRemoteOperation", "libc"] }
 objc2-foundation.workspace = true
 objc2-uniform-type-identifiers.workspace = true
 objc2-web-kit.workspace = true
@@ -107,7 +109,7 @@ splat-ooxml.workspace = true
 splat-testkit = { workspace = true, features = ["sources"] }
 
 [features]
-selftest = ["splat-editor-state/selftest", "splat-markdown/selftest"]
+selftest = ["splat-editor-state/selftest", "splat-markdown/selftest", "dep:objc2-core-graphics"]
 
 # What ships does what the tests saw: an overflow ends in `contained` instead of a wrong offset. A keystroke costs the same;
 # measured on a full layout of 10 MB, about a fifth more.

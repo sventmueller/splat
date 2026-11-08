@@ -564,7 +564,7 @@ Um arquivo Markdown pode vir de qualquer pessoa, por isso o Splat trata todo doc
 - **Cópias de texto não salvo** ficam neste Mac, na sua pasta Biblioteca, para a recuperação após uma falha. Elas saem com o salvamento ou com o encerramento normal do Splat; as cópias que uma falha deixou ficam na pasta de recuperação até você apagá-las.
 - **Links** nunca iniciam um programa com um clique. Links da web e de e-mail abrem como de costume; links para outros apps perguntam antes.
 - **O HTML nos documentos** é lido pelo parser próprio do Splat. Scripts, estilos, frames e formulários nunca são executados.
-- **As exportações** não levam scripts. As páginas HTML mantêm apenas uma lista fixa de tags e atributos inofensivos, como o GitHub faz, além de uma política de segurança de conteúdo. Os arquivos Word só vinculam endereços `http`, `https` e `mailto`.
+- **As exportações** não levam scripts. As páginas HTML mantêm apenas uma lista fixa de tags e atributos inofensivos, como o GitHub faz, além de uma política de segurança de conteúdo. Os arquivos Word só vinculam endereços `http`, `https` e `mailto`, exceto os links que vêm com um modelo do Word que você escolheu.
 - **Assinatura de código** com o Hardened Runtime. O Splat roda sem o App Sandbox para poder mostrar imagens ao lado dos seus documentos sem perguntar por cada pasta; o isolamento de toda a decodificação compensa isso.
 
 ## Documentos grandes
@@ -579,7 +579,7 @@ O Splat continua responsivo com documentos de vários megabytes:
 - A partir de cerca de 200 KB, um documento abre a janela antes de ser analisado; com 5 MB, as cores e a pré-visualização vêm cerca de um quarto de segundo depois.
 - Todas as imagens juntas, incluindo fórmulas e diagramas, ocupam no máximo um quarto da memória do Mac, e metade disso enquanto a memória está escassa. Além disso, as demais imagens aparecem como marcadores de posição até que haja espaço de novo.
 
-Algumas alterações são processadas por inteiro, com cerca de 300 ms por tecla em 10 MB: as que afetam a definição ou as referências de uma nota de rodapé, o que fica junto a uma nota de rodapé em linha, o fim do documento junto a uma nota de rodapé, o front matter ou definições de referência de link, e toda alteração em um documento com blocos de comentário `%%` ou com uma nota de rodapé definida duas vezes ou dentro de uma citação ou lista. A memória cresce com o arquivo, para aproximadamente 115–160 MB com 1 MB de Markdown e 340–510 MB com 10 MB.
+Algumas alterações são processadas por inteiro, com cerca de 300 ms por tecla em 10 MB: as que afetam a definição ou as referências de uma nota de rodapé, o que fica junto a uma nota de rodapé em linha, o fim do documento junto a uma nota de rodapé, o front matter ou definições de referência de link, e toda alteração em um documento com blocos de comentário `%%`, com uma nota de rodapé definida duas vezes ou dentro de uma citação ou lista, ou com mais de 1000 notas de rodapé em linha ou marcas de fórmula não fechadas. A memória cresce com o arquivo, para aproximadamente 115–160 MB com 1 MB de Markdown e 340–510 MB com 10 MB.
 
 ## Limitações conhecidas
 

@@ -2,19 +2,13 @@ use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-unsafe extern "C" {
-    fn kill(pid: i32, signal: i32) -> i32;
-}
-
-const SIGKILL: i32 = 9;
-
 /// Ends a child of this app that has not been waited for yet, a decoder helper that stopped answering, at once.
 pub fn end_child(pid: i32) {
     // Zero and negative numbers name whole groups of processes.
     if pid > 0 {
         // SAFETY: Plain signal delivery to a child that has not been waited for, whose number names no other process
         // until it is.
-        unsafe { kill(pid, SIGKILL) };
+        unsafe { libc::kill(pid, libc::SIGKILL) };
     }
 }
 
@@ -46,7 +40,7 @@ impl Process {
         }
         // SAFETY: Plain signal delivery to a positive number, which named this process just now: only its end and a
         // new process in the moment since could give the number to another.
-        unsafe { kill(self.pid, SIGKILL) == 0 }
+        unsafe { libc::kill(self.pid, libc::SIGKILL) == 0 }
     }
 }
 
@@ -79,7 +73,7 @@ fn program_of(pid: i32) -> Option<PathBuf> {
 /// Whether a process with this number exists.
 pub fn process_exists(pid: u32) -> bool {
     // SAFETY: Signal 0 only asks whether the process exists; nothing is delivered.
-    i32::try_from(pid).is_ok_and(|pid| unsafe { kill(pid, 0) } == 0)
+    i32::try_from(pid).is_ok_and(|pid| unsafe { libc::kill(pid, 0) } == 0)
 }
 
 #[cfg(test)]
@@ -114,7 +108,7 @@ mod tests {
         );
         assert!(process.end());
         let status = child.wait().expect("its end");
-        assert_eq!(status.signal(), Some(SIGKILL));
+        assert_eq!(status.signal(), Some(libc::SIGKILL));
     }
 
     #[test]
@@ -151,6 +145,6 @@ mod tests {
     fn a_child_ends_at_once() {
         let (mut child, pid) = sleeper();
         end_child(pid);
-        assert_eq!(child.wait().expect("its end").signal(), Some(SIGKILL));
+        assert_eq!(child.wait().expect("its end").signal(), Some(libc::SIGKILL));
     }
 }

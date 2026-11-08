@@ -589,7 +589,7 @@ pub fn right_to_left(text: &str) -> Option<bool> {
 }
 
 /// Length of the common byte prefix of two texts.
-pub(crate) fn common_prefix(a: &[u8], b: &[u8]) -> usize {
+pub fn common_prefix(a: &[u8], b: &[u8]) -> usize {
     const CHUNK: usize = 4096;
     let n = a.len().min(b.len());
     let mut i = 0;
@@ -600,7 +600,7 @@ pub(crate) fn common_prefix(a: &[u8], b: &[u8]) -> usize {
 }
 
 /// Length of the common byte suffix of two texts, at most `max`.
-pub(crate) fn common_suffix(a: &[u8], b: &[u8], max: usize) -> usize {
+pub fn common_suffix(a: &[u8], b: &[u8], max: usize) -> usize {
     const CHUNK: usize = 4096;
     let n = a.len().min(b.len()).min(max);
     let (a, b) = (&a[a.len() - n..], &b[b.len() - n..]);

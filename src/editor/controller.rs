@@ -265,6 +265,11 @@ super::actions::commands!(class_with_commands, [
             guarded((), || self.progressive().render_pending_blocks());
         }
 
+        #[unsafe(method(colorPendingSource))]
+        fn color_pending_source(&self) {
+            guarded((), || self.updater().color_pending_source());
+        }
+
         #[unsafe(method(requestRenders))]
         fn request_renders(&self) {
             guarded((), || self.updater().request_renders());
@@ -320,6 +325,7 @@ super::actions::commands!(class_with_commands, [
         #[unsafe(method(clipBoundsChanged:))]
         fn clip_bounds_changed(&self, notification: &NSNotification) {
             guarded((), || {
+                self.updater().color_visible_source();
                 self.scroll_sync().view_scrolled(notification);
                 self.change_marks().redraw();
             });

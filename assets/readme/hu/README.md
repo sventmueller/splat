@@ -561,6 +561,7 @@ Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot me
 - A **jegyzetmappákat** a Splat csak addig olvassa, amíg az oldalsáv mutatja őket, és egy jegyzet átnevezése csak azután módosít más fájlokat, hogy Ön megerősítette, hányat.
 - A **Git-tárolókat** maga a Splat olvassa. Soha nem futtatja a `git` programot, amelynek a konfigurációja egy idegen tárolóban más programokat indíthat el, és nem olvas többet a megnyitott dokumentum legutóbbi commitban lévő változatánál. Oda semmit nem ír, és hálózatra sem megy ki.
 - A **Word-dokumentumokat és a beillesztett szöveget** a Splat saját elemzői olvassák, korlátozva a méretet, a beágyazást és azt, hogy egy fájl mekkorára csomagolódhat ki. A bennük lévő linkek csak azokat a címeket tartják meg, amelyeket a Splat máshol is enged, a Word-fájlokban lévő képek neve pedig soha nem dönti el, hová íródnak.
+- Az **exportok** nem tartalmaznak szkripteket. A HTML-oldalak a GitHubhoz hasonlóan csak az ártalmatlan címkék és attribútumok rögzített listáját tartják meg, és tartalombiztonsági szabályzatot (Content Security Policy) kapnak. A Word-fájlok csak `http`-, `https`- és `mailto`-címekre mutató linkeket tartalmaznak, kivéve azokat a linkeket, amelyeket az Ön által választott Word-sablon hoz magával.
 - **Kódaláírás** Hardened Runtime-mal. A Splat az App Sandbox nélkül fut, hogy a dokumentumok melletti képeket minden mappa külön engedélyezése nélkül mutathassa; ezt az összes dekódolás elszigetelése ellensúlyozza.
 
 ## Nagy dokumentumok
@@ -575,7 +576,7 @@ A Splat több megabájtos dokumentumoknál is reszponzív marad:
 - Nagyjából 200 KB-tól a dokumentum az elemzés előtt megnyitja az ablakát; 5 MB-nál a színek és az előnézet nagyjából negyed másodperccel később követik.
 - Az összes kép együtt, a képleteket és a diagramokat is beleértve, legfeljebb a Mac memóriájának negyedét foglalja el, és ennek a felét, amíg kevés a memória. Ezen felül a további képek helyőrzőként jelennek meg, amíg újra nem lesz hely.
 
-Néhány módosítást teljes egészében feldolgoz, 10 MB-nál nagyjából 300 ms-ot igényelve billentyűleütésenként. Ilyen, ha a módosítás egy lábjegyzet definícióját vagy hivatkozásait, egy szövegközi lábjegyzet környékét, egy lábjegyzet melletti dokumentumvéget, a front mattert vagy a linkhivatkozás-definíciókat érinti, továbbá minden módosítás egy olyan dokumentumban, amelyben `%%` megjegyzésblokkok vannak, vagy egy lábjegyzet kétszer, illetve idézeten vagy listán belül van definiálva. A memória a fájllal együtt nő: 1 MB Markdownnál nagyjából 115–160 MB-ra, 10 MB-nál 340–510 MB-ra.
+Néhány módosítást teljes egészében feldolgoz, 10 MB-nál nagyjából 300 ms-ot igényelve billentyűleütésenként. Ilyen, ha a módosítás egy lábjegyzet definícióját vagy hivatkozásait, egy szövegközi lábjegyzet környékét, egy lábjegyzet melletti dokumentumvéget, a front mattert vagy a linkhivatkozás-definíciókat érinti, továbbá minden módosítás egy olyan dokumentumban, amelyben `%%` megjegyzésblokkok vannak, egy lábjegyzet kétszer, illetve idézeten vagy listán belül van definiálva, vagy több mint 1000 szövegközi lábjegyzet vagy lezáratlan képletjel van. A memória a fájllal együtt nő: 1 MB Markdownnál nagyjából 115–160 MB-ra, 10 MB-nál 340–510 MB-ra.
 
 ## Ismert korlátozások
 

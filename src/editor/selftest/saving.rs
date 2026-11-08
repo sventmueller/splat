@@ -7,11 +7,10 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use block2::RcBlock;
 use objc2::runtime::ProtocolObject;
-use objc2::{MainThreadMarker, msg_send, sel};
-use objc2_app_kit::{NSMenuItem, NSSaveOperationType};
-use objc2_foundation::{NSError, NSURL};
+use objc2::{MainThreadMarker, sel};
+use objc2_app_kit::{NSSaveOperationType, NSStandardKeyBindingResponding};
+use objc2_foundation::NSURL;
 
 use super::controller::{next_turn, until};
 use super::documents::{opened, restored, untitled, url_of};
@@ -25,7 +24,7 @@ use crate::util::ns;
 fn saved_to(document: &MdDocument, url: &NSURL) -> Option<bool> {
     let answer = Rc::new(Cell::new(None));
     let noted = answer.clone();
-    let handler = RcBlock::new(move |error: *mut NSError| noted.set(Some(error.is_null())));
+    let handler = crate::util::error_handler(move |error| noted.set(Some(error.is_none())));
     let kind = document.fileType().expect("a document type");
     document.saveToURL_ofType_forSaveOperation_completionHandler(
         url,
@@ -46,7 +45,7 @@ fn saved(document: &MdDocument) -> bool {
 fn saved_as(document: &MdDocument, url: &NSURL, operation: NSSaveOperationType) -> Option<bool> {
     let answer = Rc::new(Cell::new(None));
     let noted = answer.clone();
-    let handler = RcBlock::new(move |error: *mut NSError| noted.set(Some(error.is_null())));
+    let handler = crate::util::error_handler(move |error| noted.set(Some(error.is_none())));
     let kind = document.fileType().unwrap_or_else(|| ns("net.daringfireball.markdown"));
     document.saveToURL_ofType_forSaveOperation_completionHandler(url, &kind, operation, &handler);
     until(|| answer.get().is_some());
@@ -197,9 +196,7 @@ fn a_save_asked_for_during_an_autosave_writes_all_there_is(mtm: MainThreadMarker
     std::fs::write(&path, "Text").expect("a test file");
     let (document, e) = opened(mtm, &path);
     at_end(&e);
-    let save = NSMenuItem::new(mtm);
-    // SAFETY: A selector for a menu item that is only asked whether it is enabled.
-    unsafe { save.setAction(Some(sel!(saveDocument:))) };
+    let save = crate::util::item(mtm, "", Some(sel!(saveDocument:)), "");
     let waits_in_ms: [u64; 12] = [0, 0, 0, 0, 1, 2, 5, 10, 20, 50, 100, 200];
     let (mut under_way, mut unavailable) = (0, 0);
     let mut wrong = Vec::new();
@@ -207,7 +204,7 @@ fn a_save_asked_for_during_an_autosave_writes_all_there_is(mtm: MainThreadMarker
         type_in_source(&e, "x");
         let autosaved = Rc::new(Cell::new(false));
         let noted = autosaved.clone();
-        let handler = RcBlock::new(move |_: *mut objc2_foundation::NSError| noted.set(true));
+        let handler = crate::util::error_handler(move |_| noted.set(true));
         document.autosaveWithImplicitCancellability_completionHandler(true, &handler);
         let started = Instant::now();
         while started.elapsed() < Duration::from_millis(wait) {
@@ -357,8 +354,8 @@ fn a_restored_draft_stays_marked(mtm: MainThreadMarker, dir: &Path) {
     );
     type_in_source(&e, "y");
     at_end(&e);
-    // SAFETY: NSResponder's action, on the main thread with the view in its window.
-    let _: () = unsafe { msg_send![e.source(), deleteBackward: std::ptr::null::<objc2::runtime::AnyObject>()] };
+    // SAFETY: The view's own action, which takes any sender and none as well.
+    unsafe { e.source().deleteBackward(None) };
     check(
         "deleting back to the text of a restored draft keeps the mark",
         e.source_text() == "Entwurf" && document.isDocumentEdited(),
@@ -403,7 +400,7 @@ fn what_a_save_leaves_of_the_file(mtm: MainThreadMarker, dir: &Path) {
     let copy = url_of(&dir.join("Kopie 2.md"));
     let answer = Rc::new(Cell::new(None));
     let noted = answer.clone();
-    let handler = RcBlock::new(move |error: *mut NSError| noted.set(Some(error.is_null())));
+    let handler = crate::util::error_handler(move |error| noted.set(Some(error.is_none())));
     let kind = document.fileType().expect("a document type");
     document.saveToURL_ofType_forSaveOperation_completionHandler(
         &copy,
@@ -473,7 +470,7 @@ fn a_folder_that_takes_nothing_costs_nothing(mtm: MainThreadMarker, dir: &Path) 
     );
     let autosaved = Rc::new(Cell::new(false));
     let noted = autosaved.clone();
-    let handler = RcBlock::new(move |_: *mut NSError| noted.set(true));
+    let handler = crate::util::error_handler(move |_| noted.set(true));
     document.autosaveWithImplicitCancellability_completionHandler(false, &handler);
     until(|| autosaved.get());
     check(

@@ -21,20 +21,33 @@ use super::style::{self, SourceFonts};
 use super::{js, string_of};
 use crate::markdown::commands::Edit;
 use crate::markdown::doc::{DiagramKind, Figure, figures, macros_of};
+use crate::markdown::highlight::Style;
 use crate::markdown::incremental::{Parsed, parse_shared_and_color};
-use crate::markdown::text::TextAt;
+use crate::markdown::text::{Byte, TextAt, byte_at_u16, common_prefix, common_suffix};
 use crate::preview::layout::{Layout, Resolver, TopBlock};
 use crate::preview::map::Index;
 use crate::util::{
     Lane, contained, free_in_background, from_nsrange, insert_text, ns, shown_to_ns, storage, to_nsrange,
 };
-use splat_editor_state::progress::{Arrivals, Parsing, eager_blocks, updates_at_once};
+use splat_editor_state::progress::{
+    Arrivals, COLOR_AT_ONCE, COLOR_STEP, Parsing, Uncolored, eager_blocks, lines_around, updates_at_once,
+};
 
 #[derive(Default)]
 pub(super) struct UpdateState {
     fonts: RefCell<Option<SourceFonts>>,
     arrivals: Arrivals,
     parsing: Cell<Parsing>,
+    uncolored: RefCell<Option<Coloring>>,
+}
+
+type Spans = Arc<Vec<(std::ops::Range<Byte>, Style)>>;
+
+/// A large source on its way to the colours of its text.
+struct Coloring {
+    text: Arc<str>,
+    spans: Spans,
+    left: Uncolored,
 }
 
 pub(super) struct Images {
@@ -91,6 +104,10 @@ impl<'a> Updater<'a> {
 impl Updater<'_> {
     pub(super) fn arrivals_scheduled(&self) -> bool {
         self.state.arrivals.is_scheduled()
+    }
+
+    pub(super) fn colors_pending(&self) -> bool {
+        self.state.uncolored.borrow().is_some()
     }
 }
 
@@ -527,20 +544,115 @@ impl Updater<'_> {
         }
     }
 
-    /// Recolors the source where its colors changed, or all of it when the colors are stale.
+    /// Recolors the source where its colors changed, or all of it when the colors are stale; of a large text, what shows
+    /// at once and the rest in steps.
     fn apply_colors(&self, views: Views<'_>, recolor: Recolor) {
         let fonts = self.state.fonts.borrow().clone();
         if let Some(fonts) = &fonts {
-            style::apply_highlight_changes(
-                &storage(views.source),
-                &recolor.old_text,
-                &recolor.old_spans,
-                &recolor.text,
-                &recolor.spans,
-                fonts,
-            );
+            let whole = recolor.old_text.is_empty() && recolor.old_spans.is_empty();
+            if whole && recolor.text.len() > COLOR_AT_ONCE {
+                let shown = shown_bytes(views.source, &recolor.text);
+                let region = Byte::new(shown.start)..Byte::new(shown.end);
+                style::apply_highlight_in(&storage(views.source), &recolor.text, &recolor.spans, region, fonts);
+                *self.state.uncolored.borrow_mut() = Some(Coloring {
+                    left: Uncolored::all_but(recolor.text.len(), shown),
+                    text: recolor.text.clone(),
+                    spans: recolor.spans.clone(),
+                });
+                self.host.object().perform_later(sel!(colorPendingSource), 0.0, true);
+            } else {
+                style::apply_highlight_changes(
+                    &storage(views.source),
+                    &recolor.old_text,
+                    &recolor.old_spans,
+                    &recolor.text,
+                    &recolor.spans,
+                    fonts,
+                );
+                self.follow_edit(&recolor.text, &recolor.spans);
+            }
         }
         free_in_background((recolor.old_text, recolor.old_spans));
+    }
+
+    /// Moves what is left to colour along with the edit that made `text`.
+    fn follow_edit(&self, text: &Arc<str>, spans: &Spans) {
+        let mut uncolored = self.state.uncolored.borrow_mut();
+        let Some(coloring) = uncolored.as_mut() else {
+            return;
+        };
+        let (old, new) = (coloring.text.as_bytes(), text.as_bytes());
+        let prefix = common_prefix(old, new);
+        let suffix = common_suffix(old, new, old.len().min(new.len()) - prefix);
+        coloring
+            .left
+            .edited(prefix..old.len() - suffix, new.len() - suffix - prefix);
+        coloring.text = text.clone();
+        coloring.spans = spans.clone();
+    }
+
+    /// Colours the next part of a large source, nearest to what shows first, and comes back while any is left.
+    pub(super) fn color_pending_source(&self) {
+        if self.state.uncolored.borrow().is_none() {
+            return;
+        }
+        if !self.may_color_now() {
+            self.host.object().perform_later(sel!(colorPendingSource), 0.05, true);
+            return;
+        }
+        let top = self.host.panes().source().top_offset().unwrap_or(0);
+        let piece = self.state.uncolored.borrow_mut().as_mut().and_then(|coloring| {
+            let near = byte_at_u16(&coloring.text, Byte::new(0), top).get();
+            let piece = coloring.left.take_near(&coloring.text, near, COLOR_STEP)?;
+            Some((vec![piece], coloring.text.clone(), coloring.spans.clone()))
+        });
+        self.color_pieces(piece);
+        let done = self.state.uncolored.borrow().as_ref().is_none_or(|c| c.left.is_empty());
+        if done {
+            self.state.uncolored.replace(None);
+        } else {
+            self.host.object().perform_later(sel!(colorPendingSource), 0.0, true);
+        }
+    }
+
+    /// Colours what scrolled into view of a large source before it is drawn without.
+    pub(super) fn color_visible_source(&self) {
+        if self.state.uncolored.borrow().is_none() || !self.may_color_now() {
+            return;
+        }
+        let pieces = self.host.panes().silently(|views| {
+            let mut uncolored = self.state.uncolored.borrow_mut();
+            let coloring = uncolored.as_mut()?;
+            let pieces = coloring
+                .left
+                .take_within(&coloring.text, shown_bytes(views.source, &coloring.text));
+            Some((pieces, coloring.text.clone(), coloring.spans.clone()))
+        });
+        self.color_pieces(pieces);
+    }
+
+    fn color_pieces(&self, pieces: Option<(Vec<std::ops::Range<usize>>, Arc<str>, Spans)>) {
+        let fonts = self.state.fonts.borrow().clone();
+        let (Some((pieces, text, spans)), Some(fonts)) = (pieces, fonts) else {
+            return;
+        };
+        self.host.panes().silently(|views| {
+            for piece in pieces {
+                let region = Byte::new(piece.start)..Byte::new(piece.end);
+                style::apply_highlight_in(&storage(views.source), &text, &spans, region, &fonts);
+            }
+        });
+    }
+
+    /// Whether the source holds the text whose colours are left to give, and nothing else changes it right now.
+    fn may_color_now(&self) -> bool {
+        let Some(text) = self.state.uncolored.borrow().as_ref().map(|c| c.text.clone()) else {
+            return false;
+        };
+        !self.host.under_way().defers_background_results()
+            && self
+                .host
+                .with_text(move |snap, st| st.is_current(snap) && Arc::ptr_eq(&st.doc().shared_text(), &text))
     }
 
     /// Replaces the changed blocks in the preview view; returns whether blocks are left to render.
@@ -618,4 +730,15 @@ fn images_for(dark: bool, doc_dir: Option<PathBuf>, text: &str, macros: Arc<str>
         env: super::env::Env::known(doc_dir, text),
         macros,
     }
+}
+
+/// The bytes of `text` the source view shows, with a screen's height of lines above and below.
+fn shown_bytes(view: &objc2_app_kit::NSTextView, text: &str) -> std::ops::Range<usize> {
+    let visible = view.visibleRect();
+    let (top, height) = (visible.origin.y, visible.size.height);
+    let first = super::geometry::offset_at(view, top - height).unwrap_or(0);
+    let last = super::geometry::offset_at(view, top + 2.0 * height).unwrap_or(first);
+    let byte = |u16: usize| byte_at_u16(text, Byte::new(0), u16).get();
+    let (from, to) = (byte(first.min(last)), byte(first.max(last)));
+    lines_around(text, from..(to + COLOR_STEP / 8).min(text.len()))
 }

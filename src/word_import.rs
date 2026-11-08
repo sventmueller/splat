@@ -6,10 +6,9 @@ use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSAlert, NSApplication, NSDocument, NSDocumentController, NSModalResponse, NSModalResponseOK, NSOpenPanel,
-    NSSavePanel,
+    NSAlert, NSApplication, NSDocumentController, NSModalResponse, NSModalResponseOK, NSOpenPanel, NSSavePanel,
 };
-use objc2_foundation::{NSArray, NSError, NSURL};
+use objc2_foundation::{NSArray, NSURL};
 use objc2_uniform_type_identifiers::UTType;
 use splat_import::WordError;
 use splat_import::docx::import;
@@ -169,16 +168,10 @@ fn open(mtm: MainThreadMarker, target: &Path) {
     let Some(address) = target.to_str().map(|p| NSURL::fileURLWithPath(&ns(p))) else {
         return;
     };
-    let done = RcBlock::new(|_: *mut NSDocument, _: objc2::runtime::Bool, error: *mut NSError| {
-        guarded((), || {
-            // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
-            let Some(error) = (unsafe { Retained::retain(error) }) else {
-                return;
-            };
-            if let Some(mtm) = MainThreadMarker::new() {
-                NSApplication::sharedApplication(mtm).presentError(&error);
-            }
-        });
+    let done = crate::util::open_handler(|_, _, error| {
+        if let (Some(error), Some(mtm)) = (error, MainThreadMarker::new()) {
+            NSApplication::sharedApplication(mtm).presentError(&error);
+        }
     });
     NSDocumentController::sharedDocumentController(mtm)
         .openDocumentWithContentsOfURL_display_completionHandler(&address, true, &done);

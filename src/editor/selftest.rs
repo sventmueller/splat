@@ -29,7 +29,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSCopying, NSNotFound, NSRange, NSString, NSTimer, NSURL};
 
-pub use mock_web::protocol_classes;
+pub use mock_web::{addresses_of, protocol_classes};
 
 use super::EditorController;
 use crate::document::MdDocument;
@@ -529,8 +529,11 @@ fn source(e: &EditorController) -> String {
 }
 
 fn type_in_preview(e: &EditorController, text: &str) {
-    let preview = e.preview();
-    unsafe { preview.insertText_replacementRange(&ns(text), NSRange::new(crate::util::to_usize(NSNotFound), 0)) };
+    crate::util::insert_text(
+        e.preview(),
+        &ns(text),
+        NSRange::new(crate::util::to_usize(NSNotFound), 0),
+    );
 }
 
 /// What `--only` calls the click-through in front of the scenarios.
@@ -692,7 +695,7 @@ fn quiet(e: &EditorController) -> bool {
 
 /// The editor has applied the current text, rendered its formulas and diagrams and loaded its images.
 fn settled(e: &EditorController) -> bool {
-    if !quiet(e) {
+    if !quiet(e) || e.updater().colors_pending() {
         return false;
     }
     let dark = e.is_dark();
@@ -908,7 +911,7 @@ fn click_preview(e: &EditorController, at: usize, flags: objc2_app_kit::NSEventM
     let preview = e.preview();
     let (Some(lm), Some(container), Some(window)) = (
         crate::util::layout_manager(preview),
-        unsafe { preview.textContainer() },
+        crate::util::text_container(preview),
         e.window(),
     ) else {
         return;
@@ -986,10 +989,11 @@ fn compose(view: &objc2_app_kit::NSTextView, text: &str) {
 }
 
 fn type_in_source(e: &EditorController, text: &str) {
-    unsafe {
-        e.source()
-            .insertText_replacementRange(&ns(text), NSRange::new(crate::util::to_usize(NSNotFound), 0))
-    };
+    crate::util::insert_text(
+        e.source(),
+        &ns(text),
+        NSRange::new(crate::util::to_usize(NSNotFound), 0),
+    );
 }
 
 /// A key as the window gets it from the keyboard: unlike `insertText`, it merges into the undo step the view has open.

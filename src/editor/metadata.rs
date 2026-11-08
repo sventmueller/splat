@@ -11,7 +11,7 @@ use objc2_app_kit::{
     NSAutoresizingMaskOptions, NSBackingStoreType, NSBeep, NSBezelStyle, NSButton, NSImage, NSModalResponse,
     NSModalResponseCancel, NSModalResponseOK, NSPanel, NSScrollView, NSTextField, NSView, NSWindow, NSWindowStyleMask,
 };
-use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{NSObjectProtocol, NSPoint, NSRect, NSSize};
 
 use crate::i18n::t;
 use crate::markdown::front_matter::Value;
@@ -163,19 +163,9 @@ impl MetadataForm {
             &ns("minus.circle"),
             Some(&ns(t("Feld entfernen"))),
         );
-        // SAFETY: The target is this form, which the sheet's completion handler keeps until the sheet has ended.
-        let remove = unsafe {
-            match &symbol {
-                Some(image) => {
-                    NSButton::buttonWithImage_target_action(image, Some(self), Some(sel!(formRemoveField:)), mtm)
-                }
-                None => NSButton::buttonWithTitle_target_action(
-                    &NSString::from_str("−"),
-                    Some(self),
-                    Some(sel!(formRemoveField:)),
-                    mtm,
-                ),
-            }
+        let remove = match &symbol {
+            Some(image) => crate::util::image_button(mtm, image, self, sel!(formRemoveField:)),
+            None => crate::util::button(mtm, "−", self, sel!(formRemoveField:)),
         };
         remove.setBordered(false);
         remove.setTag(id);
@@ -234,8 +224,7 @@ fn button(
     key: &str,
     x: f64,
 ) -> Retained<NSButton> {
-    // SAFETY: The target is the form, which the sheet's completion handler keeps until the sheet has ended.
-    let b = unsafe { NSButton::buttonWithTitle_target_action(&ns(title), Some(form), Some(action), mtm) };
+    let b = crate::util::button(mtm, title, form, action);
     b.setBezelStyle(NSBezelStyle::Push);
     b.setKeyEquivalent(&ns(key));
     b.sizeToFit();

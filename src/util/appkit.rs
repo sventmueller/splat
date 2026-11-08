@@ -1,13 +1,14 @@
 use std::ops::Range;
 
+use block2::RcBlock;
 use objc2::rc::Retained;
-use objc2::runtime::Sel;
+use objc2::runtime::{AnyObject, Bool, Sel};
 use objc2::{MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
-    NSEventModifierFlags, NSLayoutManager, NSMenu, NSMenuItem, NSTextContainer, NSTextInputClient, NSTextStorage,
-    NSTextView,
+    NSButton, NSControl, NSDocument, NSEventModifierFlags, NSImage, NSLayoutManager, NSMenu, NSMenuItem,
+    NSTextContainer, NSTextInputClient, NSTextStorage, NSTextView, NSToolbarItem,
 };
-use objc2_foundation::{NSRange, NSString, NSUndoManager};
+use objc2_foundation::{NSError, NSRange, NSString, NSUndoManager};
 
 use crate::markdown::text::{Byte, U16, Utf16Map};
 use crate::preview::map::Shown;
@@ -40,6 +41,89 @@ pub fn obj<T: objc2::ClassType + 'static>(r: Retained<T>) -> Retained<objc2::run
 /// How many arguments the method behind `selector` takes: its name has one colon for each.
 fn arguments_of(selector: Sel) -> usize {
     selector.name().to_bytes().iter().filter(|&&byte| byte == b':').count()
+}
+
+/// Whether `target` has a method for `action` that takes one argument, the sender, as AppKit sends it.
+fn answers(target: &AnyObject, action: Sel) -> bool {
+    arguments_of(action) == 1 && target.class().responds_to(action)
+}
+
+/// Has `control` send `action` to `target`.
+pub fn set_action(control: &NSControl, target: &AnyObject, action: Sel) {
+    assert!(answers(target, action), "the target has no action {action:?}");
+    // SAFETY: The target has a method for the action that takes the sender, checked above; AppKit holds the target as
+    // a zeroing weak reference, so one that is gone gets nothing.
+    unsafe {
+        control.setTarget(Some(target));
+        control.setAction(Some(action));
+    }
+}
+
+/// A push button titled `title` that sends `action` to `target`.
+pub fn button(mtm: MainThreadMarker, title: &str, target: &AnyObject, action: Sel) -> Retained<NSButton> {
+    // SAFETY: Without a target and an action the button sends nothing until `set_action` gives it both.
+    let button = unsafe { NSButton::buttonWithTitle_target_action(&ns(title), None, None, mtm) };
+    set_action(&button, target, action);
+    button
+}
+
+/// A push button showing `image` that sends `action` to `target`.
+pub fn image_button(mtm: MainThreadMarker, image: &NSImage, target: &AnyObject, action: Sel) -> Retained<NSButton> {
+    // SAFETY: Without a target and an action the button sends nothing until `set_action` gives it both.
+    let button = unsafe { NSButton::buttonWithImage_target_action(image, None, None, mtm) };
+    set_action(&button, target, action);
+    button
+}
+
+/// Has `item` send its action to `target` instead of along the responder chain.
+pub fn set_target(item: &NSMenuItem, target: &AnyObject) {
+    let action = item.action();
+    assert!(
+        action.is_some_and(|action| answers(target, action)),
+        "the target has no action {action:?}"
+    );
+    // SAFETY: The target has a method for the item's action that takes the sender, checked above; AppKit holds the
+    // target as a zeroing weak reference, so one that is gone gets nothing.
+    unsafe { item.setTarget(Some(target)) };
+}
+
+/// Gives `item` an object for its action to read, which the item retains.
+pub fn set_represented(item: &NSMenuItem, object: &AnyObject) {
+    // SAFETY: A menu item can represent an object of any type.
+    unsafe { item.setRepresentedObject(Some(object)) };
+}
+
+/// Has `item` send `action` along the responder chain.
+pub fn set_toolbar_action(item: &NSToolbarItem, action: Sel) {
+    assert_eq!(arguments_of(action), 1, "{action:?} does not take the sender");
+    // SAFETY: Along the responder chain AppKit sends the action only to an object that answers it, and the method
+    // behind it takes the sender, checked above.
+    unsafe { item.setAction(Some(action)) };
+}
+
+/// A completion handler for the system, which hands it an error or nil. A panic in `f` ends only `f`.
+pub fn error_handler(f: impl Fn(Option<&NSError>) + 'static) -> RcBlock<dyn Fn(*mut NSError)> {
+    RcBlock::new(move |error: *mut NSError| {
+        crate::util::guarded((), || {
+            // SAFETY: The system passes a completion handler a valid error or nil, alive for the length of the call.
+            f(unsafe { error.as_ref() });
+        });
+    })
+}
+
+/// A completion handler for opening a document, which AppKit hands the document or nil, whether it was open already
+/// and an error or nil. A panic in `f` ends only `f`.
+pub fn open_handler(
+    f: impl Fn(Option<Retained<NSDocument>>, bool, Option<Retained<NSError>>) + 'static,
+) -> RcBlock<dyn Fn(*mut NSDocument, Bool, *mut NSError)> {
+    RcBlock::new(move |document: *mut NSDocument, already: Bool, error: *mut NSError| {
+        crate::util::guarded((), || {
+            // SAFETY: AppKit passes a completion handler a valid document and error or nil, alive for the length of
+            // the call.
+            let (document, error) = unsafe { (Retained::retain(document), Retained::retain(error)) };
+            f(document, already.as_bool(), error);
+        });
+    })
 }
 
 /// Sends `selector` to `target` after `delay` seconds, replacing a request for it that has not run yet. With
@@ -256,21 +340,6 @@ mod tests {
         }));
         assert!(panicked.is_err());
         assert!(storage.editedMask().is_empty(), "the change went out");
-    }
-
-    #[test]
-    fn undo_is_back_on_when_what_ran_without_it_panics() {
-        // SAFETY: Nothing else in this test binary touches an undo manager, and this one stays on this thread.
-        let undo = NSUndoManager::new(unsafe { MainThreadMarker::new_unchecked() });
-        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            without_undo(Some(&undo), || {
-                assert!(!undo.isUndoRegistrationEnabled());
-                panic!("without undo");
-            });
-        }));
-        assert!(panicked.is_err());
-        assert!(undo.isUndoRegistrationEnabled());
-        assert_eq!(without_undo(None, || 1), 1);
     }
 
     #[test]

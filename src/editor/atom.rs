@@ -8,9 +8,9 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::{MainThreadMarker, MainThreadOnly, sel};
 use objc2_app_kit::{
-    NSAccessibility, NSAutoresizingMaskOptions, NSBezelStyle, NSButton, NSColor, NSControlSize, NSFont,
-    NSFontWeightRegular, NSLineBreakMode, NSPopUpButton, NSPopover, NSPopoverBehavior, NSScrollView,
-    NSSegmentSwitchTracking, NSSegmentedControl, NSTextField, NSTextInputClient, NSTextView, NSView, NSViewController,
+    NSAccessibility, NSAutoresizingMaskOptions, NSBezelStyle, NSColor, NSControlSize, NSFont, NSFontWeightRegular,
+    NSLineBreakMode, NSPopUpButton, NSPopover, NSPopoverBehavior, NSScrollView, NSSegmentSwitchTracking,
+    NSSegmentedControl, NSTextField, NSTextInputClient, NSTextView, NSView, NSViewController,
 };
 use objc2_foundation::{NSArray, NSPoint, NSRange, NSRect, NSRectEdge, NSSize, NSUndoManager, NSUserDefaults};
 
@@ -197,10 +197,7 @@ impl Row<'_> {
     }
 
     fn button(&mut self, title: &str, tip: &str, tag: isize) {
-        // SAFETY: The target is the window's controller, which outlives the popover holding the button.
-        let b = unsafe {
-            NSButton::buttonWithTitle_target_action(&ns(title), Some(self.target), Some(sel!(mdAtomSnippet:)), self.mtm)
-        };
+        let b = crate::util::button(self.mtm, title, self.target, sel!(mdAtomSnippet:));
         b.setBezelStyle(NSBezelStyle::Push);
         b.setControlSize(NSControlSize::Small);
         b.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
@@ -222,8 +219,7 @@ impl Row<'_> {
         if let Some(menu) = p.menu() {
             for (label, tag) in items {
                 let item = crate::util::tagged(self.mtm, label, sel!(mdAtomSnippet:), "", *tag);
-                // SAFETY: The target is the window's controller, which outlives the popover holding the menu.
-                unsafe { item.setTarget(Some(self.target)) };
+                crate::util::set_target(&item, self.target);
                 menu.addItem(&item);
             }
         }
@@ -318,16 +314,17 @@ fn building_blocks(row: &mut Row, kind: AtomKind, diagram_kind: MermaidKind) {
 /// The switch between the visual editor and LaTeX, at the right end of the status line.
 fn mode_switch(target: &AnyObject, visual: bool, width: f64, mtm: MainThreadMarker) -> Retained<NSSegmentedControl> {
     let labels = NSArray::from_retained_slice(&[ns(t("Visuell")), ns("LaTeX")]);
-    // SAFETY: The target is the window's controller, which outlives the popover holding the control.
+    // SAFETY: Without a target and an action the control sends nothing until `set_action` gives it both.
     let mode = unsafe {
         NSSegmentedControl::segmentedControlWithLabels_trackingMode_target_action(
             &labels,
             NSSegmentSwitchTracking::SelectOne,
-            Some(target),
-            Some(sel!(mdAtomMode:)),
+            None,
+            None,
             mtm,
         )
     };
+    crate::util::set_action(&mode, target, sel!(mdAtomMode:));
     mode.setControlSize(NSControlSize::Small);
     mode.setFont(Some(&NSFont::systemFontOfSize(NSFont::smallSystemFontSize())));
     mode.setSelectedSegment(if visual { 0 } else { 1 });

@@ -564,7 +564,7 @@ Súbor Markdown môže pochádzať od kohokoľvek, preto Splat považuje každý
 - **Kópie neuloženého textu** zostávajú na tomto Macu, vo vašom priečinku Knižnica, na obnovenie po páde. Odídu s uložením alebo normálnym ukončením Splatu; kópie, ktoré zanechal pád, zostanú v priečinku obnovy, kým ich nevymažete.
 - **Odkazy** nikdy nespustia program kliknutím. Webové a poštové odkazy sa otvoria ako zvyčajne; odkazy do iných aplikácií sa najprv opýtajú.
 - **HTML v dokumentoch** číta vlastný parser Splatu. Skripty, štýly, rámce a formuláre sa nikdy nespustia.
-- **Exporty** neobsahujú skripty. Stránky HTML si ponechajú iba pevný zoznam neškodných značiek a atribútov, ako na GitHube, plus politiku zabezpečenia obsahu. Súbory Word odkazujú iba na adresy `http`, `https` a `mailto`.
+- **Exporty** neobsahujú skripty. Stránky HTML si ponechajú iba pevný zoznam neškodných značiek a atribútov, ako na GitHube, plus politiku zabezpečenia obsahu. Súbory Word odkazujú iba na adresy `http`, `https` a `mailto`, okrem odkazov, ktoré so sebou prinesie vami zvolená šablóna Word.
 - **Podpis kódu** s Hardened Runtime. Splat beží bez App Sandboxu, aby mohol zobrazovať obrázky vedľa vašich dokumentov bez pýtania sa na každý priečinok; izolácia celého dekódovania to vyvažuje.
 
 ## Veľké dokumenty
@@ -579,7 +579,7 @@ Splat zostáva pohotový aj pri dokumentoch s veľkosťou niekoľkých megabajto
 - Od približne 200 KB sa okno dokumentu otvorí pred parsovaním; pri 5 MB nasledujú farby a náhľad asi o štvrť sekundy neskôr.
 - Všetky obrázky spolu, vrátane vzorcov a diagramov, zaberajú najviac štvrtinu pamäte Macu a polovicu z toho, kým je pamäte málo. Nad túto hranicu sa ďalšie obrázky zobrazujú ako zástupné symboly, kým nebude znova miesto.
 
-Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klávesu: zmeny definície alebo odkazov poznámky pod čiarou, vedľa poznámky pod čiarou v texte, na úplnom konci dokumentu vedľa poznámky pod čiarou, vo front matter alebo v definíciách referenčných odkazov a každá zmena v dokumente s blokmi komentárov `%%` alebo s dvakrát definovanou poznámkou pod čiarou alebo s poznámkou vnútri citácie či zoznamu. Pamäť rastie so súborom, zhruba na 115 – 160 MB pre 1 MB Markdownu a 340 – 510 MB pre 10 MB.
+Niektoré zmeny sa spracúvajú celé, pri 10 MB okolo 300 ms na stlačenie klávesu: zmeny definície alebo odkazov poznámky pod čiarou, vedľa poznámky pod čiarou v texte, na úplnom konci dokumentu vedľa poznámky pod čiarou, vo front matter alebo v definíciách referenčných odkazov a každá zmena v dokumente s blokmi komentárov `%%`, s dvakrát definovanou poznámkou pod čiarou alebo s poznámkou vnútri citácie či zoznamu, alebo s viac ako 1000 poznámkami pod čiarou v texte či neuzavretými značkami vzorcov. Pamäť rastie so súborom, zhruba na 115 – 160 MB pre 1 MB Markdownu a 340 – 510 MB pre 10 MB.
 
 ## Známe obmedzenia
 

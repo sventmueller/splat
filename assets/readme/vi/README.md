@@ -563,7 +563,7 @@ Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi t
 - **Bản sao của văn bản chưa lưu** ở lại trên máy Mac này, trong thư mục Thư viện của bạn, để khôi phục sau khi bị sập. Chúng biến mất khi lưu hoặc khi Splat kết thúc bình thường; các bản sao mà lần sập để lại vẫn ở trong thư mục khôi phục cho đến khi bạn xóa chúng.
 - **Liên kết** không bao giờ khởi chạy chương trình chỉ bằng một cú bấm. Liên kết web và thư mở như thường lệ; liên kết sang ứng dụng khác hỏi trước.
 - **HTML trong tài liệu** được trình phân tích riêng của Splat đọc. Tập lệnh, kiểu, khung và biểu mẫu không bao giờ chạy.
-- **Các bản xuất** không mang tập lệnh. Trang HTML chỉ giữ một danh sách cố định các thẻ và thuộc tính vô hại, như GitHub, cộng với một chính sách bảo mật nội dung. Tệp Word chỉ liên kết các địa chỉ `http`, `https` và `mailto`.
+- **Các bản xuất** không mang tập lệnh. Trang HTML chỉ giữ một danh sách cố định các thẻ và thuộc tính vô hại, như GitHub, cộng với một chính sách bảo mật nội dung. Tệp Word chỉ liên kết các địa chỉ `http`, `https` và `mailto`, ngoài các liên kết đi kèm mẫu Word mà bạn đã chọn.
 - **Ký mã** với Hardened Runtime. Splat chạy không có App Sandbox để có thể hiển thị hình ảnh cạnh tài liệu của bạn mà không phải hỏi từng thư mục; việc cô lập toàn bộ khâu giải mã bù đắp cho điều này.
 
 ## Tài liệu lớn
@@ -578,7 +578,7 @@ Splat vẫn phản hồi nhanh với tài liệu vài megabyte:
 - Từ khoảng 200 KB, tài liệu mở cửa sổ trước khi được phân tích; ở 5 MB, màu sắc và bản xem trước theo sau khoảng một phần tư giây.
 - Tất cả hình ảnh cộng lại, kể cả công thức và sơ đồ, chiếm tối đa một phần tư bộ nhớ của máy Mac, và một nửa mức đó khi bộ nhớ thiếu. Vượt quá mức đó, các hình ảnh tiếp theo hiển thị dưới dạng phần giữ chỗ cho đến khi lại có chỗ.
 
-Một số thay đổi được xử lý toàn bộ, khoảng 300 ms cho mỗi lần gõ phím ở 10 MB: những thay đổi ở định nghĩa hoặc tham chiếu của chú thích cuối trang, bên cạnh chú thích cuối trang trong dòng, ở ngay cuối tài liệu cạnh một chú thích cuối trang, ở front matter hoặc ở các định nghĩa tham chiếu liên kết, và mọi thay đổi trong tài liệu có khối chú thích `%%` hoặc có chú thích cuối trang được định nghĩa hai lần hay nằm trong một trích dẫn hoặc danh sách. Bộ nhớ tăng theo tệp, đến khoảng 115–160 MB cho 1 MB Markdown và 340–510 MB cho 10 MB.
+Một số thay đổi được xử lý toàn bộ, khoảng 300 ms cho mỗi lần gõ phím ở 10 MB: những thay đổi ở định nghĩa hoặc tham chiếu của chú thích cuối trang, bên cạnh chú thích cuối trang trong dòng, ở ngay cuối tài liệu cạnh một chú thích cuối trang, ở front matter hoặc ở các định nghĩa tham chiếu liên kết, và mọi thay đổi trong tài liệu có khối chú thích `%%`, có chú thích cuối trang được định nghĩa hai lần hay nằm trong một trích dẫn hoặc danh sách, hoặc có hơn 1000 chú thích cuối trang trong dòng hay dấu công thức chưa đóng. Bộ nhớ tăng theo tệp, đến khoảng 115–160 MB cho 1 MB Markdown và 340–510 MB cho 10 MB.
 
 ## Hạn chế đã biết
 

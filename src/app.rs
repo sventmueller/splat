@@ -1,7 +1,6 @@
-use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject};
-use objc2::{MainThreadMarker, MainThreadOnly, define_class, msg_send, sel};
+use objc2::{MainThreadMarker, MainThreadOnly, Message, define_class, msg_send, sel};
 use objc2_app_kit::{
     NSApplication, NSApplicationDelegate, NSControlStateValueOff, NSControlStateValueOn, NSDocumentController,
     NSMenuItem, NSMenuItemValidation, NSWorkspace,
@@ -195,20 +194,18 @@ pub(crate) fn make_default(kind: &str) {
     let Some(kind) = UTType::typeWithIdentifier(&ns(kind)) else {
         return;
     };
-    let done = RcBlock::new(|error: *mut NSError| {
-        guarded((), || {
-            // SAFETY: the completion handler's error is nil or a valid NSError for the duration of the call.
-            let Some(error) = (unsafe { Retained::retain(error) }) else {
-                return;
-            };
-            if canceled(&error) {
-                return;
+    let done = crate::util::error_handler(|error| {
+        let Some(error) = error else {
+            return;
+        };
+        if canceled(error) {
+            return;
+        }
+        let error = error.retain();
+        main_soon(move || {
+            if let Some(mtm) = MainThreadMarker::new() {
+                NSApplication::sharedApplication(mtm).presentError(&error);
             }
-            main_soon(move || {
-                if let Some(mtm) = MainThreadMarker::new() {
-                    NSApplication::sharedApplication(mtm).presentError(&error);
-                }
-            });
         });
     });
     NSWorkspace::sharedWorkspace().setDefaultApplicationAtURL_toOpenContentType_completionHandler(

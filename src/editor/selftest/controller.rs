@@ -230,8 +230,7 @@ fn type_in_editor(e: &EditorController) {
     let view = e.atom_editor().code_view().expect("an open editor");
     let all = NSRange::new(0, view.string().length());
     view.setSelectedRange(all);
-    // SAFETY: The range lies within the view's text.
-    unsafe { view.insertText_replacementRange(&ns("y"), all) };
+    crate::util::insert_text(&view, &ns("y"), all);
 }
 
 fn is_open(e: &EditorController) -> bool {

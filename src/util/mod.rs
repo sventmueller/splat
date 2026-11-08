@@ -9,7 +9,8 @@ pub(crate) use appkit::constant;
 #[cfg(test)]
 pub use appkit::split_shortcut;
 pub use appkit::{
-    byte_range_to_ns, editing, from_nsrange, insert_text, item, layout_manager, now, ns, obj, perform_later, separator,
+    button, byte_range_to_ns, editing, error_handler, from_nsrange, image_button, insert_text, item, layout_manager,
+    now, ns, obj, open_handler, perform_later, separator, set_action, set_represented, set_target, set_toolbar_action,
     shown_from_ns, shown_to_ns, storage, submenu, tagged, text_container, to_isize, to_nsrange, to_usize, without_undo,
 };
 pub use files::{file_name_of, read_regular_file, stamp};

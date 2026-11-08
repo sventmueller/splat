@@ -564,7 +564,7 @@ File Markdown bisa datang dari siapa saja, jadi Splat memperlakukan setiap dokum
 - **Salinan teks yang belum disimpan** tetap berada di Mac ini, di folder Library Anda, untuk pemulihan setelah crash. Salinan itu hilang bersama penyimpanan atau berakhirnya Splat secara normal; salinan yang ditinggalkan crash tetap di folder pemulihan sampai Anda menghapusnya.
 - **Tautan** tidak pernah menjalankan program lewat klik. Tautan web dan email terbuka seperti biasa; tautan ke app lain meminta konfirmasi lebih dahulu.
 - **HTML di dokumen** dibaca oleh parser Splat sendiri. Skrip, gaya, bingkai, dan formulir tidak pernah berjalan.
-- **Ekspor** tidak membawa skrip. Halaman HTML hanya mempertahankan daftar tetap berisi tag dan atribut yang tidak berbahaya, seperti GitHub, ditambah content security policy. File Word hanya menautkan alamat `http`, `https`, dan `mailto`.
+- **Ekspor** tidak membawa skrip. Halaman HTML hanya mempertahankan daftar tetap berisi tag dan atribut yang tidak berbahaya, seperti GitHub, ditambah content security policy. File Word hanya menautkan alamat `http`, `https`, dan `mailto`, kecuali tautan yang dibawa oleh template Word yang Anda pilih.
 - **Penandatanganan kode** dengan Hardened Runtime. Splat berjalan tanpa App Sandbox agar dapat menampilkan gambar di samping dokumen Anda tanpa meminta izin untuk setiap folder; isolasi seluruh proses dekode mengimbanginya.
 
 ## Dokumen besar
@@ -579,7 +579,7 @@ Splat tetap responsif dengan dokumen berukuran beberapa megabyte:
 - Mulai sekitar 200 KB, dokumen membuka jendelanya sebelum diurai; pada 5 MB, warna dan pratinjau menyusul sekitar seperempat detik kemudian.
 - Semua gambar bersama-sama, termasuk rumus dan diagram, memakai paling banyak seperempat memori Mac, dan setengahnya saat memori sedang sedikit. Di luar itu, gambar berikutnya ditampilkan sebagai placeholder sampai ada ruang lagi.
 
-Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB: perubahan pada definisi atau referensi catatan kaki, di dekat catatan kaki sebaris, di ujung akhir dokumen di dekat catatan kaki, pada front matter atau pada definisi referensi tautan, dan setiap perubahan di dokumen dengan blok komentar `%%` atau dengan catatan kaki yang didefinisikan dua kali atau di dalam kutipan atau daftar. Memori bertambah mengikuti ukuran file, hingga sekitar 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
+Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB: perubahan pada definisi atau referensi catatan kaki, di dekat catatan kaki sebaris, di ujung akhir dokumen di dekat catatan kaki, pada front matter atau pada definisi referensi tautan, dan setiap perubahan di dokumen dengan blok komentar `%%`, dengan catatan kaki yang didefinisikan dua kali atau di dalam kutipan atau daftar, atau dengan lebih dari 1000 catatan kaki sebaris atau tanda rumus yang tidak ditutup. Memori bertambah mengikuti ukuran file, hingga sekitar 115–160 MB untuk 1 MB Markdown dan 340–510 MB untuk 10 MB.
 
 ## Keterbatasan yang diketahui
 

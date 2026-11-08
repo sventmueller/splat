@@ -11,11 +11,8 @@ use std::time::{Duration, Instant};
 
 use block2::RcBlock;
 use objc2::MainThreadOnly;
-use objc2::rc::Retained;
-use objc2_app_kit::{
-    NSAlert, NSAlertFirstButtonReturn, NSBeep, NSDocument, NSDocumentController, NSOpenPanel, NSWorkspace,
-};
-use objc2_foundation::{NSArray, NSError, NSURL};
+use objc2_app_kit::{NSAlert, NSAlertFirstButtonReturn, NSBeep, NSDocumentController, NSOpenPanel, NSWorkspace};
+use objc2_foundation::{NSArray, NSURL};
 use splat_notes::{FileHits, Query, Rewrite, Tree};
 
 use splat_editor_state::notes::{query_of, renamed_path, rows_of_hits, rows_of_tree, search_status, write_rewrites};
@@ -420,45 +417,39 @@ impl Notes<'_> {
             self.state.hits.borrow().clone(),
         );
         let handed = std::cell::RefCell::new(Some(handed));
-        let done = RcBlock::new(
-            move |document: *mut NSDocument, already: objc2::runtime::Bool, error: *mut NSError| {
-                guarded((), || {
-                    // SAFETY: The completion handler's document is nil or a valid NSDocument for the duration of the call.
-                    let Some(document) = (unsafe { Retained::retain(document) }) else {
-                        // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
-                        if let Some(error) = unsafe { Retained::retain(error) } {
-                            crate::diag::report("opening a note failed", error.code());
-                            objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
-                        }
-                        return;
-                    };
-                    if !already.as_bool() {
-                        document.makeWindowControllers();
-                        let tab_window = document.windowControllers().firstObject().and_then(|c| c.window());
-                        if let (Some(window), Some(tab_window)) = (&window, tab_window) {
-                            window.addTabbedWindow_ordered(&tab_window, objc2_app_kit::NSWindowOrderingMode::Above);
-                        }
-                    }
-                    document.showWindows();
-                    let Some(editor) = document.downcast::<MdDocument>().ok().and_then(|d| d.editor()) else {
-                        return;
-                    };
-                    if let Some((chosen, tree, wanted, hits)) = handed.borrow_mut().take() {
-                        editor.inherit_notes(Inherited {
-                            tab,
-                            chosen,
-                            tree,
-                            wanted,
-                            hits,
-                            keep_shown: already.as_bool(),
-                        });
-                    }
-                    if let Some((line, column)) = at {
-                        editor.handle(Message::RevealPlace { line, column });
-                    }
+        let done = crate::util::open_handler(move |document, already, error| {
+            let Some(document) = document else {
+                if let Some(error) = error {
+                    crate::diag::report("opening a note failed", error.code());
+                    objc2_app_kit::NSApplication::sharedApplication(mtm).presentError(&error);
+                }
+                return;
+            };
+            if !already {
+                document.makeWindowControllers();
+                let tab_window = document.windowControllers().firstObject().and_then(|c| c.window());
+                if let (Some(window), Some(tab_window)) = (&window, tab_window) {
+                    window.addTabbedWindow_ordered(&tab_window, objc2_app_kit::NSWindowOrderingMode::Above);
+                }
+            }
+            document.showWindows();
+            let Some(editor) = document.downcast::<MdDocument>().ok().and_then(|d| d.editor()) else {
+                return;
+            };
+            if let Some((chosen, tree, wanted, hits)) = handed.borrow_mut().take() {
+                editor.inherit_notes(Inherited {
+                    tab,
+                    chosen,
+                    tree,
+                    wanted,
+                    hits,
+                    keep_shown: already,
                 });
-            },
-        );
+            }
+            if let Some((line, column)) = at {
+                editor.handle(Message::RevealPlace { line, column });
+            }
+        });
         NSDocumentController::sharedDocumentController(self.host.mtm())
             .openDocumentWithContentsOfURL_display_completionHandler(&address, false, &done);
     }
@@ -625,24 +616,20 @@ impl Notes<'_> {
             let report = std::cell::RefCell::new(Some(report));
             let already_failed = failed.clone();
             let from_for_report = from.clone();
-            let moved = RcBlock::new(move |error: *mut NSError| {
-                guarded((), || {
-                    // SAFETY: The completion handler's error is nil or a valid NSError for the duration of the call.
-                    let error = unsafe { error.as_ref() };
-                    let (Some(writes), Some(report)) = (writes.borrow_mut().take(), report.borrow_mut().take()) else {
-                        return;
-                    };
-                    let mut failed = already_failed.clone();
-                    if let Some(error) = error {
-                        crate::diag::report("moving a note failed", error.code());
-                        failed.push(from_for_report.clone());
-                        report(failed);
-                        return;
-                    }
-                    lane.run(move || {
-                        failed.extend(write_rewrites(&writes));
-                        report(failed);
-                    });
+            let moved = crate::util::error_handler(move |error| {
+                let (Some(writes), Some(report)) = (writes.borrow_mut().take(), report.borrow_mut().take()) else {
+                    return;
+                };
+                let mut failed = already_failed.clone();
+                if let Some(error) = error {
+                    crate::diag::report("moving a note failed", error.code());
+                    failed.push(from_for_report.clone());
+                    report(failed);
+                    return;
+                }
+                lane.run(move || {
+                    failed.extend(write_rewrites(&writes));
+                    report(failed);
                 });
             });
             document.moveToURL_completionHandler(&address, Some(&moved));

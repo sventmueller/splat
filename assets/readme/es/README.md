@@ -564,7 +564,7 @@ Un archivo Markdown puede venir de cualquiera, así que Splat trata todo documen
 - **Las copias del texto sin guardar** se quedan en este Mac, en tu carpeta Library, para la recuperación tras un cierre inesperado. Desaparecen al guardar o al terminar Splat con normalidad; las copias que dejó un cierre inesperado permanecen en la carpeta de recuperación hasta que las borres.
 - **Los enlaces** nunca inician un programa con un clic. Los enlaces web y de correo se abren como siempre; los enlaces a otras apps preguntan antes.
 - **El HTML de los documentos** lo lee el propio parser de Splat. Los scripts, los estilos, los marcos y los formularios nunca se ejecutan.
-- **Las exportaciones** no llevan scripts. Las páginas HTML conservan solo una lista fija de etiquetas y atributos inofensivos, como hace GitHub, más una política de seguridad de contenido. Los archivos de Word enlazan solo direcciones `http`, `https` y `mailto`.
+- **Las exportaciones** no llevan scripts. Las páginas HTML conservan solo una lista fija de etiquetas y atributos inofensivos, como hace GitHub, más una política de seguridad de contenido. Los archivos de Word enlazan solo direcciones `http`, `https` y `mailto`, aparte de los enlaces que traiga una plantilla de Word que hayas elegido.
 - **Firma de código** con Hardened Runtime. Splat se ejecuta sin App Sandbox para poder mostrar imágenes junto a tus documentos sin pedir permiso para cada carpeta; el aislamiento de toda la decodificación lo compensa.
 
 ## Documentos grandes
@@ -579,7 +579,7 @@ Splat sigue respondiendo con documentos de varios megabytes:
 - A partir de unos 200 KB, un documento abre su ventana antes de analizarse; con 5 MB, los colores y la previsualización llegan aproximadamente un cuarto de segundo después.
 - Todas las imágenes juntas, incluidas las fórmulas y los diagramas, ocupan como máximo una cuarta parte de la memoria del Mac, y la mitad de eso mientras escasea la memoria. A partir de ahí, las demás imágenes se muestran como marcadores de posición hasta que vuelve a haber espacio.
 
-Algunos cambios se procesan por completo, con unos 300 ms por pulsación a 10 MB: los de la definición o las referencias de una nota al pie, junto a una nota al pie en línea, justo al final de un documento junto a una nota al pie, en el front matter o en definiciones de referencia de enlaces, y todo cambio en un documento con bloques de comentarios `%%` o con una nota al pie definida dos veces o dentro de una cita o lista. La memoria crece con el archivo, hasta unos 115–160 MB para 1 MB de Markdown y 340–510 MB para 10 MB.
+Algunos cambios se procesan por completo, con unos 300 ms por pulsación a 10 MB: los de la definición o las referencias de una nota al pie, junto a una nota al pie en línea, justo al final de un documento junto a una nota al pie, en el front matter o en definiciones de referencia de enlaces, y todo cambio en un documento con bloques de comentarios `%%`, con una nota al pie definida dos veces o dentro de una cita o lista, o con más de 1000 notas al pie en línea o marcas de fórmula sin cerrar. La memoria crece con el archivo, hasta unos 115–160 MB para 1 MB de Markdown y 340–510 MB para 10 MB.
 
 ## Limitaciones conocidas
 

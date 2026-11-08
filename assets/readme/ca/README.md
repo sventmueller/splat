@@ -563,7 +563,7 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 - **Les còpies del text sense desar** es queden en aquest Mac, a la carpeta Library, per a la recuperació després d’una fallada. Desapareixen amb el desament o amb el tancament normal del Splat; les còpies que una fallada ha deixat es queden a la carpeta de recuperació fins que les eliminis.
 - **Els enllaços** mai inicien un programa amb un clic. Els enllaços web i de correu s’obren com sempre; els enllaços a altres apps demanen confirmació.
 - **L’HTML als documents** el llegeix l’analitzador propi del Splat. Els scripts, els estils, els marcs i els formularis no s’executen mai.
-- **Les exportacions** no porten scripts. Les pàgines HTML només conserven una llista fixa d’etiquetes i atributs inofensius, com fa GitHub, més una política de seguretat de contingut. Els fitxers de Word només enllacen adreces `http`, `https` i `mailto`.
+- **Les exportacions** no porten scripts. Les pàgines HTML només conserven una llista fixa d’etiquetes i atributs inofensius, com fa GitHub, més una política de seguretat de contingut. Els fitxers de Word només enllacen adreces `http`, `https` i `mailto`, a part dels enllaços que porti una plantilla del Word que hagis triat.
 - **Signatura de codi** amb el Hardened Runtime. El Splat s’executa sense l’App Sandbox perquè pugui mostrar imatges al costat dels teus documents sense demanar permís per a cada carpeta; l’aïllament de tota la descodificació ho compensa.
 
 ## Documents grans
@@ -578,7 +578,7 @@ El Splat continua responent amb documents de diversos megabytes:
 - A partir d’uns 200 KB, un document obre la finestra abans d’analitzar-se; a 5 MB, els colors i la previsualització arriben aproximadament un quart de segon més tard.
 - Totes les imatges juntes, incloses les fórmules i els diagrames, ocupen com a màxim una quarta part de la memòria del Mac, i la meitat d’això mentre hi ha poca memòria. Més enllà d’això, les altres imatges es mostren com a marcadors de posició fins que torna a haver-hi espai.
 
-Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 MB: els de la definició o de les referències d’una nota a peu de pàgina, els que hi ha al costat d’una nota en línia, al final mateix d’un document al costat d’una nota a peu de pàgina, al front matter o a definicions de referències d’enllaços, i tots els canvis en un document amb blocs de comentaris `%%` o amb una nota a peu de pàgina definida dues vegades o dins d’una cita o d’una llista. La memòria creix amb el fitxer, fins a uns 115–160 MB per a 1 MB de Markdown i 340–510 MB per a 10 MB.
+Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 MB: els de la definició o de les referències d’una nota a peu de pàgina, els que hi ha al costat d’una nota en línia, al final mateix d’un document al costat d’una nota a peu de pàgina, al front matter o a definicions de referències d’enllaços, i tots els canvis en un document amb blocs de comentaris `%%`, amb una nota a peu de pàgina definida dues vegades o dins d’una cita o d’una llista, o amb més de 1000 notes en línia o marques de fórmula sense tancar. La memòria creix amb el fitxer, fins a uns 115–160 MB per a 1 MB de Markdown i 340–510 MB per a 10 MB.
 
 ## Limitacions conegudes
 
