@@ -91,6 +91,11 @@ pub(crate) fn coverage(library: bool) -> Result<(), String> {
         Some((key.to_string(), value.trim_matches('\'').to_string()))
     }));
     run(cargo(&["llvm-cov", "clean", "--workspace"], &env))?;
+    for entry in fs::read_dir(&target).into_iter().flatten().flatten() {
+        if entry.path().extension().is_some_and(|e| e == "partial") {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
     run(cargo(&["test", "--release", "--workspace"], &env))?;
     if !library {
         let _ = fs::remove_dir_all(crate::selftest::skipped_dir());

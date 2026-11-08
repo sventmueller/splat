@@ -1,5 +1,6 @@
-//! The decoder helper, started the way the app starts it: it decodes images, and it can neither read files nor
-//! open connections.
+//! What the decoding service makes of images, run on its standard streams as `--stdio` and `--stdio-native` start it.
+//! That it reaches neither files nor the network holds in the sandbox macOS starts it in from the app bundle, which the
+//! self-test checks through the app.
 
 use std::io::{Read, Write};
 use std::process::{Child, Command, Stdio};
@@ -10,8 +11,8 @@ fn limited() -> splat_testkit::TimeLimit {
 }
 
 fn helper() -> Child {
-    Command::new(env!("CARGO_BIN_EXE_splat"))
-        .arg("--splat-decoder")
+    Command::new(env!("CARGO_BIN_EXE_splat-decoder"))
+        .arg("--stdio")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -143,34 +144,9 @@ fn an_svg_image_keeps_its_text_and_its_colored_emoji() {
     );
 }
 
-unsafe extern "C" {
-    fn fcntl(fd: i32, command: i32, ...) -> i32;
-}
-
-#[test]
-fn the_helper_can_neither_read_files_nor_connect() {
-    let _limit = limited();
-    const F_SETFD: i32 = 2;
-    let path = std::env::temp_dir().join(format!("splat-secret-{}", std::process::id()));
-    std::fs::write(&path, "secret").unwrap();
-    // A file the app left open without close-on-exec, as a library might.
-    let open = std::fs::File::open(&path).unwrap();
-    // SAFETY: Clearing the flags of a descriptor this test owns for as long as the file lives.
-    assert_eq!(unsafe { fcntl(std::os::fd::AsRawFd::as_raw_fd(&open), F_SETFD, 0) }, 0);
-    let mut child = helper();
-    drop(open);
-    send(&mut child, 3, path.to_str().unwrap().as_bytes());
-    assert_eq!(
-        read(&mut child, 2),
-        [3, 0],
-        "the helper read the file or reached the network"
-    );
-    let _ = std::fs::remove_file(&path);
-}
-
 fn native_helper() -> Child {
-    Command::new(env!("CARGO_BIN_EXE_splat"))
-        .arg("--splat-native-decoder")
+    Command::new(env!("CARGO_BIN_EXE_splat-decoder"))
+        .arg("--stdio-native")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -197,7 +173,7 @@ fn pixels_of(child: &mut Child, bytes: &[u8], side: u32) -> Option<Picture> {
 /// What only the system reads, in every kind it comes in here: each must show something, in a process that started
 /// without any of it having been read yet.
 #[test]
-fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
+fn the_system_decoders_hand_back_pixels() {
     let _limit = limited();
     let mut child = native_helper();
     for (name, bytes) in [
@@ -217,7 +193,7 @@ fn the_system_decoders_work_inside_their_sandbox_and_hand_back_pixels() {
 
 /// A pasted TIFF becomes a PNG of the full size, which pixels drawn for the preview would not be.
 #[test]
-fn a_pasted_tiff_becomes_a_png_inside_the_sandbox() {
+fn a_pasted_tiff_becomes_a_png() {
     let _limit = limited();
     const PASTED_TIFF: u8 = 5;
     let tiff = include_bytes!("../src/editor/warmup/sample.tiff").as_slice();
@@ -260,21 +236,4 @@ fn colours_come_apart_from_their_alpha() {
     let px = &pixels[..4];
     assert!(px[0] > 240 && px[1] < 10 && px[2] < 10, "{px:?}");
     assert!((120..=135).contains(&px[3]), "{px:?}");
-}
-
-/// The sandbox of this helper is wider than the other's by what the system's decoders need, and by nothing else.
-#[test]
-fn the_helper_for_the_system_decoders_reads_no_files_and_opens_no_connections() {
-    let _limit = limited();
-    const SELF_CHECK: u8 = 3;
-    let secret = std::env::temp_dir().join(format!("splat-native-secret-{}", std::process::id()));
-    std::fs::write(&secret, "secret").unwrap();
-    let mut child = native_helper();
-    send(&mut child, SELF_CHECK, secret.to_str().unwrap().as_bytes());
-    assert_eq!(
-        read(&mut child, 2),
-        [SELF_CHECK, 0],
-        "it reached the file or the network"
-    );
-    std::fs::remove_file(&secret).unwrap();
 }

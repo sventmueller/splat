@@ -47,6 +47,8 @@ pub(super) struct EditState {
     preview_edit: RefCell<Option<Announced>>,
     /// Toolbar and menu validation asks for the formatting at the caret once per item and event.
     active_cache: RefCell<Option<(ActiveKey, Active)>>,
+    /// A picture was pasted into a document whose folder the sandbox keeps closed; it goes in once the folder is granted.
+    paste_after_grant: std::cell::Cell<bool>,
 }
 
 impl EditState {
@@ -235,6 +237,7 @@ impl Editing<'_> {
             ZoomReset => self.host.updater().set_zoom(1.0),
             NewTab => super::window::new_tab(self.host.mtm(), self.host.window().as_deref()),
             LoadRemoteImages => self.host.pictures().allow_remote_images(),
+            GrantFolder => self.grant_folder(),
             ExportHtml => self.host.sharing().export(super::export::ExportKind::Html),
             ExportWord => self.host.sharing().export(super::export::ExportKind::Word),
             EditAtomAt => {
@@ -804,6 +807,27 @@ impl Editing<'_> {
         });
     }
 
+    /// The folder around the document was granted: a picture pasted before goes in now.
+    pub(super) fn folder_granted(&self) {
+        if self.state.paste_after_grant.take() {
+            self.paste_image(&objc2_app_kit::NSPasteboard::generalPasteboard());
+        }
+    }
+
+    /// Asks for the folder around the document, suggesting its repository, where the change marks need a grant as well.
+    fn grant_folder(&self) {
+        let (Some(window), Some(dir)) = (self.host.window(), self.host.doc_dir()) else {
+            return;
+        };
+        let suggested = super::env::repository_root(&dir).map_or(dir.clone(), Path::to_path_buf);
+        let messenger = self.host.object().messenger();
+        crate::grants::ask(self.host.mtm(), Some(&window), &suggested, move |granted| {
+            if granted {
+                messenger.send_soon(Message::FolderGranted);
+            }
+        });
+    }
+
     pub(super) fn image_chosen(&self, path: &Path) {
         self.host.updater().update_now();
         let (sel, _) = self.selected_source();
@@ -845,6 +869,11 @@ impl Editing<'_> {
             self.ask_to_save_before_pasting();
             return true;
         };
+        if !crate::grants::reaches(&dir) {
+            self.state.paste_after_grant.set(true);
+            self.grant_folder();
+            return true;
+        }
         let stem = format!("{} {}", t("Bild"), crate::util::now("yyyy-MM-dd HH.mm.ss"));
         let messenger = self.host.object().messenger();
         crate::util::BACKGROUND.run(move || {

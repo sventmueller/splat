@@ -67,6 +67,9 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
             let _ = Command::new("open").arg("-a").arg(&app).status();
         }
         if let Some(status) = child.try_wait().map_err(|e| format!("{}: {e}", binary.display()))? {
+            if mode == "probe" {
+                let _ = hdiutil(&["detach", "-force"], &work.join(FULL_DISK));
+            }
             println!("output in {}", work.display());
             if let Some(sampler) = sampler.as_mut() {
                 sampler.wait().map_err(|e| format!("sample: {e}"))?;
@@ -107,6 +110,72 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
         }
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
+}
+
+/// The programs a self-test may have the runner start, which the sandboxed app cannot.
+const RUN_FOR_THE_APP: [&str; 3] = ["git", "/opt/homebrew/bin/pdftotext", "/usr/local/bin/pdftotext"];
+
+/// Runs a command the app asked for, in the folder of the file the answer goes to: the exit status on the first line, then
+/// what the command wrote. The file appears whole or not at all.
+fn run_for_the_app(request: &str) {
+    let mut parts = request.split('\u{1f}');
+    let (Some(answer), Some(program)) = (parts.next(), parts.next()) else {
+        return;
+    };
+    let answer = std::path::Path::new(answer);
+    let Some(dir) = answer.parent().filter(|_| RUN_FOR_THE_APP.contains(&program)) else {
+        return;
+    };
+    let text = match Command::new(program).args(parts).current_dir(dir).output() {
+        Ok(output) => format!(
+            "{}\n{}",
+            output.status.code().unwrap_or(-1),
+            String::from_utf8_lossy(&output.stdout)
+        ),
+        Err(_) => "-1\n".to_string(),
+    };
+    let partial = answer.with_extension("partial");
+    if fs::write(&partial, text).is_ok() {
+        let _ = fs::rename(&partial, answer);
+    }
+}
+
+/// Ends a process of the app's as a crash would, which the sandboxed app cannot do itself.
+fn end_process(pid: &str) {
+    if pid.parse::<u32>().is_ok_and(|pid| pid > 0) {
+        let _ = Command::new("/bin/kill").args(["-KILL", pid]).status();
+    }
+}
+
+/// Where the small disk the probe saves to until it is full is mounted, under the run's folder.
+const FULL_DISK: &str = "Klein";
+
+fn hdiutil(args: &[&str], path: &std::path::Path) -> bool {
+    Command::new("/usr/bin/hdiutil")
+        .args(args)
+        .arg(path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+/// A disk image of 2 MB, mounted under `work`: the sandboxed app can make none, and the probe fills it while saving.
+fn full_disk(work: &std::path::Path) -> Option<std::path::PathBuf> {
+    let image = work.join("Klein.dmg");
+    let mount = work.join(FULL_DISK);
+    let made = hdiutil(
+        &["create", "-size", "2m", "-fs", "HFS+", "-volname", "SplatProbe"],
+        &image,
+    ) && Command::new("/usr/bin/hdiutil")
+        .args(["attach", "-nobrowse", "-noautoopen", "-mountpoint"])
+        .arg(&mount)
+        .arg(&image)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success());
+    made.then_some(mount)
 }
 
 /// The texts the click-through groups start from, as a recording run wrote them, for the next build to take in.
@@ -170,6 +239,9 @@ fn set_up_mode(cmd: &mut Command, mode: &str, args: &[String], work: &std::path:
     match mode {
         "probe" => {
             cmd.env("SPLAT_RENDER_PROBE", "1");
+            if let Some(mount) = full_disk(work) {
+                cmd.env("SPLAT_FULL_DISK", mount);
+            }
         }
         "gui" => {
             // A copy, since the test edits the document and autosave would write the changes back.
@@ -236,7 +308,11 @@ pub(crate) struct Report {
 
 impl Report {
     pub(crate) fn note(&mut self, line: &str) {
-        if let Some(name) = line.strip_prefix("SELFTEST PASS ") {
+        if let Some(pid) = line.strip_prefix("SELFTEST END-PROCESS ") {
+            end_process(pid);
+        } else if let Some(request) = line.strip_prefix("SELFTEST RUN ") {
+            run_for_the_app(request);
+        } else if let Some(name) = line.strip_prefix("SELFTEST PASS ") {
             *self.passed.entry(name.to_string()).or_default() += 1;
         } else if let Some(failure) = line.strip_prefix("SELFTEST FAIL ") {
             self.failed.push(failure.to_string());

@@ -1,5 +1,23 @@
 //! What an address in a document may be: one reading of it for the preview and both exports.
 
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+static HOME: OnceLock<PathBuf> = OnceLock::new();
+
+/// Gives the user's home folder, which `~/` in an address names. In the App Sandbox `HOME` names the app's container
+/// instead, so the app gives the real one at its start.
+pub fn set_home(home: PathBuf) {
+    let _ = HOME.set(home);
+}
+
+/// The user's home folder, as `set_home` gave it or else as `HOME` names it.
+pub fn home() -> Option<PathBuf> {
+    HOME.get()
+        .cloned()
+        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
+}
+
 /// The scheme of an address, in lowercase, as a browser reads it: it drops tabs and line breaks anywhere in an address
 /// and control characters around it, so `java&#9;script:` has a scheme to it. A relative path has none.
 pub fn scheme(url: &str) -> Option<String> {

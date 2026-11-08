@@ -63,6 +63,7 @@ macro_rules! commands {
             ZoomReset = mdZoomReset, Always { title: n("Originalgröße"), key: "cmd+0" };
             NewTab = mdNewTab, Always { title: n("Neuer Tab"), label: n("Neues Dokument"), tip: n("Neues Dokument in einem Tab öffnen"), symbol: "plus" };
             LoadRemoteImages = mdLoadRemoteImages, Always { title: n("Bilder laden") };
+            GrantFolder = mdGrantFolder, Always { title: n("Ordner freigeben …") };
             ExportHtml = mdExportHTML, Always { title: n("Als HTML exportieren …") };
             ExportWord = mdExportWord, Always { title: n("Als Word-Dokument exportieren …") };
             PasteMarkdown = mdPasteMarkdown, InText { title: n("Als Markdown einsetzen"), tip: n("Formatierten Text als Markdown einsetzen"), key: "ctrl+cmd+v", symbol: "doc.on.clipboard" };

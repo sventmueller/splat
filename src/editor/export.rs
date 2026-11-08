@@ -17,12 +17,12 @@ use objc2_foundation::{
 use objc2_uniform_type_identifiers::UTType;
 
 use super::attributes::{Attribute, Attributes, attributed};
+use super::decoder::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::export_options::{ExportOptions, TitleFacts};
 use super::images::{native_only, resolve_path};
 use super::layers::{ForSharing, Message};
 use super::picture::Sizing;
 use super::render::{Live, RenderCtx};
-use super::safe_image::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
 use super::update::{Images, render_key};
 use super::{decoder, js, remote, views};
 use crate::i18n::t;

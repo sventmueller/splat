@@ -43,10 +43,13 @@ const NEEDS_NO_GUARD: [(&str, &str); 10] = [
 ];
 
 /// Blocks without a guard, told by what they hold.
-const BLOCKS_THAT_NEED_NO_GUARD: [(&str, &str); 1] = [(
-    "palette::color(token",
-    "guards the lookup, and a color must come back whatever happens",
-)];
+const BLOCKS_THAT_NEED_NO_GUARD: [(&str, &str); 2] = [
+    (
+        "palette::color(token",
+        "guards the lookup, and a color must come back whatever happens",
+    ),
+    ("|_: Object| {}", "does nothing"),
+];
 
 /// Macros whose tokens read as no Rust, which the checks therefore cannot look into.
 const UNREAD_MACROS: [(&str, &str); 1] = [(

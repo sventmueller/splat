@@ -217,8 +217,11 @@ define_class!(
                     .collect();
                 panel.setAllowedContentTypes(&NSArray::from_retained_slice(&kinds));
                 if panel.runModal() == NSModalResponseOK
-                    && let Some(path) = panel.URL().and_then(|u| u.path())
+                    && let Some(url) = panel.URL()
+                    && let Some(path) = url.path()
                 {
+                    // Every export reads it again, also after Splat restarted.
+                    crate::grants::remember(&url);
                     self.show_template(Some(PathBuf::from(path.to_string())));
                 }
             });

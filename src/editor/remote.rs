@@ -1,5 +1,5 @@
 //! Loads images referenced by https URLs in the background. A document decides which URLs are requested, so only
-//! public https hosts are contacted, downloads are size-limited, and the data is decoded by `safe_image`.
+//! public https hosts are contacted, downloads are size-limited, and the data is decoded in the decoding service.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -17,8 +17,8 @@ use objc2_foundation::{
 };
 
 use super::EditorController;
+use super::decoder::{Decoded, MAX_BYTES};
 use super::picture::{Rendered, Sizing};
-use super::safe_image::{Decoded, MAX_BYTES};
 use crate::util::{Lane, guarded, main_soon, ns};
 
 #[derive(Default)]

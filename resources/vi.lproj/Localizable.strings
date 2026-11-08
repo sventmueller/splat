@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Xuất dưới dạng Tài liệu Word…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Hình ảnh từ internet bị chặn: khi tải chúng, máy chủ của chúng sẽ biết bạn mở tài liệu này và mở lúc nào.";
 "Bilder laden" = "Tải Hình ảnh";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat chỉ có thể đọc hình ảnh, ghi chú và dữ liệu Git bên cạnh tài liệu này sau khi bạn cấp quyền truy cập vào thư mục chứa chúng.";
+"Ordner freigeben …" = "Cấp quyền truy cập thư mục…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Sau đó Splat được phép đọc hình ảnh, ghi chú và dữ liệu Git trong thư mục này và mọi thư mục con của nó, kể cả sau khi khởi động lại.";
+"Freigeben" = "Cấp quyền truy cập";
 "Dokument zuerst sichern" = "Hãy lưu tài liệu trước";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Hình ảnh được dán sẽ được lưu dưới dạng tệp bên cạnh tài liệu. Hãy lưu tài liệu, sau đó dán lại hình ảnh.";
 "Export fehlgeschlagen" = "Xuất không thành công";

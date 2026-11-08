@@ -2,7 +2,6 @@
 //! the sidebar, the metadata form, pasting formatted text, the export options and importing a Word document.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use objc2::MainThreadOnly;
 use objc2::rc::Retained;
@@ -209,43 +208,34 @@ pub(super) fn word_count_steps() -> Vec<Step> {
 /// Commits `text` as the document's file without touching the file, which a document that is open would take for the work
 /// of another program.
 fn commit_text(dir: &Path, text: &str) -> bool {
-    use std::io::Write;
-    let Ok(mut hashing) = Command::new("git")
-        .args(["hash-object", "-w", "--stdin"])
-        .current_dir(dir)
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .spawn()
-    else {
-        return false;
-    };
-    if let Some(mut input) = hashing.stdin.take()
-        && input.write_all(text.as_bytes()).is_err()
-    {
+    let staged = dir.join(".committed");
+    if std::fs::write(&staged, text).is_err() {
         return false;
     }
-    let Ok(output) = hashing.wait_with_output() else {
-        return false;
-    };
-    let blob = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    git(
-        dir,
-        &[
-            "update-index",
-            "--add",
-            "--cacheinfo",
-            &format!("100644,{blob},QuickReference.md"),
-        ],
-    ) && git(dir, &["commit", "-qm", "x"])
+    let blob = git_output(dir, &["hash-object", "-w", ".committed"]);
+    let _ = std::fs::remove_file(&staged);
+    blob.is_some_and(|blob| {
+        git(
+            dir,
+            &[
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                &format!("100644,{},QuickReference.md", blob.trim()),
+            ],
+        ) && git(dir, &["commit", "-qm", "x"])
+    })
 }
 
 fn git(dir: &Path, args: &[&str]) -> bool {
-    Command::new("git")
-        .args(["-c", "user.name=Splat", "-c", "user.email=splat@example.invalid"])
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .is_ok_and(|output| output.status.success())
+    git_output(dir, args).is_some()
+}
+
+/// What `git` writes for `args` in `dir`, run by the runner: the sandbox lets the app start no program of the system.
+fn git_output(dir: &Path, args: &[&str]) -> Option<String> {
+    let mut command = vec!["git", "-c", "user.name=Splat", "-c", "user.email=splat@example.invalid"];
+    command.extend_from_slice(args);
+    super::by_the_runner(dir, &command)
 }
 
 /// Lines that differ from each other, as blank lines between them would leave a diff several ways to read a change.
@@ -900,13 +890,12 @@ pub(super) fn paste_markdown_steps() -> Vec<Step> {
     ]
 }
 
-/// The text of a PDF by poppler's tool, which only the developer's Mac has.
+/// The text of a PDF by poppler's tool, which only the developer's Mac has; the runner runs it.
 fn pdf_text(pdf: &Path) -> Option<String> {
     let tool = ["/opt/homebrew/bin/pdftotext", "/usr/local/bin/pdftotext"]
         .into_iter()
         .find(|tool| Path::new(tool).exists())?;
-    let output = Command::new(tool).arg(pdf).arg("-").output().ok()?;
-    Some(String::from_utf8_lossy(&output.stdout).into_owned())
+    super::by_the_runner(pdf.parent()?, &[tool, &pdf.to_string_lossy(), "-"])
 }
 
 #[expect(clippy::too_many_lines, reason = "a list of steps, each of which stands for itself")]

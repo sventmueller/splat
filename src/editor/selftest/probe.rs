@@ -19,12 +19,12 @@ use objc2_web_kit::{WKURLSchemeHandler, WKURLSchemeTask, WKWebView};
 
 use super::super::EditorController;
 use super::super::decoder;
+use super::super::decoder::Decoded;
 use super::super::images::ImageStore;
 use super::super::js::{self, Key, PageAnswer};
 use super::super::mathfield::{self, MathField};
 use super::super::picture::{Rendered, Sizing};
 use super::super::render::{Drawn, RenderCtx};
-use super::super::safe_image::Decoded;
 use super::super::webkit;
 use super::mock_web::{HOST, requests_of};
 use super::{after, check, finish, guarded, once};
@@ -155,6 +155,8 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
 pub(super) fn run(mtm: MainThreadMarker) {
     rendering_takes_what_it_is_given(mtm);
     undo_is_back_on_after_a_panic(mtm);
+    a_closed_folder_is_offered_for_a_grant(mtm);
+    a_granted_folder_is_kept_and_taken_up_again(mtm);
     another_thread_gets_an_answer_from_the_main_thread();
     let name = "a document without formulas or diagrams starts no web view";
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
@@ -222,6 +224,70 @@ fn undo_is_back_on_after_a_panic(mtm: MainThreadMarker) {
             "panicked {panicked}, off inside {}, on after {back_on}",
             off_inside.get()
         ),
+    );
+}
+
+/// The bar offers the folder of a document that names a picture beside it while the sandbox keeps the folder closed, and
+/// leaves once the folder is granted.
+fn a_closed_folder_is_offered_for_a_grant(mtm: MainThreadMarker) {
+    let name = "a picture in a closed folder offers to grant the folder, and the grant takes the offer away";
+    let dir = std::env::temp_dir()
+        .join(format!("splat-probe-grant-{}", std::process::id()))
+        .join("Gesperrt");
+    let path = dir.join("Notiz.md");
+    if std::fs::create_dir_all(&dir).is_err() || std::fs::write(&path, "# Notiz\n\n![Bild](bild.png)\n").is_err() {
+        check(name, false, "no test document");
+        return;
+    }
+    crate::test_hooks::play_closed_folders(true);
+    let (document, e) = super::documents::opened(mtm, &path);
+    let grant = crate::i18n::t("Ordner freigeben …");
+    let offered = super::controller::until(|| e.pictures().banner_offers().as_deref() == Some(grant));
+    crate::test_hooks::play_closed_folders(false);
+    e.handle(super::super::layers::Message::FolderGranted);
+    let gone = super::controller::until(|| e.pictures().banner_offers().is_none());
+    check(name, offered && gone, &format!("offered {offered}, gone {gone}"));
+    document.close();
+    let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
+}
+
+/// A folder picked in the panel is kept as a bookmark and taken up again at the next start, and the panel itself shows
+/// and closes. The panel is cancelled here, as a run can pick nothing in it; the folder stands for one the user picked.
+fn a_granted_folder_is_kept_and_taken_up_again(mtm: MainThreadMarker) {
+    let name = "a granted folder is kept, taken up again at the next start, and the panel asks for it";
+    let dir = super::super::super::test_hooks::output_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("Freigabe");
+    let _ = std::fs::create_dir_all(&dir);
+    let Ok(dir) = dir.canonicalize() else {
+        check(name, false, "no folder");
+        return;
+    };
+    crate::grants::remember(&NSURL::fileURLWithPath(&ns(&dir.to_string_lossy())));
+    let path = dir.to_string_lossy().into_owned();
+    let kept = crate::grants::granted().contains(&path);
+    crate::grants::restore();
+    let taken_up = crate::grants::granted().contains(&path);
+    crate::grants::forget(&dir);
+    let (document, e) = super::documents::untitled(mtm, "# Freigabe\n");
+    let Some(window) = e.window() else {
+        check(name, false, "no window");
+        return;
+    };
+    let answered: std::rc::Rc<Cell<Option<bool>>> = std::rc::Rc::default();
+    let heard = answered.clone();
+    crate::grants::ask(mtm, Some(&window), &dir, move |granted| heard.set(Some(granted)));
+    let shown = super::controller::until(|| window.attachedSheet().is_some());
+    if let Some(sheet) = window.attachedSheet() {
+        window.endSheet_returnCode(&sheet, objc2_app_kit::NSModalResponseCancel);
+    }
+    let cancelled = super::controller::until(|| answered.get().is_some()) && answered.get() == Some(false);
+    document.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeCleared);
+    document.close();
+    check(
+        name,
+        kept && taken_up && !crate::grants::granted().contains(&path) && shown && cancelled,
+        &format!("kept {kept}, taken up {taken_up}, panel shown {shown}, cancelled {cancelled}"),
     );
 }
 
@@ -349,14 +415,11 @@ fn two_pixel_bmp() -> Vec<u8> {
 fn sandbox_of_the_helper() {
     let secret = std::env::temp_dir().join(format!("splat-probe-secret-{}", std::process::id()));
     let _ = std::fs::write(&secret, "secret");
-    for (name, arg) in [
-        ("the decoder helper", super::super::decoder::ARG),
-        (
-            "the helper for the system's decoders",
-            super::super::decoder::NATIVE_ARG,
-        ),
+    for (name, native) in [
+        ("the decoder helper", false),
+        ("the helper for the system's decoders", true),
     ] {
-        let escaped = super::super::decoder::self_check(arg, secret.to_str().unwrap_or_default());
+        let escaped = super::super::decoder::self_check(native, secret.to_str().unwrap_or_default());
         check(
             &format!("{name} reads no files and reaches no network"),
             escaped == Some(false),
@@ -902,7 +965,7 @@ const FORMULA_STYLES: &str = "const svg = async (tex, color) => (await renderMat
 
 /// Of a formula's picture, the share of pixels that are drawn, and of those the share that is dark.
 fn drawn_and_dark(svg: &str) -> Option<(f64, f64)> {
-    let Some(Decoded::Rgba { pixels, .. }) = decoder::svg_to_pixels(svg, crate::editor::safe_image::SHOWN_SIDE) else {
+    let Some(Decoded::Rgba { pixels, .. }) = decoder::svg_to_pixels(svg, crate::editor::decoder::SHOWN_SIDE) else {
         return None;
     };
     let (pixels, _) = pixels.as_chunks::<4>();
@@ -1008,7 +1071,8 @@ fn the_formula_survives_its_web_process(mtm: MainThreadMarker, editor: Option<Re
     let field = mathfield::field(mtm);
     field.attach(&editor, "x^2");
     let ended = web_process(&field.web);
-    js::end_web_process(&field.web);
+    // A crash the runner causes: the sandbox lets the app signal no process of WebKit's.
+    eprintln!("SELFTEST END-PROCESS {ended}");
     let watched = field.clone();
     let back = move || watched.loaded.get() && ![0, ended].contains(&web_process(&watched.web));
     once(0.0, "the formula editor's page to load again", back, move || {

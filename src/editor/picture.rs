@@ -7,7 +7,7 @@ use objc2::rc::Retained;
 use objc2_app_kit::NSImage;
 use objc2_foundation::NSSize;
 
-use super::safe_image::SHOWN_SIDE;
+use super::decoder::SHOWN_SIDE;
 use crate::util::Lane;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

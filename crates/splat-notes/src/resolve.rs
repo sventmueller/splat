@@ -156,9 +156,9 @@ impl<'t> Resolver<'t> {
                 } else if path.is_absolute() {
                     path
                 } else if let Some(rest) = decoded.strip_prefix("~/")
-                    && let Some(home) = std::env::var_os("HOME")
+                    && let Some(home) = splat_markdown::url::home()
                 {
-                    PathBuf::from(home).join(rest)
+                    home.join(rest)
                 } else {
                     from_file.parent()?.join(path)
                 }
@@ -379,8 +379,8 @@ mod tests {
     #[test]
     fn a_home_folder_is_expanded_where_there_is_one() {
         let tree = vault();
-        if let Some(home) = std::env::var_os("HOME") {
-            let wanted = Path::new(&home).join("x.md").display().to_string();
+        if let Some(home) = splat_markdown::url::home() {
+            let wanted = home.join("x.md").display().to_string();
             assert_eq!(leads(&tree, "~/x.md", "/v/from.md"), Some(wanted));
         }
     }

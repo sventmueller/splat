@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Exportar como documento Word…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "As imagens da internet estão bloqueadas: ao carregá-las, os respetivos servidores ficam a saber que e quando abre este documento.";
 "Bilder laden" = "Carregar imagens";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "O Splat só pode ler as imagens, notas e dados do Git junto deste documento depois de conceder acesso à respetiva pasta.";
+"Ordner freigeben …" = "Conceder acesso à pasta…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "O Splat poderá então ler imagens, notas e dados do Git nesta pasta e em todas as subpastas, também depois de reiniciar.";
+"Freigeben" = "Conceder acesso";
 "Dokument zuerst sichern" = "Guarde primeiro o documento";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "As imagens coladas são guardadas como ficheiros junto do documento. Guarde-o e volte a colar a imagem.";
 "Export fehlgeschlagen" = "A exportação falhou";

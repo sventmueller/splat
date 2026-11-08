@@ -138,8 +138,8 @@ nothing over the network unless you ask it to.
 - **Native to the bone.** Real AppKit windows, tabs, menus, popovers, Versions, Auto Save, the share menu, dark mode,
   spell checking, dictation and VoiceOver. No Electron, no web view for the text itself.
 - **Fast with big files.** Rendering a keystroke in a 10 MB document takes about 10 ms, before the view's own work.
-- **Private and careful.** Images from the web load only after you allow them, links to other apps ask first, and
-  everything that decodes untrusted image data runs in sandboxed helper processes.
+- **Private and careful.** Splat runs in the App Sandbox, images from the web load only after you allow them, links to
+  other apps ask first, and everything that decodes untrusted image data runs in a sandboxed service of its own.
 - **In your language.** The interface and the built-in Markdown quick reference come in 35 languages: Arabic, Catalan,
   Chinese (Simplified), Chinese (Traditional), Croatian, Czech, Danish, Dutch, English, Finnish, French, German, Greek,
   Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Polish, Portuguese (Brazil),
@@ -711,15 +711,20 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
   nothing from your documents.
 - **Images from the web** load only after your permission, only over `https`, never from hosts in your local network,
   at most 10 MB each, and in a private session without cookies.
-- **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in helper processes that close
-  every file they inherited and lock themselves into a sandbox before reading the first byte: no file access, no
-  network. They hand back only pixels, whose size is checked, and are stopped after 10 seconds. Apple's own image
-  decoders only see HEIC, TIFF, AVIF and PDF, and only when the data really is that format; they run in a helper of
-  their own, which may in addition read the system's font folders and use the system's video decoder. SVGs, formulas
-  and diagrams pass that helper as well, so they are pictures with a fixed resolution in Splat: four pixels per point,
-  up to 2560 on the longer side.
-- **Local files** reach a document only by the path it names. Embeds show Markdown notes from the document's folder
-  and below, and a missing picture is looked for only there. An image path elsewhere, absolute or starting with `~`, still loads in the preview; HTML and Word exports, printing and PDFs take along only what lies in the document's folder or its Git repository, unless that repository also holds your home folder, so a document from someone else cannot pull your files into an export you pass on.
+- **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in a service of their own, which
+  macOS starts in a sandbox of its own: none of your files, no network. It hands back only pixels, whose size is
+  checked, and ends itself when a decode takes more than 10 seconds or too much memory. Apple's own image decoders only
+  see HEIC, TIFF, AVIF and PDF, and only when the data really is that format. SVGs, formulas and diagrams pass that
+  service as well, so they are pictures with a fixed resolution in Splat: four pixels per point, up to 2560 on the
+  longer side.
+- **Local files** reach a document only by the path it names, and only from a folder you granted: Splat may read a
+  document you open, but the pictures, notes, bibliography and repository around it only once you grant their folder
+  with **Grant Access to Folder…** in the bar above the preview. A grant covers all subfolders and is remembered.
+  Embeds show Markdown notes from the document's folder and below, and a missing picture is looked for only there. An
+  image path elsewhere, absolute or starting with `~`, loads in the preview from a granted folder; HTML and Word
+  exports, printing and PDFs take along only what lies in the document's folder or its Git repository, unless that
+  repository also holds your home folder, so a document from someone else cannot pull your files into an export you
+  pass on.
 - **Folders of notes** are read only while the sidebar shows them, and renaming a note changes other files only after you
   confirmed how many.
 - **Git repositories** are read by Splat itself. It never runs the `git` program, whose configuration in a repository from
@@ -736,8 +741,9 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
 - **Exports** carry no scripts. HTML pages keep only a fixed list of harmless tags and attributes, as GitHub does, plus
   a content security policy. Word files link only `http`, `https` and `mailto` addresses, apart from the links a Word
   template you chose brings along.
-- **Code signing** with the Hardened Runtime. Splat runs without the App Sandbox so that it can show images next to
-  your documents without asking for every folder; the isolation of all decoding offsets this.
+- **Code signing** with the Hardened Runtime and the App Sandbox. Splat may read and write the documents you open and
+  the folders you grant, reach the network for pictures from the web you allowed and for updates, and print; nothing
+  else.
 
 ## Large documents
 

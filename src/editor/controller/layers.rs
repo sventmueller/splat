@@ -63,6 +63,8 @@ pub(in crate::editor) enum Message {
     Notes(NoteAnswer),
     /// The user chose the folder the sidebar shows.
     NotesFolder(PathBuf),
+    /// The user granted the folder around the document.
+    FolderGranted,
     /// The user typed a new name for a note.
     RenameChosen { from: PathBuf, to: PathBuf },
     /// The user agreed to the changes a rename makes to the links.
@@ -401,6 +403,7 @@ impl ForEditing<'_> {
         if self.controller().panes().toggle_tab(SidebarTab::Files) {
             self.controller().notes().rescan();
         }
+        self.controller().updater().update_offer();
     }
 
     /// Shows the sidebar on the tab it showed last, or hides it.
@@ -409,6 +412,7 @@ impl ForEditing<'_> {
         if panes.toggle_tab(panes.sidebar_tab().unwrap_or_default()) {
             self.controller().notes().rescan();
         }
+        self.controller().updater().update_offer();
     }
 
     pub(in crate::editor) fn search_notes(&self) {

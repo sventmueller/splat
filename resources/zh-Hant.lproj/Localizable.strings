@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "輸出為 Word 文件⋯";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "已阻擋來自網際網路的影像：載入影像時，其伺服器會得知你打開了此文件以及打開的時間。";
 "Bilder laden" = "載入影像";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "只有在你授予其所在檔案夾的取用權限後，Splat 才能讀取此文件旁的影像、筆記和 Git 資料。";
+"Ordner freigeben …" = "授予檔案夾取用權限⋯";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "之後 Splat 可以讀取此檔案夾及其所有子檔案夾中的影像、筆記和 Git 資料，重新啟動後仍然有效。";
+"Freigeben" = "授予取用權限";
 "Dokument zuerst sichern" = "請先儲存文件";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "貼上的影像會以檔案形式存放在文件旁。請先儲存文件，再重新貼上影像。";
 "Export fehlgeschlagen" = "輸出失敗";

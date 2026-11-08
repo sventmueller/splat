@@ -96,13 +96,13 @@ pub(super) fn memory_steps() -> Vec<Step> {
         let small = crate::editor::decoder::decode(&png_of_side(700), crate::editor::picture::allowed_side());
         check(
             "the helpers start again after they were ended for memory",
-            matches!(small, Some(crate::editor::safe_image::Decoded::Rgba { width: 640, .. })),
+            matches!(small, Some(crate::editor::decoder::Decoded::Rgba { width: 640, .. })),
             "",
         );
         crate::editor::images::memory_pressure_changed(false);
         check(
             "once memory is back, images decode at full size again",
-            crate::editor::picture::allowed_side() == crate::editor::safe_image::SHOWN_SIDE,
+            crate::editor::picture::allowed_side() == crate::editor::decoder::SHOWN_SIDE,
             "",
         );
         check("the shown image survives", shown_width(c, "bild.png").is_some(), "");

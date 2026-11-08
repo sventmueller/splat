@@ -31,6 +31,10 @@ pub struct Env {
     pub citations: Option<Arc<HashMap<String, String>>>,
     /// The bibliography lies with the document's own files, so a file that leaves the Mac may show its entries.
     pub citations_travel: bool,
+    /// The sandbox keeps the document's folder closed until the user grants it.
+    pub folder_closed: bool,
+    /// A repository lies around the folder, whose marks for what changed need the folder granted.
+    pub repository_around: bool,
     pub doc_dir: Option<PathBuf>,
 }
 
@@ -45,6 +49,8 @@ impl Env {
             repository: doc_dir.as_deref().and_then(find_repository),
             citations_travel: found.as_ref().is_some_and(|(_, travels)| *travels),
             citations: found.map(|(entries, _)| entries),
+            folder_closed: doc_dir.as_deref().is_some_and(|d| !crate::grants::reaches(d)),
+            repository_around: doc_dir.as_deref().is_some_and(|d| repository_root(d).is_some()),
             doc_dir,
         }
     }
@@ -64,15 +70,17 @@ impl Env {
             .as_deref()
             .map(|d| Question::Around(d.to_path_buf(), named_bibliography(d, text)))
             .and_then(look_up);
-        let (repository, found) = match around {
-            Some(Answer::Around(repository, found)) => (repository, found),
-            _ => (None, None),
+        let (repository, found, folder_closed, repository_around) = match around {
+            Some(Answer::Around(repository, found, closed, around)) => (repository, found, closed, around),
+            _ => (None, None, false, false),
         };
         Env {
             quotes: typography_on().then(quotes),
             repository,
             citations_travel: found.as_ref().is_some_and(|(_, travels)| *travels),
             citations: found.map(|(entries, _)| entries),
+            folder_closed,
+            repository_around,
             doc_dir,
         }
     }
@@ -102,14 +110,16 @@ enum Question {
 
 #[derive(Clone, PartialEq)]
 enum Answer {
-    Around(Option<Repository>, Option<(Citations, bool)>),
+    /// The repository, the bibliography and whether it may travel, whether the sandbox keeps the folder closed and whether a
+    /// repository lies around it.
+    Around(Option<Repository>, Option<(Citations, bool)>, bool, bool),
     Note(Option<(String, String)>),
 }
 
 impl Question {
     fn answer_before_any_look(&self) -> Answer {
         match self {
-            Question::Around(..) => Answer::Around(None, None),
+            Question::Around(..) => Answer::Around(None, None, false, false),
             Question::Note(..) => Answer::Note(None),
         }
     }
@@ -122,7 +132,12 @@ impl Question {
 
     fn look(&self) -> Answer {
         match self {
-            Question::Around(dir, named) => Answer::Around(find_repository(dir), find_citations(dir, named.clone())),
+            Question::Around(dir, named) => Answer::Around(
+                find_repository(dir),
+                find_citations(dir, named.clone()),
+                !crate::grants::reaches(dir),
+                repository_root(dir).is_some(),
+            ),
             Question::Note(dir, target) => Answer::Note(embedded_note(dir, target)),
         }
     }
@@ -193,6 +208,11 @@ fn look_up(question: Question) -> Option<Answer> {
         known.waiting = false;
         Some(known.answer.clone())
     })?
+}
+
+/// Forgets every answer, as after the user granted a folder: what the sandbox kept closed may be read now.
+pub fn forget_known() {
+    with_answers(|answers| answers.known.clear());
 }
 
 fn send_to_look(question: Question, told: Option<Sender<()>>) {
@@ -329,7 +349,7 @@ pub(super) fn may_carry_along(path: &Path, doc_dir: Option<&Path>) -> bool {
     let Some(doc_dir) = doc_dir else {
         return false;
     };
-    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let home = crate::markdown::url::home();
     let root = what_a_document_brings_along(doc_dir, home.as_deref());
     match (path.canonicalize(), root.canonicalize()) {
         (Ok(file), Ok(root)) => file.starts_with(root),

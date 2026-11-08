@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Eksporter som Word-dokument…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Billeder fra internettet er blokeret: Når de indlæses, får deres servere at vide, at og hvornår du åbner dette dokument.";
 "Bilder laden" = "Indlæs billeder";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat kan først læse billeder, noter og Git-data ved siden af dette dokument, når du giver adgang til deres mappe.";
+"Ordner freigeben …" = "Giv adgang til mappe…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat må derefter læse billeder, noter og Git-data i denne mappe og alle dens undermapper, også efter en genstart.";
+"Freigeben" = "Giv adgang";
 "Dokument zuerst sichern" = "Gem dokumentet først";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Indsatte billeder gemmes som filer ved siden af dokumentet. Gem det, og sæt derefter billedet ind igen.";
 "Export fehlgeschlagen" = "Eksporten mislykkedes";

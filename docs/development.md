@@ -32,6 +32,7 @@ make coverage               # line coverage of all tests and self-tests, with a 
 make coverage-library       # the same floors for the modules without a window, as in CI
 make bench FILE=<file.md>   # timings for opening, typing and scrolling a large file
 make profile FILE=<file.md> # the same with a call tree of the whole run, from macOS's sample tool
+SPLAT_BENCH_IDLE=1 make bench FILE=<file.md>  # only opening, and how long until pictures, formulas and diagrams are in place
 make release                # make test and coverage-library first, then the notarized disk image
 ```
 
@@ -52,6 +53,14 @@ as it stays, Splat keeps its recent documents and folder permissions across rebu
 build would be a new app to macOS. Debug and self-test builds carry bundle IDs of their own (`local.splat.debug`,
 `local.splat.selftest`) and do not register for Markdown files, so the Finder never opens a document in an outdated
 build and they leave the settings of the normal app alone.
+
+Every build runs in the App Sandbox, as an app of the Mac App Store would, without exceptions for files. `bundle` signs
+the app with the entitlements for files the user opens or saves, bookmarks of folders the user granted, the network for
+pictures from the web and for updates, and printing; builds with Sparkle may reach its installer service by name as
+well. The decoding service gets the sandbox alone. The self-test build may in addition read and write under `target/`,
+where the runner puts the documents of a run, and it starts no program of the system: what it needs of `git`,
+`pdftotext` or a crashed web process it asks the runner for in `SELFTEST RUN` and `SELFTEST END-PROCESS` lines of its
+output, and the runner makes the full disk of the probe.
 
 `bundle` also writes `Acknowledgements.txt` into the resources, since the licenses of what Splat contains ask for their
 texts to go along with the app; the About window links only Splat's own. The file holds Splat's license and the
@@ -136,7 +145,7 @@ permissions for the two.
 | `cargo test --release --test fuzz_seeds` | the seeds in `fuzz/seeds/` through the checks of those fuzz targets, without a fuzzer; part of every `cargo test` |
 | `cargo test --profile checked --workspace` | the tests with what a debug build checks on top: after every partial parse the blocks fit their text, and what it carries on is what the text says. Part of `make test-long` |
 | `cargo test --release --test entry_points --test structure` | from the sources: everything the system calls is guarded against panics, modules depend downwards only, and the names in the tables of `docs/` exist in the code |
-| `cargo test --release --test decoder` | the decoder process decodes images and reaches neither files nor the network |
+| `cargo test --release --test decoder` | what the decoding service makes of images, run on its standard streams as `splat-decoder --stdio`; that it reaches neither files nor the network the probe checks in its sandbox |
 | `make coverage` | line coverage of `cargo test` and all self-tests, through [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fails below the floors. Occupies the Mac for about five minutes, also on a locked screen |
 | `make coverage-library` | the crates `splat-markdown`, `splat-preview`, `splat-file-state`, `splat-git`, `splat-import`, `splat-ooxml`, `splat-notes`, `splat-editor-state` and `splat-i18n` against their higher floors, measured by `cargo test` alone |
 
@@ -165,8 +174,9 @@ a save, none of which may cost text.
 Coverage has two floors: every module at least 84 % of its lines, all modules together at least 96 %. `make coverage`
 measures `cargo test` together with the self-tests and fails below either; `make coverage-library` holds what needs no window to 90 % and 97 %. The floors and the few exceptions, such
 as the panic hook in `main.rs` that runs only in a crash, are in [xtask](../xtask/src/coverage.rs) next to their reasons.
-Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. The
-decoder helper opens its measurement file before it locks itself in, so it is measured as well.
+Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. launchd
+starts the decoding service without the app's environment, so a measured self-test build names the measurement file in
+the service's property list, and the service writes what ran after each socket.
 
 CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) runs `make check`, `make coverage-library` and the universal
 build on Apple Silicon and `cargo test` on Intel for every push to `main` and every pull request. Every night,
@@ -239,14 +249,18 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `notes.rs`, `sidebar.rs` | `Notes`: the folder of notes, searching, opening and renaming; the views of the sidebar |
 | `metadata.rs`, `export_options.rs` | the metadata form; what exports add to the text |
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |
-| `decoder.rs` | sandboxed helper processes that decode images and graphics |
+| `decoder.rs` | the app's side of the decoding service, which decodes images and graphics in a sandbox of its own; `decoder/protocol.rs` what both sides say, `decoder/serve.rs` the service's side |
 | `export.rs`, `outline.rs` | `Sharing`: HTML and Word export, the share file, printing; the outline sidebar |
 | `js.rs`, `mathfield.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor |
 | `webkit.rs` | calls into WebKit; only the navigation delegate's lifetime stays with `js.rs` and `mathfield.rs` |
 | `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
-  subclass). `src/word_import.rs`: asking for a Word document and writing its Markdown and images.
+  subclass). `src/word_import.rs`: asking for a Word document and writing its Markdown and images. `src/grants.rs`:
+  the folders the user granted, kept as security-scoped bookmarks; the bar above the preview offers the folder around a
+  document while the App Sandbox keeps it closed.
+- `src/decoder_main.rs`: the program of the decoding service, `SplatDecoder.xpc` in the app bundle, which macOS starts
+  in a sandbox without the user's files and without the network; `src/util/xpc.rs` hands it a socket per helper.
 - `src/util/`: worker threads (`lanes.rs`), volumes that may stop answering (`volumes.rs`), AppKit helpers, files and
   processes. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
@@ -297,7 +311,7 @@ The source text in the left text view is the single source of truth.
 6. A new command needs a row in `actions.rs`, which gives it its method in `controller.rs` as well, and a branch in
    `Editing::perform`, which the compiler asks for.
 7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
-   the helper process only, through `decoder::decode_native`; a test scans the sources for other calls.
+   the decoding service only, through `decoder::decode_native`; a test scans the sources for other calls.
 8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
    looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user
    waits for, like an export or saving, may touch the disk directly.

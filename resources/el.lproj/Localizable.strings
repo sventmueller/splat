@@ -290,6 +290,10 @@
 "Als Word-Dokument exportieren …" = "Εξαγωγή ως έγγραφο Word…";
 "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Οι εικόνες από το διαδίκτυο είναι αποκλεισμένες: αν φορτωθούν, οι διακομιστές τους μαθαίνουν ότι ανοίγετε αυτό το έγγραφο και πότε.";
 "Bilder laden" = "Φόρτωση εικόνων";
+"Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Το Splat μπορεί να διαβάσει τις εικόνες, τις σημειώσεις και τα δεδομένα Git δίπλα σε αυτό το έγγραφο μόνο αφού παραχωρήσετε πρόσβαση στον φάκελό τους.";
+"Ordner freigeben …" = "Παραχώρηση πρόσβασης σε φάκελο…";
+"Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Το Splat θα μπορεί τότε να διαβάζει εικόνες, σημειώσεις και δεδομένα Git σε αυτόν τον φάκελο και σε όλους τους υποφακέλους του, και μετά από επανεκκίνηση.";
+"Freigeben" = "Παραχώρηση πρόσβασης";
 "Dokument zuerst sichern" = "Αποθηκεύστε πρώτα το έγγραφο";
 "Eingesetzte Bilder werden als Datei neben dem Dokument abgelegt. Sichere es, dann setze das Bild noch einmal ein." = "Οι εικόνες που επικολλάτε αποθηκεύονται ως αρχεία δίπλα στο έγγραφο. Αποθηκεύστε το και μετά επικολλήστε ξανά την εικόνα.";
 "Export fehlgeschlagen" = "Η εξαγωγή απέτυχε";
