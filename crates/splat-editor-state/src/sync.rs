@@ -207,15 +207,6 @@ impl Blocks {
         self.placeholders.clear();
     }
 
-    /// Marks blocks for rendering again although their key is unchanged, e.g. because an image in them arrived.
-    pub fn invalidate(&mut self, stale: impl Fn(usize) -> bool) {
-        for (i, key) in self.keys.iter_mut().enumerate() {
-            if stale(i) {
-                *key = 0;
-            }
-        }
-    }
-
     /// `edited` is the range of the shown text (before the edit) that the user changed directly, with the change in
     /// length; every block it touches is replaced. `shown_len` is the current length of the preview text.
     pub fn diff(&self, new_keys: &[u64], edited: Option<(Range<Shown>, isize)>, shown_len: usize) -> BlockDiff {

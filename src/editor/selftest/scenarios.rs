@@ -641,8 +641,6 @@ pub(super) fn document_holding(group: &'static str, text: impl Fn(&Ctx) -> Strin
             std::fs::create_dir_all(&dir).expect("a test folder");
             write_files(&dir);
             std::fs::write(&path, text(c)).expect("a test file");
-            // The permission for web pictures outlives a run, under the same path.
-            super::forget_web_image_permission(path.to_str().unwrap_or_default());
             super::open_document(c.e.mtm(), path.to_str().unwrap_or_default());
         }),
         when(

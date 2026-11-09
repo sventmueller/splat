@@ -109,7 +109,6 @@ impl Progressive<'_> {
             max_image_width: max_width,
             dark,
             controller: Some(self.host.object()),
-            remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: false,
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,

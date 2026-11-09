@@ -62,7 +62,6 @@ a look at the file after a save leaves what was typed since
 a look at the file leaves the undo steps
 a look that came too late leaves the other program's file alone
 a lost connection passes: the picture loads on the next try
-a name that is slow to resolve after a redirect holds up no other download
 a numbered list is undone in one step
 a numbered list writes exactly its text
 a panic does not copy a document without changes
@@ -74,14 +73,12 @@ a panic in the start of a save ends the save and keeps the text
 a panic in the text a save takes ends the save and keeps the text
 a panic saves the text of an edited document
 a pasted picture lies next to the document and is linked
+a picture from a host in the local network loads
 a picture in a closed folder offers to grant the folder, and the grant takes the offer away
-a public name that leads into the local network is not asked
 a quote is undone in one step
 a quote writes exactly its text
-a redirect to a name that does not resolve passes: the picture loads on the next try
-a redirect to a private host is not followed
+a redirect to a host in the local network is followed
 a redirect to a public host is followed
-a redirect to a public name that leads into the local network is not followed
 a remote answer that is no picture counts as failed
 a remote picture loads
 a remote picture over the size limit is not loaded
@@ -134,7 +131,6 @@ a task list writes exactly its text
 after Save As the document is its new file
 aligning the table is undone in one step
 aligning the table writes exactly its text
-allowing web images hides the question
 an address with its scheme in capitals loads
 an alert box is undone in one step
 an alert box writes exactly its text
@@ -160,7 +156,6 @@ deleting back to the text of a restored draft keeps the mark
 half transparent white over black comes out grey
 highlight is undone in one step
 highlight writes exactly its text
-images on private hosts count as failed at once
 injected content in the formula editor can do nothing
 injected content in the renderer can do nothing
 inline code is undone in one step
@@ -169,7 +164,6 @@ italic is undone in one step
 italic writes exactly its text
 left alignment is undone in one step
 left alignment writes exactly its text
-nothing reaches the private host a redirect names
 one undo takes the formula back
 paper takes along no image from outside the folder of its document
 removing formatting is undone in one step
@@ -223,7 +217,7 @@ the outline lists two nested headings
 the page answers a diagram with the fields the app reads
 the page answers a formula with the fields the app reads
 the picture after a helper that stopped answering decodes
-the preview shows formulas and web pictures from what it is given, and asks for web pictures only when allowed
+the preview shows formulas and web pictures from what it is given
 the preview takes input again once the text is small enough
 the problem form names the version of Splat and of macOS
 the recent documents list a document just noted
@@ -245,7 +239,7 @@ undoing back to the text of a restored draft keeps the mark
 undoing in the document with the editor open closes it
 undoing marks a document after a copy just when the text is not the one on file
 undoing marks the document just when the text is not the one on file
-web images wait for permission
+web images load without a question above the preview
 what a composition ends with lands where it was typed
 what is typed after a panic in a reload marks the document
 what is typed after a save marks the document at once

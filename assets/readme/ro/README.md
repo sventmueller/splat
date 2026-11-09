@@ -4,7 +4,7 @@
 
 **Editorul Markdown pentru macOS în care scrieți în sursă sau direct în previzualizare.**
 
-Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în dreapta o previzualizare în direct, complet editabilă. Puteți scrie în oricare dintre ele: tot ce scrieți în previzualizare devine o modificare minimă a sursei, astfel că rândurile pe care nu le-ați atins rămân identice octet cu octet, iar diferențele din Git rămân curate. Splat citește Markdownul pe care îl folosiți deja: CommonMark și GitHub Flavored Markdown, alertele GitHub, linkurile wiki, încorporările și casetele informative din Obsidian, extensiile Pandoc și Typora, HTML încorporat, formule LaTeX și diagrame Mermaid, Graphviz și PlantUML, toate randate offline. Răsfoiți și căutați într-un dosar întreg de note, vedeți ce s-a schimbat de la ultimul commit Git, lipiți din Word sau dintr-o pagină web ca Markdown și exportați în PDF, HTML sau Word dintr-un singur clic. Este scris în Rust, pe controale AppKit autentice, vorbește 35 de limbi și nu trimite nimic prin rețea decât dacă îi cereți.
+Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în dreapta o previzualizare în direct, complet editabilă. Puteți scrie în oricare dintre ele: tot ce scrieți în previzualizare devine o modificare minimă a sursei, astfel că rândurile pe care nu le-ați atins rămân identice octet cu octet, iar diferențele din Git rămân curate. Splat citește Markdownul pe care îl folosiți deja: CommonMark și GitHub Flavored Markdown, alertele GitHub, linkurile wiki, încorporările și casetele informative din Obsidian, extensiile Pandoc și Typora, HTML încorporat, formule LaTeX și diagrame Mermaid, Graphviz și PlantUML, toate randate offline. Răsfoiți și căutați într-un dosar întreg de note, vedeți ce s-a schimbat de la ultimul commit Git, lipiți din Word sau dintr-o pagină web ca Markdown și exportați în PDF, HTML sau Word dintr-un singur clic. Este scris în Rust, pe controale AppKit autentice, vorbește 35 de limbi și nu are telemetrie.
  
 
 
@@ -29,7 +29,7 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 [![Graphviz prin Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 de limbi de interfață](https://img.shields.io/badge/languages-35-4C9A2A)
-![Offline implicit](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Fără telemetrie](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Semnat cu Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licență: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licență)
 
@@ -123,7 +123,7 @@ Splat afișează în stânga sursa Markdown, cu culori de sintaxă, iar în drea
 - **Export fără pierderi.** PDF, un singur fișier HTML autonom sau un document Word cu titluri, liste, tabele, note de subsol și imagini reale. Adăugați numere de pagină, antete și o pagină de titlu sau folosiți șablonul Word al companiei dumneavoastră.
 - **Nativ până în măduva oaselor.** Ferestre, file, meniuri, popovere, Versiuni, Salvare automată, meniul de partajare, modul întunecat, verificarea ortografică, dictarea și VoiceOver autentice AppKit. Fără Electron, fără vizualizare web pentru textul propriu-zis.
 - **Rapid cu fișiere mari.** Randarea unei apăsări de tastă într-un document de 10 MB durează circa 10 ms, înainte de munca proprie a vizualizării.
-- **Privat și atent.** Splat rulează în App Sandbox, imaginile de pe web se încarcă doar după ce permiteți, linkurile către alte aplicații cer mai întâi confirmare, iar tot ce decodează date de imagine nesigure rulează într-un serviciu propriu, izolat într-un sandbox.
+- **Privat și atent.** Splat rulează în App Sandbox, linkurile către alte aplicații cer mai întâi confirmare, iar tot ce decodează date de imagine nesigure rulează într-un serviciu propriu, izolat într-un sandbox.
 - **În limba dumneavoastră.** Interfața și referința rapidă Markdown integrată există în 35 de limbi: arabă, catalană, chineză (simplificată), chineză (tradițională), croată, cehă, daneză, olandeză, engleză, finlandeză, franceză, germană, greacă, ebraică, hindi, maghiară, indoneziană, italiană, japoneză, coreeană, malaeză, norvegiană, poloneză, portugheză (Brazilia), portugheză (Portugalia), română, rusă, slovacă, slovenă, spaniolă, suedeză, thailandeză, turcă, ucraineană și vietnameză.
 
 ## Cerințe
@@ -438,7 +438,7 @@ Prima diagramă de după pornire durează circa o secundă, pentru că motorul d
 ## Imagini
 
 - **Imaginile locale** folosesc căi relative la document: `![Logo](images/logo.png)`. Splat afișează PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF și PDF.
-- **Imaginile de pe web** rămân blocate până le permiteți: o bară deasupra previzualizării explică faptul că încărcarea lor anunță serverele lor că și când deschideți documentul. **Încărcați imaginile** le permite pentru acest document; Splat reține alegerea pentru fiecare fișier.
+- **Imaginile de pe web** se încarcă de îndată ce un document le afișează, prin `https` și de până la 10 MB fiecare. Ca imaginile dintr-un e-mail, ele anunță serverele lor că și când este deschis documentul.
 - **Dimensiunea.** `<img width="200">` stabilește dimensiunea unei imagini; altfel, imaginile se potrivesc lățimii previzualizării.
 - **Modificări pe disc.** O imagine pe care o înlocuiți sau una care apare după ce documentul a numit-o este afișată fără a redeschide documentul. Imaginile de pe web care au eșuat din cauza rețelei sunt încercate din nou cât timp un document le afișează.
 - **Memoria.** Imaginile sunt afișate cu cel mult 2560 de pixeli pe latura lungă, ceea ce umple și o pagină A4. Ele se decodează la dimensiuni mai mici odată ce ocupă o optime din memoria Mac-ului și cât timp macOS raportează presiune asupra memoriei.
@@ -483,7 +483,7 @@ Rândurile care diferă doar prin sfârșitul de rând nu se numără, așa că 
 | **Word** | **Fișier › Exportați ca document Word…** sau meniul Partajare | Un fișier `.docx` cu stilurile de titlu din Word, liste și tabele reale (inclusiv celule îmbinate), note de subsol ca note de subsol Word, imagini încorporate, formule și diagrame. |
 | **Markdown** | Butonul **Partajați** din bara de instrumente | Documentul ca fișier `.md` pentru Mail, Mesaje, AirDrop și orice alt serviciu de partajare. |
 
-Meniul **Fișier › Partajați** le oferă pe toate într-un singur loc. Exporturile țin cont de setarea pentru punctuația tipografică și de imaginile de pe web pe care le-ați permis; în HTML, imaginile de pe web rămân linkuri.
+Meniul **Fișier › Partajați** le oferă pe toate într-un singur loc. Exporturile țin cont de setarea pentru punctuația tipografică și de imaginile de pe web pe care le-a încărcat previzualizarea; în HTML, imaginile de pe web rămân linkuri.
 
 **Fișier › Opțiuni de export…** stabilește ce adaugă la text PDF-ul, tipărirea și Word, pentru toate documentele:
 
@@ -554,8 +554,8 @@ Splat lasă scurtăturile standard Apple acolo unde sunt.
 
 Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare document ca fiind nesigur.
 
-- **Fără rețea implicit.** Splat nu are telemetrie. Caută actualizări doar după ce sunteți de acord sau alegeți **Căutați actualizări…**: atunci încarcă de pe GitHub un mic fișier de flux, iar cererea nu numește decât aplicația și versiunea ei. Formulele și diagramele se randează local; vizualizările web care o fac nu pot ajunge la rețea. **Ajutor › Raportați o problemă…** deschide un formular pe GitHub în browser; adresa lui conține versiunea Splat, versiunea macOS și tipul de Mac, nimic din documentele dumneavoastră.
-- **Imaginile de pe web** se încarcă doar cu permisiunea dumneavoastră, doar prin `https`, niciodată de la gazde din rețeaua locală, de cel mult 10 MB fiecare și într-o sesiune privată, fără cookie-uri.
+- **Fără telemetrie.** Splat nu raportează nimic despre felul în care îl folosiți. Caută actualizări doar după ce sunteți de acord sau alegeți **Căutați actualizări…**: atunci încarcă de pe GitHub un mic fișier de flux, iar cererea nu numește decât aplicația și versiunea ei. Formulele și diagramele se randează local; vizualizările web care o fac nu pot ajunge la rețea. **Ajutor › Raportați o problemă…** deschide un formular pe GitHub în browser; adresa lui conține versiunea Splat, versiunea macOS și tipul de Mac, nimic din documentele dumneavoastră.
+- **Imaginile de pe web** se încarcă de îndată ce un document le afișează, de la orice gazdă, doar prin `https`, de cel mult 10 MB fiecare și într-o sesiune privată, fără cookie-uri. Serverele lor află că și când este deschis documentul.
 - **Decodare izolată.** Imaginile și graficele formulelor și ale diagramelor sunt decodate într-un serviciu propriu, pe care macOS îl pornește într-un sandbox propriu: niciunul dintre fișierele dumneavoastră, fără rețea. Serviciul returnează doar pixeli, a căror dimensiune este verificată, și se închide singur când o decodare durează mai mult de 10 secunde sau cere prea multă memorie. Decodoarele de imagini ale Apple văd doar HEIC, TIFF, AVIF și PDF, și numai când datele sunt într-adevăr în acel format. SVG-urile, formulele și diagramele trec și ele prin acel serviciu, deci în Splat sunt imagini cu rezoluție fixă: patru pixeli pe punct, până la 2560 pe latura mai lungă.
 - **Fișierele locale** ajung într-un document doar prin calea pe care o numește, și doar dintr-un dosar la care ați acordat acces: Splat poate citi un document pe care îl deschideți, dar imaginile, notele, bibliografia și depozitul din jurul lui doar după ce acordați acces la dosarul lor cu **Acordați acces la dosar…** din bara de deasupra previzualizării. Un acces acoperă toate subdosarele și este reținut. Încorporările afișează note Markdown din dosarul documentului și de mai jos, iar o imagine lipsă este căutată doar acolo. O cale de imagine în altă parte, absolută sau care începe cu `~`, se încarcă în previzualizare dintr-un dosar la care s-a acordat acces; exporturile HTML și Word, tipărirea și fișierele PDF iau cu ele doar ce se află în dosarul documentului sau în depozitul său Git, cu excepția cazului în care acel depozit conține și dosarul tău de reședință, ca un document de la altcineva să nu poată trage fișierele tale într-un export pe care îl dai mai departe.
 - **Dosarele de note** sunt citite doar cât timp bara laterală le afișează, iar redenumirea unei note modifică alte fișiere doar după ce ați confirmat câte.
@@ -565,7 +565,7 @@ Un fișier Markdown poate veni de la oricine, așa că Splat tratează fiecare d
 - **Linkurile** nu pornesc niciodată un program printr-un clic. Linkurile web și de e-mail se deschid ca de obicei; linkurile către alte aplicații întreabă mai întâi.
 - **HTML-ul din documente** este citit de parserul propriu al Splat. Scripturile, stilurile, cadrele și formularele nu rulează niciodată.
 - **Exporturile** nu conțin scripturi. Paginile HTML păstrează doar o listă fixă de etichete și atribute inofensive, ca GitHub, plus o politică de securitate a conținutului. Fișierele Word leagă doar adrese `http`, `https` și `mailto`, în afară de linkurile aduse de un șablon Word pe care l-ați ales.
-- **Semnarea codului** cu Hardened Runtime și App Sandbox. Splat poate citi și scrie documentele pe care le deschideți și dosarele la care acordați acces, poate accesa rețeaua pentru imaginile de pe web pe care le-ați permis și pentru actualizări și poate tipări; nimic altceva.
+- **Semnarea codului** cu Hardened Runtime și App Sandbox. Splat poate citi și scrie documentele pe care le deschideți și dosarele la care acordați acces, poate accesa rețeaua pentru imaginile de pe web și pentru actualizări și poate tipări; nimic altceva.
 
 ## Documente mari
 
@@ -610,7 +610,7 @@ Unele modificări sunt procesate integral, la circa 300 ms pe apăsare de tastă
 
 **Nu există Căutați actualizări… în meniul Splat.** Numai versiunea din imaginea de disc sau din Homebrew se actualizează singură; o versiune compilată de dumneavoastră nu are mecanism de actualizare.
 
-**Imaginile de pe web nu apar.** Faceți clic pe **Încărcați imaginile** în bara de deasupra previzualizării. Se încarcă doar imaginile `https` de pe gazde publice.
+**Imaginile de pe web nu apar.** Se încarcă doar imaginile `https`, de până la 10 MB fiecare. Una care a eșuat din cauza rețelei este încercată din nou cât timp documentul o afișează.
 
 **La lipirea unei capturi de ecran mi se cere să salvez mai întâi.** Imaginile lipite sunt stocate ca fișiere lângă document, ceea ce cere un loc pe disc. Salvați-l, apoi lipiți din nou.
 

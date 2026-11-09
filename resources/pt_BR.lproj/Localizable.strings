@@ -288,8 +288,6 @@
 "Öffnen" = "Abrir";
 "Als HTML exportieren …" = "Exportar como HTML…";
 "Als Word-Dokument exportieren …" = "Exportar como Documento do Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "As imagens da internet estão bloqueadas: ao carregá-las, os servidores delas ficam sabendo que e quando você abre este documento.";
-"Bilder laden" = "Carregar Imagens";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "O Splat só poderá ler as imagens, notas e dados do Git ao lado deste documento depois que você conceder acesso à pasta em que estão.";
 "Ordner freigeben …" = "Conceder Acesso à Pasta…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "O Splat poderá então ler imagens, notas e dados do Git nesta pasta e em todas as suas subpastas, também depois de reiniciar.";

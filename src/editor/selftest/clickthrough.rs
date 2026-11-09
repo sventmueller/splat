@@ -720,11 +720,10 @@ pub(super) fn scrolling_dark_mode_and_remote_steps() -> Vec<Step> {
             );
             append(e, "\n\n![Badge](https://bilder.splat-test.example/badge.svg)\n");
             check(
-                "images from the web wait for permission",
-                e.pictures().banner_shown() == Some(true),
+                "images from the web load without a question",
+                e.pictures().banner_shown() == Some(false),
                 "",
             );
-            e.pictures().allow_remote_images();
         }),
         settle(|c| {
             let store = storage(c.e.preview());

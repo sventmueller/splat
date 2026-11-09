@@ -35,8 +35,8 @@ Ports to other systems are welcome. They keep the premises of the Mac app and wh
   cover the port's sources.
 - Whatever edits the text, in the source or in the preview, changes only what it must: lines the user did not touch stay
   byte-for-byte identical, and so do the file's encoding and line endings.
-- Nothing goes over the network unless the user asks for it. Images from the web load only after the user allows them,
-  links to other apps ask first, and whatever decodes untrusted image data runs in a sandboxed helper process.
+- No telemetry: the network carries only the pictures from the web a document shows and the update checks the user
+  agreed to. Links to other apps ask first, and whatever decodes untrusted image data runs in a sandboxed helper process.
 - The port runs the same checks as `make check` on its own system: formatting, clippy without warnings and all tests,
   the translation tests included. CI runs them on every pull request, and a failing step fails the run.
 - Installers come only from the releases of this repository and are signed where the platform signs apps, such as

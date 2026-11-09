@@ -139,7 +139,6 @@ impl Sharing<'_> {
             max_image_width: width - 20.0,
             dark: false,
             controller: None,
-            remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: true,
             macros,
             drawn: &live,
@@ -203,7 +202,6 @@ impl Sharing<'_> {
             text: self.host.source_text(),
             doc_dir: self.host.doc_dir(),
             macros: self.host.model().read(|st| st.macros()),
-            remote: self.host.pictures().remote_allowed(),
             options: ExportOptions::load(),
         }
     }
@@ -382,7 +380,6 @@ impl ExportFailure {
 pub(super) struct ExportSource {
     text: String,
     doc_dir: Option<PathBuf>,
-    remote: bool,
     macros: Arc<str>,
     options: ExportOptions,
 }
@@ -460,7 +457,7 @@ impl ExportSource {
         let image = |url: &str| {
             let picture = if remote::is_remote(url) {
                 on_main(|| {
-                    let rendered = self.remote.then(|| remote::get(url, None)).flatten().flatten()?;
+                    let rendered = remote::get(url, None).flatten()?;
                     picture_of(&rendered.image, rendered.image.size())
                 })
                 .flatten()?

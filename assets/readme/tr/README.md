@@ -4,7 +4,7 @@
 
 **Kaynakta ya da doğrudan önizlemede yazmanızı sağlayan macOS Markdown düzenleyicisi.**
 
-Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüyle düzenlenebilir bir önizlemeyi gösterir. İkisinden birinde yazın: önizlemede yazdığınız her şey kaynakta asgari bir değişikliğe dönüşür; böylece dokunmadığınız satırlar bayt bayt aynı kalır ve Git diff’leriniz temiz kalır. Splat zaten kullandığınız Markdown’ı okur: CommonMark ve GitHub Flavored Markdown, GitHub uyarıları, Obsidian wiki bağlantıları, gömmeleri ve bilgi kutuları, Pandoc ve Typora eklentileri, gömülü HTML, LaTeX formülleri ile Mermaid, Graphviz ve PlantUML diyagramları; hepsi çevrimdışı görüntülenir. Bütün bir not klasörüne göz atın ve içinde arama yapın, son Git commit’inden beri neyin değiştiğini görün, Word’den ya da bir web sayfasından Markdown olarak yapıştırın ve tek tıkla PDF, HTML ya da Word olarak dışa aktarın. Rust ile gerçek AppKit denetimleri üzerine yazılmıştır, 35 dilde kullanılabilir ve siz istemedikçe ağa hiçbir şey göndermez.
+Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüyle düzenlenebilir bir önizlemeyi gösterir. İkisinden birinde yazın: önizlemede yazdığınız her şey kaynakta asgari bir değişikliğe dönüşür; böylece dokunmadığınız satırlar bayt bayt aynı kalır ve Git diff’leriniz temiz kalır. Splat zaten kullandığınız Markdown’ı okur: CommonMark ve GitHub Flavored Markdown, GitHub uyarıları, Obsidian wiki bağlantıları, gömmeleri ve bilgi kutuları, Pandoc ve Typora eklentileri, gömülü HTML, LaTeX formülleri ile Mermaid, Graphviz ve PlantUML diyagramları; hepsi çevrimdışı görüntülenir. Bütün bir not klasörüne göz atın ve içinde arama yapın, son Git commit’inden beri neyin değiştiğini görün, Word’den ya da bir web sayfasından Markdown olarak yapıştırın ve tek tıkla PDF, HTML ya da Word olarak dışa aktarın. Rust ile gerçek AppKit denetimleri üzerine yazılmıştır, 35 dilde kullanılabilir ve telemetri içermez.
  
 
 
@@ -29,7 +29,7 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 [![Viz.js 3.24 üzerinden Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 arayüz dili](https://img.shields.io/badge/languages-35-4C9A2A)
-![Varsayılan olarak çevrimdışı](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Telemetri yok](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Hardened Runtime ile imzalı](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Lisans: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#lisans)
 
@@ -123,7 +123,7 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 - **Hiçbir şey kaybetmeden dışa aktarma.** PDF, tek başına yeterli tek bir HTML dosyası ya da gerçek başlıklar, listeler, tablolar, dipnotlar ve görüntüler içeren bir Word belgesi. Sayfa numaraları, üst bilgiler ve başlık sayfası ekleyin ya da şirketinizin Word şablonunu kullanın.
 - **Tepeden tırnağa yerel.** Gerçek AppKit pencereleri, sekmeler, menüler, açılır pencereler, Sürümler, Otomatik Kaydet, paylaşım menüsü, koyu mod, yazım denetimi, dikte ve VoiceOver. Electron yok, metnin kendisi için web görünümü yok.
 - **Büyük dosyalarda hızlı.** 10 MB’lık bir belgede bir tuş vuruşunu işlemek, görünümün kendi işinden önce yaklaşık 10 ms sürer.
-- **Gizliliğe duyarlı ve özenli.** Splat, App Sandbox içinde çalışır; Web’deki görüntüler yalnızca siz izin verdikten sonra yüklenir, diğer uygulamalara giden bağlantılar önce sorar ve güvenilmeyen görüntü verilerini çözen her şey korumalı, ayrı bir hizmette çalışır.
+- **Gizliliğe duyarlı ve özenli.** Splat, App Sandbox içinde çalışır; diğer uygulamalara giden bağlantılar önce sorar ve güvenilmeyen görüntü verilerini çözen her şey korumalı, ayrı bir hizmette çalışır.
 - **Kendi dilinizde.** Arayüz ve yerleşik Markdown hızlı başvurusu 35 dilde gelir: Arapça, Katalanca, Çince (Basitleştirilmiş), Çince (Geleneksel), Hırvatça, Çekçe, Danca, Felemenkçe, İngilizce, Fince, Fransızca, Almanca, Yunanca, İbranice, Hintçe, Macarca, Endonezce, İtalyanca, Japonca, Korece, Malayca, Norveççe, Lehçe, Portekizce (Brezilya), Portekizce (Portekiz), Romence, Rusça, Slovakça, Slovence, İspanyolca, İsveççe, Tayca, Türkçe, Ukraynaca ve Vietnamca.
 
 ## Gereksinimler
@@ -438,7 +438,7 @@ Açılıştan sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görü
 ## Görüntüler
 
 - **Yerel görüntüler** belgeye göreli yollar kullanır: `![Logo](images/logo.png)`. Splat PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF ve PDF gösterir.
-- **Web’deki görüntüler** siz izin verene kadar engelli kalır: önizlemenin üstündeki bir çubuk, bunları yüklemenin sunucularına belgeyi açtığınızı ve ne zaman açtığınızı bildireceğini açıklar. **Görüntüleri Yükle** bunlara bu belge için izin verir; Splat seçimi dosya başına hatırlar.
+- **Web’deki görüntüler**, bir belge onları gösterir göstermez `https` üzerinden ve her biri en fazla 10 MB olarak yüklenir. Bir e-postadaki görüntüler gibi, sunucularına belgenin açıldığını ve ne zaman açıldığını bildirirler.
 - **Boyut.** `<img width="200">` bir görüntünün boyutunu belirler; aksi halde görüntüler önizlemenin genişliğine sığar.
 - **Diskteki değişiklikler.** Değiştirdiğiniz bir görüntü ya da belge adını verdikten sonra ortaya çıkan bir görüntü, belge yeniden açılmadan görünür. Ağ yüzünden başarısız olan web görüntüleri, bir belge onları gösterdiği sürece yeniden denenir.
 - **Bellek.** Görüntüler en uzun kenarında 2560 piksele kadar gösterilir; bu bir A4 sayfayı da doldurur. Mac’in belleğinin sekizde birini doldurduklarında ve macOS bellek baskısı bildirdiği sürece daha küçük çözülürler.
@@ -483,7 +483,7 @@ Yalnızca satır sonlarında farklı olan satırlar sayılmaz; bu yüzden LF’l
 | **Word** | **Dosya › Word Belgesi Olarak Dışa Aktar…** veya Paylaş menüsü | Word’ün başlık stillerini, gerçek listeleri ve tabloları (birleştirilmiş hücreler dahil), Word dipnotları olarak dipnotları, gömülü görüntüleri, formülleri ve diyagramları içeren bir `.docx`. |
 | **Markdown** | Araç çubuğundaki **Paylaş** düğmesi | Mail, Mesajlar, AirDrop ve diğer tüm paylaşım servisleri için belge bir `.md` dosyası olarak. |
 
-**Dosya › Paylaş** menüsü bunların hepsini tek bir yerde sunar. Dışa aktarmalar tipografik noktalama ayarını ve web’den izin verdiğiniz görüntüleri kullanır; web’deki görüntüler HTML’de bağlantı olarak kalır.
+**Dosya › Paylaş** menüsü bunların hepsini tek bir yerde sunar. Dışa aktarmalar tipografik noktalama ayarını ve önizlemenin web’den yüklediği görüntüleri kullanır; web’deki görüntüler HTML’de bağlantı olarak kalır.
 
 **Dosya › Dışa Aktarma Seçenekleri…**, tüm belgeler için PDF’in, yazdırmanın ve Word’ün metne ne ekleyeceğini belirler:
 
@@ -554,8 +554,8 @@ Splat, Apple’ın standart kısayollarına dokunmaz.
 
 Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenilmez sayar.
 
-- **Varsayılan olarak ağ yok.** Splat’ta telemetri yoktur. Güncellemeleri yalnızca siz onay verdikten sonra ya da **Güncellemeleri Denetle…**’yi seçtiğinizde arar: o zaman GitHub’dan küçük bir akış dosyası yükler ve istek uygulamanın adı ile sürümünden başka bir şey içermez. Formüller ve diyagramlar yerelde görüntülenir; bunu yapan web görünümleri ağa erişemez. **Yardım › Sorun Bildir…**, tarayıcınızda GitHub’daki bir formu açar; adresi Splat sürümünü, macOS sürümünü ve Mac türünü içerir, belgelerinizden hiçbir şey içermez.
-- **Web’deki görüntüler** yalnızca izninizden sonra, yalnızca `https` üzerinden, asla yerel ağınızdaki sunuculardan olmayarak, her biri en fazla 10 MB ve çerezsiz özel bir oturumda yüklenir.
+- **Telemetri yok.** Splat, onu nasıl kullandığınız hakkında hiçbir şey bildirmez. Güncellemeleri yalnızca siz onay verdikten sonra ya da **Güncellemeleri Denetle…**’yi seçtiğinizde arar: o zaman GitHub’dan küçük bir akış dosyası yükler ve istek uygulamanın adı ile sürümünden başka bir şey içermez. Formüller ve diyagramlar yerelde görüntülenir; bunu yapan web görünümleri ağa erişemez. **Yardım › Sorun Bildir…**, tarayıcınızda GitHub’daki bir formu açar; adresi Splat sürümünü, macOS sürümünü ve Mac türünü içerir, belgelerinizden hiçbir şey içermez.
+- **Web’deki görüntüler**, bir belge onları gösterir göstermez, herhangi bir sunucudan, yalnızca `https` üzerinden, her biri en fazla 10 MB ve çerezsiz özel bir oturumda yüklenir. Sunucuları belgenin açıldığını ve ne zaman açıldığını öğrenir.
 - **Yalıtılmış çözme.** Görüntüler ile formüllerin ve diyagramların grafikleri ayrı bir hizmette çözülür; macOS bu hizmeti kendine ait bir sanal alanda (sandbox) başlatır: dosyalarınızın hiçbiri yok, ağ yok. Hizmet yalnızca boyutu denetlenen pikselleri geri verir ve bir çözme işlemi 10 saniyeden uzun sürdüğünde ya da çok fazla bellek kullandığında kendini sonlandırır. Apple’ın kendi görüntü çözücüleri yalnızca HEIC, TIFF, AVIF ve PDF’yi görür, o da yalnızca veri gerçekten o biçimdeyse. SVG’ler, formüller ve diyagramlar da bu hizmetten geçer; bu yüzden Splat’ta sabit çözünürlüklü resimlerdir: nokta başına dört piksel, uzun kenarda en fazla 2560.
 - **Yerel dosyalar** bir belgeye yalnızca onun adlandırdığı yolla ve yalnızca erişim izni verdiğiniz bir klasörden ulaşır: Splat açtığınız bir belgeyi okuyabilir, ancak çevresindeki resimleri, notları, kaynakçayı ve depoyu ancak önizlemenin üstündeki çubukta **Klasöre Erişim İzni Ver…** ile klasörlerine erişim izni verdiğinizde okur. Verilen izin tüm alt klasörleri kapsar ve hatırlanır. Gömmeler Markdown notlarını belgenin klasöründen ve altından gösterir, eksik bir resim de yalnızca orada aranır. Başka yerdeki, mutlak ya da `~` ile başlayan bir görüntü yolu, erişim izni verilmiş bir klasördeyse önizlemede yüklenir; HTML ve Word dışa aktarmaları, yazdırma ve PDF’ler yalnızca belgenin klasöründe ya da Git deposunda (bu depo Ana klasörünüzü de içermediği sürece) olanı yanına alır, böylece başkasından gelen bir belge dosyalarınızı ilettiğiniz bir dışa aktarmaya çekemez.
 - **Not klasörleri** yalnızca kenar çubuğu onları gösterirken okunur; bir notun adını değiştirmek, diğer dosyaları ancak kaç tane olduğunu onayladıktan sonra değiştirir.
@@ -565,7 +565,7 @@ Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenil
 - **Bağlantılar** bir tıklamayla asla bir program başlatmaz. Web ve posta bağlantıları olağan şekilde açılır; diğer uygulamalara giden bağlantılar önce sorar.
 - **Belgelerdeki HTML**, Splat’ın kendi ayrıştırıcısı tarafından okunur. Betikler, stiller, çerçeveler ve formlar asla çalışmaz.
 - **Dışa aktarmalar** betik taşımaz. HTML sayfaları, GitHub’ın yaptığı gibi yalnızca sabit bir zararsız etiket ve öznitelik listesini ve ek olarak bir içerik güvenlik politikasını korur. Word dosyaları, seçtiğiniz bir Word şablonunun beraberinde getirdiği bağlantılar dışında yalnızca `http`, `https` ve `mailto` adreslerine bağlanır.
-- **Kod imzalama**, Hardened Runtime ve App Sandbox ile. Splat açtığınız belgeleri ve erişim izni verdiğiniz klasörleri okuyup yazabilir, izin verdiğiniz Web görüntüleri ve güncellemeler için ağa bağlanabilir ve yazdırabilir; başka hiçbir şey yapamaz.
+- **Kod imzalama**, Hardened Runtime ve App Sandbox ile. Splat açtığınız belgeleri ve erişim izni verdiğiniz klasörleri okuyup yazabilir, Web görüntüleri ve güncellemeler için ağa bağlanabilir ve yazdırabilir; başka hiçbir şey yapamaz.
 
 ## Büyük belgeler
 
@@ -610,7 +610,7 @@ Bazı değişiklikler tümüyle işlenir; 10 MB’ta tuş vuruşu başına yakla
 
 **Splat menüsünde Güncellemeleri Denetle… yok.** Yalnızca disk görüntüsünden ya da Homebrew ile gelen sürüm kendini günceller; kendi derlemenizde güncelleyici yoktur.
 
-**Web’deki görüntüler görünmüyor.** Önizlemenin üstündeki çubukta **Görüntüleri Yükle**’ye tıklayın. Yalnızca herkese açık sunuculardaki `https` görüntüleri yüklenir.
+**Web’deki görüntüler görünmüyor.** Yalnızca `https` görüntüleri yüklenir, her biri en fazla 10 MB. Ağ yüzünden başarısız olan bir görüntü, belge onu gösterdiği sürece yeniden denenir.
 
 **Ekran görüntüsünü yapıştırmak önce kaydetmemi istiyor.** Yapıştırılan görüntüler belgenin yanına dosya olarak kaydedilir; bunun için diskte bir yer gerekir. Belgeyi kaydedin, sonra yeniden yapıştırın.
 

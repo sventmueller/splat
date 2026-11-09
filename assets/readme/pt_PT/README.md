@@ -4,7 +4,7 @@
 
 **O editor de Markdown para macOS que lhe permite escrever no código-fonte ou diretamente na pré-visualização.**
 
-O Splat mostra à esquerda o seu código-fonte Markdown com cores de sintaxe e, à direita, uma pré-visualização em direto e totalmente editável. Escreva num dos dois lados: tudo o que escrever na pré-visualização torna-se uma alteração mínima no código-fonte, pelo que as linhas em que não tocou ficam idênticas byte a byte e os seus diffs do Git permanecem limpos. O Splat lê o Markdown que já utiliza: CommonMark e GitHub Flavored Markdown, alertas do GitHub, hiperligações wiki, incorporações e caixas de informação do Obsidian, extensões do Pandoc e do Typora, HTML incorporado, fórmulas LaTeX e diagramas Mermaid, Graphviz e PlantUML, tudo apresentado offline. Percorra e pesquise toda uma pasta de notas, veja o que mudou desde o último commit do Git, cole a partir do Word ou de uma página web como Markdown e exporte para PDF, HTML ou Word com um clique. Está escrito em Rust sobre controlos AppKit genuínos, fala 35 idiomas e não envia nada pela rede, a menos que lho peça.
+O Splat mostra à esquerda o seu código-fonte Markdown com cores de sintaxe e, à direita, uma pré-visualização em direto e totalmente editável. Escreva num dos dois lados: tudo o que escrever na pré-visualização torna-se uma alteração mínima no código-fonte, pelo que as linhas em que não tocou ficam idênticas byte a byte e os seus diffs do Git permanecem limpos. O Splat lê o Markdown que já utiliza: CommonMark e GitHub Flavored Markdown, alertas do GitHub, hiperligações wiki, incorporações e caixas de informação do Obsidian, extensões do Pandoc e do Typora, HTML incorporado, fórmulas LaTeX e diagramas Mermaid, Graphviz e PlantUML, tudo apresentado offline. Percorra e pesquise toda uma pasta de notas, veja o que mudou desde o último commit do Git, cole a partir do Word ou de uma página web como Markdown e exporte para PDF, HTML ou Word com um clique. Está escrito em Rust sobre controlos AppKit genuínos, fala 35 idiomas e não tem telemetria.
  
 
 
@@ -29,7 +29,7 @@ O Splat mostra à esquerda o seu código-fonte Markdown com cores de sintaxe e, 
 [![Graphviz através de Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 idiomas da interface](https://img.shields.io/badge/languages-35-4C9A2A)
-![Offline por predefinição](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Sem telemetria](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Assinado com Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licença: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licença)
 
@@ -123,7 +123,7 @@ O Splat mostra à esquerda o seu código-fonte Markdown com cores de sintaxe e, 
 - **Exportação sem perdas.** PDF, um único ficheiro HTML autónomo ou um documento Word com títulos, listas, tabelas, notas de rodapé e imagens verdadeiros. Acrescente números de página, cabeçalhos e uma página de rosto, ou use o modelo do Word da sua empresa.
 - **Nativo até ao último pormenor.** Janelas, separadores, menus, popovers, Versões, Guardar automaticamente, o menu de partilha, modo escuro, verificação ortográfica, ditado e VoiceOver autênticos do AppKit. Sem Electron, sem vista web para o próprio texto.
 - **Rápido com ficheiros grandes.** Renderizar uma tecla num documento de 10 MB demora cerca de 10 ms, antes do trabalho da própria vista.
-- **Privado e cuidadoso.** O Splat corre na App Sandbox, as imagens da web só são carregadas depois de as permitir, as hiperligações para outras aplicações pedem confirmação, e tudo o que descodifica dados de imagem não fiáveis corre num serviço próprio isolado numa sandbox.
+- **Privado e cuidadoso.** O Splat corre na App Sandbox, as hiperligações para outras aplicações pedem confirmação, e tudo o que descodifica dados de imagem não fiáveis corre num serviço próprio isolado numa sandbox.
 - **No seu idioma.** A interface e a referência rápida de Markdown integrada existem em 35 idiomas: alemão, árabe, catalão, checo, chinês (simplificado), chinês (tradicional), coreano, croata, dinamarquês, eslovaco, esloveno, espanhol, finlandês, francês, grego, hebraico, hindi, húngaro, indonésio, inglês, italiano, japonês, malaio, neerlandês, norueguês, polaco, português (Brasil), português (Portugal), romeno, russo, sueco, tailandês, turco, ucraniano e vietnamita.
 
 ## Requisitos
@@ -438,7 +438,7 @@ O primeiro diagrama após o arranque demora cerca de um segundo, porque o motor 
 ## Imagens
 
 - **Imagens locais** usam caminhos relativos ao documento: `![Logótipo](images/logo.png)`. O Splat mostra PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF e PDF.
-- **Imagens da web** ficam bloqueadas até as permitir: uma barra acima da pré-visualização explica que, ao carregá-las, os respetivos servidores ficam a saber que e quando abre o documento. **Carregar imagens** permite-as neste documento; o Splat memoriza a escolha por ficheiro.
+- **Imagens da web** são carregadas assim que um documento as mostra, por `https` e com até 10 MB cada. Tal como as imagens num e-mail, informam os respetivos servidores de que e quando o documento é aberto.
 - **Tamanho.** `<img width="200">` define o tamanho de uma imagem; caso contrário, as imagens ajustam-se à largura da pré-visualização.
 - **Alterações no disco.** Uma imagem que substitua, ou uma que apareça depois de o documento a indicar, é mostrada sem voltar a abrir o documento. As imagens da web que falharam por causa da rede são tentadas de novo enquanto um documento as mostrar.
 - **Memória.** As imagens são mostradas com até 2560 píxeis no lado mais comprido, o que também preenche uma página A4. São descodificadas em tamanho menor quando ocupam um oitavo da memória do Mac e enquanto o macOS indicar pressão de memória.
@@ -483,7 +483,7 @@ As linhas que só diferem no fim de linha não contam, pelo que um ficheiro com 
 | **Word** | **Ficheiro › Exportar como documento Word…** ou o menu Partilhar | Um `.docx` com os estilos de título do Word, listas e tabelas verdadeiras (incluindo células unidas), notas de rodapé como notas de rodapé do Word, imagens incorporadas, fórmulas e diagramas. |
 | **Markdown** | O botão **Partilhar** na barra de ferramentas | O documento como ficheiro `.md` para o Mail, as Mensagens, o AirDrop e todos os outros serviços de partilha. |
 
-O menu **Ficheiro › Partilhar** oferece tudo isto num só lugar. As exportações usam a opção de pontuação tipográfica e as imagens da web que permitiu; no HTML, as imagens da web continuam a ser hiperligações.
+O menu **Ficheiro › Partilhar** oferece tudo isto num só lugar. As exportações usam a opção de pontuação tipográfica e as imagens da web que a pré-visualização carregou; no HTML, as imagens da web continuam a ser hiperligações.
 
 **Ficheiro › Opções de exportação…** define o que o PDF, a impressão e o Word acrescentam ao texto, para todos os documentos:
 
@@ -554,8 +554,8 @@ O Splat deixa os atalhos padrão da Apple onde estão.
 
 Um ficheiro Markdown pode vir de qualquer pessoa, por isso o Splat trata cada documento como não fiável.
 
-- **Sem rede por predefinição.** O Splat não tem telemetria. Só procura atualizações depois de o autorizar ou de escolher **Procurar atualizações…**: nesse caso, carrega um pequeno ficheiro de feed do GitHub, e o pedido indica apenas a aplicação e a sua versão. As fórmulas e os diagramas são apresentados localmente; as vistas web que o fazem não conseguem aceder à rede. **Ajuda › Comunicar um problema…** abre um formulário do GitHub no navegador; o endereço contém a versão do Splat, a do macOS e o tipo de Mac, nada dos seus documentos.
-- **As imagens da web** só são carregadas com a sua autorização, apenas por `https`, nunca de anfitriões na sua rede local, com no máximo 10 MB cada e numa sessão privada sem cookies.
+- **Sem telemetria.** O Splat não comunica nada sobre a forma como o utiliza. Só procura atualizações depois de o autorizar ou de escolher **Procurar atualizações…**: nesse caso, carrega um pequeno ficheiro de feed do GitHub, e o pedido indica apenas a aplicação e a sua versão. As fórmulas e os diagramas são apresentados localmente; as vistas web que o fazem não conseguem aceder à rede. **Ajuda › Comunicar um problema…** abre um formulário do GitHub no navegador; o endereço contém a versão do Splat, a do macOS e o tipo de Mac, nada dos seus documentos.
+- **As imagens da web** são carregadas assim que um documento as mostra, de qualquer anfitrião, apenas por `https`, com no máximo 10 MB cada e numa sessão privada sem cookies. Os respetivos servidores ficam a saber que e quando o documento é aberto.
 - **Descodificação isolada.** As imagens e os gráficos de fórmulas e diagramas são descodificados num serviço próprio, que o macOS inicia numa sandbox própria: nenhum dos seus ficheiros, sem rede. Devolve apenas píxeis, cujo tamanho é verificado, e termina por si quando uma descodificação demora mais de 10 segundos ou exige memória a mais. Os descodificadores de imagem da própria Apple só veem HEIC, TIFF, AVIF e PDF, e só quando os dados são mesmo desse formato. Os SVG, as fórmulas e os diagramas também passam por esse serviço, pelo que no Splat são imagens com resolução fixa: quatro píxeis por ponto, até 2560 no lado mais comprido.
 - **Os ficheiros locais** só chegam a um documento pelo caminho que ele indica, e só a partir de uma pasta à qual concedeu acesso: o Splat pode ler um documento que abra, mas as imagens, notas, bibliografia e repositório à sua volta só depois de conceder acesso à respetiva pasta com **Conceder acesso à pasta…** na barra acima da pré-visualização. Um acesso abrange todas as subpastas e fica memorizado. As incorporações mostram notas Markdown da pasta do documento e abaixo, e uma imagem em falta só é procurada aí. Um caminho de imagem noutro local, absoluto ou a começar por `~`, é carregado na pré-visualização a partir de uma pasta com acesso concedido; as exportações HTML e Word, a impressão e os PDF só levam o que está na pasta do documento ou no seu repositório Git, a menos que esse repositório também contenha a sua pasta pessoal, para que um documento de outra pessoa não arraste os seus ficheiros para uma exportação que reencaminhe.
 - **As pastas de notas** só são lidas enquanto a barra lateral as mostra, e alterar o nome de uma nota só altera outros ficheiros depois de confirmar quantos.
@@ -565,7 +565,7 @@ Um ficheiro Markdown pode vir de qualquer pessoa, por isso o Splat trata cada do
 - **As hiperligações** nunca iniciam um programa com um clique. As hiperligações web e de correio abrem como de costume; as que levam a outras aplicações pedem confirmação.
 - **O HTML nos documentos** é lido pelo analisador próprio do Splat. Scripts, estilos, frames e formulários nunca são executados.
 - **As exportações** não contêm scripts. As páginas HTML só mantêm uma lista fixa de etiquetas e atributos inofensivos, como o GitHub, mais uma política de segurança de conteúdo. Os ficheiros Word só ligam endereços `http`, `https` e `mailto`, exceto as hiperligações que vêm com um modelo do Word que tenha escolhido.
-- **Assinatura de código** com o Hardened Runtime e a App Sandbox. O Splat pode ler e escrever os documentos que abre e as pastas às quais concede acesso, aceder à rede para as imagens da web que permitiu e para atualizações, e imprimir; mais nada.
+- **Assinatura de código** com o Hardened Runtime e a App Sandbox. O Splat pode ler e escrever os documentos que abre e as pastas às quais concede acesso, aceder à rede para as imagens da web e para atualizações, e imprimir; mais nada.
 
 ## Documentos grandes
 
@@ -610,7 +610,7 @@ Algumas alterações são processadas por inteiro, a cerca de 300 ms por tecla a
 
 **Não há «Procurar atualizações…» no menu Splat.** Só a versão da imagem de disco ou do Homebrew se atualiza sozinha; uma compilação própria não tem atualizador.
 
-**As imagens da web não aparecem.** Clique em **Carregar imagens** na barra acima da pré-visualização. Só são carregadas imagens `https` de anfitriões públicos.
+**As imagens da web não aparecem.** Só são carregadas imagens `https`, com até 10 MB cada. Uma que falhou por causa da rede é tentada de novo enquanto o documento a mostrar.
 
 **Ao colar uma captura de ecrã, pede-me para guardar primeiro.** As imagens coladas são guardadas como ficheiros junto do documento, o que exige um lugar no disco. Guarde-o e cole de novo.
 

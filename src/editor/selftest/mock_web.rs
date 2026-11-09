@@ -3,8 +3,6 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, Instant};
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject};
@@ -18,54 +16,8 @@ use crate::util::ns;
 
 pub const HOST: &str = "https://bilder.splat-test.example";
 
-/// A public name whose address lies in the local network, as a router's can.
-pub const HOME_HOST: &str = "https://router.splat-test.example";
-
-/// What the hosts of this server resolve to.
-pub fn addresses_of(host: &str) -> Option<Vec<std::net::IpAddr>> {
-    let address = match host {
-        "bilder.splat-test.example" => [93, 184, 216, 34],
-        "router.splat-test.example" => [192, 168, 178, 1],
-        // A name the resolver has no answer for, as while the network is away.
-        "weg.splat-test.example" => return Some(Vec::new()),
-        "zaeh.splat-test.example" => {
-            wait_until_freed();
-            [93, 184, 216, 34]
-        }
-        _ => return None,
-    };
-    Some(vec![std::net::IpAddr::from(address)])
-}
-
-static SLOW_NAME_ASKED: AtomicBool = AtomicBool::new(false);
-static SLOW_NAME_FREED: AtomicBool = AtomicBool::new(false);
-static SLOW_NAME_IN_VAIN: AtomicBool = AtomicBool::new(false);
-
-/// Holds the lookup of a slow name until the probe frees it, as a resolver that stops answering holds its caller.
-fn wait_until_freed() {
-    SLOW_NAME_ASKED.store(true, Ordering::SeqCst);
-    let asked = Instant::now();
-    while !SLOW_NAME_FREED.load(Ordering::SeqCst) {
-        if asked.elapsed() > Duration::from_secs(20) {
-            SLOW_NAME_IN_VAIN.store(true, Ordering::SeqCst);
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
-}
-
-pub fn slow_name_asked() -> bool {
-    SLOW_NAME_ASKED.load(Ordering::SeqCst)
-}
-
-pub fn free_slow_name() {
-    SLOW_NAME_FREED.store(true, Ordering::SeqCst);
-}
-
-/// The probe did not free the slow name in time.
-pub fn slow_name_waited_in_vain() -> bool {
-    SLOW_NAME_IN_VAIN.load(Ordering::SeqCst)
-}
+/// An address in the local network, as a router's.
+pub const HOME_HOST: &str = "https://192.168.178.1";
 
 /// Every address requested so far, and how often.
 static REQUESTS: Mutex<Option<HashMap<String, usize>>> = Mutex::new(None);
@@ -106,13 +58,9 @@ fn answer(path: &str, count: usize) -> Answer {
         "/fehlt.png" => Answer::Body(404, "nicht da"),
         "/kein-bild.png" => Answer::Body(200, "<html>keine Grafik</html>"),
         "/zu-gross.png" => Answer::TooLarge,
+        "/heimlich.png" | "/router.png" => Answer::Body(200, BADGE),
         "/umleitung.png" => Answer::Redirect("https://127.0.0.1/heimlich.png"),
-        "/umleitung-nach-hause.png" => Answer::Redirect("https://router.splat-test.example/router.png"),
         "/umleitung-weiter.svg" => Answer::Redirect("https://bilder.splat-test.example/badge.svg"),
-        "/umleitung-ins-leere.svg" if count == 1 => Answer::Redirect("https://weg.splat-test.example/badge.svg"),
-        "/umleitung-ins-leere.svg" => Answer::Body(200, BADGE),
-        "/umleitung-zaeh.svg" => Answer::Redirect("https://zaeh.splat-test.example/badge.svg"),
-        "/waehrend-der-suche.svg" => Answer::Body(200, BADGE),
         "/wackelig.svg" | "/nicht-gezeigt.svg" if count == 1 => Answer::Body(503, "gleich wieder"),
         "/wackelig.svg" | "/nicht-gezeigt.svg" => Answer::Body(200, BADGE),
         "/ohne-netz.svg" if count == 1 => Answer::Unreachable,

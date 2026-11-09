@@ -288,8 +288,6 @@
 "Öffnen" = "เปิด";
 "Als HTML exportieren …" = "ส่งออกเป็น HTML…";
 "Als Word-Dokument exportieren …" = "ส่งออกเป็นเอกสาร Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "ภาพจากอินเทอร์เน็ตถูกบล็อกไว้ เพราะเมื่อโหลดภาพ เซิร์ฟเวอร์ของภาพจะรู้ว่าคุณเปิดเอกสารนี้และเปิดเมื่อใด";
-"Bilder laden" = "โหลดภาพ";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat จะอ่านภาพ โน้ต และข้อมูล Git ที่อยู่ข้างเอกสารนี้ได้ก็ต่อเมื่อคุณให้สิทธิ์เข้าถึงโฟลเดอร์นั้น";
 "Ordner freigeben …" = "ให้สิทธิ์เข้าถึงโฟลเดอร์…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "จากนั้น Splat จะอ่านภาพ โน้ต และข้อมูล Git ในโฟลเดอร์นี้และโฟลเดอร์ย่อยทั้งหมดได้ แม้หลังจากเริ่มการทำงานใหม่";

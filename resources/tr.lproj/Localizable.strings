@@ -288,8 +288,6 @@
 "Öffnen" = "Aç";
 "Als HTML exportieren …" = "HTML Olarak Dışa Aktar…";
 "Als Word-Dokument exportieren …" = "Word Belgesi Olarak Dışa Aktar…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "İnternetten gelen görüntüler engellendi: Yüklendiklerinde sunucuları bu belgeyi açtığınızı ve ne zaman açtığınızı öğrenir.";
-"Bilder laden" = "Görüntüleri Yükle";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat, bu belgenin yanındaki görüntüleri, notları ve Git verilerini ancak klasörlerine erişim izni verdiğinizde okuyabilir.";
 "Ordner freigeben …" = "Klasöre Erişim İzni Ver…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat bundan sonra bu klasördeki ve tüm alt klasörlerindeki görüntüleri, notları ve Git verilerini okuyabilir; bu, yeniden başlattıktan sonra da geçerlidir.";

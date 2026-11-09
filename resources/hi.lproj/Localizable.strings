@@ -288,8 +288,6 @@
 "Öffnen" = "खोलें";
 "Als HTML exportieren …" = "HTML के रूप में एक्सपोर्ट करें…";
 "Als Word-Dokument exportieren …" = "Word दस्तावेज़ के रूप में एक्सपोर्ट करें…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "इंटरनेट की इमेज ब्लॉक हैं। उन्हें लोड करने पर उनके सर्वर को पता चल जाता है कि आपने यह दस्तावेज़ खोला है और कब खोला है।";
-"Bilder laden" = "इमेज लोड करें";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat इस दस्तावेज़ के पास की इमेज, नोट्स और Git डेटा तभी पढ़ सकता है, जब आप उनके फ़ोल्डर का ऐक्सेस दें।";
 "Ordner freigeben …" = "फ़ोल्डर का ऐक्सेस दें…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "इसके बाद Splat इस फ़ोल्डर और इसके सभी सबफ़ोल्डर में इमेज, नोट्स और Git डेटा पढ़ सकेगा, रीस्टार्ट के बाद भी।";

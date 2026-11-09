@@ -288,8 +288,6 @@
 "Öffnen" = "Відкрити";
 "Als HTML exportieren …" = "Експортувати як HTML…";
 "Als Word-Dokument exportieren …" = "Експортувати як документ Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Зображення з інтернету заблоковано: під час їх завантаження сервери дізнаються, що ви відкриваєте цей документ і коли саме.";
-"Bilder laden" = "Завантажити зображення";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat зможе читати зображення, нотатки й дані Git поруч із цим документом лише після того, як ви надасте доступ до їхньої папки.";
 "Ordner freigeben …" = "Надати доступ до папки…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Після цього Splat зможе читати зображення, нотатки й дані Git у цій папці та в усіх її вкладених папках, зокрема після перезапуску.";

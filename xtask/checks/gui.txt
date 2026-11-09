@@ -58,7 +58,7 @@ formula popover shows TeX
 formulas and diagram rendered as images
 fraction button inserts a template with the selection
 highlight wraps the selection in <mark>
-images from the web wait for permission
+images from the web load without a question
 inserting a formula opens its editor
 link dialog fields are full width
 link dialog fields span the sheet

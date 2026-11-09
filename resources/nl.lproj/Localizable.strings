@@ -288,8 +288,6 @@
 "Öffnen" = "Open";
 "Als HTML exportieren …" = "Exporteer als HTML…";
 "Als Word-Dokument exportieren …" = "Exporteer als Word-document…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Afbeeldingen van internet worden geblokkeerd: bij het laden komen hun servers te weten dat en wanneer je dit document opent.";
-"Bilder laden" = "Laad afbeeldingen";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat kan de afbeeldingen, notities en Git-gegevens naast dit document pas lezen als je toegang geeft tot hun map.";
 "Ordner freigeben …" = "Geef toegang tot map…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat mag dan afbeeldingen, notities en Git-gegevens in deze map en alle submappen ervan lezen, ook na opnieuw opstarten.";

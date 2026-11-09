@@ -288,8 +288,6 @@
 "Öffnen" = "打开";
 "Als HTML exportieren …" = "导出为 HTML…";
 "Als Word-Dokument exportieren …" = "导出为 Word 文稿…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "来自互联网的图像已被阻止：载入这些图像会让其服务器得知你打开了此文稿以及打开的时间。";
-"Bilder laden" = "载入图像";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "只有在你授予其所在文件夹的访问权限后，Splat 才能读取此文稿旁边的图像、笔记和 Git 数据。";
 "Ordner freigeben …" = "授予文件夹访问权限…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "之后 Splat 可以读取此文件夹及其所有子文件夹中的图像、笔记和 Git 数据，重新启动后依然有效。";

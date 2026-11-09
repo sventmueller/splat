@@ -288,8 +288,6 @@
 "Öffnen" = "열기";
 "Als HTML exportieren …" = "HTML로 내보내기…";
 "Als Word-Dokument exportieren …" = "Word 문서로 내보내기…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "인터넷의 이미지가 차단되었습니다. 이미지를 로드하면 이미지 서버에 이 문서를 열었다는 사실과 연 시각이 전달됩니다.";
-"Bilder laden" = "이미지 로드";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "이 문서와 같은 위치에 있는 이미지, 메모 및 Git 데이터는 해당 폴더에 대한 접근 권한을 부여한 후에만 Splat이 읽을 수 있습니다.";
 "Ordner freigeben …" = "폴더 접근 권한 부여…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "그러면 Splat이 이 폴더와 모든 하위 폴더에 있는 이미지, 메모 및 Git 데이터를 읽을 수 있으며, 재시동 후에도 유지됩니다.";

@@ -10,8 +10,8 @@ stay byte-for-byte identical and your Git diffs stay clean. Splat reads the Mark
 GitHub Flavored Markdown, GitHub alerts, Obsidian wiki links, embeds and callouts, Pandoc and Typora extensions,
 embedded HTML, LaTeX formulas, and Mermaid, Graphviz and PlantUML diagrams, all rendered offline. Browse and search a
 whole folder of notes, see what changed since the last Git commit, paste from Word or a web page as Markdown, and export
-to PDF, HTML or Word in one click. It is written in Rust on genuine AppKit controls, speaks 35 languages, and sends
-nothing over the network unless you ask it to.
+to PDF, HTML or Word in one click. It is written in Rust on genuine AppKit controls, speaks 35 languages, and has no
+telemetry.
  
 
 
@@ -36,7 +36,7 @@ nothing over the network unless you ask it to.
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 interface languages](https://img.shields.io/badge/languages-35-4C9A2A)
-![Offline by default](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![No telemetry](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Signed with Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#license)
 
@@ -138,8 +138,8 @@ nothing over the network unless you ask it to.
 - **Native to the bone.** Real AppKit windows, tabs, menus, popovers, Versions, Auto Save, the share menu, dark mode,
   spell checking, dictation and VoiceOver. No Electron, no web view for the text itself.
 - **Fast with big files.** Rendering a keystroke in a 10 MB document takes about 10 ms, before the view's own work.
-- **Private and careful.** Splat runs in the App Sandbox, images from the web load only after you allow them, links to
-  other apps ask first, and everything that decodes untrusted image data runs in a sandboxed service of its own.
+- **Private and careful.** Splat runs in the App Sandbox, links to other apps ask first, and everything that decodes
+  untrusted image data runs in a sandboxed service of its own.
 - **In your language.** The interface and the built-in Markdown quick reference come in 35 languages: Arabic, Catalan,
   Chinese (Simplified), Chinese (Traditional), Croatian, Czech, Danish, Dutch, English, Finnish, French, German, Greek,
   Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Polish, Portuguese (Brazil),
@@ -546,9 +546,8 @@ PlantUML's engine (3 MB) loads only with the first PlantUML diagram. A PlantUML 
 
 - **Local images** use paths relative to the document: `![Logo](images/logo.png)`. Splat shows PNG, JPEG, GIF, WebP,
   BMP, SVG, HEIC, TIFF, AVIF and PDF.
-- **Images from the web** stay blocked until you allow them: a bar above the preview explains that loading them tells
-  their servers that and when you open the document. **Load Images** allows them for this document; Splat remembers
-  the choice per file.
+- **Images from the web** load as soon as a document shows them, over `https` and up to 10 MB each. Like images in an
+  email, they tell their servers that and when the document is opened.
 - **Size.** `<img width="200">` sizes an image; otherwise images fit the width of the preview.
 - **Changes on disk.** An image you replace, or one that appears after the document named it, shows without opening
   the document again. Images from the web that failed because of the network are tried again while a document shows
@@ -613,7 +612,7 @@ file has no marks until its first commit, and neither has a document above 32 MB
 | **Markdown** | The **Share** button in the toolbar | The document as a `.md` file for Mail, Messages, AirDrop and every other share service. |
 
 The **File › Share** menu offers all of these in one place. Exports use the typographic punctuation setting and the
-images you allowed from the web; images from the web stay links in HTML.
+images from the web the preview has loaded; images from the web stay links in HTML.
 
 **File › Export Options…** sets what PDF, printing and Word add to the text, for all documents:
 
@@ -704,13 +703,14 @@ Splat leaves Apple's standard shortcuts where they are.
 
 A Markdown file can come from anyone, so Splat treats every document as untrusted.
 
-- **No network by default.** Splat has no telemetry. It looks for updates only once you agree or choose **Check for
-  Updates…**: it then loads a small feed file from GitHub, and the request names nothing but the app and its version.
+- **No telemetry.** Splat reports nothing about how you use it. It looks for updates only once you agree or choose
+  **Check for Updates…**: it then loads a small feed file from GitHub, and the request names nothing but the app and its
+  version.
   Formulas and diagrams render locally; the web views that do it cannot reach the network. **Help › Report a Problem…**
   opens a form on GitHub in your browser; its address carries Splat's version, the macOS version and the kind of Mac,
   nothing from your documents.
-- **Images from the web** load only after your permission, only over `https`, never from hosts in your local network,
-  at most 10 MB each, and in a private session without cookies.
+- **Images from the web** load as soon as a document shows them, from any host, only over `https`, at most 10 MB each,
+  and in a private session without cookies. Their servers learn that and when the document is opened.
 - **Isolated decoding.** Images and the graphics of formulas and diagrams are decoded in a service of their own, which
   macOS starts in a sandbox of its own: none of your files, no network. It hands back only pixels, whose size is
   checked, and ends itself when a decode takes more than 10 seconds or too much memory. Apple's own image decoders only
@@ -742,7 +742,7 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
   a content security policy. Word files link only `http`, `https` and `mailto` addresses, apart from the links a Word
   template you chose brings along.
 - **Code signing** with the Hardened Runtime and the App Sandbox. Splat may read and write the documents you open and
-  the folders you grant, reach the network for pictures from the web you allowed and for updates, and print; nothing
+  the folders you grant, reach the network for pictures from the web and for updates, and print; nothing
   else.
 
 ## Large documents
@@ -814,8 +814,8 @@ Applications folder.
 **There is no Check for Updates… in the Splat menu.** Only the version from the disk image or Homebrew updates
 itself; a build of your own has no updater.
 
-**Images from the web do not appear.** Click **Load Images** in the bar above the preview. Only `https` images from
-public hosts load.
+**Images from the web do not appear.** Only `https` images load, up to 10 MB each. One that failed because of the
+network is tried again while the document shows it.
 
 **Pasting a screenshot asks me to save first.** Pasted images are stored as files next to the document, which needs a
 place on disk. Save it, then paste again.

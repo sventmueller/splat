@@ -288,8 +288,6 @@
 "Öffnen" = "فتح";
 "Als HTML exportieren …" = "تصدير كملف HTML…";
 "Als Word-Dokument exportieren …" = "تصدير كمستند Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "تم حظر الصور من الإنترنت: عند تحميلها تعرف خوادمها أنك تفتح هذا المستند ومتى تفتحه.";
-"Bilder laden" = "تحميل الصور";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "لا يمكن لـ Splat قراءة الصور والملاحظات وبيانات Git الموجودة بجوار هذا المستند إلا بعد أن تمنح حق الوصول إلى مجلدها.";
 "Ordner freigeben …" = "منح حق الوصول إلى المجلد…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "يمكن لـ Splat بعد ذلك قراءة الصور والملاحظات وبيانات Git في هذا المجلد وجميع مجلداته الفرعية، حتى بعد إعادة التشغيل.";

@@ -541,25 +541,16 @@ impl Updater<'_> {
     }
 
     /// What the bar above the preview offers: the document's folder while the sandbox keeps it closed and something needs
-    /// it, else images from the web while they are blocked.
+    /// it.
     pub(super) fn update_offer(&self) {
-        let (remote, local) = self.host.model().read(|st| {
-            (
-                crate::markdown::remote::has_remote_images(st.doc()),
-                crate::markdown::remote::has_local_files(st.doc()),
-            )
-        });
+        let local = self
+            .host
+            .model()
+            .read(|st| crate::markdown::remote::has_local_files(st.doc()));
         let env = super::env::Env::known(self.host.doc_dir(), "");
         let needs_folder = local || env.repository_around || self.host.panes().sidebar_visible();
-        let pictures = self.host.pictures();
-        let offer = if env.folder_closed && needs_folder {
-            Some(super::images::Offer::GrantFolder)
-        } else if remote && !pictures.remote_allowed() {
-            Some(super::images::Offer::RemoteImages)
-        } else {
-            None
-        };
-        pictures.show_banner(offer);
+        let offer = (env.folder_closed && needs_folder).then_some(super::images::Offer::GrantFolder);
+        self.host.pictures().show_banner(offer);
     }
 
     /// The user granted the folder of the document: what failed to load from it loads now.
@@ -710,7 +701,6 @@ impl Updater<'_> {
             max_image_width: self.host.panes().preview_image_width(),
             dark: self.host.is_dark(),
             controller: Some(self.host.object()),
-            remote_images: self.host.pictures().remote_allowed(),
             leaves_the_mac: false,
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,

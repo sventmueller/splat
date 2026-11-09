@@ -288,8 +288,6 @@
 "Öffnen" = "Öppna";
 "Als HTML exportieren …" = "Exportera som HTML…";
 "Als Word-Dokument exportieren …" = "Exportera som Word-dokument…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Bilder från internet blockeras: när de läses in får deras servrar veta att och när du öppnar det här dokumentet.";
-"Bilder laden" = "Läs in bilder";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat kan läsa bilder, anteckningar och Git-data bredvid det här dokumentet först när du ger åtkomst till deras mapp.";
 "Ordner freigeben …" = "Ge åtkomst till mapp…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat får sedan läsa bilder, anteckningar och Git-data i den här mappen och alla dess undermappar, även efter en omstart.";

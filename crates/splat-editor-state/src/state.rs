@@ -53,8 +53,6 @@ pub enum Invalidate {
     Preview,
     /// Rendered formulas or diagrams arrived.
     Arrivals,
-    /// The user allowed images from the web.
-    RemoteAllowed,
     /// A setting changed what the preview shows for the same text.
     Layout,
 }
@@ -388,13 +386,6 @@ impl State {
                 self.dirty_preview = None;
             }
             Invalidate::Arrivals => self.stale.layout = true,
-            Invalidate::RemoteAllowed => {
-                self.stale.layout = true;
-                // A loaded image keeps the block's text, so its key would not change on its own.
-                let layout = &self.layout;
-                self.blocks
-                    .invalidate(|i| layout.blocks.get(i).is_some_and(|block| shows_image(block)));
-            }
         }
         if why == Invalidate::Text {
             self.pending = None;
@@ -686,11 +677,6 @@ impl State {
     }
 }
 
-/// Whether the block shows a picture.
-pub fn shows_image(block: &TopBlock) -> bool {
-    images_of(block).next().is_some()
-}
-
 /// The addresses of the pictures the block shows.
 pub fn images_of(block: &TopBlock) -> impl Iterator<Item = &str> {
     use crate::preview::layout::{Atom, RunMap};
@@ -950,15 +936,6 @@ mod tests {
         assert!(state.stale.colors);
         state.invalidate(Invalidate::Text);
         assert!(state.pending().is_none(), "a new text has no waiting styles");
-    }
-
-    #[test]
-    fn an_allowed_web_image_renders_again_though_its_text_is_unchanged() {
-        let mut state = shown("Text\n\n![b](https://a.de/b.png)\n");
-        let before = state.blocks.keys.clone();
-        state.invalidate(Invalidate::RemoteAllowed);
-        assert_eq!(state.blocks.keys[0], before[0]);
-        assert_ne!(state.blocks.keys[1], before[1]);
     }
 
     #[test]

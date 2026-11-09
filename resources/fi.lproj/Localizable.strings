@@ -288,8 +288,6 @@
 "Öffnen" = "Avaa";
 "Als HTML exportieren …" = "Vie HTML:nä…";
 "Als Word-Dokument exportieren …" = "Vie Word-dokumenttina…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Internetin kuvat on estetty: kun ne ladataan, niiden palvelimet saavat tietää, että ja milloin avaat tämän dokumentin.";
-"Bilder laden" = "Lataa kuvat";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat voi lukea tämän dokumentin vieressä olevia kuvia, muistiinpanoja ja Git-tietoja vasta, kun annat käyttöoikeuden niiden kansioon.";
 "Ordner freigeben …" = "Anna kansion käyttöoikeus…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat saa sen jälkeen lukea kuvia, muistiinpanoja ja Git-tietoja tässä kansiossa ja kaikissa sen alikansioissa, myös uudelleenkäynnistyksen jälkeen.";

@@ -4,7 +4,7 @@
 
 **Penyunting Markdown untuk macOS yang membolehkan anda menulis dalam sumber atau terus dalam pratonton.**
 
-Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan pratonton langsung yang boleh diedit sepenuhnya di sebelah kanan. Taip di mana-mana: apa-apa yang anda tulis dalam pratonton menjadi perubahan minimum pada sumber, jadi baris yang tidak anda sentuh kekal sama bait demi bait dan diff Git anda kekal bersih. Splat membaca Markdown yang sudah anda gunakan: CommonMark dan GitHub Flavored Markdown, GitHub alerts, pautan wiki, benam dan kotak maklumat Obsidian, sambungan Pandoc dan Typora, HTML terbenam, formula LaTeX serta rajah Mermaid, Graphviz dan PlantUML, semuanya dipaparkan luar talian. Layari dan cari seluruh folder nota, lihat apa yang berubah sejak commit Git terakhir, tampal dari Word atau halaman web sebagai Markdown, dan eksport ke PDF, HTML atau Word dengan satu klik. Ia ditulis dalam Rust di atas kawalan AppKit tulen, menyokong 35 bahasa dan tidak menghantar apa-apa melalui rangkaian melainkan anda memintanya.
+Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan pratonton langsung yang boleh diedit sepenuhnya di sebelah kanan. Taip di mana-mana: apa-apa yang anda tulis dalam pratonton menjadi perubahan minimum pada sumber, jadi baris yang tidak anda sentuh kekal sama bait demi bait dan diff Git anda kekal bersih. Splat membaca Markdown yang sudah anda gunakan: CommonMark dan GitHub Flavored Markdown, GitHub alerts, pautan wiki, benam dan kotak maklumat Obsidian, sambungan Pandoc dan Typora, HTML terbenam, formula LaTeX serta rajah Mermaid, Graphviz dan PlantUML, semuanya dipaparkan luar talian. Layari dan cari seluruh folder nota, lihat apa yang berubah sejak commit Git terakhir, tampal dari Word atau halaman web sebagai Markdown, dan eksport ke PDF, HTML atau Word dengan satu klik. Ia ditulis dalam Rust di atas kawalan AppKit tulen, menyokong 35 bahasa dan tidak mempunyai telemetri.
  
 
 
@@ -29,7 +29,7 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 [![Graphviz melalui Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 bahasa antara muka](https://img.shields.io/badge/languages-35-4C9A2A)
-![Luar talian secara lalai](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Tiada telemetri](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Ditandatangani dengan Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Lesen: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#lesen)
 
@@ -123,7 +123,7 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 - **Eksport tanpa kehilangan apa-apa.** PDF, satu fail HTML yang berdiri sendiri, atau dokumen Word dengan tajuk, senarai, jadual, nota kaki dan imej yang sebenar. Tambah nombor halaman, pengepala dan halaman tajuk, atau gunakan templat Word syarikat anda.
 - **Natif sepenuhnya.** Tetingkap, tab, menu, popover, Versi, Simpan Auto, menu kongsi, mod gelap, semakan ejaan, dikte dan VoiceOver yang sebenar daripada AppKit. Tiada Electron, tiada paparan web untuk teks itu sendiri.
 - **Pantas dengan fail besar.** Merender satu ketukan kekunci dalam dokumen 10 MB mengambil kira-kira 10 ms, sebelum kerja paparan itu sendiri.
-- **Peribadi dan berhati-hati.** Splat berjalan dalam App Sandbox, imej dari web dimuatkan hanya selepas anda membenarkannya, pautan ke app lain bertanya dahulu, dan semua yang menyahkod data imej yang tidak dipercayai berjalan dalam perkhidmatan tersendiri yang berkotak pasir.
+- **Peribadi dan berhati-hati.** Splat berjalan dalam App Sandbox, pautan ke app lain bertanya dahulu, dan semua yang menyahkod data imej yang tidak dipercayai berjalan dalam perkhidmatan tersendiri yang berkotak pasir.
 - **Dalam bahasa anda.** Antara muka dan rujukan pantas Markdown terbina dalam tersedia dalam 35 bahasa: Arab, Katalan, Cina (Ringkas), Cina (Tradisional), Croatia, Czech, Denmark, Belanda, Inggeris, Finland, Perancis, Jerman, Yunani, Ibrani, Hindi, Hungary, Indonesia, Itali, Jepun, Korea, Melayu, Norway, Poland, Portugis (Brazil), Portugis (Portugal), Romania, Rusia, Slovak, Slovenia, Sepanyol, Sweden, Thai, Turki, Ukraine dan Vietnam.
 
 ## Keperluan
@@ -437,7 +437,7 @@ Rajah pertama selepas pelancaran mengambil masa kira-kira satu saat, kerana enji
 ## Imej
 
 - **Imej setempat** menggunakan laluan relatif kepada dokumen: `![Logo](images/logo.png)`. Splat menunjukkan PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF dan PDF.
-- **Imej dari web** kekal disekat sehingga anda membenarkannya: bar di atas pratonton menerangkan bahawa memuatkannya memberitahu pelayannya bahawa dan bila anda membuka dokumen. **Muatkan Imej** membenarkannya untuk dokumen ini; Splat mengingati pilihan itu bagi setiap fail.
+- **Imej dari web** dimuatkan sebaik sahaja dokumen menunjukkannya, melalui `https` dan sehingga 10 MB setiap satu. Seperti imej dalam e-mel, imej ini memberitahu pelayannya bahawa dan bila dokumen dibuka.
 - **Saiz.** `<img width="200">` menetapkan saiz imej; jika tidak, imej muat dengan lebar pratonton.
 - **Perubahan pada cakera.** Imej yang anda gantikan, atau yang muncul selepas dokumen menamakannya, ditunjukkan tanpa membuka dokumen sekali lagi. Imej dari web yang gagal kerana rangkaian dicuba semula selagi dokumen menunjukkannya.
 - **Memori.** Imej ditunjukkan sehingga 2560 piksel pada sisi terpanjangnya, yang juga memenuhi halaman A4. Ia dinyahkod lebih kecil apabila ia memenuhi satu perlapan memori Mac, dan semasa macOS melaporkan tekanan memori.
@@ -482,7 +482,7 @@ Baris yang berbeza hanya pada hujung barisnya tidak dikira, jadi fail dengan CRL
 | **Word** | **Fail › Eksport sebagai Dokumen Word…** atau menu Kongsi | Fail `.docx` dengan gaya tajuk Word, senarai dan jadual sebenar (termasuk sel yang digabungkan), nota kaki sebagai nota kaki Word, imej terbenam, formula dan rajah. |
 | **Markdown** | Butang **Kongsi** pada bar alat | Dokumen sebagai fail `.md` untuk Mail, Mesej, AirDrop dan setiap perkhidmatan kongsi yang lain. |
 
-Menu **Fail › Kongsi** menawarkan semua ini di satu tempat. Eksport menggunakan tetapan tanda baca tipografi dan imej dari web yang anda benarkan; imej dari web kekal sebagai pautan dalam HTML.
+Menu **Fail › Kongsi** menawarkan semua ini di satu tempat. Eksport menggunakan tetapan tanda baca tipografi dan imej dari web yang telah dimuatkan oleh pratonton; imej dari web kekal sebagai pautan dalam HTML.
 
 **Fail › Pilihan Eksport…** menetapkan apa yang ditambah oleh PDF, pencetakan dan Word pada teks, untuk semua dokumen:
 
@@ -553,8 +553,8 @@ Splat membiarkan pintasan standard Apple di tempatnya.
 
 Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap dokumen tidak dipercayai.
 
-- **Tiada rangkaian secara lalai.** Splat tidak mempunyai telemetri. Ia mencari kemas kini hanya apabila anda bersetuju atau memilih **Semak Kemas Kini…**: ia kemudian memuatkan fail suapan kecil daripada GitHub, dan permintaan itu tidak menamakan apa-apa selain app dan versinya. Formula dan rajah dipaparkan secara setempat; paparan web yang melakukannya tidak dapat mencapai rangkaian. **Bantuan › Laporkan Masalah…** membuka borang di GitHub dalam pelayar anda; alamatnya mengandungi versi Splat, versi macOS dan jenis Mac, tiada apa-apa daripada dokumen anda.
-- **Imej dari web** dimuatkan hanya selepas kebenaran anda, hanya melalui `https`, tidak pernah daripada hos dalam rangkaian setempat anda, paling banyak 10 MB setiap satu, dan dalam sesi persendirian tanpa kuki.
+- **Tiada telemetri.** Splat tidak melaporkan apa-apa tentang cara anda menggunakannya. Ia mencari kemas kini hanya apabila anda bersetuju atau memilih **Semak Kemas Kini…**: ia kemudian memuatkan fail suapan kecil daripada GitHub, dan permintaan itu tidak menamakan apa-apa selain app dan versinya. Formula dan rajah dipaparkan secara setempat; paparan web yang melakukannya tidak dapat mencapai rangkaian. **Bantuan › Laporkan Masalah…** membuka borang di GitHub dalam pelayar anda; alamatnya mengandungi versi Splat, versi macOS dan jenis Mac, tiada apa-apa daripada dokumen anda.
+- **Imej dari web** dimuatkan sebaik sahaja dokumen menunjukkannya, daripada mana-mana hos, hanya melalui `https`, paling banyak 10 MB setiap satu, dan dalam sesi persendirian tanpa kuki. Pelayannya mengetahui bahawa dan bila dokumen dibuka.
 - **Penyahkodan terasing.** Imej dan grafik formula serta rajah dinyahkod dalam perkhidmatan tersendiri, yang dimulakan oleh macOS dalam kotak pasirnya sendiri: tiada satu pun fail anda, tiada rangkaian. Ia hanya menyerahkan semula piksel, yang saiznya disemak, dan menamatkan dirinya sendiri apabila sesuatu penyahkodan mengambil masa lebih daripada 10 saat atau terlalu banyak memori. Penyahkod imej Apple sendiri hanya melihat HEIC, TIFF, AVIF dan PDF, dan hanya apabila data itu benar-benar format tersebut. SVG, formula dan rajah turut melalui perkhidmatan itu, jadi ia ialah gambar dengan resolusi tetap dalam Splat: empat piksel setiap titik, sehingga 2560 pada sisi yang lebih panjang.
 - **Fail setempat** sampai kepada dokumen hanya melalui laluan yang dinamakannya, dan hanya daripada folder yang telah anda beri akses: Splat boleh membaca dokumen yang anda buka, tetapi gambar, nota, bibliografi dan repositori di sekelilingnya hanya selepas anda memberikan akses kepada foldernya dengan **Beri Akses kepada Folder…** dalam bar di atas pratonton. Akses meliputi semua subfolder dan diingati. Benam menunjukkan nota Markdown daripada folder dokumen dan ke bawah, dan gambar yang tiada dicari di situ sahaja. Laluan imej di tempat lain, mutlak atau bermula dengan `~`, dimuatkan dalam pratonton daripada folder yang telah diberi akses; eksport HTML dan Word, pencetakan dan PDF hanya membawa apa yang ada dalam folder dokumen atau repositori Gitnya, melainkan repositori itu juga menyimpan folder Utama anda, supaya dokumen daripada orang lain tidak dapat menarik fail anda ke dalam eksport yang anda hantar.
 - **Folder nota** dibaca hanya semasa bar sisi menunjukkannya, dan menamakan semula nota mengubah fail lain hanya selepas anda mengesahkan berapa banyak.
@@ -564,7 +564,7 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 - **Pautan** tidak pernah memulakan program dengan satu klik. Pautan web dan mel dibuka seperti biasa; pautan ke app lain bertanya dahulu.
 - **HTML dalam dokumen** dibaca oleh penghurai Splat sendiri. Skrip, gaya, bingkai dan borang tidak pernah dijalankan.
 - **Eksport** tidak membawa skrip. Halaman HTML hanya mengekalkan senarai tetap teg dan atribut yang tidak berbahaya, seperti GitHub, serta dasar keselamatan kandungan. Fail Word hanya memaut alamat `http`, `https` dan `mailto`, kecuali pautan yang dibawa oleh templat Word yang anda pilih.
-- **Penandatanganan kod** dengan Hardened Runtime dan App Sandbox. Splat boleh membaca dan menulis dokumen yang anda buka dan folder yang anda beri akses, mencapai rangkaian untuk imej dari web yang anda benarkan dan untuk kemas kini, serta mencetak; tidak lebih daripada itu.
+- **Penandatanganan kod** dengan Hardened Runtime dan App Sandbox. Splat boleh membaca dan menulis dokumen yang anda buka dan folder yang anda beri akses, mencapai rangkaian untuk imej dari web dan untuk kemas kini, serta mencetak; tidak lebih daripada itu.
 
 ## Dokumen besar
 
@@ -609,7 +609,7 @@ Sesetengah perubahan diproses sepenuhnya, pada kira-kira 300 ms setiap ketukan k
 
 **Tiada Semak Kemas Kini… dalam menu Splat.** Hanya versi daripada imej cakera atau Homebrew yang mengemas kini dirinya; binaan anda sendiri tidak mempunyai pengemas kini.
 
-**Imej dari web tidak muncul.** Klik **Muatkan Imej** dalam bar di atas pratonton. Hanya imej `https` daripada hos awam yang dimuatkan.
+**Imej dari web tidak muncul.** Hanya imej `https` yang dimuatkan, sehingga 10 MB setiap satu. Imej yang gagal kerana rangkaian dicuba semula selagi dokumen menunjukkannya.
 
 **Menampal tangkapan skrin meminta saya menyimpan dahulu.** Imej yang ditampal disimpan sebagai fail di sebelah dokumen, yang memerlukan tempat pada cakera. Simpan dokumen, kemudian tampal lagi.
 
