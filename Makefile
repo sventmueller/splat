@@ -61,8 +61,8 @@ profile: ## The bench with a call tree of the whole run in target/selftest/profi
 	@test -n "$(FILE)" || { echo "usage: make profile FILE=<file.md>"; exit 2; }
 	cargo xtask selftest bench "$(FILE)" --profile
 
-release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
+release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: the Mac App Store package in ~/Downloads, then dist/Splat-<version>.dmg, notarized; replaces the old one
 	cargo xtask dmg
 
-appstore: test coverage-library ## After make test and coverage-library: target/Splat-<version>.pkg for Transporter, signed for the Mac App Store; needs its two certificates and profile
+appstore: test coverage-library ## After make test and coverage-library: ~/Downloads/Splat-<version>.pkg for Transporter, signed for the Mac App Store, without a disk image; needs its two certificates and profile
 	cargo xtask appstore

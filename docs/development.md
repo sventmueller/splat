@@ -33,8 +33,8 @@ make coverage-library       # the same floors for the modules without a window, 
 make bench FILE=<file.md>   # timings for opening, typing and scrolling a large file
 make profile FILE=<file.md> # the same with a call tree of the whole run, from macOS's sample tool
 SPLAT_BENCH_IDLE=1 make bench FILE=<file.md>  # only opening, and how long until pictures, formulas and diagrams are in place
-make release                # make test and coverage-library first, then the notarized disk image
-make appstore               # make test and coverage-library first, then the package for the Mac App Store
+make release                # make test and coverage-library first, then the store package and the notarized disk image
+make appstore               # make test and coverage-library first, then only the package for the Mac App Store
 ```
 
 The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
@@ -42,8 +42,8 @@ The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
 ```sh
 cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signed with "Splat Local Signing"
 cargo xtask bundle             # target/debug/Splat Debug.app, a separate app that never opens Markdown files
-cargo xtask dmg                # dist/Splat-<version>.dmg for distribution, Developer ID, notarized
-cargo xtask appstore           # target/Splat-<version>.pkg for the Mac App Store, Apple Distribution
+cargo xtask dmg                # the store package, then dist/Splat-<version>.dmg for distribution, Developer ID, notarized
+cargo xtask appstore           # ~/Downloads/Splat-<version>.pkg for the Mac App Store, Apple Distribution
 cargo xtask icon               # rebuild assets/AppIcon.icns and the README icon from assets/icon-1024.png
 cargo xtask vendor check       # verify the bundled JavaScript against vendor.lock
 cargo xtask vendor fetch       # download it again after changing a version in vendor.lock
@@ -80,7 +80,8 @@ next build gets exactly that. Since the version ends in the build number, the Ab
 
 ## Distribution
 
-`cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) builds a release, signs it with your Developer ID,
+`cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) first builds the package
+for the [Mac App Store](#mac-app-store) with the same version, then a release, signs it with your Developer ID,
 notarizes the app with Apple and staples the ticket, packs it into a compressed, read-only disk image with a link to
 Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
@@ -100,6 +101,7 @@ Each release adds the full image, about 16 MB, to the repository history. It run
 - rustup (`brew install rustup`, which leaves Homebrew's Rust in place)
 - `RELEASE_NOTES.md`, with what this release brings. The update dialog shows it above a line on how to report a problem,
   so `dmg` stops if the file is empty or still holds the previous release's notes
+- the certificates and the profile of the [Mac App Store](#mac-app-store) package
 
 If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
 Finder, which lays out the disk image window. `dmg` then reads the icon positions Finder stored in the image and stops
@@ -128,8 +130,9 @@ permissions for the two.
 
 `cargo xtask appstore` (or `make appstore`, after `make test` and `make coverage-library`) builds the same universal app
 without Sparkle, since the store allows no updater but its own, embeds the provisioning profile, signs it with Apple
-Distribution and packs it into `target/Splat-<version>.pkg`, signed with the installer certificate. Transporter uploads
-that package to App Store Connect; Apple checks it there instead of notarizing it. The build number stays, so a second
+Distribution and packs it into `target/Splat-<version>.pkg`, signed with the installer certificate, with a copy in
+`~/Downloads`. `make release` builds it as well, before the disk image. Transporter uploads that package to App Store
+Connect; Apple checks it there instead of notarizing it. The build number stays, so a second
 upload of the same version needs a higher one in VERSION. It needs, in the login keychain and the developer account of
 team `TEAM_ID`:
 

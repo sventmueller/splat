@@ -12,8 +12,9 @@ const PROFILE_DIRS: [&str; 2] = [
     "Library/MobileDevice/Provisioning Profiles",
 ];
 
-/// Builds `target/Splat-<version>.pkg` for App Store Connect. The build number stays: the store needs the version it
-/// was given, and a second upload of the same version needs a higher one in `VERSION`.
+/// Builds `target/Splat-<version>.pkg` for App Store Connect and puts a copy into `~/Downloads` for Transporter. The
+/// build number stays: the store needs the version it was given, and a second upload of the same version needs a higher
+/// one in `VERSION`.
 pub(crate) fn app_store() -> Result<PathBuf, String> {
     let version = version()?;
     let (signer, name) = identity(
@@ -43,7 +44,15 @@ pub(crate) fn app_store() -> Result<PathBuf, String> {
         .args(["--sign", &installer])
         .arg(&package))?;
     run(Command::new("pkgutil").arg("--check-signature").arg(&package))?;
-    Ok(package)
+    let delivered = home()?.join("Downloads").join(format!("{APP}-{version}.pkg"));
+    files::copy(&package, &delivered)?;
+    Ok(delivered)
+}
+
+fn home() -> Result<PathBuf, String> {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .ok_or_else(|| "HOME is not set".to_string())
 }
 
 /// The profile named by `PROFILE`, or the newest Mac App Store profile for the app in the usual folders.
@@ -59,7 +68,7 @@ fn store_profile() -> Result<PathBuf, String> {
             ))
         };
     }
-    let home = PathBuf::from(std::env::var_os("HOME").ok_or("HOME is not set")?);
+    let home = home()?;
     let mut found: Vec<(std::time::SystemTime, PathBuf)> = PROFILE_DIRS
         .iter()
         .filter_map(|dir| std::fs::read_dir(home.join(dir)).ok())

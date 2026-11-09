@@ -19,7 +19,8 @@ const REPORT_LINE: &str =
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
 /// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
 /// into the repository: it replaces older ones there, `dist/appcast.xml` offers it to installed copies with the
-/// notes of `RELEASE_NOTES.md`, and the build number goes up.
+/// notes of `RELEASE_NOTES.md`, and the build number goes up. The package for the Mac App Store is built first, with
+/// the same version.
 pub(crate) fn dmg() -> Result<PathBuf, String> {
     let version = version()?;
     let dist = root().join("dist");
@@ -53,6 +54,8 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             key.trim()
         ));
     }
+    // Ahead of the notary rounds, so that a missing store certificate or profile stops the release before they start.
+    println!("{}", app_store()?.display());
     let app = assemble(Build::Distribution, &version)?;
     check_no_coverage(&app)?;
     check_universal(&app)?;
