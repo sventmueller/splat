@@ -2,23 +2,5 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
     <title>Splat</title>
-    <item>
-      <title>Splat 1.0.13</title>
-      <pubDate>Mon, 09 Nov 2026 14:33:43 +0000</pubDate>
-      <sparkle:version>1.0.13</sparkle:version>
-      <sparkle:shortVersionString>1.0.13</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="markdown"><![CDATA[Splat 1.0.13 replaces 1.0.12 with the same changes and is the version that goes to the Mac App Store.
-
-- **Splat now runs in the App Sandbox**, as apps from the Mac App Store do: it reaches only the documents you open and the folders you grant. For the pictures, notes and Git data next to a document, the bar above the preview offers **Grant Access to Folder…**, and Splat keeps that access, also after a restart.
-- Your settings and unsaved texts come along on the first launch. **Open Recent** starts empty once; opening a document adds it again.
-- **Images from the web load without asking**, from any host, as soon as a document shows them. Like images in an email, they tell their servers that and when the document is opened.
-- An embed no longer follows a link out of the document's folder, and a bibliography outside the folder or its repository stays out of exports and printing.
-- A source over 1 MB colours what shows at once and the rest in steps, so the window answers right away.
-- The disk image shows its background sharp on Retina screens.
-
-Something wrong or missing? [Report it on GitHub](https://github.com/sventmueller/splat/issues/new/choose).]]></description>
-      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.13.dmg" sparkle:edSignature="60p6/CkVzlSwM9rjEvEnvZcBWaE3gITodIJqWP6vDE76BfZb9r/Ykwau42WPneBpVjeiKvTsvXKGkKavM9PNAw==" length="18770190" type="application/octet-stream"/>
-    </item>
   </channel>
 </rss>
