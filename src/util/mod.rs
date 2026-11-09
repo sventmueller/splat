@@ -22,6 +22,6 @@ pub use lanes::{
     BACKGROUND, DISK, Lane, contained, free_in_background, guarded, main_after, main_soon, on_main, panic_is_contained,
     with_raised,
 };
-pub use process::{Process, process_exists};
+pub use process::process_exists;
 pub use splat_file_state::Stamp;
 pub use volumes::{BusyVolumes, answer_from, lane_of, lane_of_volume, volume_of};

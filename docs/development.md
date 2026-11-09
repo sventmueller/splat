@@ -34,6 +34,7 @@ make bench FILE=<file.md>   # timings for opening, typing and scrolling a large 
 make profile FILE=<file.md> # the same with a call tree of the whole run, from macOS's sample tool
 SPLAT_BENCH_IDLE=1 make bench FILE=<file.md>  # only opening, and how long until pictures, formulas and diagrams are in place
 make release                # make test and coverage-library first, then the notarized disk image
+make appstore               # make test and coverage-library first, then the package for the Mac App Store
 ```
 
 The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
@@ -42,6 +43,7 @@ The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
 cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signed with "Splat Local Signing"
 cargo xtask bundle             # target/debug/Splat Debug.app, a separate app that never opens Markdown files
 cargo xtask dmg                # dist/Splat-<version>.dmg for distribution, Developer ID, notarized
+cargo xtask appstore           # target/Splat-<version>.pkg for the Mac App Store, Apple Distribution
 cargo xtask icon               # rebuild assets/AppIcon.icns and the README icon from assets/icon-1024.png
 cargo xtask vendor check       # verify the bundled JavaScript against vendor.lock
 cargo xtask vendor fetch       # download it again after changing a version in vendor.lock
@@ -121,6 +123,24 @@ the toolchain and targets of [rust-toolchain.toml](../rust-toolchain.toml) on fi
 Sparkle lacks the code for either processor. `make universal` builds only the program.
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
 permissions for the two.
+
+### Mac App Store
+
+`cargo xtask appstore` (or `make appstore`, after `make test` and `make coverage-library`) builds the same universal app
+without Sparkle, since the store allows no updater but its own, embeds the provisioning profile, signs it with Apple
+Distribution and packs it into `target/Splat-<version>.pkg`, signed with the installer certificate. Transporter uploads
+that package to App Store Connect; Apple checks it there instead of notarizing it. The build number stays, so a second
+upload of the same version needs a higher one in VERSION. It needs, in the login keychain and the developer account of
+team `TEAM_ID`:
+
+- an "Apple Distribution" certificate and a "Mac Installer Distribution" certificate, whose identity is named
+  "3rd Party Mac Developer Installer"
+- the App ID `local.splat` and a "Mac App Store Connect" provisioning profile for it, in
+  `~/Library/Developer/Xcode/UserData/Provisioning Profiles`, or named with `PROFILE=<file>`
+
+The entitlements are those of the disk image without Sparkle's exceptions, plus the application and team identifiers the
+profile grants. A test in `tests/structure.rs` fails when the app sends a message whose name starts with an underscore,
+as App Review refuses methods that are not public; only the self-test may.
 
 ## Testing
 
