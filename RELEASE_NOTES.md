@@ -1,4 +1,6 @@
-- **Paste as Markdown** reads rich text in the code page it was written in, so Cyrillic, Greek, Central European, Hebrew, Arabic, Thai, Chinese, Japanese or Korean text no longer arrives as the wrong letters.
-- **Import Word Document…** leaves out a picture too large to read instead of stopping, and documents with many styles take far less memory.
-- A pasted picture never replaces a file of the same name beside the document.
-- Pictures from the web load in the preview only from addresses on the public internet, now also when an IPv6 address leads to a local one.
+- **Splat now runs in the App Sandbox**, as apps from the Mac App Store do: it reaches only the documents you open and the folders you grant. For the pictures, notes and Git data next to a document, the bar above the preview offers **Grant Access to Folder…**, and Splat keeps that access, also after a restart.
+- Your settings and unsaved texts come along on the first launch. **Open Recent** starts empty once; opening a document adds it again.
+- **Images from the web load without asking**, from any host, as soon as a document shows them. Like images in an email, they tell their servers that and when the document is opened.
+- An embed no longer follows a link out of the document's folder, and a bibliography outside the folder or its repository stays out of exports and printing.
+- A source over 1 MB colours what shows at once and the rest in steps, so the window answers right away.
+- The disk image shows its background sharp on Retina screens.
