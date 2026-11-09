@@ -53,6 +53,12 @@ pub(crate) fn app_entitlements(build: Build) -> String {
             &[format!("{id}-spks"), format!("{id}-spki")],
         );
     }
+    if build == Build::AppStore {
+        let string = |key: &str, value: &str| format!("\t<key>{key}</key>\n\t<string>{value}</string>\n");
+        // Both must match the provisioning profile the bundle carries, or the store refuses the upload.
+        keys += &string("com.apple.application-identifier", &format!("{TEAM_ID}.{BUNDLE_ID}"));
+        keys += &string("com.apple.developer.team-identifier", TEAM_ID);
+    }
     if build.selftest() {
         // The local certificate has no Team ID; without this, the hardened runtime refuses to load Sparkle.
         keys += &flag("com.apple.security.cs.disable-library-validation");
@@ -242,6 +248,8 @@ pub(crate) fn info_plist(version: &str, languages: &[String], variant: Option<&s
 	<string>NSApplication</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Sven Müller</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 {updates}	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -313,15 +321,17 @@ pub(crate) enum Build {
     Release,
     /// The app with its self-test, optimised or not.
     Selftest { release: bool },
-    /// The universal release signed with the Developer ID, the only one that goes out.
+    /// The universal release signed with the Developer ID, for the disk image and Homebrew.
     Distribution,
+    /// The universal release for the Mac App Store, signed with Apple Distribution and without an updater of its own.
+    AppStore,
 }
 
 impl Build {
     pub(crate) fn release(self) -> bool {
         match self {
             Build::Debug => false,
-            Build::Release | Build::Distribution => true,
+            Build::Release | Build::Distribution | Build::AppStore => true,
             Build::Selftest { release } => release,
         }
     }
@@ -335,7 +345,7 @@ impl Build {
         match self {
             Build::Selftest { .. } => Some("Selftest"),
             Build::Debug => Some("Debug"),
-            Build::Release | Build::Distribution => None,
+            Build::Release | Build::Distribution | Build::AppStore => None,
         }
     }
 
@@ -344,7 +354,8 @@ impl Build {
         match self {
             Build::Distribution => Updates::Published,
             Build::Selftest { .. } => Updates::Selftest,
-            Build::Debug | Build::Release => Updates::Off,
+            // The Mac App Store allows no updates but its own.
+            Build::Debug | Build::Release | Build::AppStore => Updates::Off,
         }
     }
 }
@@ -365,7 +376,7 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     let root = root();
     let profile = if build.release() { "release" } else { "debug" };
     let target = target_dir().join(profile);
-    let (program, decoder) = if build == Build::Distribution {
+    let (program, decoder) = if matches!(build, Build::Distribution | Build::AppStore) {
         universal_programs()?
     } else {
         let mut cargo = Command::new(env!("CARGO"));
@@ -536,13 +547,18 @@ pub(crate) fn missing_architectures(listed: &str) -> Vec<&'static str> {
 /// A program without the code for one processor goes unnoticed on the other and keeps the app from starting on that one.
 pub(crate) fn check_universal(app: &Path) -> Result<(), String> {
     let sparkle = app.join("Contents/Frameworks/Sparkle.framework/Versions/B");
-    for program in [
+    let mut programs = vec![
         app.join("Contents/MacOS").join(APP),
         app.join(DECODER_BUNDLE).join("Contents/MacOS").join(DECODER),
-        sparkle.join("Sparkle"),
-        sparkle.join("Autoupdate"),
-        sparkle.join("Updater.app/Contents/MacOS/Updater"),
-    ] {
+    ];
+    if sparkle.exists() {
+        programs.extend([
+            sparkle.join("Sparkle"),
+            sparkle.join("Autoupdate"),
+            sparkle.join("Updater.app/Contents/MacOS/Updater"),
+        ]);
+    }
+    for program in programs {
         let missing = missing_architectures(&stdout(Command::new("lipo").arg("-archs").arg(&program))?);
         if !missing.is_empty() {
             return Err(format!("{} lacks {}", program.display(), missing.join(" and ")));

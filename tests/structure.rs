@@ -294,3 +294,53 @@ fn a_name_the_code_lacks_is_found() {
     let doc = "| `Doc::parse`, `Gone` (`splat-x`) | text with `Missing` |\n| `Doc.parse()` | |\nnot a table `Other`\n";
     assert_eq!(names_the_code_lacks(doc, &words), ["Gone"]);
 }
+
+/// The lines that send an Objective-C message whose name starts with an underscore, Apple's mark for a method that is not
+/// public: App Review turns away an app that calls one.
+fn private_calls(text: &str) -> Vec<usize> {
+    let private = |message: &str| {
+        let mut chars = message.trim_start().chars();
+        chars.next() == Some('_') && chars.next().is_some_and(char::is_alphabetic)
+    };
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| {
+            line.split("sel!(").skip(1).any(private)
+                || line.split("msg_send![").skip(1).any(|call| {
+                    let call = call.split(']').next().unwrap_or("");
+                    call.split_once(',').is_some_and(|(_, message)| private(message))
+                })
+        })
+        .map(|(n, _)| n + 1)
+        .collect()
+}
+
+#[test]
+fn the_app_calls_no_private_method() {
+    let root = root();
+    let selftest = root.join("src/editor/selftest");
+    let files: Vec<_> = sources::rust_files(&root.join("src"))
+        .into_iter()
+        .filter(|file| !file.starts_with(&selftest) && *file != root.join("src/editor/selftest.rs"))
+        .collect();
+    assert!(files.len() > 50, "{} files found", files.len());
+    for file in files {
+        let found = private_calls(&std::fs::read_to_string(&file).unwrap());
+        assert!(found.is_empty(), "{}: lines {found:?}", file.display());
+    }
+}
+
+#[test]
+fn a_private_method_is_found_however_it_is_sent() {
+    assert_eq!(
+        private_calls("if web.respondsToSelector(sel!(_webProcessIdentifier)) {"),
+        [1]
+    );
+    assert_eq!(
+        private_calls("let () = unsafe { msg_send![web, _killWebContentProcess] };"),
+        [1]
+    );
+    assert_eq!(private_calls("x\nmsg_send![&*u,  _private: on]"), [2]);
+    assert!(private_calls("msg_send![super(Loader::alloc().set_ivars(())), init]").is_empty());
+    assert!(private_calls("sel!(mdGrantFolder:) msg_send![web, isLoading]").is_empty());
+}

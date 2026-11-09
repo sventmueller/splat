@@ -54,15 +54,7 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
         ));
     }
     let app = assemble(Build::Distribution, &version)?;
-    // A coverage build, as a manual `cargo llvm-cov` run can leave, would write measurement files on users' Macs.
-    let load_commands = stdout(
-        Command::new("otool")
-            .args(["-arch", "all", "-l"])
-            .arg(app.join("Contents/MacOS").join(APP)),
-    )?;
-    if load_commands.contains("__llvm_prf") {
-        return Err("the release binary carries coverage counters; run `cargo clean` and try again".into());
-    }
+    check_no_coverage(&app)?;
     check_universal(&app)?;
     println!("signing {version} with {name}");
     sign(&app, &identity, true, Build::Distribution)?;
@@ -177,18 +169,39 @@ pub(crate) fn image_name_len(s: &str) -> Option<usize> {
     is_version(&rest[..end]).then_some(APP.len() + 1 + end + 4)
 }
 
+/// A coverage build, as a manual `cargo llvm-cov` run can leave, would write measurement files on users' Macs.
+pub(crate) fn check_no_coverage(app: &Path) -> Result<(), String> {
+    let load_commands = stdout(
+        Command::new("otool")
+            .args(["-arch", "all", "-l"])
+            .arg(app.join("Contents/MacOS").join(APP)),
+    )?;
+    if load_commands.contains("__llvm_prf") {
+        return Err("the release binary carries coverage counters; run `cargo clean` and try again".into());
+    }
+    Ok(())
+}
+
 /// SHA-1 hash and name of the first valid Developer ID Application identity in the keychains.
 pub(crate) fn developer_id() -> Result<(String, String), String> {
-    let listed = stdout(Command::new("security").args(["find-identity", "-v", "-p", "codesigning"]))?;
+    identity("codesigning", &["Developer ID Application:"])
+}
+
+/// SHA-1 hash and name of the first valid identity whose name starts with one of `kinds`, among those `security` lists
+/// for `policy`: installer certificates are no code signing identities.
+pub(crate) fn identity(policy: &str, kinds: &[&str]) -> Result<(String, String), String> {
+    let listed = stdout(Command::new("security").args(["find-identity", "-v", "-p", policy]))?;
     listed
         .lines()
         .find_map(|line| {
             let name = line.split('"').nth(1)?;
             let hash = line.split_whitespace().nth(1)?;
-            name.starts_with("Developer ID Application:")
+            kinds
+                .iter()
+                .any(|kind| name.starts_with(kind))
                 .then(|| (hash.to_string(), name.to_string()))
         })
-        .ok_or_else(|| "no Developer ID Application certificate in the keychain".into())
+        .ok_or_else(|| format!("no {} certificate in the keychain", kinds.join(" or ")))
 }
 
 /// Packs the app with a link to /Applications into a compressed, read-only disk image.

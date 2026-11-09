@@ -1,6 +1,6 @@
 # Entry points only; the build logic lives in xtask/src/main.rs.
 .DEFAULT_GOAL := help
-.PHONY: help build universal lint check test test-gui test-long mutants fuzz coverage coverage-library bench profile release
+.PHONY: help build universal lint check test test-gui test-long mutants fuzz coverage coverage-library bench profile release appstore
 
 ROUNDS ?= 20000
 
@@ -63,3 +63,6 @@ profile: ## The bench with a call tree of the whole run in target/selftest/profi
 
 release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: dist/Splat-<version>.dmg, notarized; replaces the old one
 	cargo xtask dmg
+
+appstore: test coverage-library ## After make test and coverage-library: target/Splat-<version>.pkg for Transporter, signed for the Mac App Store; needs its two certificates and profile
+	cargo xtask appstore

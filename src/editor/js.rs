@@ -18,7 +18,7 @@ use super::picture::{Rendered, Sizing, allowed_side, count_decoded, room_for_mor
 use super::render_queue::{Owner, RenderQueue};
 use super::webkit::{self, ScriptValue};
 use crate::markdown::doc::DiagramKind;
-use crate::util::{Process, guarded, main_after, main_soon, ns, to_isize};
+use crate::util::{guarded, main_after, main_soon, ns, to_isize};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Key {
@@ -190,26 +190,6 @@ pub(super) fn asks_for_nothing(controller: &EditorController) {
     }
 }
 
-/// The program of the processes WebKit shows pages in.
-const WEB_CONTENT: &str = "com.apple.WebKit.WebContent";
-
-/// Ends the web process of `web` at once. WebKit has no public way to stop a page's process, and its private
-/// `_killWebContentProcess` leaves a busy one running; the private process number is used where it exists, and only for
-/// the process it named, as that is no child of the app and its number may go to another. The App Sandbox lets no signal
-/// reach that process, so there WebKit's own way has to do.
-pub(super) fn end_web_process(web: &WKWebView) {
-    let ended = web.respondsToSelector(objc2::sel!(_webProcessIdentifier)) && {
-        let asked = std::time::SystemTime::now();
-        // SAFETY: A WKWebView method without arguments that returns a pid_t, present as just checked.
-        let pid: i32 = unsafe { msg_send![web, _webProcessIdentifier] };
-        Process::named(pid, asked, WEB_CONTENT).is_some_and(Process::end)
-    };
-    if !ended && web.respondsToSelector(objc2::sel!(_killWebContentProcess)) {
-        // SAFETY: A WKWebView method without arguments or result, present as just checked.
-        let () = unsafe { msg_send![web, _killWebContentProcess] };
-    }
-}
-
 /// Frees what the shared renderer holds for documents that no longer ask for it.
 pub fn trim() {
     if let Some(r) = renderer_if_started() {
@@ -373,7 +353,8 @@ impl Renderer {
     }
 
     /// Ends render attempt `job` if it is still running: it failed, and a new view takes over. A script that never
-    /// returns keeps its web process busy, and that process neither loads the page again nor quits with its view.
+    /// returns keeps its web process busy until Splat quits: that process neither loads the page again nor quits with its
+    /// view, and WebKit has no public way to end it.
     fn give_up(&self, job: u64) {
         if self.queue.borrow().timed_out(job) {
             self.replace_view();
@@ -386,7 +367,6 @@ impl Renderer {
     fn replace_view(&self) {
         let stuck = self.web.borrow().clone();
         webkit::detach_delegate(&stuck);
-        end_web_process(&stuck);
         let web = web_view(&self.window, &self._delegate);
         load_page(&self.window, &web);
         *self.web.borrow_mut() = web;

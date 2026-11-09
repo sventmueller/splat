@@ -1,6 +1,7 @@
 //! Build tasks in the language of the project: bundling, signing, the disk image, the icon, vendoring and running the
 //! self-tests.
 
+mod app_store;
 mod assets;
 mod bundle;
 mod coverage;
@@ -12,6 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
+pub(crate) use app_store::*;
 pub(crate) use assets::*;
 pub(crate) use bundle::*;
 pub(crate) use coverage::*;
@@ -29,6 +31,9 @@ pub(crate) const DECODER: &str = "splat-decoder";
 pub(crate) const APP: &str = "Splat";
 
 pub(crate) const BUNDLE_ID: &str = "local.splat";
+
+/// The developer team that signs the releases.
+pub(crate) const TEAM_ID: &str = "R5F5FUKVSD";
 
 /// Where GitHub serves the committed `dist/` folder: the disk image and the update feed.
 pub(crate) const DOWNLOADS: &str = "https://raw.githubusercontent.com/sventmueller/splat/main/dist";
@@ -54,6 +59,7 @@ fn main() -> ExitCode {
             bundle(build).map(|p| println!("{}", p.display()))
         }
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
+        Some("appstore") => app_store().map(|p| println!("{}", p.display())),
         Some("universal") => {
             universal_programs().map(|(app, decoder)| println!("{}\n{}", app.display(), decoder.display()))
         }
@@ -92,7 +98,7 @@ const FLAGS: [&str; 11] = [
 ];
 
 pub(crate) const USAGE: &str =
-    "usage: cargo xtask bundle [--release] [--selftest] | dmg | universal | check-library | icon | vendor [check|fetch]
+    "usage: cargo xtask bundle [--release] [--selftest] | dmg | appstore | universal | check-library | icon | vendor [check|fetch]
        cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] [--only <group>] [--in-back] | resize | typing [--by-hand] | bench <file.md> [--keystroke-ms <n>] [--profile], with --record to write what a run made into xtask/checks
        cargo xtask coverage [--library]";
 
@@ -240,6 +246,7 @@ mod tests {
             Build::Selftest { release: false },
             Build::Selftest { release: true },
             Build::Distribution,
+            Build::AppStore,
         ];
         let seen: Vec<_> = builds.map(|b| (b.variant(), b.release(), b.updates())).into();
         assert_eq!(
@@ -250,8 +257,46 @@ mod tests {
                 (Some("Selftest"), false, Updates::Selftest),
                 (Some("Selftest"), true, Updates::Selftest),
                 (None, true, Updates::Published),
+                (None, true, Updates::Off),
             ]
         );
+    }
+
+    #[test]
+    fn only_the_store_build_names_its_team_and_it_asks_for_no_exception() {
+        let store = app_entitlements(Build::AppStore);
+        assert!(store.contains(&format!(
+            "<key>com.apple.application-identifier</key>\n\t<string>{TEAM_ID}.{BUNDLE_ID}</string>"
+        )));
+        assert!(store.contains(&format!(
+            "<key>com.apple.developer.team-identifier</key>\n\t<string>{TEAM_ID}</string>"
+        )));
+        assert!(store.contains("com.apple.security.app-sandbox"));
+        assert!(!store.contains("temporary-exception") && !store.contains("disable-library-validation"));
+        assert!(!app_entitlements(Build::Distribution).contains("application-identifier"));
+        let plist = info_plist("1.0.4", &["de".to_string()], None, Build::AppStore.updates());
+        assert!(plist.contains("<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>") && !plist.contains("SUFeedURL"));
+    }
+
+    #[test]
+    fn only_a_store_profile_for_this_app_is_taken() {
+        let profile = |id: &str, devices: &str| {
+            format!(
+                "<plist><dict><key>Entitlements</key><dict><key>com.apple.application-identifier</key>\n\t\t                 <string>{id}</string></dict>{devices}</dict></plist>"
+            )
+        };
+        let ours = format!("{TEAM_ID}.{BUNDLE_ID}");
+        assert!(is_store_profile(&profile(&ours, "")));
+        assert!(!is_store_profile(&profile(&format!("{TEAM_ID}.other"), "")));
+        assert!(!is_store_profile(&profile(
+            &ours,
+            "<key>ProvisionedDevices</key><array><string>x</string></array>"
+        )));
+        assert!(!is_store_profile(&profile(
+            &ours,
+            "<key>ProvisionsAllDevices</key><true/>"
+        )));
+        assert!(!is_store_profile("<plist/>"));
     }
 
     #[test]
