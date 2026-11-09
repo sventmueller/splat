@@ -1,3 +1,5 @@
+Splat 1.0.13 replaces 1.0.12 with the same changes and is the version that goes to the Mac App Store.
+
 - **Splat now runs in the App Sandbox**, as apps from the Mac App Store do: it reaches only the documents you open and the folders you grant. For the pictures, notes and Git data next to a document, the bar above the preview offers **Grant Access to Folder…**, and Splat keeps that access, also after a restart.
 - Your settings and unsaved texts come along on the first launch. **Open Recent** starts empty once; opening a document adds it again.
 - **Images from the web load without asking**, from any host, as soon as a document shows them. Like images in an email, they tell their servers that and when the document is opened.
