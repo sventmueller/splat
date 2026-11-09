@@ -4,7 +4,7 @@
 
 **Trình soạn thảo Markdown cho macOS, cho phép bạn viết ngay trong mã nguồn hoặc trực tiếp trong bản xem trước.**
 
-Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bản xem trước trực tiếp, chỉnh sửa được hoàn toàn ở bên phải. Bạn gõ ở bên nào cũng được: mọi thứ viết trong bản xem trước chỉ tạo ra thay đổi tối thiểu trong mã nguồn, nên những dòng bạn không đụng tới vẫn giữ nguyên từng byte và diff Git của bạn luôn gọn gàng. Splat đọc được loại Markdown bạn vẫn dùng: CommonMark và GitHub Flavored Markdown, GitHub alert, liên kết wiki, nhúng và callout của Obsidian, phần mở rộng của Pandoc và Typora, HTML nhúng, công thức LaTeX, cùng sơ đồ Mermaid, Graphviz và PlantUML, tất cả đều hiển thị ngoại tuyến. Duyệt và tìm kiếm trong cả một thư mục ghi chú, xem những gì đã thay đổi kể từ commit Git gần nhất, dán từ Word hoặc trang web dưới dạng Markdown, và xuất ra PDF, HTML hoặc Word chỉ bằng một lần bấm. Splat được viết bằng Rust trên các điều khiển AppKit chính gốc, có 35 ngôn ngữ và không gửi gì qua mạng trừ khi bạn yêu cầu.
+Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bản xem trước trực tiếp, chỉnh sửa được hoàn toàn ở bên phải. Bạn gõ ở bên nào cũng được: mọi thứ viết trong bản xem trước chỉ tạo ra thay đổi tối thiểu trong mã nguồn, nên những dòng bạn không đụng tới vẫn giữ nguyên từng byte và diff Git của bạn luôn gọn gàng. Splat đọc được loại Markdown bạn vẫn dùng: CommonMark và GitHub Flavored Markdown, GitHub alert, liên kết wiki, nhúng và callout của Obsidian, phần mở rộng của Pandoc và Typora, HTML nhúng, công thức LaTeX, cùng sơ đồ Mermaid, Graphviz và PlantUML, tất cả đều hiển thị ngoại tuyến. Duyệt và tìm kiếm trong cả một thư mục ghi chú, xem những gì đã thay đổi kể từ commit Git gần nhất, dán từ Word hoặc trang web dưới dạng Markdown, và xuất ra PDF, HTML hoặc Word chỉ bằng một lần bấm. Splat được viết bằng Rust trên các điều khiển AppKit chính gốc, có 35 ngôn ngữ và không có telemetry.
  
 
 
@@ -29,7 +29,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 ngôn ngữ giao diện](https://img.shields.io/badge/languages-35-4C9A2A)
-![Mặc định ngoại tuyến](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Không có telemetry](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Được ký với Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Giấy phép: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#giấy-phép)
 
@@ -123,7 +123,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 - **Xuất mà không mất gì.** PDF, một tệp HTML độc lập duy nhất, hoặc tài liệu Word với đề mục, danh sách, bảng, chú thích cuối trang và hình ảnh thực thụ. Thêm số trang, đầu trang và trang tiêu đề, hoặc dùng mẫu Word của công ty bạn.
 - **Chính gốc từ trong ra ngoài.** Cửa sổ, tab, menu, popover AppKit thật, Phiên bản, Tự động lưu, menu chia sẻ, chế độ tối, kiểm tra chính tả, đọc chính tả và VoiceOver. Không Electron, không web view cho chính phần văn bản.
 - **Nhanh với tệp lớn.** Kết xuất một lần gõ phím trong tài liệu 10 MB mất khoảng 10 ms, trước phần việc của chính view.
-- **Riêng tư và cẩn trọng.** Splat chạy trong App Sandbox, hình ảnh từ web chỉ được tải sau khi bạn cho phép, liên kết sang ứng dụng khác sẽ hỏi trước, và mọi thao tác giải mã dữ liệu hình ảnh không đáng tin đều chạy trong một dịch vụ riêng có sandbox.
+- **Riêng tư và cẩn trọng.** Splat chạy trong App Sandbox, liên kết sang ứng dụng khác sẽ hỏi trước, và mọi thao tác giải mã dữ liệu hình ảnh không đáng tin đều chạy trong một dịch vụ riêng có sandbox.
 - **Bằng ngôn ngữ của bạn.** Giao diện và phần tham khảo nhanh Markdown tích hợp có 35 ngôn ngữ: Ả Rập, Catalan, Trung Quốc (Giản thể), Trung Quốc (Phồn thể), Croatia, Séc, Đan Mạch, Hà Lan, Anh, Phần Lan, Pháp, Đức, Hy Lạp, Do Thái, Hindi, Hungary, Indonesia, Ý, Nhật, Hàn, Mã Lai, Na Uy, Ba Lan, Bồ Đào Nha (Brazil), Bồ Đào Nha (Bồ Đào Nha), Romania, Nga, Slovakia, Slovenia, Tây Ban Nha, Thụy Điển, Thái, Thổ Nhĩ Kỳ, Ukraina và Việt Nam.
 
 ## Yêu cầu
@@ -437,7 +437,7 @@ Sơ đồ đầu tiên sau khi mở ứng dụng mất khoảng một giây, vì
 ## Hình ảnh
 
 - **Hình ảnh cục bộ** dùng đường dẫn tương đối so với tài liệu: `![Logo](images/logo.png)`. Splat hiển thị PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF và PDF.
-- **Hình ảnh từ web** bị chặn cho đến khi bạn cho phép: một thanh phía trên bản xem trước giải thích rằng việc tải chúng cho máy chủ của chúng biết bạn mở tài liệu và mở lúc nào. **Tải Hình ảnh** cho phép chúng với tài liệu này; Splat nhớ lựa chọn theo từng tệp.
+- **Hình ảnh từ web** được tải ngay khi tài liệu hiển thị chúng, qua `https` và tối đa 10 MB mỗi hình. Giống như hình ảnh trong email, chúng cho máy chủ của chúng biết tài liệu được mở và mở lúc nào.
 - **Kích thước.** `<img width="200">` đặt kích thước hình ảnh; nếu không, hình ảnh vừa với chiều rộng của bản xem trước.
 - **Thay đổi trên đĩa.** Hình ảnh bạn thay thế, hoặc hình xuất hiện sau khi tài liệu đã nhắc tới nó, hiển thị mà không cần mở lại tài liệu. Hình ảnh từ web bị lỗi do mạng sẽ được thử lại khi tài liệu đang hiển thị chúng.
 - **Bộ nhớ.** Hình ảnh hiển thị tới 2560 pixel ở cạnh dài nhất, cũng đủ lấp đầy một trang A4. Chúng được giải mã nhỏ hơn khi chiếm một phần tám bộ nhớ của máy Mac, và trong lúc macOS báo áp lực bộ nhớ.
@@ -482,7 +482,7 @@ Những dòng chỉ khác nhau ở ký tự cuối dòng không được tính, 
 | **Word** | **Tệp › Xuất dưới dạng Tài liệu Word…** hoặc menu Chia sẻ | Một tệp `.docx` với kiểu đề mục của Word, danh sách và bảng thực thụ (kể cả ô đã gộp), chú thích cuối trang của Word, hình ảnh được nhúng, công thức và sơ đồ. |
 | **Markdown** | Nút **Chia sẻ** trên thanh công cụ | Tài liệu dưới dạng tệp `.md` cho Mail, Tin nhắn, AirDrop và mọi dịch vụ chia sẻ khác. |
 
-Menu **Tệp › Chia sẻ** đưa tất cả những cách này vào một chỗ. Các bản xuất dùng tùy chọn dấu câu kiểu chữ in và những hình ảnh từ web mà bạn đã cho phép; trong HTML, hình ảnh từ web vẫn là liên kết.
+Menu **Tệp › Chia sẻ** đưa tất cả những cách này vào một chỗ. Các bản xuất dùng tùy chọn dấu câu kiểu chữ in và những hình ảnh từ web mà bản xem trước đã tải; trong HTML, hình ảnh từ web vẫn là liên kết.
 
 **Tệp › Tùy chọn xuất…** đặt những gì PDF, bản in và Word thêm vào văn bản, cho tất cả tài liệu:
 
@@ -553,8 +553,8 @@ Splat để nguyên các phím tắt chuẩn của Apple.
 
 Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi tài liệu là không đáng tin.
 
-- **Mặc định không dùng mạng.** Splat không có telemetry. Nó chỉ tìm bản cập nhật khi bạn đồng ý hoặc chọn **Kiểm tra Bản cập nhật…**: khi đó nó tải một tệp nguồn cấp nhỏ từ GitHub, và yêu cầu chỉ nêu tên ứng dụng và phiên bản của nó. Công thức và sơ đồ được hiển thị cục bộ; các web view thực hiện việc đó không thể truy cập mạng. **Trợ giúp › Báo cáo sự cố…** mở một biểu mẫu trên GitHub trong trình duyệt; địa chỉ của nó chứa phiên bản Splat, phiên bản macOS và loại máy Mac, không có gì từ tài liệu của bạn.
-- **Hình ảnh từ web** chỉ được tải sau khi bạn cho phép, chỉ qua `https`, không bao giờ từ máy chủ trong mạng cục bộ của bạn, tối đa 10 MB mỗi hình, và trong một phiên riêng tư không có cookie.
+- **Không có telemetry.** Splat không báo cáo gì về cách bạn sử dụng nó. Nó chỉ tìm bản cập nhật khi bạn đồng ý hoặc chọn **Kiểm tra Bản cập nhật…**: khi đó nó tải một tệp nguồn cấp nhỏ từ GitHub, và yêu cầu chỉ nêu tên ứng dụng và phiên bản của nó. Công thức và sơ đồ được hiển thị cục bộ; các web view thực hiện việc đó không thể truy cập mạng. **Trợ giúp › Báo cáo sự cố…** mở một biểu mẫu trên GitHub trong trình duyệt; địa chỉ của nó chứa phiên bản Splat, phiên bản macOS và loại máy Mac, không có gì từ tài liệu của bạn.
+- **Hình ảnh từ web** được tải ngay khi tài liệu hiển thị chúng, từ bất kỳ máy chủ nào, chỉ qua `https`, tối đa 10 MB mỗi hình, và trong một phiên riêng tư không có cookie. Máy chủ của chúng biết tài liệu được mở và mở lúc nào.
 - **Giải mã cô lập.** Hình ảnh cùng đồ họa của công thức và sơ đồ được giải mã trong một dịch vụ riêng, được macOS khởi động trong sandbox riêng của nó: không tệp nào của bạn, không mạng. Dịch vụ chỉ trả về điểm ảnh, có kiểm tra kích thước, và tự kết thúc khi một lần giải mã mất hơn 10 giây hoặc dùng quá nhiều bộ nhớ. Bộ giải mã hình ảnh của chính Apple chỉ nhìn thấy HEIC, TIFF, AVIF và PDF, và chỉ khi dữ liệu thật sự thuộc định dạng đó. SVG, công thức và sơ đồ cũng đi qua dịch vụ đó, nên trong Splat chúng là hình ảnh có độ phân giải cố định: bốn điểm ảnh cho mỗi point, tối đa 2560 ở cạnh dài hơn.
 - **Tệp cục bộ** chỉ đến được tài liệu qua đường dẫn mà nó nêu, và chỉ từ một thư mục bạn đã cấp quyền truy cập: Splat được đọc tài liệu bạn mở, nhưng hình ảnh, ghi chú, danh mục tài liệu tham khảo và kho xung quanh nó thì chỉ sau khi bạn cấp quyền truy cập thư mục chứa chúng bằng **Cấp quyền truy cập thư mục…** trong thanh phía trên bản xem trước. Quyền đã cấp áp dụng cho mọi thư mục con và được ghi nhớ. Phần nhúng hiển thị các ghi chú Markdown từ thư mục của tài liệu và bên dưới, và hình ảnh bị thiếu chỉ được tìm ở đó. Đường dẫn hình ảnh ở nơi khác, tuyệt đối hoặc bắt đầu bằng `~`, được tải trong bản xem trước từ một thư mục đã được cấp quyền truy cập; các bản xuất HTML và Word, việc in và các tệp PDF chỉ mang theo những gì nằm trong thư mục của tài liệu hoặc kho Git của nó, trừ khi kho đó cũng chứa thư mục chính của bạn, nên tài liệu của người khác không thể kéo tệp của bạn vào bản xuất mà bạn chuyển đi.
 - **Thư mục ghi chú** chỉ được đọc khi thanh bên đang hiển thị chúng, và việc đổi tên ghi chú chỉ thay đổi các tệp khác sau khi bạn đã xác nhận số lượng.
@@ -564,7 +564,7 @@ Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi t
 - **Liên kết** không bao giờ khởi chạy chương trình chỉ bằng một cú bấm. Liên kết web và thư mở như thường lệ; liên kết sang ứng dụng khác hỏi trước.
 - **HTML trong tài liệu** được trình phân tích riêng của Splat đọc. Tập lệnh, kiểu, khung và biểu mẫu không bao giờ chạy.
 - **Các bản xuất** không mang tập lệnh. Trang HTML chỉ giữ một danh sách cố định các thẻ và thuộc tính vô hại, như GitHub, cộng với một chính sách bảo mật nội dung. Tệp Word chỉ liên kết các địa chỉ `http`, `https` và `mailto`, ngoài các liên kết đi kèm mẫu Word mà bạn đã chọn.
-- **Ký mã** với Hardened Runtime và App Sandbox. Splat được phép đọc và ghi các tài liệu bạn mở và các thư mục bạn cấp quyền truy cập, kết nối mạng để tải hình ảnh từ web mà bạn đã cho phép và để cập nhật, và in; ngoài ra không gì khác.
+- **Ký mã** với Hardened Runtime và App Sandbox. Splat được phép đọc và ghi các tài liệu bạn mở và các thư mục bạn cấp quyền truy cập, kết nối mạng để tải hình ảnh từ web và để cập nhật, và in; ngoài ra không gì khác.
 
 ## Tài liệu lớn
 
@@ -609,7 +609,7 @@ Một số thay đổi được xử lý toàn bộ, khoảng 300 ms cho mỗi l
 
 **Không có Kiểm tra Bản cập nhật… trong menu Splat.** Chỉ phiên bản từ ảnh đĩa hoặc Homebrew mới tự cập nhật; bản tự build không có trình cập nhật.
 
-**Hình ảnh từ web không hiện.** Bấm **Tải Hình ảnh** trong thanh phía trên bản xem trước. Chỉ hình ảnh `https` từ máy chủ công khai mới được tải.
+**Hình ảnh từ web không hiện.** Chỉ hình ảnh `https` mới được tải, tối đa 10 MB mỗi hình. Hình bị lỗi do mạng sẽ được thử lại khi tài liệu đang hiển thị nó.
 
 **Dán ảnh chụp màn hình thì bị yêu cầu lưu trước.** Hình ảnh được dán sẽ lưu thành tệp cạnh tài liệu, cần có chỗ trên đĩa. Hãy lưu tài liệu, rồi dán lại.
 

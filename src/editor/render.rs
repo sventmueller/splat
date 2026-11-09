@@ -40,8 +40,6 @@ pub struct RenderCtx<'a> {
     pub dark: bool,
     /// Receives a re-render once a remote image has loaded; print rendering passes `None`.
     pub controller: Option<Object<'a>>,
-    /// Images from the web load only once the user allowed it for the document.
-    pub remote_images: bool,
     /// What leaves the Mac as a file shows only the local images `may_carry_along` allows.
     pub leaves_the_mac: bool,
     /// What the formulas of the document define for each other.
@@ -640,9 +638,8 @@ impl RenderCtx<'_> {
             Atom::Image(image) => {
                 let (url, alt) = (&image.url, &image.alt);
                 let found = if remote::is_remote(url) {
-                    self.remote_images
-                        .then(|| self.drawn.web_picture(url))
-                        .flatten()
+                    self.drawn
+                        .web_picture(url)
                         .map(|r| self.images.borrow_mut().for_appearance(url, r, self.dark))
                 } else if self.leaves_the_mac && !may_leave_with_the_document(url, self.doc_dir) {
                     None

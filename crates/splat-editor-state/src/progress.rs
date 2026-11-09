@@ -20,11 +20,7 @@ pub fn updates_at_once(why: Invalidate, len_u16: usize) -> bool {
     match why {
         Invalidate::Text => len_u16 < BACKGROUND_FROM,
         Invalidate::Preview => true,
-        Invalidate::Zoom
-        | Invalidate::Appearance
-        | Invalidate::Arrivals
-        | Invalidate::RemoteAllowed
-        | Invalidate::Layout => false,
+        Invalidate::Zoom | Invalidate::Appearance | Invalidate::Arrivals | Invalidate::Layout => false,
     }
 }
 
@@ -369,7 +365,6 @@ mod tests {
             Invalidate::Zoom,
             Invalidate::Appearance,
             Invalidate::Arrivals,
-            Invalidate::RemoteAllowed,
             Invalidate::Layout,
         ] {
             assert!(!updates_at_once(why, 0), "{why:?}");

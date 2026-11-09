@@ -288,8 +288,6 @@
 "Öffnen" = "Buka";
 "Als HTML exportieren …" = "Ekspor sebagai HTML…";
 "Als Word-Dokument exportieren …" = "Ekspor sebagai Dokumen Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Gambar dari internet diblokir: saat dimuat, servernya mengetahui bahwa dan kapan Anda membuka dokumen ini.";
-"Bilder laden" = "Muat Gambar";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat baru dapat membaca gambar, catatan, dan data Git di samping dokumen ini setelah Anda memberikan akses ke foldernya.";
 "Ordner freigeben …" = "Beri Akses ke Folder…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat kemudian boleh membaca gambar, catatan, dan data Git di folder ini dan semua subfoldernya, juga setelah dimulai ulang.";

@@ -37,16 +37,13 @@ use crate::util::{constant, ns};
 /// How long rendering, the reload and the downloads may take together.
 const PATIENCE: f64 = 45.0;
 
-const REMOTE_PICTURES: [&str; 12] = [
+const REMOTE_PICTURES: [&str; 9] = [
     "/badge.svg",
     "/fehlt.png",
     "/kein-bild.png",
     "/zu-gross.png",
     "/umleitung.png",
-    "/umleitung-nach-hause.png",
     "/umleitung-weiter.svg",
-    "/umleitung-ins-leere.svg",
-    "/umleitung-zaeh.svg",
     "/wackelig.svg",
     "/ohne-netz.svg",
     "/nicht-gezeigt.svg",
@@ -110,7 +107,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
     };
     let shown = layout(&parse("$x$ ![a](https://example.com/a.png)\n"), &Ready, None);
     let images = RefCell::new(ImageStore::default());
-    let pictures_given = |remote_images: bool| {
+    let pictures_given = || {
         let ctx = RenderCtx {
             mtm,
             zoom: 1.0,
@@ -119,7 +116,6 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
             max_image_width: 400.0,
             dark: false,
             controller: None,
-            remote_images,
             leaves_the_mac: false,
             macros: std::sync::Arc::from(""),
             drawn: &given,
@@ -142,13 +138,12 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
         }
         found
     };
-    let without_web = pictures_given(false);
-    let asked_without = given.asked_for_web.get();
-    let with_web = pictures_given(true);
+    let pictures = pictures_given();
+    let asked = given.asked_for_web.get();
     check(
-        "the preview shows formulas and web pictures from what it is given, and asks for web pictures only when allowed",
-        (without_web, asked_without, with_web, given.asked_for_web.get()) == (1, 0, 2, 1),
-        &format!("without web {without_web} pictures, {asked_without} asked; with web {with_web}"),
+        "the preview shows formulas and web pictures from what it is given",
+        (pictures, asked) == (2, 1),
+        &format!("{pictures} pictures, {asked} asked for the web"),
     );
 }
 
@@ -328,15 +323,13 @@ fn with_web_views_started(mtm: MainThreadMarker) {
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
     let document: Retained<MdDocument> = unsafe { objc2::msg_send![MdDocument::alloc(mtm), init] };
     document.set_initial_text(&format!(
-        "# Probe\n\n## Teil\n\n![a](https://192.168.0.1/x.png) ![b](https://localhost/y.png)\n\n![c](https://intranet/z.png)\n\n![w]({0}) ![n]({1}) ![u]({2})\n\n![lokal](<{3}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+        "# Probe\n\n## Teil\n\n![w]({0}) ![n]({1})\n\n![lokal](<{2}>)\n\nFormel $E = mc^2$\n\n| a | b |\n|---|---|\n| 1 | 2 |",
         url_in_probe("/wackelig.svg"),
         url_in_probe("/ohne-netz.svg"),
-        url_in_probe("/umleitung-ins-leere.svg"),
         local.display()
     ));
     document.makeWindowControllers();
     sandbox_of_the_helper();
-    blocked_addresses();
     // With a document asking, which keeps them in memory and tries failures again.
     let editor = document.editor();
     for path in REMOTE_PICTURES {
@@ -429,22 +422,6 @@ fn sandbox_of_the_helper() {
     let _ = std::fs::remove_file(&secret);
 }
 
-fn blocked_addresses() {
-    let blocked = [
-        "https://192.168.0.1/x.png",
-        "https://localhost/y.png",
-        "https://intranet/z.png",
-    ]
-    .iter()
-    .filter(|u| matches!(super::super::remote::get(u, None), Some(None)))
-    .count();
-    check(
-        "images on private hosts count as failed at once",
-        blocked == 3,
-        &format!("{blocked} of 3"),
-    );
-}
-
 /// Another program changes an open file right after Splat saved it, without file coordination, as Git or a shell would:
 /// the hardest case, since macOS reports no change of its own then.
 fn open_and_change_after_saving(mtm: MainThreadMarker) -> (PathBuf, Retained<NSURL>) {
@@ -518,7 +495,6 @@ impl Probe {
             && super::super::remote::idle()
             && answered("/wackelig.svg")
             && answered("/ohne-netz.svg")
-            && answered("/umleitung-ins-leere.svg")
     }
 }
 
@@ -528,20 +504,7 @@ fn answered(path: &str) -> bool {
     matches!(super::super::remote::get(&url_in_probe(path), None), Some(Some(_)))
 }
 
-/// Asks for a picture while the slow name is being looked up, and ends the lookup once that picture is in.
-fn meanwhile_another_download(editor: Option<&EditorController>) {
-    if super::mock_web::slow_name_asked()
-        && matches!(
-            super::super::remote::get(&url_in_probe("/waehrend-der-suche.svg"), editor),
-            Some(Some(_))
-        )
-    {
-        super::mock_web::free_slow_name();
-    }
-}
-
 fn wait_until_done(probe: std::rc::Rc<Probe>, started: std::time::Instant) {
-    meanwhile_another_download(probe.editor.as_deref());
     if probe.done() || started.elapsed().as_secs_f64() > PATIENCE {
         report(&probe);
     } else {
@@ -593,7 +556,7 @@ fn report(probe: &Probe) {
     }
     let _ = std::fs::remove_file(&probe.local);
     if let Some(e) = &probe.editor {
-        guarded("the outline and web permission", || outline_and_web_permission(e));
+        guarded("the outline and web pictures", || outline_and_web_pictures(e));
         guarded("pasting a picture", || pasting_a_picture(e, &probe.document));
     }
     guarded("a closed document", || a_closed_document_stops_asking(probe.mtm));
@@ -613,7 +576,6 @@ fn a_closed_document_stops_asking(mtm: MainThreadMarker) {
         })
         .collect();
     let (document, e) = super::documents::untitled(mtm, &text);
-    e.pictures().allow_remote_images();
     let asked = super::controller::until(|| super::mock_web::requests_holding(super::mock_web::SLOW) > 0);
     document.updateChangeCount(objc2_app_kit::NSDocumentChangeType::ChangeCleared);
     e.stop_showing_for_a_check();
@@ -666,18 +628,8 @@ fn remote_answers() {
         "",
     );
     check(
-        "a redirect to a private host is not followed",
-        failed("/umleitung.png"),
-        "",
-    );
-    check(
-        "nothing reaches the private host a redirect names",
-        requests_of("https://127.0.0.1/heimlich.png") == 0,
-        "",
-    );
-    check(
-        "a redirect to a public name that leads into the local network is not followed",
-        failed("/umleitung-nach-hause.png"),
+        "a redirect to a host in the local network is followed",
+        shown("/umleitung.png") && requests_of("https://127.0.0.1/heimlich.png") == 1,
         "",
     );
     check(
@@ -686,21 +638,8 @@ fn remote_answers() {
         "",
     );
     check(
-        "a name that is slow to resolve after a redirect holds up no other download",
-        !super::mock_web::slow_name_waited_in_vain()
-            && shown("/waehrend-der-suche.svg")
-            && shown("/umleitung-zaeh.svg"),
-        "",
-    );
-    check(
-        "a redirect to a name that does not resolve passes: the picture loads on the next try",
-        shown("/umleitung-ins-leere.svg"),
-        "",
-    );
-    check(
-        "a public name that leads into the local network is not asked",
-        matches!(super::super::remote::get(&at_home(), None), Some(None))
-            && super::mock_web::requests_holding("router.splat-test.example") == 0,
+        "a picture from a host in the local network loads",
+        matches!(super::super::remote::get(&at_home(), None), Some(Some(_))),
         "",
     );
     check(
@@ -861,7 +800,7 @@ fn sharing(e: &EditorController, mtm: MainThreadMarker) {
     );
 }
 
-fn outline_and_web_permission(e: &EditorController) {
+fn outline_and_web_pictures(e: &EditorController) {
     e.panes().toggle_outline();
     let rows = e.panes().outline_rows();
     check(
@@ -869,17 +808,11 @@ fn outline_and_web_permission(e: &EditorController) {
         rows == Some(2),
         &format!("{rows:?}"),
     );
-    let banner = |e: &EditorController| e.pictures().banner_shown();
+    let banner = e.pictures().banner_shown();
     check(
-        "web images wait for permission",
-        banner(e) == Some(true),
-        &format!("{:?}", banner(e)),
-    );
-    e.pictures().allow_remote_images();
-    check(
-        "allowing web images hides the question",
-        banner(e) == Some(false),
-        &format!("{:?}", banner(e)),
+        "web images load without a question above the preview",
+        banner == Some(false),
+        &format!("{banner:?}"),
     );
 }
 

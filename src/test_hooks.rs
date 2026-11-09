@@ -109,17 +109,6 @@ pub(crate) fn keeps_unshown_editor() -> bool {
     false
 }
 
-/// The addresses of the hosts the server inside the self-test answers for, which no resolver knows.
-pub(crate) fn addresses_of(host: &str) -> Option<Vec<std::net::IpAddr>> {
-    #[cfg(feature = "selftest")]
-    return crate::editor::selftest::addresses_of(host);
-    #[cfg(not(feature = "selftest"))]
-    {
-        let _ = host;
-        None
-    }
-}
-
 /// Web pictures in the self-test come from a server inside the app, so no check depends on one somewhere.
 pub(crate) fn serve_the_web_inside(config: &objc2_foundation::NSURLSessionConfiguration) {
     #[cfg(feature = "selftest")]

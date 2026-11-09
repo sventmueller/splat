@@ -4,7 +4,7 @@
 
 **Editor Markdown untuk macOS yang memungkinkan Anda menulis langsung di sumber atau di pratinjau.**
 
-Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri dan pratinjau langsung yang sepenuhnya dapat diedit di sebelah kanan. Ketik di salah satunya: apa pun yang Anda tulis di pratinjau menjadi perubahan sekecil mungkin pada sumber, sehingga baris yang tidak Anda sentuh tetap identik byte demi byte dan diff Git Anda tetap bersih. Splat membaca Markdown yang sudah biasa Anda pakai: CommonMark dan GitHub Flavored Markdown, GitHub alerts, wiki link, embed, dan callout Obsidian, ekstensi Pandoc dan Typora, HTML tersemat, rumus LaTeX, serta diagram Mermaid, Graphviz, dan PlantUML, semuanya ditampilkan secara offline. Telusuri dan cari di seluruh folder catatan, lihat apa yang berubah sejak commit Git terakhir, tempel dari Word atau halaman web sebagai Markdown, dan ekspor ke PDF, HTML, atau Word dengan satu klik. Splat ditulis dalam Rust dengan kontrol AppKit asli, tersedia dalam 35 bahasa, dan tidak mengirim apa pun melalui jaringan kecuali Anda memintanya.
+Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri dan pratinjau langsung yang sepenuhnya dapat diedit di sebelah kanan. Ketik di salah satunya: apa pun yang Anda tulis di pratinjau menjadi perubahan sekecil mungkin pada sumber, sehingga baris yang tidak Anda sentuh tetap identik byte demi byte dan diff Git Anda tetap bersih. Splat membaca Markdown yang sudah biasa Anda pakai: CommonMark dan GitHub Flavored Markdown, GitHub alerts, wiki link, embed, dan callout Obsidian, ekstensi Pandoc dan Typora, HTML tersemat, rumus LaTeX, serta diagram Mermaid, Graphviz, dan PlantUML, semuanya ditampilkan secara offline. Telusuri dan cari di seluruh folder catatan, lihat apa yang berubah sejak commit Git terakhir, tempel dari Word atau halaman web sebagai Markdown, dan ekspor ke PDF, HTML, atau Word dengan satu klik. Splat ditulis dalam Rust dengan kontrol AppKit asli, tersedia dalam 35 bahasa, dan tidak punya telemetri.
  
 
 
@@ -29,7 +29,7 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 bahasa antarmuka](https://img.shields.io/badge/languages-35-4C9A2A)
-![Offline secara default](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Tanpa telemetri](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Ditandatangani dengan Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Lisensi: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#license)
 
@@ -123,7 +123,7 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 - **Ekspor tanpa kehilangan apa pun.** PDF, satu file HTML mandiri, atau dokumen Word dengan heading, daftar, tabel, catatan kaki, dan gambar yang sungguhan. Tambahkan nomor halaman, header, dan halaman judul, atau gunakan template Word perusahaan Anda.
 - **Asli sepenuhnya.** Jendela, tab, menu, popover, Versi, Simpan Otomatis, menu bagikan, mode gelap, pemeriksaan ejaan, dikte, dan VoiceOver yang sungguhan dari AppKit. Tanpa Electron, tanpa web view untuk teksnya sendiri.
 - **Cepat dengan file besar.** Merender satu ketukan tombol di dokumen 10 MB memerlukan sekitar 10 ms, sebelum pekerjaan view itu sendiri.
-- **Privat dan hati-hati.** Splat berjalan dalam App Sandbox, gambar dari web dimuat hanya setelah Anda mengizinkannya, tautan ke app lain meminta konfirmasi lebih dahulu, dan semua yang mendekode data gambar yang tidak tepercaya berjalan di layanan tersendiri dalam sandbox.
+- **Privat dan hati-hati.** Splat berjalan dalam App Sandbox, tautan ke app lain meminta konfirmasi lebih dahulu, dan semua yang mendekode data gambar yang tidak tepercaya berjalan di layanan tersendiri dalam sandbox.
 - **Dalam bahasa Anda.** Antarmuka dan referensi singkat Markdown bawaan tersedia dalam 35 bahasa: Arab, Katalan, Tionghoa (Sederhana), Tionghoa (Tradisional), Kroasia, Ceko, Denmark, Belanda, Inggris, Finlandia, Prancis, Jerman, Yunani, Ibrani, Hindi, Hungaria, Indonesia, Italia, Jepang, Korea, Melayu, Norwegia, Polandia, Portugis (Brasil), Portugis (Portugal), Rumania, Rusia, Slovakia, Slovenia, Spanyol, Swedia, Thai, Turki, Ukraina, dan Vietnam.
 
 ## Persyaratan
@@ -438,7 +438,7 @@ Diagram pertama setelah peluncuran memerlukan sekitar satu detik, karena mesin p
 ## Gambar
 
 - **Gambar lokal** memakai path relatif terhadap dokumen: `![Logo](images/logo.png)`. Splat menampilkan PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF, dan PDF.
-- **Gambar dari web** tetap diblokir sampai Anda mengizinkannya: bar di atas pratinjau menjelaskan bahwa memuatnya memberi tahu server mereka bahwa dan kapan Anda membuka dokumen. **Muat Gambar** mengizinkannya untuk dokumen ini; Splat mengingat pilihan itu per file.
+- **Gambar dari web** dimuat begitu dokumen menampilkannya, melalui `https` dan paling banyak 10 MB per gambar. Seperti gambar dalam email, gambar ini memberi tahu servernya bahwa dan kapan dokumen dibuka.
 - **Ukuran.** `<img width="200">` mengatur ukuran gambar; jika tidak, gambar menyesuaikan lebar pratinjau.
 - **Perubahan di disk.** Gambar yang Anda ganti, atau yang muncul setelah dokumen menyebutnya, tampil tanpa membuka dokumen lagi. Gambar dari web yang gagal karena jaringan dicoba lagi selama dokumen menampilkannya.
 - **Memori.** Gambar ditampilkan hingga 2560 piksel pada sisi terpanjangnya, yang juga memenuhi halaman A4. Gambar didekode lebih kecil begitu memenuhi seperdelapan memori Mac, dan selama macOS melaporkan tekanan memori.
@@ -483,7 +483,7 @@ Baris yang hanya berbeda pada akhir barisnya tidak dihitung, sehingga file denga
 | **Word** | **File › Ekspor sebagai Dokumen Word…** atau menu Bagikan | File `.docx` dengan gaya heading Word, daftar dan tabel sungguhan (termasuk sel yang digabung), catatan kaki sebagai catatan kaki Word, gambar tersemat, rumus, dan diagram. |
 | **Markdown** | Tombol **Bagikan** di bar alat | Dokumen sebagai file `.md` untuk Mail, Pesan, AirDrop, dan semua layanan berbagi lainnya. |
 
-Menu **File › Bagikan** menawarkan semuanya di satu tempat. Ekspor memakai pengaturan tanda baca tipografis dan gambar dari web yang Anda izinkan; di HTML, gambar dari web tetap berupa tautan.
+Menu **File › Bagikan** menawarkan semuanya di satu tempat. Ekspor memakai pengaturan tanda baca tipografis dan gambar dari web yang sudah dimuat pratinjau; di HTML, gambar dari web tetap berupa tautan.
 
 **File › Pilihan Ekspor…** mengatur apa yang ditambahkan PDF, pencetakan, dan Word ke teks, untuk semua dokumen:
 
@@ -554,8 +554,8 @@ Splat membiarkan pintasan standar Apple di tempatnya.
 
 File Markdown bisa datang dari siapa saja, jadi Splat memperlakukan setiap dokumen sebagai tidak tepercaya.
 
-- **Tanpa jaringan secara default.** Splat tidak punya telemetri. Splat mencari pembaruan hanya setelah Anda setuju atau memilih **Periksa Pembaruan…**: saat itu Splat memuat file feed kecil dari GitHub, dan permintaannya hanya menyebut app dan versinya. Rumus dan diagram ditampilkan secara lokal; web view yang melakukannya tidak dapat menjangkau jaringan. **Bantuan › Laporkan Masalah…** membuka formulir di GitHub pada browser Anda; alamatnya memuat versi Splat, versi macOS, dan jenis Mac, tanpa apa pun dari dokumen Anda.
-- **Gambar dari web** dimuat hanya setelah izin Anda, hanya melalui `https`, tidak pernah dari host di jaringan lokal Anda, paling banyak 10 MB per gambar, dan dalam sesi privat tanpa cookie.
+- **Tanpa telemetri.** Splat tidak melaporkan apa pun tentang cara Anda menggunakannya. Splat mencari pembaruan hanya setelah Anda setuju atau memilih **Periksa Pembaruan…**: saat itu Splat memuat file feed kecil dari GitHub, dan permintaannya hanya menyebut app dan versinya. Rumus dan diagram ditampilkan secara lokal; web view yang melakukannya tidak dapat menjangkau jaringan. **Bantuan › Laporkan Masalah…** membuka formulir di GitHub pada browser Anda; alamatnya memuat versi Splat, versi macOS, dan jenis Mac, tanpa apa pun dari dokumen Anda.
+- **Gambar dari web** dimuat begitu dokumen menampilkannya, dari host mana pun, hanya melalui `https`, paling banyak 10 MB per gambar, dan dalam sesi privat tanpa cookie. Servernya mengetahui bahwa dan kapan dokumen dibuka.
 - **Dekode terisolasi.** Gambar serta grafik rumus dan diagram didekode di layanan tersendiri, yang dijalankan macOS dalam sandbox tersendiri: tanpa satu pun file Anda, tanpa jaringan. Layanan itu hanya mengembalikan piksel, yang ukurannya diperiksa, dan menghentikan dirinya sendiri jika suatu dekode memakan waktu lebih dari 10 detik atau terlalu banyak memori. Dekoder gambar bawaan Apple hanya melihat HEIC, TIFF, AVIF, dan PDF, dan hanya jika datanya memang berformat itu. SVG, rumus, dan diagram juga melewati layanan itu, sehingga di Splat semuanya berupa gambar dengan resolusi tetap: empat piksel per poin, hingga 2560 pada sisi yang lebih panjang.
 - **File lokal** sampai ke dokumen hanya melalui path yang disebutnya, dan hanya dari folder yang telah Anda beri akses: Splat boleh membaca dokumen yang Anda buka, tetapi gambar, catatan, bibliografi, dan repositori di sekitarnya baru setelah Anda memberikan akses ke foldernya dengan **Beri Akses ke Folder…** di bar di atas pratinjau. Akses berlaku untuk semua subfolder dan diingat. Embed menampilkan catatan Markdown dari folder dokumen dan di bawahnya, dan gambar yang hilang dicari hanya di sana. Path gambar di tempat lain, absolut atau diawali `~`, dimuat di pratinjau dari folder yang telah diberi akses; ekspor HTML dan Word, pencetakan, dan PDF hanya membawa yang ada di folder dokumen atau repositori Git-nya, kecuali repositori itu juga memuat folder Utama Anda, sehingga dokumen dari orang lain tidak bisa menarik file Anda ke dalam ekspor yang Anda teruskan.
 - **Folder catatan** dibaca hanya selama bilah samping menampilkannya, dan mengubah nama catatan mengubah file lain hanya setelah Anda mengonfirmasi berapa banyak.
@@ -565,7 +565,7 @@ File Markdown bisa datang dari siapa saja, jadi Splat memperlakukan setiap dokum
 - **Tautan** tidak pernah menjalankan program lewat klik. Tautan web dan email terbuka seperti biasa; tautan ke app lain meminta konfirmasi lebih dahulu.
 - **HTML di dokumen** dibaca oleh parser Splat sendiri. Skrip, gaya, bingkai, dan formulir tidak pernah berjalan.
 - **Ekspor** tidak membawa skrip. Halaman HTML hanya mempertahankan daftar tetap berisi tag dan atribut yang tidak berbahaya, seperti GitHub, ditambah content security policy. File Word hanya menautkan alamat `http`, `https`, dan `mailto`, kecuali tautan yang dibawa oleh template Word yang Anda pilih.
-- **Penandatanganan kode** dengan Hardened Runtime dan App Sandbox. Splat boleh membaca dan menulis dokumen yang Anda buka dan folder yang Anda beri akses, mengakses jaringan untuk gambar dari web yang Anda izinkan dan untuk pembaruan, serta mencetak; tidak lebih.
+- **Penandatanganan kode** dengan Hardened Runtime dan App Sandbox. Splat boleh membaca dan menulis dokumen yang Anda buka dan folder yang Anda beri akses, mengakses jaringan untuk gambar dari web dan untuk pembaruan, serta mencetak; tidak lebih.
 
 ## Dokumen besar
 
@@ -610,7 +610,7 @@ Beberapa perubahan diproses penuh, sekitar 300 ms per ketukan tombol pada 10 MB:
 
 **Tidak ada Periksa Pembaruan… di menu Splat.** Hanya versi dari image disk atau Homebrew yang memperbarui dirinya sendiri; build buatan sendiri tidak punya pemutakhir.
 
-**Gambar dari web tidak muncul.** Klik **Muat Gambar** di bar di atas pratinjau. Hanya gambar `https` dari host publik yang dimuat.
+**Gambar dari web tidak muncul.** Hanya gambar `https` yang dimuat, paling banyak 10 MB per gambar. Gambar yang gagal karena jaringan dicoba lagi selama dokumen menampilkannya.
 
 **Menempel tangkapan layar meminta saya menyimpan dahulu.** Gambar yang ditempel disimpan sebagai file di samping dokumen, yang memerlukan tempat di disk. Simpan dokumen, lalu tempel lagi.
 

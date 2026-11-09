@@ -288,8 +288,6 @@
 "Öffnen" = "פתיחה";
 "Als HTML exportieren …" = "ייצוא כ-HTML…";
 "Als Word-Dokument exportieren …" = "ייצוא כמסמך Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "תמונות מהאינטרנט חסומות: טעינתן מיידעת את השרתים שלהן על כך שמסמך זה נפתח ומתי.";
-"Bilder laden" = "טעינת תמונות";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat יוכל לקרוא תמונות, פתקים ונתוני Git שליד מסמך זה רק לאחר מתן גישה לתיקיה שלהם.";
 "Ordner freigeben …" = "מתן גישה לתיקיה…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "לאחר מכן Splat יוכל לקרוא תמונות, פתקים ונתוני Git בתיקיה זו ובכל תיקיות המשנה שלה, גם לאחר הפעלה מחדש.";

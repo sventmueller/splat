@@ -11,7 +11,7 @@ GitHub Flavored Markdown, GitHub-alerts, Obsidians wikilänkar, inbäddningar oc
 inbäddad HTML, LaTeX-formler samt diagram i Mermaid, Graphviz och PlantUML, allt renderat offline. Bläddra och sök i en hel
 mapp med anteckningar, se vad som ändrats sedan senaste Git-commit, klistra in från Word eller en webbsida som Markdown och
 exportera till PDF, HTML eller Word med ett klick. Splat är skrivet i Rust med äkta AppKit-kontroller, finns på 35 språk och
-skickar ingenting över nätverket om du inte ber om det.
+har ingen telemetri.
  
 
 
@@ -36,7 +36,7 @@ skickar ingenting över nätverket om du inte ber om det.
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 gränssnittsspråk](https://img.shields.io/badge/languages-35-4C9A2A)
-![Offline som standard](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Ingen telemetri](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Signerad med Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licens: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licens)
 
@@ -139,8 +139,8 @@ skickar ingenting över nätverket om du inte ber om det.
 - **Native in i märgen.** Äkta AppKit-fönster, flikar, menyer, popovers, Versioner, Spara automatiskt, delningsmenyn, mörkt läge,
   stavningskontroll, diktering och VoiceOver. Inget Electron, ingen webbvy för själva texten.
 - **Snabb med stora filer.** Att rendera en tangenttryckning i ett dokument på 10 MB tar cirka 10 ms, före vyns eget arbete.
-- **Privat och försiktig.** Splat körs i App Sandbox, bilder från webben läses in först när du tillåter det, länkar till
-  andra appar frågar först, och allt som avkodar opålitliga bilddata körs i en egen tjänst i en sandlåda.
+- **Privat och försiktig.** Splat körs i App Sandbox, länkar till andra appar frågar först, och allt som avkodar
+  opålitliga bilddata körs i en egen tjänst i en sandlåda.
 - **På ditt språk.** Gränssnittet och den inbyggda Markdown-snabbreferensen finns på 35 språk: arabiska, katalanska,
   kinesiska (förenklad), kinesiska (traditionell), kroatiska, tjeckiska, danska, nederländska, engelska, finska, franska,
   tyska, grekiska, hebreiska, hindi, ungerska, indonesiska, italienska, japanska, koreanska, malajiska, norska, polska, portugisiska (Brasilien),
@@ -550,9 +550,8 @@ PlantUML:s motor (3 MB) läses in först med det första PlantUML-diagrammet. En
 
 - **Lokala bilder** använder sökvägar relativa till dokumentet: `![Logo](images/logo.png)`. Splat visar PNG, JPEG, GIF, WebP,
   BMP, SVG, HEIC, TIFF, AVIF och PDF.
-- **Bilder från webben** förblir blockerade tills du tillåter dem: ett fält ovanför förhandsvisningen förklarar att när de läses in får
-  deras servrar veta att och när du öppnar dokumentet. **Läs in bilder** tillåter dem för det här dokumentet; Splat minns
-  valet per fil.
+- **Bilder från webben** läses in så snart ett dokument visar dem, över `https` och upp till 10 MB vardera. Precis som
+  bilder i ett e-postmeddelande talar de om för sina servrar att och när dokumentet öppnas.
 - **Storlek.** `<img width="200">` anger en bilds storlek; annars anpassas bilder efter förhandsvisningens bredd.
 - **Ändringar på disk.** En bild som du byter ut, eller en som dyker upp sedan dokumentet nämnt den, visas utan att dokumentet
   öppnas igen. Bilder från webben som misslyckades på grund av nätverket provas på nytt medan ett dokument visar
@@ -619,7 +618,7 @@ ny fil har inga markeringar före sin första commit, och det har inte heller et
 | **Markdown** | Knappen **Dela** i verktygsfältet | Dokumentet som en `.md`-fil för Mail, Meddelanden, AirDrop och alla andra delningstjänster. |
 
 Menyn **Arkiv › Dela** erbjuder alla dessa på ett ställe. Exporterna använder inställningen för typografiska skiljetecken och de
-bilder från webben som du tillåtit; bilder från webben förblir länkar i HTML.
+bilder från webben som förhandsvisningen har läst in; bilder från webben förblir länkar i HTML.
 
 **Arkiv › Exportalternativ…** anger vad PDF, utskrift och Word lägger till i texten, för alla dokument:
 
@@ -710,11 +709,12 @@ Splat lämnar Apples standardkortkommandon som de är.
 
 En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokument som opålitligt.
 
-- **Inget nätverk som standard.** Splat har ingen telemetri. Appen letar efter uppdateringar först när du går med på det eller väljer **Leta efter
-  uppdateringar…**: den läser då in en liten flödesfil från GitHub, och förfrågan innehåller bara appens namn och version.
+- **Ingen telemetri.** Splat rapporterar ingenting om hur du använder det. Appen letar efter uppdateringar först när du
+  går med på det eller väljer **Leta efter uppdateringar…**: den läser då in en liten flödesfil från GitHub, och
+  förfrågan innehåller bara appens namn och version.
   Formler och diagram renderas lokalt; webbvyerna som gör det kan inte nå nätverket. **Hjälp › Rapportera ett problem…** öppnar ett formulär på GitHub i webbläsaren; adressen innehåller versionen av Splat och macOS och typen av Mac, inget från dina dokument.
-- **Bilder från webben** läses in först efter ditt tillstånd, bara över `https`, aldrig från värdar i ditt lokala nätverk,
-  högst 10 MB vardera och i en privat session utan cookies.
+- **Bilder från webben** läses in så snart ett dokument visar dem, från vilken värd som helst, bara över `https`, högst
+  10 MB vardera och i en privat session utan cookies. Deras servrar får veta att och när dokumentet öppnas.
 - **Isolerad avkodning.** Bilder och grafiken i formler och diagram avkodas i en egen tjänst, som macOS startar i en
   egen sandlåda: inga av dina filer, inget nätverk. Den lämnar bara tillbaka pixlar, vars storlek kontrolleras, och
   avslutar sig själv när en avkodning tar mer än 10 sekunder eller för mycket minne. Apples egna bildavkodare får bara
@@ -746,8 +746,8 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
   en innehållssäkerhetspolicy. Word-filer länkar bara adresser med `http`, `https` och `mailto`, utom länkar som följer
   med en Word-mall du har valt.
 - **Kodsignering** med Hardened Runtime och App Sandbox. Splat får läsa och skriva de dokument som du öppnar och de
-  mappar som du ger åtkomst till, använda nätverket för bilder från webben som du har tillåtit och för uppdateringar,
-  och skriva ut; inget annat.
+  mappar som du ger åtkomst till, använda nätverket för bilder från webben och för uppdateringar, och skriva ut; inget
+  annat.
 
 ## Stora dokument
 
@@ -818,8 +818,8 @@ mapp Appar.
 **Det finns ingen Leta efter uppdateringar… i Splat-menyn.** Bara versionen från skivavbilden eller Homebrew uppdaterar
 sig själv; en egen build har ingen uppdateringsfunktion.
 
-**Bilder från webben visas inte.** Klicka på **Läs in bilder** i fältet ovanför förhandsvisningen. Bara `https`-bilder från
-offentliga värdar läses in.
+**Bilder från webben visas inte.** Bara `https`-bilder läses in, upp till 10 MB vardera. En bild som misslyckades på
+grund av nätverket provas på nytt medan dokumentet visar den.
 
 **När jag klistrar in en skärmavbild ombeds jag spara först.** Inklistrade bilder sparas som filer bredvid dokumentet, vilket kräver en
 plats på disken. Spara det och klistra sedan in igen.

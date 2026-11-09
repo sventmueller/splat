@@ -288,8 +288,6 @@
 "Öffnen" = "Otevřít";
 "Als HTML exportieren …" = "Exportovat jako HTML…";
 "Als Word-Dokument exportieren …" = "Exportovat jako dokument Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Obrázky z internetu jsou blokované: při jejich načtení se jejich servery dozvědí, že a kdy tento dokument otevíráte.";
-"Bilder laden" = "Načíst obrázky";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Obrázky, poznámky a data Gitu vedle tohoto dokumentu může Splat číst, až když udělíte přístup k jejich složce.";
 "Ordner freigeben …" = "Udělit přístup ke složce…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat pak smí číst obrázky, poznámky a data Gitu v této složce a ve všech jejích podsložkách, i po restartu.";

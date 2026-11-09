@@ -4,7 +4,7 @@
 
 **L’editor de Markdown per a macOS que et deixa escriure al codi font o directament a la previsualització.**
 
-El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i una previsualització en directe, totalment editable, a la dreta. Escriu en qualsevol dels dos: tot el que escriguis a la previsualització esdevé un canvi mínim al codi font, de manera que les línies que no has tocat es mantenen idèntiques byte a byte i els teus diffs de Git queden nets. El Splat entén el Markdown que ja fas servir: CommonMark i GitHub Flavored Markdown, alertes de GitHub, enllaços wiki, incrustacions i requadres d’Obsidian, extensions de Pandoc i de Typora, HTML incrustat, fórmules LaTeX i diagrames de Mermaid, Graphviz i PlantUML, tot renderitzat sense connexió. Navega per tota una carpeta de notes i cerca-hi, mira què ha canviat des de l’últim commit de Git, enganxa des del Word o d’una pàgina web com a Markdown i exporta a PDF, HTML o Word amb un sol clic. Està escrit en Rust amb controls AppKit autèntics, parla 35 idiomes i no envia res per la xarxa si no li ho demanes.
+El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i una previsualització en directe, totalment editable, a la dreta. Escriu en qualsevol dels dos: tot el que escriguis a la previsualització esdevé un canvi mínim al codi font, de manera que les línies que no has tocat es mantenen idèntiques byte a byte i els teus diffs de Git queden nets. El Splat entén el Markdown que ja fas servir: CommonMark i GitHub Flavored Markdown, alertes de GitHub, enllaços wiki, incrustacions i requadres d’Obsidian, extensions de Pandoc i de Typora, HTML incrustat, fórmules LaTeX i diagrames de Mermaid, Graphviz i PlantUML, tot renderitzat sense connexió. Navega per tota una carpeta de notes i cerca-hi, mira què ha canviat des de l’últim commit de Git, enganxa des del Word o d’una pàgina web com a Markdown i exporta a PDF, HTML o Word amb un sol clic. Està escrit en Rust amb controls AppKit autèntics, parla 35 idiomes i no té telemetria.
  
 
 
@@ -29,7 +29,7 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 [![Graphviz mitjançant Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 idiomes d’interfície](https://img.shields.io/badge/languages-35-4C9A2A)
-![Sense connexió per omissió](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Sense telemetria](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Signat amb Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Llicència: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#llicència)
 
@@ -123,7 +123,7 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 - **Exporta sense perdre res.** PDF, un únic fitxer HTML autònom o un document de Word amb capçaleres, llistes, taules, notes a peu de pàgina i imatges de debò. Afegeix números de pàgina, capçaleres i una portada, o fes servir la plantilla del Word de la teva empresa.
 - **Natiu fins al moll de l’os.** Finestres, pestanyes, menús, finestres emergents, Versions, desament automàtic, el menú de compartir, mode fosc, correcció ortogràfica, dictat i VoiceOver autèntics d’AppKit. Sense Electron, i sense vista web per al text mateix.
 - **Àgil amb fitxers grans.** Renderitzar una pulsació de tecla en un document de 10 MB triga uns 10 ms, abans de la feina pròpia de la vista.
-- **Privat i prudent.** El Splat s’executa a l’App Sandbox, les imatges d’internet només es carreguen quan ho permets, els enllaços a altres apps demanen confirmació, i tot el que descodifica dades d’imatge no fiables s’executa en un servei propi aïllat en una caixa de proves.
+- **Privat i prudent.** El Splat s’executa a l’App Sandbox, els enllaços a altres apps demanen confirmació, i tot el que descodifica dades d’imatge no fiables s’executa en un servei propi aïllat en una caixa de proves.
 - **En el teu idioma.** La interfície i la referència ràpida de Markdown integrada estan disponibles en 35 idiomes: àrab, català, xinès (simplificat), xinès (tradicional), croat, txec, danès, neerlandès, anglès, finès, francès, alemany, grec, hebreu, hindi, hongarès, indonesi, italià, japonès, coreà, malai, noruec, polonès, portuguès (Brasil), portuguès (Portugal), romanès, rus, eslovac, eslovè, castellà, suec, tailandès, turc, ucraïnès i vietnamita.
 
 ## Requisits
@@ -437,7 +437,7 @@ El primer diagrama després d’obrir l’app triga aproximadament un segon, per
 ## Imatges
 
 - **Les imatges locals** fan servir rutes relatives al document: `![Logotip](images/logo.png)`. El Splat mostra PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF i PDF.
-- **Les imatges d’internet** continuen bloquejades fins que les permets: una barra sobre la previsualització explica que carregar-les fa saber als seus servidors que obres el document i quan. **Carrega les imatges** les permet per a aquest document; el Splat recorda l’elecció per a cada fitxer.
+- **Les imatges d’internet** es carreguen tan bon punt un document les mostra, per `https` i de fins a 10 MB cadascuna. Com les imatges d’un correu electrònic, fan saber als seus servidors que s’obre el document i quan.
 - **Mida.** `<img width="200">` dona mida a una imatge; si no, les imatges s’ajusten a l’amplada de la previsualització.
 - **Canvis al disc.** Una imatge que substitueixes, o una que apareix després que el document la nomeni, es mostra sense tornar a obrir el document. Les imatges d’internet que han fallat per culpa de la xarxa es tornen a provar mentre un document les mostra.
 - **Memòria.** Les imatges es mostren amb fins a 2560 píxels al costat més llarg, cosa que també omple una pàgina A4. Es descodifiquen més petites quan ocupen una vuitena part de la memòria del Mac, i mentre macOS informa de pressió de memòria.
@@ -482,7 +482,7 @@ Les línies que només difereixen en el final de línia no compten, de manera qu
 | **Word** | **Arxiu › Exporta com a document del Word…** o el menú Comparteix | Un `.docx` amb els estils de capçalera de Word, llistes i taules de debò (incloses les cel·les combinades), notes a peu de pàgina com a notes a peu de pàgina de Word, imatges incrustades, fórmules i diagrames. |
 | **Markdown** | El botó **Comparteix** de la barra d’eines | El document com a fitxer `.md` per a Mail, Missatges, AirDrop i tots els altres serveis per compartir. |
 
-El menú **Arxiu › Comparteix** ofereix tot això en un sol lloc. Les exportacions fan servir l’ajust de puntuació tipogràfica i les imatges d’internet que has permès; en HTML, les imatges d’internet continuen sent enllaços.
+El menú **Arxiu › Comparteix** ofereix tot això en un sol lloc. Les exportacions fan servir l’ajust de puntuació tipogràfica i les imatges d’internet que la previsualització ha carregat; en HTML, les imatges d’internet continuen sent enllaços.
 
 **Arxiu › Opcions d’exportació…** defineix què afegeixen al text el PDF, la impressió i el Word, per a tots els documents:
 
@@ -553,8 +553,8 @@ El Splat deixa les dreceres estàndard d’Apple tal com són.
 
 Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada document com a no fiable.
 
-- **Sense xarxa per omissió.** El Splat no té telemetria. Només cerca actualitzacions quan hi estàs d’acord o tries **Cerca actualitzacions…**: llavors carrega un petit fitxer de canal de GitHub, i la sol·licitud no esmenta res més que l’app i la seva versió. Les fórmules i els diagrames es renderitzen en local; les vistes web que ho fan no poden accedir a la xarxa. **Ajuda › Informa d’un problema…** obre un formulari de GitHub al navegador; la seva adreça porta la versió del Splat, la de macOS i el tipus de Mac, però res dels teus documents.
-- **Les imatges d’internet** només es carreguen amb el teu permís, només per `https`, mai des de servidors de la teva xarxa local, com a màxim de 10 MB cadascuna i en una sessió privada sense galetes.
+- **Sense telemetria.** El Splat no informa de res sobre com el fas servir. Només cerca actualitzacions quan hi estàs d’acord o tries **Cerca actualitzacions…**: llavors carrega un petit fitxer de canal de GitHub, i la sol·licitud no esmenta res més que l’app i la seva versió. Les fórmules i els diagrames es renderitzen en local; les vistes web que ho fan no poden accedir a la xarxa. **Ajuda › Informa d’un problema…** obre un formulari de GitHub al navegador; la seva adreça porta la versió del Splat, la de macOS i el tipus de Mac, però res dels teus documents.
+- **Les imatges d’internet** es carreguen tan bon punt un document les mostra, des de qualsevol servidor, només per `https`, com a màxim de 10 MB cadascuna i en una sessió privada sense galetes. Els seus servidors saben que s’obre el document i quan.
 - **Descodificació aïllada.** Les imatges i els gràfics de fórmules i diagrames es descodifiquen en un servei propi, que macOS inicia en una caixa de proves pròpia: cap dels teus fitxers, sense xarxa. Només retorna píxels, la mida dels quals es comprova, i s’atura tot sol quan una descodificació triga més de 10 segons o necessita massa memòria. Els descodificadors d’imatge d’Apple només veuen HEIC, TIFF, AVIF i PDF, i només quan les dades són realment d’aquest format. Els SVG, les fórmules i els diagrames també passen per aquest servei, de manera que al Splat són imatges amb una resolució fixa: quatre píxels per punt, fins a 2560 al costat més llarg.
 - **Els fitxers locals** només arriben a un document per la ruta que aquest anomena, i només des d’una carpeta a la qual has donat accés: el Splat pot llegir un document que obres, però les imatges, les notes, la bibliografia i el repositori que l’envolten només quan dones accés a la seva carpeta amb **Dona accés a la carpeta…** a la barra sobre la previsualització. Un accés val per a totes les subcarpetes i es recorda. Les incrustacions mostren notes Markdown de la carpeta del document i de sota, i una imatge que falta només es busca allà. Una ruta d’imatge a un altre lloc, absoluta o que comença per `~`, es carrega a la previsualització des d’una carpeta amb accés donat; les exportacions HTML i Word, la impressió i els PDF només s’emporten el que hi ha a la carpeta del document o al seu repositori Git, tret que aquest repositori també contingui la teva carpeta d’inici, de manera que un document d’una altra persona no pot arrossegar els teus fitxers a una exportació que passis a algú.
 - **Les carpetes de notes** només es llegeixen mentre la barra lateral les mostra, i canviar el nom d’una nota només canvia altres fitxers després que hagis confirmat quants.
@@ -564,7 +564,7 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 - **Els enllaços** mai inicien un programa amb un clic. Els enllaços web i de correu s’obren com sempre; els enllaços a altres apps demanen confirmació.
 - **L’HTML als documents** el llegeix l’analitzador propi del Splat. Els scripts, els estils, els marcs i els formularis no s’executen mai.
 - **Les exportacions** no porten scripts. Les pàgines HTML només conserven una llista fixa d’etiquetes i atributs inofensius, com fa GitHub, més una política de seguretat de contingut. Els fitxers de Word només enllacen adreces `http`, `https` i `mailto`, a part dels enllaços que porti una plantilla del Word que hagis triat.
-- **Signatura de codi** amb el Hardened Runtime i l’App Sandbox. El Splat pot llegir i escriure els documents que obres i les carpetes a les quals dones accés, connectar-se a la xarxa per a les imatges d’internet que has permès i per a les actualitzacions, i imprimir; res més.
+- **Signatura de codi** amb el Hardened Runtime i l’App Sandbox. El Splat pot llegir i escriure els documents que obres i les carpetes a les quals dones accés, connectar-se a la xarxa per a les imatges d’internet i per a les actualitzacions, i imprimir; res més.
 
 ## Documents grans
 
@@ -609,7 +609,7 @@ Alguns canvis es processen sencers, amb uns 300 ms per pulsació de tecla a 10 M
 
 **No hi ha cap Cerca actualitzacions… al menú Splat.** Només la versió de la imatge de disc o de Homebrew s’actualitza sola; una compilació pròpia no té actualitzador.
 
-**Les imatges d’internet no apareixen.** Fes clic a **Carrega les imatges** a la barra sobre la previsualització. Només es carreguen les imatges `https` de servidors públics.
+**Les imatges d’internet no apareixen.** Només es carreguen les imatges `https`, de fins a 10 MB cadascuna. Una que ha fallat per culpa de la xarxa es torna a provar mentre el document la mostra.
 
 **Enganxar una captura de pantalla em demana desar primer.** Les imatges enganxades es desen com a fitxers al costat del document, cosa que necessita un lloc al disc. Desa’l i torna a enganxar.
 

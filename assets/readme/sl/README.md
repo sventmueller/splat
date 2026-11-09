@@ -4,7 +4,7 @@
 
 **Urejevalnik Markdown za macOS, v katerem pišete v izvornem besedilu ali kar v predogledu.**
 
-Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprotni, popolnoma urejljiv predogled na desni. Tipkajte, kjer želite: vse, kar napišete v predogledu, se v izvornem besedilu pokaže kot najmanjša možna sprememba, zato vrstice, ki se jih niste dotaknili, ostanejo bajt za bajtom enake in so vaše razlike v Gitu pregledne. Splat bere Markdown, ki ga že uporabljate: CommonMark in GitHub Flavored Markdown, opozorila GitHub, wiki povezave, vdelave in informativne okvirje Obsidiana, razširitve Pandoc in Typora, vdelani HTML, formule LaTeX ter diagrame Mermaid, Graphviz in PlantUML, vse upodobljeno brez povezave. Brskajte po celotni mapi zapiskov in jih preiskujte, oglejte si, kaj se je spremenilo od zadnjega commita v Gitu, prilepite iz Worda ali spletne strani kot Markdown ter izvozite v PDF, HTML ali Word z enim klikom. Napisan je v jeziku Rust na pravih kontrolnikih AppKit, govori 35 jezikov in po omrežju ne pošilja ničesar, razen če to zahtevate.
+Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprotni, popolnoma urejljiv predogled na desni. Tipkajte, kjer želite: vse, kar napišete v predogledu, se v izvornem besedilu pokaže kot najmanjša možna sprememba, zato vrstice, ki se jih niste dotaknili, ostanejo bajt za bajtom enake in so vaše razlike v Gitu pregledne. Splat bere Markdown, ki ga že uporabljate: CommonMark in GitHub Flavored Markdown, opozorila GitHub, wiki povezave, vdelave in informativne okvirje Obsidiana, razširitve Pandoc in Typora, vdelani HTML, formule LaTeX ter diagrame Mermaid, Graphviz in PlantUML, vse upodobljeno brez povezave. Brskajte po celotni mapi zapiskov in jih preiskujte, oglejte si, kaj se je spremenilo od zadnjega commita v Gitu, prilepite iz Worda ali spletne strani kot Markdown ter izvozite v PDF, HTML ali Word z enim klikom. Napisan je v jeziku Rust na pravih kontrolnikih AppKit, govori 35 jezikov in nima telemetrije.
  
 
 
@@ -29,7 +29,7 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 [![Graphviz prek Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 jezikov vmesnika](https://img.shields.io/badge/languages-35-4C9A2A)
-![Privzeto brez omrežja](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Brez telemetrije](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Podpisan s Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licenca: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licenca)
 
@@ -123,7 +123,7 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 - **Izvoz brez izgub.** PDF, ena sama samostojna datoteka HTML ali dokument Word s pravimi naslovi, seznami, tabelami, sprotnimi opombami in slikami. Dodajte številke strani, glave in naslovno stran ali uporabite predlogo Word svojega podjetja.
 - **Domač na Macu skozi in skozi.** Prava okna AppKit, zavihki, meniji, pojavna okna, različice, samodejno shranjevanje, meni za deljenje, temni način, preverjanje črkovanja, narekovanje in VoiceOver. Brez Electrona, brez spletnega pogleda za samo besedilo.
 - **Hiter z velikimi datotekami.** Izris pritiska tipke v dokumentu velikosti 10 MB traja okoli 10 ms, pred lastnim delom pogleda.
-- **Zasebnost in previdnost.** Splat teče v App Sandboxu, slike iz spleta se naložijo šele, ko jih dovolite, povezave do drugih aplikacij vprašajo za dovoljenje, vse, kar dekodira nezaupane slikovne podatke, pa teče v lastni storitvi v peskovniku.
+- **Zasebnost in previdnost.** Splat teče v App Sandboxu, povezave do drugih aplikacij vprašajo za dovoljenje, vse, kar dekodira nezaupane slikovne podatke, pa teče v lastni storitvi v peskovniku.
 - **V vašem jeziku.** Vmesnik in vgrajeni hitri priročnik za Markdown sta na voljo v 35 jezikih: arabščini, katalonščini, kitajščini (poenostavljeni), kitajščini (tradicionalni), hrvaščini, češčini, danščini, nizozemščini, angleščini, finščini, francoščini, nemščini, grščini, hebrejščini, hindijščini, madžarščini, indonezijščini, italijanščini, japonščini, korejščini, malajščini, norveščini, poljščini, portugalščini (Brazilija), portugalščini (Portugalska), romunščini, ruščini, slovaščini, slovenščini, španščini, švedščini, tajščini, turščini, ukrajinščini in vietnamščini.
 
 ## Zahteve
@@ -438,7 +438,7 @@ Prvi diagram po zagonu traja približno sekundo, ker se pogon za upodabljanje za
 ## Slike
 
 - **Lokalne slike** uporabljajo poti glede na dokument: `![Logotip](images/logo.png)`. Splat prikaže PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF in PDF.
-- **Slike iz spleta** ostanejo blokirane, dokler jih ne dovolite: vrstica nad predogledom pojasni, da njihovo nalaganje njihovim strežnikom izda, da in kdaj odprete dokument. **Naloži slike** jih dovoli za ta dokument; Splat si izbiro zapomni za vsako datoteko posebej.
+- **Slike iz spleta** se naložijo, takoj ko jih dokument prikaže, prek `https` in do 10 MB vsaka. Tako kot slike v e-poštnem sporočilu svojim strežnikom izdajo, da in kdaj se dokument odpre.
 - **Velikost.** `<img width="200">` določi velikost slike; sicer se slike prilegajo širini predogleda.
 - **Spremembe na disku.** Slika, ki jo zamenjate, ali slika, ki se pojavi, potem ko jo je dokument poimenoval, se prikaže brez ponovnega odpiranja dokumenta. Slike iz spleta, ki zaradi omrežja niso uspele, se poskusijo znova, dokler jih dokument prikazuje.
 - **Pomnilnik.** Slike se prikažejo z do 2560 slikovnimi pikami na daljši strani, kar zapolni tudi stran A4. Dekodirajo se manjše, ko zapolnijo osmino pomnilnika Maca in dokler macOS poroča o pomanjkanju pomnilnika.
@@ -483,7 +483,7 @@ Vrstice, ki se razlikujejo le v koncu vrstice, se ne štejejo, zato datoteka s C
 | **Word** | **Datoteka › Izvozi kot dokument Word …** ali meni Deli | Datoteka `.docx` z Wordovimi slogi naslovov, pravimi seznami in tabelami (vključno z združenimi celicami), sprotnimi opombami kot Wordovimi opombami, vdelanimi slikami, formulami in diagrami. |
 | **Markdown** | Gumb **Deli** v orodni vrstici | Dokument kot datoteka `.md` za Pošto, Sporočila, AirDrop in vse druge storitve deljenja. |
 
-Meni **Datoteka › Deli** ponuja vse naštete možnosti na enem mestu. Izvozi upoštevajo nastavitev tipografskih ločil in slike iz spleta, ki ste jih dovolili; slike iz spleta ostanejo v HTML povezave.
+Meni **Datoteka › Deli** ponuja vse naštete možnosti na enem mestu. Izvozi upoštevajo nastavitev tipografskih ločil in slike iz spleta, ki jih je naložil predogled; slike iz spleta ostanejo v HTML povezave.
 
 **Datoteka › Možnosti izvoza …** nastavi, kaj PDF, tiskanje in Word dodajo besedilu, za vse dokumente:
 
@@ -554,8 +554,8 @@ Splat pušča Applove standardne bližnjice tam, kjer so.
 
 Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokumentu.
 
-- **Privzeto brez omrežja.** Splat nima telemetrije. Posodobitve išče šele, ko se strinjate ali izberete **Preveri, ali so na voljo posodobitve …**: nato z GitHuba naloži majhno datoteko vira, zahteva pa ne navaja ničesar razen aplikacije in njene različice. Formule in diagrami se upodobijo lokalno; spletni pogledi, ki to počnejo, ne dosežejo omrežja. **Pomoč › Prijavi težavo …** v brskalniku odpre obrazec na GitHubu; njegov naslov vsebuje različico Splata, različico macOS in vrsto Maca, nič iz vaših dokumentov.
-- **Slike iz spleta** se naložijo šele z vašim dovoljenjem, samo prek `https`, nikoli z gostiteljev v vašem lokalnem omrežju, največ 10 MB vsaka in v zasebni seji brez piškotkov.
+- **Brez telemetrije.** Splat ne sporoča ničesar o tem, kako ga uporabljate. Posodobitve išče šele, ko se strinjate ali izberete **Preveri, ali so na voljo posodobitve …**: nato z GitHuba naloži majhno datoteko vira, zahteva pa ne navaja ničesar razen aplikacije in njene različice. Formule in diagrami se upodobijo lokalno; spletni pogledi, ki to počnejo, ne dosežejo omrežja. **Pomoč › Prijavi težavo …** v brskalniku odpre obrazec na GitHubu; njegov naslov vsebuje različico Splata, različico macOS in vrsto Maca, nič iz vaših dokumentov.
+- **Slike iz spleta** se naložijo, takoj ko jih dokument prikaže, s katerega koli gostitelja, samo prek `https`, največ 10 MB vsaka in v zasebni seji brez piškotkov. Njihovi strežniki izvejo, da in kdaj se dokument odpre.
 - **Izolirano dekodiranje.** Slike ter grafike formul in diagramov se dekodirajo v lastni storitvi, ki jo macOS zažene v lastnem peskovniku: nobena od vaših datotek, brez omrežja. Vrne samo piksle, katerih velikost se preveri, in se sama ustavi, kadar dekodiranje traja več kot 10 sekund ali porabi preveč pomnilnika. Applovi lastni dekodirniki slik vidijo samo HEIC, TIFF, AVIF in PDF, in to le, kadar so podatki res v tej obliki. Tudi SVG-ji, formule in diagrami gredo skozi to storitev, zato so v Splatu slike s fiksno ločljivostjo: štiri slikovne pike na točko, do 2560 na daljši strani.
 - **Lokalne datoteke** dosežejo dokument samo po poti, ki jo ta navaja, in samo iz mape, do katere ste dodelili dostop: Splat sme brati dokument, ki ga odprete, slike, zapiske, bibliografijo in repozitorij okoli njega pa šele, ko z gumbom **Dodeli dostop do mape …** v vrstici nad predogledom dodelite dostop do njihove mape. Dostop velja za vse podmape in se zapomni. Vdelave prikažejo zapiske Markdown iz mape dokumenta in niže, manjkajoča slika pa se išče samo tam. Pot do slike drugje, absolutna ali z začetkom `~`, se v predogledu naloži iz mape, do katere je dodeljen dostop; izvoza v HTML in Word, tiskanje in PDF-ji vzamejo le tisto, kar je v mapi dokumenta ali v njegovem repozitoriju Git, razen če ta repozitorij vsebuje tudi vašo domačo mapo, zato tuj dokument ne more povleči vaših datotek v izvoz, ki ga posredujete naprej.
 - **Mape z zapiski** se berejo samo, dokler jih stranska vrstica prikazuje, preimenovanje zapiska pa spremeni druge datoteke šele, ko potrdite, koliko jih je.
@@ -565,7 +565,7 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 - **Povezave** nikoli ne zaženejo programa s klikom. Spletne in poštne povezave se odprejo kot običajno; povezave do drugih aplikacij najprej vprašajo.
 - **HTML v dokumentih** bere Splatov lastni razčlenjevalnik. Skripte, slogi, okvirji in obrazci se nikoli ne izvedejo.
 - **Izvozi** ne vsebujejo skript. Strani HTML obdržijo le določen seznam neškodljivih oznak in atributov, kot to počne GitHub, ter politiko varnosti vsebine. Datoteke Word povezujejo samo naslove `http`, `https` in `mailto`, razen povezav, ki jih prinese predloga Word po vaši izbiri.
-- **Podpisovanje kode** s Hardened Runtime in App Sandboxom. Splat sme brati in pisati dokumente, ki jih odprete, in mape, do katerih dodelite dostop, dostopati do omrežja zaradi slik iz spleta, ki ste jih dovolili, in zaradi posodobitev ter tiskati; nič drugega.
+- **Podpisovanje kode** s Hardened Runtime in App Sandboxom. Splat sme brati in pisati dokumente, ki jih odprete, in mape, do katerih dodelite dostop, dostopati do omrežja zaradi slik iz spleta in zaradi posodobitev ter tiskati; nič drugega.
 
 ## Veliki dokumenti
 
@@ -610,7 +610,7 @@ Nekatere spremembe se obdelajo v celoti, pri okoli 300 ms na pritisk tipke pri 1
 
 **V meniju Splat ni ukaza Preveri, ali so na voljo posodobitve ….** Samo različica z diskovne slike ali iz Homebrewa se posodablja sama; vaša lastna zgradba nima posodabljalnika.
 
-**Slike iz spleta se ne prikažejo.** Kliknite **Naloži slike** v vrstici nad predogledom. Naložijo se samo slike `https` z javnih gostiteljev.
+**Slike iz spleta se ne prikažejo.** Naložijo se samo slike `https`, do 10 MB vsaka. Slika, ki zaradi omrežja ni uspela, se poskusi znova, dokler jo dokument prikazuje.
 
 **Lepljenje posnetka zaslona zahteva, da najprej shranim.** Prilepljene slike se shranijo kot datoteke poleg dokumenta, kar zahteva mesto na disku. Shranite dokument in nato znova prilepite.
 

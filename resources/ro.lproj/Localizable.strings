@@ -288,8 +288,6 @@
 "Öffnen" = "Deschideți";
 "Als HTML exportieren …" = "Exportați ca HTML…";
 "Als Word-Dokument exportieren …" = "Exportați ca document Word…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Imaginile de pe internet sunt blocate: la încărcare, serverele lor află că și când deschideți acest document.";
-"Bilder laden" = "Încărcați imaginile";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Splat poate citi imaginile, notele și datele Git de lângă acest document doar după ce acordați acces la dosarul lor.";
 "Ordner freigeben …" = "Acordați acces la dosar…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat va putea apoi să citească imagini, note și date Git din acest dosar și din toate subdosarele sale, și după o repornire.";

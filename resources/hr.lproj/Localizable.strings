@@ -288,8 +288,6 @@
 "Öffnen" = "Otvori";
 "Als HTML exportieren …" = "Eksportiraj kao HTML…";
 "Als Word-Dokument exportieren …" = "Eksportiraj kao Word dokument…";
-"Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest." = "Slike s interneta su blokirane: kad se učitaju, njihovi poslužitelji saznaju da i kada otvarate ovaj dokument.";
-"Bilder laden" = "Učitaj slike";
 "Bilder, Notizen und Git-Daten neben diesem Dokument kann Splat erst lesen, wenn du ihren Ordner freigibst." = "Slike, bilješke i Git podatke pokraj ovog dokumenta Splat može čitati tek kad dodijelite pristup njihovoj mapi.";
 "Ordner freigeben …" = "Dodijeli pristup mapi…";
 "Splat darf dann Bilder, Notizen und Git-Daten in diesem Ordner und allen Unterordnern lesen. Das gilt dauerhaft." = "Splat tada smije čitati slike, bilješke i Git podatke u ovoj mapi i svim njezinim podmapama, i nakon ponovnog pokretanja.";

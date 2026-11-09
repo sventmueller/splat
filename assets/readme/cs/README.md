@@ -4,7 +4,7 @@
 
 **Editor Markdownu pro macOS, ve kterém píšete ve zdrojovém textu nebo přímo v náhledu.**
 
-Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntaxe a vpravo živý, plně upravitelný náhled. Pište v kterémkoli z nich: co napíšete v náhledu, promítne se do zdrojového textu jako minimální změna, takže řádky, kterých jste se nedotkli, zůstanou bajt po bajtu stejné a diffy v Gitu zůstanou přehledné. Splat čte Markdown, který už používáte: CommonMark a GitHub Flavored Markdown, upozornění GitHubu, wikiodkazy, vložené poznámky a informační rámečky z Obsidianu, rozšíření Pandocu a Typory, vložený HTML kód, vzorce LaTeX a diagramy Mermaid, Graphviz a PlantUML, vše vykreslené offline. Procházejte a prohledávejte celou složku poznámek, sledujte, co se změnilo od posledního commitu v Gitu, vkládejte z Wordu nebo webové stránky jako Markdown a exportujte do PDF, HTML nebo Wordu jedním kliknutím. Je napsaný v Rustu na skutečných ovládacích prvcích AppKit, mluví 35 jazyky a nic neposílá po síti, pokud o to nepožádáte.
+Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntaxe a vpravo živý, plně upravitelný náhled. Pište v kterémkoli z nich: co napíšete v náhledu, promítne se do zdrojového textu jako minimální změna, takže řádky, kterých jste se nedotkli, zůstanou bajt po bajtu stejné a diffy v Gitu zůstanou přehledné. Splat čte Markdown, který už používáte: CommonMark a GitHub Flavored Markdown, upozornění GitHubu, wikiodkazy, vložené poznámky a informační rámečky z Obsidianu, rozšíření Pandocu a Typory, vložený HTML kód, vzorce LaTeX a diagramy Mermaid, Graphviz a PlantUML, vše vykreslené offline. Procházejte a prohledávejte celou složku poznámek, sledujte, co se změnilo od posledního commitu v Gitu, vkládejte z Wordu nebo webové stránky jako Markdown a exportujte do PDF, HTML nebo Wordu jedním kliknutím. Je napsaný v Rustu na skutečných ovládacích prvcích AppKit, mluví 35 jazyky a nemá žádnou telemetrii.
  
 
 
@@ -29,7 +29,7 @@ Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntax
 [![Graphviz přes Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 jazyků rozhraní](https://img.shields.io/badge/languages-35-4C9A2A)
-![Ve výchozím stavu offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Žádná telemetrie](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Podepsáno s Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licence: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licence)
 
@@ -123,7 +123,7 @@ Splat zobrazuje vlevo zdrojový text Markdownu s barevným zvýrazněním syntax
 - **Export bez ztrát.** PDF, jediný samostatný soubor HTML nebo dokument Word se skutečnými nadpisy, seznamy, tabulkami, poznámkami pod čarou a obrázky. Přidejte čísla stránek, záhlaví a titulní stranu, nebo použijte šablonu Word své firmy.
 - **Nativní do posledního detailu.** Skutečná okna AppKit, panely, nabídky, popovery, Verze, Automatické ukládání, nabídka Sdílet, tmavý režim, kontrola pravopisu, diktování a VoiceOver. Žádný Electron, žádné webové zobrazení pro samotný text.
 - **Rychlý i u velkých souborů.** Vykreslení stisku klávesy v dokumentu o velikosti 10 MB trvá zhruba 10 ms, před vlastní prací zobrazení.
-- **Soukromí a opatrnost.** Splat běží v App Sandbox, obrázky z webu se načtou, až když to povolíte, odkazy do jiných aplikací se nejdřív zeptají a vše, co dekóduje nedůvěryhodná obrazová data, běží ve vlastní službě v sandboxu.
+- **Soukromí a opatrnost.** Splat běží v App Sandbox, odkazy do jiných aplikací se nejdřív zeptají a vše, co dekóduje nedůvěryhodná obrazová data, běží ve vlastní službě v sandboxu.
 - **Ve vašem jazyce.** Rozhraní i vestavěný stručný přehled Markdownu jsou ve 35 jazycích: arabština, katalánština, čínština (zjednodušená), čínština (tradiční), chorvatština, čeština, dánština, nizozemština, angličtina, finština, francouzština, němčina, řečtina, hebrejština, hindština, maďarština, indonéština, italština, japonština, korejština, malajština, norština, polština, portugalština (Brazílie), portugalština (Portugalsko), rumunština, ruština, slovenština, slovinština, španělština, švédština, thajština, turečtina, ukrajinština a vietnamština.
 
 ## Požadavky
@@ -438,7 +438,7 @@ První diagram po spuštění trvá asi vteřinu, protože se vykreslovací engi
 ## Obrázky
 
 - **Místní obrázky** používají cesty relativní k dokumentu: `![Logo](images/logo.png)`. Splat zobrazí PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF a PDF.
-- **Obrázky z webu** zůstávají zablokované, dokud je nepovolíte: lišta nad náhledem vysvětlí, že jejich načtením se jejich servery dozvědí, že a kdy dokument otevíráte. **Načíst obrázky** je povolí pro tento dokument; Splat si volbu pamatuje pro každý soubor zvlášť.
+- **Obrázky z webu** se načtou, jakmile je dokument zobrazí, přes `https` a do 10 MB každý. Stejně jako obrázky v e-mailu prozradí svým serverům, že a kdy se dokument otevírá.
 - **Velikost.** `<img width="200">` nastaví velikost obrázku; jinak se obrázky přizpůsobí šířce náhledu.
 - **Změny na disku.** Obrázek, který nahradíte, nebo ten, který se objeví po jeho uvedení v dokumentu, se zobrazí bez nového otevření dokumentu. Obrázky z webu, které selhaly kvůli síti, se zkusí znovu, dokud je dokument zobrazuje.
 - **Paměť.** Obrázky se zobrazují nejvýše na 2560 pixelů na delší straně, což vyplní i stránku A4. Dekódují se menší, jakmile zaplní osminu paměti Macu a když macOS hlásí nedostatek paměti.
@@ -483,7 +483,7 @@ V dokumentu v repozitáři Git značí pruhy vedle textu to, co se liší od pos
 | **Word** | **Soubor › Exportovat jako dokument Word…** nebo nabídka Sdílet | Soubor `.docx` se styly nadpisů Wordu, skutečnými seznamy a tabulkami (včetně sloučených buněk), poznámkami pod čarou jako poznámkami Wordu, vloženými obrázky, vzorci a diagramy. |
 | **Markdown** | Tlačítko **Sdílet** na panelu nástrojů | Dokument jako soubor `.md` pro Mail, Zprávy, AirDrop a každou další službu sdílení. |
 
-Nabídka **Soubor › Sdílet** nabízí všechno z toho na jednom místě. Exporty používají nastavení typografické interpunkce a obrázky z webu, které jste povolili; obrázky z webu zůstávají v HTML odkazy.
+Nabídka **Soubor › Sdílet** nabízí všechno z toho na jednom místě. Exporty používají nastavení typografické interpunkce a obrázky z webu, které načetl náhled; obrázky z webu zůstávají v HTML odkazy.
 
 **Soubor › Volby exportu…** nastavuje, co PDF, tisk a Word přidají k textu, pro všechny dokumenty:
 
@@ -554,8 +554,8 @@ Splat nechává standardní zkratky Applu tam, kde jsou.
 
 Soubor Markdown může pocházet od kohokoli, proto Splat považuje každý dokument za nedůvěryhodný.
 
-- **Ve výchozím stavu bez sítě.** Splat nemá žádnou telemetrii. Aktualizace vyhledává, až když s tím souhlasíte nebo zvolíte **Vyhledat aktualizace…**: načte pak malý soubor kanálu z GitHubu a požadavek uvádí jen aplikaci a její verzi. Vzorce a diagramy se vykreslují lokálně; webová zobrazení, která to dělají, nemají přístup k síti. **Nápověda › Nahlásit problém…** otevře v prohlížeči formulář na GitHubu; jeho adresa nese verzi Splatu, verzi macOS a typ Macu, nic z vašich dokumentů.
-- **Obrázky z webu** se načtou až s vaším svolením, jen přes `https`, nikdy z hostitelů ve vaší místní síti, nejvýše 10 MB každý a v soukromé relaci bez cookies.
+- **Žádná telemetrie.** Splat nehlásí nic o tom, jak ho používáte. Aktualizace vyhledává, až když s tím souhlasíte nebo zvolíte **Vyhledat aktualizace…**: načte pak malý soubor kanálu z GitHubu a požadavek uvádí jen aplikaci a její verzi. Vzorce a diagramy se vykreslují lokálně; webová zobrazení, která to dělají, nemají přístup k síti. **Nápověda › Nahlásit problém…** otevře v prohlížeči formulář na GitHubu; jeho adresa nese verzi Splatu, verzi macOS a typ Macu, nic z vašich dokumentů.
+- **Obrázky z webu** se načtou, jakmile je dokument zobrazí, z libovolného hostitele, jen přes `https`, nejvýše 10 MB každý a v soukromé relaci bez cookies. Jejich servery se dozvědí, že a kdy se dokument otevírá.
 - **Izolované dekódování.** Obrázky a grafika vzorců a diagramů se dekódují ve vlastní službě, kterou macOS spouští ve vlastním sandboxu: žádné z vašich souborů, žádná síť. Vrací jen pixely, jejichž velikost se kontroluje, a sama se ukončí, když dekódování trvá déle než 10 sekund nebo potřebuje příliš mnoho paměti. Dekodéry obrazu přímo od Applu vidí jen HEIC, TIFF, AVIF a PDF, a to jen když data opravdu mají tento formát. Přes tuto službu procházejí i SVG, vzorce a diagramy, takže jsou ve Splatu obrázky s pevným rozlišením: čtyři pixely na bod, nejvýše 2560 na delší straně.
 - **Místní soubory** se k dokumentu dostanou jen cestou, kterou uvádí, a jen ze složky, ke které jste udělili přístup: Splat smí číst dokument, který otevřete, ale obrázky, poznámky, bibliografii a repozitář kolem něj až poté, co k jejich složce udělíte přístup pomocí **Udělit přístup ke složce…** na liště nad náhledem. Udělený přístup platí pro všechny podsložky a zůstane zapamatován. Vložení zobrazují poznámky Markdown ze složky dokumentu a z podsložek a chybějící obrázek se hledá jen tam. Cesta k obrázku jinde, absolutní nebo začínající `~`, se v náhledu načte ze složky, ke které jste udělili přístup; exporty do HTML a Wordu, tisk a PDF berou jen to, co leží ve složce dokumentu nebo v jeho repozitáři Git, pokud tento repozitář neobsahuje i vaši domovskou složku, takže cizí dokument nemůže vtáhnout vaše soubory do exportu, který předáte dál.
 - **Složky s poznámkami** se čtou jen tehdy, když je postranní panel zobrazuje, a přejmenování poznámky změní jiné soubory až poté, co potvrdíte, kolik jich je.
@@ -565,7 +565,7 @@ Soubor Markdown může pocházet od kohokoli, proto Splat považuje každý doku
 - **Odkazy** nikdy nespustí program kliknutím. Odkazy na web a e-mail se otevřou jako obvykle; odkazy do jiných aplikací se nejdřív zeptají.
 - **HTML v dokumentech** čte vlastní parser Splatu. Skripty, styly, rámce a formuláře se nikdy nespustí.
 - **Exporty** neobsahují žádné skripty. Stránky HTML si ponechávají jen pevný seznam neškodných značek a atributů, jako GitHub, a k tomu zásady zabezpečení obsahu. Soubory Word odkazují jen na adresy `http`, `https` a `mailto`, kromě odkazů, které s sebou přinese vámi zvolená šablona Word.
-- **Podepisování kódu** s Hardened Runtime a App Sandbox. Splat smí číst a zapisovat dokumenty, které otevřete, a složky, ke kterým udělíte přístup, připojovat se k síti kvůli obrázkům z webu, které jste povolili, a kvůli aktualizacím, a tisknout; nic jiného.
+- **Podepisování kódu** s Hardened Runtime a App Sandbox. Splat smí číst a zapisovat dokumenty, které otevřete, a složky, ke kterým udělíte přístup, připojovat se k síti kvůli obrázkům z webu a kvůli aktualizacím, a tisknout; nic jiného.
 
 ## Velké dokumenty
 
@@ -610,7 +610,7 @@ Některé změny se zpracovávají celé, při 10 MB zhruba 300 ms na stisk klá
 
 **V nabídce Splat chybí položka Vyhledat aktualizace…** Aktualizuje se jen verze z obrazu disku nebo z Homebrew; vlastní sestavení aktualizace nemá.
 
-**Obrázky z webu se nezobrazují.** Klikněte na **Načíst obrázky** na liště nad náhledem. Načtou se jen obrázky `https` z veřejných hostitelů.
+**Obrázky z webu se nezobrazují.** Načtou se jen obrázky `https`, do 10 MB každý. Obrázek, který selhal kvůli síti, se zkusí znovu, dokud ho dokument zobrazuje.
 
 **Vložení snímku obrazovky chce nejdřív uložit.** Vložené obrázky se ukládají jako soubory vedle dokumentu, což vyžaduje místo na disku. Uložte dokument a vložte obrázek znovu.
 

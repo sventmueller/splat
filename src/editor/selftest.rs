@@ -29,7 +29,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSCopying, NSNotFound, NSRange, NSString, NSTimer, NSURL};
 
-pub use mock_web::{addresses_of, protocol_classes};
+pub use mock_web::protocol_classes;
 
 use super::EditorController;
 use crate::document::MdDocument;
@@ -382,7 +382,6 @@ pub fn start(mtm: MainThreadMarker) {
         return;
     }
     let out = PathBuf::from(std::env::var("SPLAT_SELFTEST_OUT").unwrap_or_else(|_| ".".into()));
-    forget_web_image_permission(&file);
     // AppKit opens its untitled window after this call, and says so to nobody.
     after(1.0, move || {
         let (file, out) = (file.clone(), out.clone());
@@ -468,20 +467,6 @@ fn open_document(mtm: MainThreadMarker, file: &str) {
 /// The window of the test file shows, with the text applied.
 fn window_rendered(mtm: MainThreadMarker) -> bool {
     editor(mtm).is_some_and(|e| e.window().is_some_and(|w| w.isVisible()) && quiet(&e))
-}
-
-/// User defaults keep the permission an earlier run gave its copy of the document.
-fn forget_web_image_permission(file: &str) {
-    let paths: Vec<_> = super::images::allowed_documents()
-        .iter()
-        .filter(|p| *p != file)
-        .map(|p| ns(p))
-        .collect();
-    let list = objc2_foundation::NSArray::from_retained_slice(&paths);
-    unsafe {
-        objc2_foundation::NSUserDefaults::standardUserDefaults()
-            .setObject_forKey(Some(&list), &ns(super::images::ALLOWED_KEY))
-    };
 }
 
 fn document_window_shown(mtm: MainThreadMarker) -> bool {
@@ -1331,12 +1316,6 @@ fn finish() {
     {
         // An inactive app does not close popovers, so the formula and diagram editor checks fail on their own.
         eprintln!("SELFTEST WARN the app was not active (screen locked or another app in front)");
-    }
-    if let (Ok(file), Ok(_)) = (
-        std::env::var("SPLAT_SELFTEST_FILE"),
-        std::env::var("SPLAT_SELFTEST_OUT"),
-    ) {
-        forget_web_image_permission(&file);
     }
     eprintln!("SELFTEST DONE failures={failures}");
     std::process::exit(if failures == 0 { 0 } else { 1 });

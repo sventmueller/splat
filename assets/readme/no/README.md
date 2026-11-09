@@ -4,7 +4,7 @@
 
 **Markdown-editoren for macOS der du skriver i kildeteksten eller rett i forhåndsvisningen.**
 
-Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levende, fullt redigerbar forhåndsvisning til høyre. Skriv i den ene eller den andre: det du skriver i forhåndsvisningen, blir til en minimal endring i kildeteksten, så linjer du ikke har rørt, forblir byte for byte like, og Git-diffene dine holder seg ryddige. Splat leser den Markdownen du allerede bruker: CommonMark og GitHub Flavored Markdown, GitHub-varsler, Obsidians wikilenker, innbygginger og infobokser, utvidelser fra Pandoc og Typora, innebygd HTML, LaTeX-formler og diagrammer i Mermaid, Graphviz og PlantUML, alt gjengitt uten nett. Bla gjennom og søk i en hel mappe med notater, se hva som er endret siden siste Git-commit, lim inn fra Word eller en nettside som Markdown, og eksporter til PDF, HTML eller Word med ett klikk. Appen er skrevet i Rust på ekte AppKit-kontroller, finnes på 35 språk og sender ingenting over nettverket med mindre du ber om det.
+Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levende, fullt redigerbar forhåndsvisning til høyre. Skriv i den ene eller den andre: det du skriver i forhåndsvisningen, blir til en minimal endring i kildeteksten, så linjer du ikke har rørt, forblir byte for byte like, og Git-diffene dine holder seg ryddige. Splat leser den Markdownen du allerede bruker: CommonMark og GitHub Flavored Markdown, GitHub-varsler, Obsidians wikilenker, innbygginger og infobokser, utvidelser fra Pandoc og Typora, innebygd HTML, LaTeX-formler og diagrammer i Mermaid, Graphviz og PlantUML, alt gjengitt uten nett. Bla gjennom og søk i en hel mappe med notater, se hva som er endret siden siste Git-commit, lim inn fra Word eller en nettside som Markdown, og eksporter til PDF, HTML eller Word med ett klikk. Appen er skrevet i Rust på ekte AppKit-kontroller, finnes på 35 språk og har ingen telemetri.
  
 
 
@@ -29,7 +29,7 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 grensesnittspråk](https://img.shields.io/badge/languages-35-4C9A2A)
-![Uten nett som standard](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Ingen telemetri](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Signert med Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Lisens: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#lisens)
 
@@ -123,7 +123,7 @@ Splat viser Markdown-kildeteksten din med syntaksfarger til venstre og en levend
 - **Eksport uten tap.** PDF, én enkelt selvstendig HTML-fil eller et Word-dokument med ekte overskrifter, lister, tabeller, fotnoter og bilder. Legg til sidetall, topptekster og en tittelside, eller bruk bedriftens Word-mal.
 - **Native helt inn i margen.** Ekte AppKit-vinduer, faner, menyer, popovere, Versjoner, Lagre automatisk, delingsmenyen, mørk modus, stavekontroll, diktering og VoiceOver. Ingen Electron, ingen nettvisning for selve teksten.
 - **Rask med store filer.** Å gjengi et tastetrykk i et dokument på 10 MB tar rundt 10 ms, før visningens eget arbeid.
-- **Privat og varsom.** Splat kjører i App Sandbox, bilder fra nettet lastes først etter at du har tillatt det, lenker til andre apper spør først, og alt som dekoder upålitelige bildedata, kjører i en egen tjeneste i en sandkasse.
+- **Privat og varsom.** Splat kjører i App Sandbox, lenker til andre apper spør først, og alt som dekoder upålitelige bildedata, kjører i en egen tjeneste i en sandkasse.
 - **På ditt språk.** Grensesnittet og den innebygde Markdown-hurtigreferansen finnes på 35 språk: arabisk, katalansk, kinesisk (forenklet), kinesisk (tradisjonelt), kroatisk, tsjekkisk, dansk, nederlandsk, engelsk, finsk, fransk, tysk, gresk, hebraisk, hindi, ungarsk, indonesisk, italiensk, japansk, koreansk, malayisk, norsk, polsk, portugisisk (Brasil), portugisisk (Portugal), rumensk, russisk, slovakisk, slovensk, spansk, svensk, thai, tyrkisk, ukrainsk og vietnamesisk.
 
 ## Krav
@@ -438,7 +438,7 @@ Det første diagrammet etter oppstart tar rundt ett sekund, fordi gjengivelsesmo
 ## Bilder
 
 - **Lokale bilder** bruker stier relative til dokumentet: `![Logo](images/logo.png)`. Splat viser PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF og PDF.
-- **Bilder fra nettet** forblir blokkert til du tillater dem: en linje over forhåndsvisningen forklarer at når de lastes, får serverne deres vite at og når du åpner dokumentet. **Last inn bilder** tillater dem for dette dokumentet; Splat husker valget per fil.
+- **Bilder fra nettet** lastes så snart et dokument viser dem, over `https` og på opptil 10 MB hver. Som bilder i en e-post forteller de serverne sine at og når dokumentet åpnes.
 - **Størrelse.** `<img width="200">` angir størrelsen på et bilde; ellers tilpasses bildene bredden på forhåndsvisningen.
 - **Endringer på disken.** Et bilde du erstatter, eller et som dukker opp etter at dokumentet navnga det, vises uten at du åpner dokumentet på nytt. Bilder fra nettet som feilet på grunn av nettverket, prøves igjen så lenge et dokument viser dem.
 - **Minne.** Bilder vises med opptil 2560 piksler på den lengste siden, noe som også fyller en A4-side. De dekodes mindre når de fyller en åttedel av Macens minne, og mens macOS melder om minnepress.
@@ -483,7 +483,7 @@ Linjer som bare skiller seg i linjeslutten, teller ikke, så en fil med CRLF mot
 | **Word** | **Fil › Eksporter som Word-dokument…** eller Del-menyen | En `.docx` med Words overskriftsstiler, ekte lister og tabeller (også sammenslåtte celler), fotnoter som Word-fotnoter, innebygde bilder, formler og diagrammer. |
 | **Markdown** | **Del**-knappen i verktøylinjen | Dokumentet som en `.md`-fil for Mail, Meldinger, AirDrop og alle andre delingstjenester. |
 
-Menyen **Fil › Del** har alle disse på ett sted. Eksportene bruker innstillingen for typografisk tegnsetting og bildene du har tillatt fra nettet; bilder fra nettet forblir lenker i HTML.
+Menyen **Fil › Del** har alle disse på ett sted. Eksportene bruker innstillingen for typografisk tegnsetting og bildene fra nettet som forhåndsvisningen har lastet; bilder fra nettet forblir lenker i HTML.
 
 **Fil › Eksportvalg…** angir hva PDF, utskrift og Word legger til teksten, for alle dokumenter:
 
@@ -554,8 +554,8 @@ Splat lar Apples standard hurtigtaster stå i fred.
 
 En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument som upålitelig.
 
-- **Ingen nettverksbruk som standard.** Splat har ingen telemetri. Appen søker etter oppdateringer først når du har samtykket eller velger **Søk etter oppdateringer…**: da laster den en liten feedfil fra GitHub, og forespørselen nevner ikke annet enn appen og versjonen. Formler og diagrammer gjengis lokalt; nettvisningene som gjør det, kan ikke nå nettverket. **Hjelp › Rapporter et problem…** åpner et skjema på GitHub i nettleseren; adressen inneholder versjonen av Splat og macOS og typen Mac, ingenting fra dokumentene dine.
-- **Bilder fra nettet** lastes først etter at du har gitt tillatelse, bare over `https`, aldri fra verter i det lokale nettverket ditt, på maksimalt 10 MB hver og i en privat økt uten informasjonskapsler.
+- **Ingen telemetri.** Splat rapporterer ingenting om hvordan du bruker appen. Appen søker etter oppdateringer først når du har samtykket eller velger **Søk etter oppdateringer…**: da laster den en liten feedfil fra GitHub, og forespørselen nevner ikke annet enn appen og versjonen. Formler og diagrammer gjengis lokalt; nettvisningene som gjør det, kan ikke nå nettverket. **Hjelp › Rapporter et problem…** åpner et skjema på GitHub i nettleseren; adressen inneholder versjonen av Splat og macOS og typen Mac, ingenting fra dokumentene dine.
+- **Bilder fra nettet** lastes så snart et dokument viser dem, fra hvilken som helst vert, bare over `https`, på maksimalt 10 MB hver og i en privat økt uten informasjonskapsler. Serverne deres får vite at og når dokumentet åpnes.
 - **Isolert dekoding.** Bilder og grafikken til formler og diagrammer dekodes i en egen tjeneste, som macOS starter i en egen sandkasse: ingen av filene dine, ingen nettverk. Den leverer bare tilbake piksler, hvis størrelse kontrolleres, og avslutter seg selv når en dekoding tar mer enn 10 sekunder eller for mye minne. Apples egne bildedekodere ser bare HEIC, TIFF, AVIF og PDF, og bare når dataene faktisk har det formatet. SVG-er, formler og diagrammer går også gjennom denne tjenesten, så de er bilder med fast oppløsning i Splat: fire piksler per punkt, opptil 2560 på den lengste siden.
 - **Lokale filer** når et dokument bare via stien det navngir, og bare fra en mappe du har gitt tilgang til: Splat kan lese et dokument du åpner, men bildene, notatene, bibliografien og repositoriet rundt det først når du gir tilgang til mappen deres med **Gi tilgang til mappe…** i linjen over forhåndsvisningen. En tilgang gjelder alle undermapper og huskes. Innbygginger viser Markdown-notater fra dokumentets mappe og nedover, og et manglende bilde letes det bare etter der. En bildesti andre steder, absolutt eller som begynner med `~`, lastes i forhåndsvisningen fra en mappe du har gitt tilgang til; HTML- og Word-eksporter, utskrift og PDF-er tar bare med det som ligger i dokumentets mappe eller Git-repositoriet, med mindre det repositoriet også inneholder Hjem-mappen din, så et dokument fra noen andre ikke kan dra filene dine inn i en eksport du gir videre.
 - **Mapper med notater** leses bare mens sidefeltet viser dem, og å endre navn på et notat endrer andre filer først etter at du har bekreftet hvor mange.
@@ -565,7 +565,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 - **Lenker** starter aldri et program ved et klikk. Web- og e-postlenker åpnes som vanlig; lenker til andre apper spør først.
 - **HTML i dokumenter** leses av Splats egen parser. Skript, stiler, rammer og skjemaer kjører aldri.
 - **Eksporter** inneholder ingen skript. HTML-sider beholder bare en fast liste over harmløse tagger og attributter, som GitHub, pluss en content security policy. Word-filer lenker bare til adresser med `http`, `https` og `mailto`, bortsett fra lenkene som følger med en Word-mal du har valgt.
-- **Kodesignering** med Hardened Runtime og App Sandbox. Splat kan lese og skrive dokumentene du åpner og mappene du gir tilgang til, bruke nettverket til bilder fra nettet som du har tillatt, og til oppdateringer, og skrive ut; ingenting annet.
+- **Kodesignering** med Hardened Runtime og App Sandbox. Splat kan lese og skrive dokumentene du åpner og mappene du gir tilgang til, bruke nettverket til bilder fra nettet og til oppdateringer, og skrive ut; ingenting annet.
 
 ## Store dokumenter
 
@@ -610,7 +610,7 @@ Noen endringer behandles i sin helhet, med rundt 300 ms per tastetrykk ved 10 MB
 
 **Det finnes ingen Søk etter oppdateringer… i Splat-menyen.** Bare versjonen fra diskbildet eller Homebrew oppdaterer seg selv; et bygg du har laget selv, har ingen oppdaterer.
 
-**Bilder fra nettet vises ikke.** Klikk på **Last inn bilder** i linjen over forhåndsvisningen. Bare `https`-bilder fra offentlige verter lastes.
+**Bilder fra nettet vises ikke.** Bare `https`-bilder lastes, på opptil 10 MB hver. Et bilde som feilet på grunn av nettverket, prøves igjen så lenge dokumentet viser det.
 
 **Når jeg limer inn et skjermbilde, blir jeg bedt om å lagre først.** Innlimte bilder lagres som filer ved siden av dokumentet, og det trengs et sted på disken. Lagre det, og lim deretter inn på nytt.
 

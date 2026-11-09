@@ -4,7 +4,7 @@
 
 **Markdown-editori macOS:lle, jolla voit kirjoittaa lähdetekstiin tai suoraan esikatseluun.**
 
-Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävän, täysin muokattavan esikatselun oikealla. Voit kirjoittaa kumpaan tahansa: esikatseluun kirjoittamasi muuttuu lähdetekstiin mahdollisimman pienenä muutoksena, joten koskemattomat rivit pysyvät tavu tavulta samoina ja Git-diffit pysyvät siisteinä. Splat lukee jo käyttämääsi Markdownia: CommonMarkia ja GitHub Flavored Markdownia, GitHubin huomautuslaatikoita, Obsidianin wikilinkkejä, upotuksia ja huomautuslaatikoita, Pandocin ja Typoran laajennuksia, upotettua HTML:ää, LaTeX-kaavoja sekä Mermaid-, Graphviz- ja PlantUML-kaavioita, kaikki renderöitynä offline-tilassa. Selaa kokonaista muistiinpanokansiota ja etsi siitä, katso, mikä on muuttunut viimeisimmän Git-commitin jälkeen, sijoita Wordista tai verkkosivulta Markdownina ja vie PDF:ksi, HTML:ksi tai Wordiksi yhdellä napsautuksella. Se on kirjoitettu Rustilla aitojen AppKit-ohjainten päälle, puhuu 35 kieltä eikä lähetä mitään verkon yli, ellet pyydä.
+Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävän, täysin muokattavan esikatselun oikealla. Voit kirjoittaa kumpaan tahansa: esikatseluun kirjoittamasi muuttuu lähdetekstiin mahdollisimman pienenä muutoksena, joten koskemattomat rivit pysyvät tavu tavulta samoina ja Git-diffit pysyvät siisteinä. Splat lukee jo käyttämääsi Markdownia: CommonMarkia ja GitHub Flavored Markdownia, GitHubin huomautuslaatikoita, Obsidianin wikilinkkejä, upotuksia ja huomautuslaatikoita, Pandocin ja Typoran laajennuksia, upotettua HTML:ää, LaTeX-kaavoja sekä Mermaid-, Graphviz- ja PlantUML-kaavioita, kaikki renderöitynä offline-tilassa. Selaa kokonaista muistiinpanokansiota ja etsi siitä, katso, mikä on muuttunut viimeisimmän Git-commitin jälkeen, sijoita Wordista tai verkkosivulta Markdownina ja vie PDF:ksi, HTML:ksi tai Wordiksi yhdellä napsautuksella. Se on kirjoitettu Rustilla aitojen AppKit-ohjainten päälle, puhuu 35 kieltä eikä kerää telemetriaa.
  
 
 
@@ -29,7 +29,7 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 [![Graphviz Viz.js:n kautta 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 käyttöliittymäkieltä](https://img.shields.io/badge/languages-35-4C9A2A)
-![Oletuksena offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Ei telemetriaa](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Allekirjoitettu Hardened Runtimella](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Lisenssi: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#lisenssi)
 
@@ -123,7 +123,7 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 - **Vie menettämättä mitään.** PDF, yksittäinen itsenäinen HTML-tiedosto tai Word-dokumentti, jossa on aidot otsikot, luettelot, taulukot, alaviitteet ja kuvat. Lisää sivunumerot, yläotsakkeet ja nimiösivu tai käytä yrityksesi Word-työpohjaa.
 - **Natiivi läpikotaisin.** Aidot AppKit-ikkunat, välilehdet, valikot, ponnahdusikkunat, versiot, automaattinen tallennus, jakovalikko, tumma tila, oikeinkirjoituksen tarkistus, sanelu ja VoiceOver. Ei Electronia, ei verkkonäkymää itse tekstille.
 - **Nopea suurillakin tiedostoilla.** Näppäinpainalluksen piirtäminen 10 Mt:n dokumentissa kestää noin 10 ms ennen näkymän omaa työtä.
-- **Yksityinen ja huolellinen.** Splat toimii App Sandboxissa, verkon kuvat latautuvat vasta luvallasi, linkit muihin appeihin kysyvät ensin, ja kaikki epäluotettavan kuvadatan purkaminen tapahtuu omassa, hiekkalaatikossa toimivassa palvelussa.
+- **Yksityinen ja huolellinen.** Splat toimii App Sandboxissa, linkit muihin appeihin kysyvät ensin, ja kaikki epäluotettavan kuvadatan purkaminen tapahtuu omassa, hiekkalaatikossa toimivassa palvelussa.
 - **Omalla kielelläsi.** Käyttöliittymä ja sisäänrakennettu Markdown-pikaopas ovat saatavilla 35 kielellä: arabia, englanti, espanja, heprea, hindi, hollanti, indonesia, italia, japani, katalaani, kiina (yksinkertaistettu), kiina (perinteinen), korea, kreikka, kroatia, malaiji, norja, portugali (Brasilia), portugali (Portugali), puola, ranska, romania, ruotsi, saksa, slovakki, sloveeni, suomi, tanska, thai, turkki, tšekki, ukraina, unkari, venäjä ja vietnam.
 
 ## Vaatimukset
@@ -438,7 +438,7 @@ Ensimmäinen kaavio käynnistyksen jälkeen kestää noin sekunnin, koska render
 ## Kuvat
 
 - **Paikalliset kuvat** käyttävät dokumenttiin nähden suhteellisia polkuja: `![Logo](images/logo.png)`. Splat näyttää PNG-, JPEG-, GIF-, WebP-, BMP-, SVG-, HEIC-, TIFF-, AVIF- ja PDF-tiedostot.
-- **Verkon kuvat** pysyvät estettyinä, kunnes sallit ne: esikatselun yläpuolella oleva palkki kertoo, että niiden lataaminen kertoo niiden palvelimille, että ja milloin avaat dokumentin. **Lataa kuvat** sallii ne tälle dokumentille; Splat muistaa valinnan tiedostokohtaisesti.
+- **Verkon kuvat** latautuvat heti, kun dokumentti näyttää ne, `https`-yhteydellä ja enintään 10 Mt kukin. Kuten sähköpostin kuvat, ne kertovat palvelimilleen, että ja milloin dokumentti avataan.
 - **Koko.** `<img width="200">` määrittää kuvan koon; muuten kuvat sovitetaan esikatselun leveyteen.
 - **Muutokset levyllä.** Korvaamasi tai vasta dokumentin mainitsemisen jälkeen ilmestyvä kuva näkyy avaamatta dokumenttia uudelleen. Verkon kuvia, jotka epäonnistuivat verkon vuoksi, yritetään uudelleen, kun dokumentti niitä näyttää.
 - **Muisti.** Kuvat näytetään enintään 2560 pikselin pisimmällä sivullaan, mikä täyttää myös A4-sivun. Ne puretaan pienempinä, kun ne täyttävät kahdeksasosan Macin muistista, ja kun macOS ilmoittaa muistipaineesta.
@@ -483,7 +483,7 @@ Rivejä, jotka eroavat vain rivinvaihdoltaan, ei lasketa, joten CRLF-tiedosto LF
 | **Word** | **Tiedosto › Vie Word-dokumenttina…** tai Jaa-valikko | `.docx`, jossa on Wordin otsikkotyylit, aidot luettelot ja taulukot (myös yhdistetyt solut), alaviitteet Wordin alaviitteinä, upotetut kuvat, kaavat ja kaaviot. |
 | **Markdown** | Työkalupalkin **Jaa**-painike | Dokumentti `.md`-tiedostona Mailia, Viestejä, AirDropia ja kaikkia muita jakopalveluja varten. |
 
-**Tiedosto › Jaa** -valikko tarjoaa kaikki nämä yhdessä paikassa. Viennit käyttävät typografisten välimerkkien asetusta ja verkosta sallimiasi kuvia; verkon kuvat pysyvät HTML:ssä linkkeinä.
+**Tiedosto › Jaa** -valikko tarjoaa kaikki nämä yhdessä paikassa. Viennit käyttävät typografisten välimerkkien asetusta ja verkon kuvia, jotka esikatselu on ladannut; verkon kuvat pysyvät HTML:ssä linkkeinä.
 
 **Tiedosto › Vientivalinnat…** määrittää, mitä PDF, tulostus ja Word lisäävät tekstiin, kaikille dokumenteille:
 
@@ -554,8 +554,8 @@ Splat jättää Applen vakiopikanäppäimet ennalleen.
 
 Markdown-tiedosto voi tulla keneltä tahansa, joten Splat kohtelee jokaista dokumenttia epäluotettavana.
 
-- **Ei verkkoa oletuksena.** Splat ei kerää telemetriaa. Se etsii päivityksiä vasta, kun suostut tai valitset **Etsi päivityksiä…**: silloin se lataa GitHubista pienen syötetiedoston, ja pyyntö kertoo vain apin ja sen version. Kaavat ja kaaviot renderöidään paikallisesti; ne renderöivät verkkonäkymät eivät pääse verkkoon. **Ohje › Ilmoita ongelmasta…** avaa selaimessa lomakkeen GitHubissa; sen osoite sisältää Splatin version, macOSin version ja Mac-tyypin, ei mitään dokumenteistasi.
-- **Verkon kuvat** latautuvat vasta luvallasi, vain `https`-yhteydellä, eivät koskaan paikallisverkon isännistä, enintään 10 Mt kukin ja yksityisessä istunnossa ilman evästeitä.
+- **Ei telemetriaa.** Splat ei raportoi mitään siitä, miten käytät sitä. Se etsii päivityksiä vasta, kun suostut tai valitset **Etsi päivityksiä…**: silloin se lataa GitHubista pienen syötetiedoston, ja pyyntö kertoo vain apin ja sen version. Kaavat ja kaaviot renderöidään paikallisesti; ne renderöivät verkkonäkymät eivät pääse verkkoon. **Ohje › Ilmoita ongelmasta…** avaa selaimessa lomakkeen GitHubissa; sen osoite sisältää Splatin version, macOSin version ja Mac-tyypin, ei mitään dokumenteistasi.
+- **Verkon kuvat** latautuvat heti, kun dokumentti näyttää ne, mistä tahansa isännästä, vain `https`-yhteydellä, enintään 10 Mt kukin ja yksityisessä istunnossa ilman evästeitä. Niiden palvelimet saavat tietää, että ja milloin dokumentti avataan.
 - **Eristetty purku.** Kuvat sekä kaavojen ja kaavioiden grafiikka puretaan omassa palvelussaan, jonka macOS käynnistää omaan hiekkalaatikkoonsa: ei yhtään tiedostoistasi, ei verkkoa. Se palauttaa vain pikseleitä, joiden koko tarkistetaan, ja lopettaa itsensä, kun purku kestää yli 10 sekuntia tai vie liikaa muistia. Applen omat kuvanpurkajat näkevät vain HEIC-, TIFF-, AVIF- ja PDF-aineistoa, ja vain kun data todella on sitä muotoa. SVG:t, kaavat ja kaaviot kulkevat myös tämän palvelun kautta, joten ne ovat Splatissa kuvia, joilla on kiinteä erottelutarkkuus: neljä pikseliä pistettä kohti, enintään 2560 pidemmällä sivulla.
 - **Paikalliset tiedostot** tavoittavat dokumentin vain sen nimeämän polun kautta ja vain kansiosta, johon olet antanut käyttöoikeuden: Splat saa lukea avaamasi dokumentin, mutta sen ympärillä olevat kuvat, muistiinpanot, kirjallisuusluettelon ja tietovaraston vasta, kun annat niiden kansioon käyttöoikeuden valitsemalla **Anna kansion käyttöoikeus…** esikatselun yläpuolella olevassa palkissa. Käyttöoikeus koskee kaikkia alikansioita ja säilyy muistissa. Upotukset näyttävät Markdown-muistiinpanoja dokumentin kansiosta ja sen alta, ja puuttuvaa kuvaa etsitään vain sieltä. Muualla oleva kuvapolku, absoluuttinen tai `~`:lla alkava, latautuu esikatselussa kansiosta, johon on annettu käyttöoikeus; HTML- ja Word-viennit, tulostus ja PDF:t ottavat mukaan vain sen, mikä on dokumentin kansiossa tai sen Git-tietovarastossa, paitsi jos tämä tietovarasto sisältää myös kotikansiosi, joten toisen tekemä dokumentti ei voi vetää tiedostojasi vientiin, jonka annat eteenpäin.
 - **Muistiinpanokansiot** luetaan vain silloin, kun sivupalkki näyttää ne, ja muistiinpanon uudelleennimeäminen muuttaa muita tiedostoja vasta, kun olet vahvistanut, kuinka monta.
@@ -565,7 +565,7 @@ Markdown-tiedosto voi tulla keneltä tahansa, joten Splat kohtelee jokaista doku
 - **Linkit** eivät koskaan käynnistä ohjelmaa napsautuksella. Web- ja sähköpostilinkit avautuvat tavalliseen tapaan; linkit muihin appeihin kysyvät ensin.
 - **Dokumenttien HTML** luetaan Splatin omalla jäsentimellä. Skriptit, tyylit, kehykset ja lomakkeet eivät koskaan suoriteta.
 - **Viennit** eivät sisällä skriptejä. HTML-sivuille jää vain kiinteä luettelo vaarattomia tageja ja attribuutteja, kuten GitHubissa, sekä sisältöturvakäytäntö. Word-tiedostoissa linkitetään vain osoitteet `http`, `https` ja `mailto`, lukuun ottamatta linkkejä, jotka valitsemasi Word-työpohja tuo mukanaan.
-- **Koodiallekirjoitus** Hardened Runtimella ja App Sandboxilla. Splat saa lukea ja kirjoittaa avaamiasi dokumentteja ja kansioita, joihin annat käyttöoikeuden, käyttää verkkoa sallimiesi verkon kuvien ja päivitysten hakemiseen sekä tulostaa; ei mitään muuta.
+- **Koodiallekirjoitus** Hardened Runtimella ja App Sandboxilla. Splat saa lukea ja kirjoittaa avaamiasi dokumentteja ja kansioita, joihin annat käyttöoikeuden, käyttää verkkoa verkon kuvien ja päivitysten hakemiseen sekä tulostaa; ei mitään muuta.
 
 ## Suuret dokumentit
 
@@ -610,7 +610,7 @@ Jotkin muutokset käsitellään kokonaan, noin 300 ms näppäinpainallusta kohti
 
 **Splat-valikossa ei ole kohtaa Etsi päivityksiä….** Vain levykuvasta tai Homebrew'lla asennettu versio päivittää itsensä; itse rakennetussa versiossa ei ole päivitysohjelmaa.
 
-**Verkon kuvat eivät näy.** Napsauta esikatselun yläpuolella olevassa palkissa **Lataa kuvat**. Vain julkisten isäntien `https`-kuvat latautuvat.
+**Verkon kuvat eivät näy.** Vain `https`-kuvat latautuvat, enintään 10 Mt kukin. Verkon vuoksi epäonnistunutta kuvaa yritetään uudelleen, kun dokumentti sitä näyttää.
 
 **Kuvakaappauksen sijoittaminen pyytää tallentamaan ensin.** Sijoitetut kuvat tallennetaan tiedostoina dokumentin viereen, mikä vaatii paikan levyltä. Tallenna dokumentti ja sijoita sitten uudelleen.
 

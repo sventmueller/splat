@@ -12,7 +12,7 @@ use splat_markdown::highlight::highlight;
 use splat_markdown::html::{Export, to_html};
 use splat_markdown::incremental::{memory_estimate, reparse_and_color};
 use splat_markdown::reader::parse;
-use splat_markdown::remote::has_remote_images;
+use splat_markdown::remote::has_local_files;
 use splat_markdown::table::{self, TableOp};
 use splat_markdown::text::{Byte, bytes};
 use splat_markdown::typography::Quotes;
@@ -138,7 +138,7 @@ fn consume(text: &str) -> Stages {
     stages.time("facts", || TextFacts::of(&doc));
     stages.time("what the document holds", || {
         figures(&doc);
-        has_remote_images(&doc);
+        has_local_files(&doc);
         heading_anchors(&doc);
     });
     stages.time("layout with images", || layout(&doc, &Everything(true), None));

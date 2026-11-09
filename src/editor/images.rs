@@ -8,7 +8,7 @@ use objc2::rc::Retained;
 use objc2::runtime::Bool;
 use objc2::{MainThreadMarker, MainThreadOnly, Message as _, sel};
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSCompositingOperation, NSImage, NSView};
-use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, NSUserDefaults};
+use objc2_foundation::{NSPoint, NSRect, NSSize};
 
 use super::EditorController;
 use super::decoder::{Decoded, MAX_FILE_BYTES, SHOWN_SIDE};
@@ -19,31 +19,8 @@ use crate::i18n::t;
 use crate::markdown::url;
 use crate::util::{BusyVolumes, Stamp, answer_from, lane_of_volume, ns, stamp, volume_of};
 
-/// Height of the bar above the preview that offers to load images from the web.
+/// Height of the bar above the preview that offers to grant the document's folder.
 const BANNER_HEIGHT: f64 = 48.0;
-/// User defaults key listing the documents whose images from the web load without asking.
-pub(super) const ALLOWED_KEY: &str = "RemoteImagesAllowed";
-const MAX_ALLOWED_DOCUMENTS: usize = 500;
-
-pub(super) fn allowed_documents() -> Vec<String> {
-    NSUserDefaults::standardUserDefaults()
-        .stringArrayForKey(&ns(ALLOWED_KEY))
-        .map(|a| a.iter().map(|s| s.to_string()).collect())
-        .unwrap_or_default()
-}
-
-/// The list of allowed documents once `path` is one of them: the last, once, and only the newest are kept.
-fn allowing(mut paths: Vec<String>, path: String) -> Vec<String> {
-    paths.retain(|p| *p != path);
-    paths.push(path);
-    let keep = paths.len().saturating_sub(MAX_ALLOWED_DOCUMENTS);
-    paths.split_off(keep)
-}
-
-/// A document without a file cannot have been allowed.
-fn is_allowed(paths: &[String], path: Option<&str>) -> bool {
-    path.is_some_and(|path| paths.iter().any(|p| p == path))
-}
 
 enum ImageLoad {
     Loading,
@@ -453,9 +430,8 @@ struct LookAtEditor {
 #[derive(Default)]
 pub(super) struct PictureState {
     images: RefCell<ImageStore>,
-    remote_allowed: Cell<bool>,
-    /// The bar above the preview, which offers to grant the document's folder or to load images from the web.
-    remote_banner: OnceCell<Retained<NSView>>,
+    /// The bar above the preview, which offers to grant the document's folder.
+    banner: OnceCell<Retained<NSView>>,
     banner_parts: OnceCell<(Retained<objc2_app_kit::NSTextField>, Retained<objc2_app_kit::NSButton>)>,
 }
 
@@ -464,8 +440,6 @@ pub(super) struct PictureState {
 pub(super) enum Offer {
     /// The sandbox keeps the folder around the document closed, and the document names files in it.
     GrantFolder,
-    /// The document shows images from the web, which load only once allowed.
-    RemoteImages,
 }
 
 impl Offer {
@@ -477,13 +451,6 @@ impl Offer {
                 ),
                 t("Ordner freigeben …"),
                 sel!(mdGrantFolder:),
-            ),
-            Offer::RemoteImages => (
-                t(
-                    "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest.",
-                ),
-                t("Bilder laden"),
-                sel!(mdLoadRemoteImages:),
             ),
         }
     }
@@ -503,11 +470,11 @@ impl<'a> Pictures<'a> {
 #[cfg(feature = "selftest")]
 impl Pictures<'_> {
     pub(super) fn banner_shown(&self) -> Option<bool> {
-        self.state.remote_banner.get().map(|b| !b.isHidden())
+        self.state.banner.get().map(|b| !b.isHidden())
     }
 
     pub(super) fn banner_offers(&self) -> Option<String> {
-        let shown = self.state.remote_banner.get().is_some_and(|b| !b.isHidden());
+        let shown = self.state.banner.get().is_some_and(|b| !b.isHidden());
         let (_, button) = self.state.banner_parts.get()?;
         shown.then(|| button.title().to_string())
     }
@@ -534,15 +501,9 @@ impl<'a> Pictures<'a> {
         &self.state.images
     }
 
-    pub(super) fn remote_allowed(&self) -> bool {
-        self.state.remote_allowed.get()
-    }
-
-    /// The bar is in the view hierarchy now; a document allowed earlier keeps its permission from here on.
+    /// The bar is in the view hierarchy now.
     pub(super) fn install_banner(&self, banner: Retained<NSView>) {
-        let _ = self.state.remote_banner.set(banner);
-        let allowed = is_allowed(&allowed_documents(), self.document_path().as_deref());
-        self.state.remote_allowed.set(allowed);
+        let _ = self.state.banner.set(banner);
     }
 
     pub(super) fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
@@ -576,12 +537,8 @@ impl<'a> Pictures<'a> {
         );
         banner.setHidden(true);
         let content = banner.contentView().expect("box content view");
-        let button = crate::util::button(
-            mtm,
-            t("Bilder laden"),
-            self.host.object().target(),
-            sel!(mdLoadRemoteImages:),
-        );
+        let (text, title, action) = Offer::GrantFolder.wording();
+        let button = crate::util::button(mtm, title, self.host.object().target(), action);
         button.setControlSize(objc2_app_kit::NSControlSize::Small);
         button.setFont(Some(&objc2_app_kit::NSFont::systemFontOfSize(
             objc2_app_kit::NSFont::smallSystemFontSize(),
@@ -594,12 +551,7 @@ impl<'a> Pictures<'a> {
         ));
         button.setAutoresizingMask(NSAutoresizingMaskOptions::ViewMinXMargin);
         content.addSubview(&button);
-        let label = objc2_app_kit::NSTextField::wrappingLabelWithString(
-            &ns(t(
-                "Bilder aus dem Internet sind blockiert: Beim Laden erfahren deren Server, dass und wann du dieses Dokument öffnest.",
-            )),
-            mtm,
-        );
+        let label = objc2_app_kit::NSTextField::wrappingLabelWithString(&ns(text), mtm);
         label.setFont(Some(&objc2_app_kit::NSFont::systemFontOfSize(
             objc2_app_kit::NSFont::smallSystemFontSize(),
         )));
@@ -624,7 +576,7 @@ impl<'a> Pictures<'a> {
 
     /// Shows the bar with what it offers, or hides it, and gives the preview the room that is left.
     pub(super) fn show_banner(&self, offer: Option<Offer>) {
-        let Some(banner) = self.state.remote_banner.get() else {
+        let Some(banner) = self.state.banner.get() else {
             return;
         };
         if let (Some(offer), Some((label, button))) = (offer, self.state.banner_parts.get()) {
@@ -654,23 +606,6 @@ impl<'a> Pictures<'a> {
             .images
             .borrow_mut()
             .keep_only(&std::collections::HashSet::new());
-    }
-
-    /// The user allowed images from the web for this document; it is remembered for the file.
-    pub(super) fn allow_remote_images(&self) {
-        self.state.remote_allowed.set(true);
-        self.show_banner(None);
-        if let Some(path) = self.document_path() {
-            let paths = allowing(allowed_documents(), path);
-            let list = NSArray::from_retained_slice(&paths.iter().map(|p| ns(p)).collect::<Vec<_>>());
-            // SAFETY: an array of strings is a property list value, as user defaults require.
-            unsafe { NSUserDefaults::standardUserDefaults().setObject_forKey(Some(&list), &ns(ALLOWED_KEY)) };
-        }
-        self.host.invalidate(super::Invalidate::RemoteAllowed);
-    }
-
-    fn document_path(&self) -> Option<String> {
-        Some(self.host.document()?.fileURL()?.path()?.to_string())
     }
 }
 
@@ -742,33 +677,6 @@ mod tests {
         assert_eq!(resolve_path("/docs/text/../d/a.png", None), plain);
         assert_eq!(resolve_path("../../../../a.png", dir), Some(PathBuf::from("/a.png")));
         assert_eq!(resolve_path("../a.png", None), None);
-    }
-
-    #[test]
-    fn web_images_load_only_for_a_document_that_was_allowed() {
-        let allowed = vec!["/a.md".to_string()];
-        assert!(is_allowed(&allowed, Some("/a.md")));
-        assert!(!is_allowed(&allowed, Some("/b.md")));
-        assert!(
-            !is_allowed(&allowed, None),
-            "a document without a file has no permission to remember"
-        );
-        assert!(
-            !PictureState::default().remote_allowed.get(),
-            "and nothing is allowed before asking"
-        );
-    }
-
-    #[test]
-    fn the_list_of_allowed_documents_keeps_each_once_and_only_the_newest() {
-        let list = allowing(vec!["/a.md".into(), "/b.md".into()], "/a.md".into());
-        assert_eq!(list, ["/b.md", "/a.md"]);
-
-        let full: Vec<String> = (0..MAX_ALLOWED_DOCUMENTS).map(|n| format!("/{n}.md")).collect();
-        let list = allowing(full, "/neu.md".into());
-        assert_eq!(list.len(), MAX_ALLOWED_DOCUMENTS);
-        assert_eq!(list[0], "/1.md");
-        assert_eq!(list[MAX_ALLOWED_DOCUMENTS - 1], "/neu.md");
     }
 
     #[test]

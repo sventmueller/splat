@@ -236,7 +236,6 @@ impl Editing<'_> {
             }
             ZoomReset => self.host.updater().set_zoom(1.0),
             NewTab => super::window::new_tab(self.host.mtm(), self.host.window().as_deref()),
-            LoadRemoteImages => self.host.pictures().allow_remote_images(),
             GrantFolder => self.grant_folder(),
             ExportHtml => self.host.sharing().export(super::export::ExportKind::Html),
             ExportWord => self.host.sharing().export(super::export::ExportKind::Word),

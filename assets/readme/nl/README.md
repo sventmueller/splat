@@ -11,8 +11,7 @@ gebruikt: CommonMark en GitHub Flavored Markdown, GitHub-alerts, wikilinks, insl
 extensies van Pandoc en Typora, ingebedde HTML, LaTeX-formules en diagrammen in Mermaid, Graphviz en PlantUML, alles
 offline weergegeven. Blader door en zoek in een hele map met notities, zie wat er is gewijzigd sinds de laatste
 Git-commit, plak vanuit Word of een webpagina als Markdown en exporteer met één klik naar pdf, HTML of Word. Het is
-geschreven in Rust op echte AppKit-besturingselementen, spreekt 35 talen en stuurt niets over het netwerk, tenzij jij
-dat vraagt.
+geschreven in Rust op echte AppKit-besturingselementen, spreekt 35 talen en heeft geen telemetrie.
  
 
 
@@ -37,7 +36,7 @@ dat vraagt.
 [![Graphviz via Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 interfacetalen](https://img.shields.io/badge/languages-35-4C9A2A)
-![Standaard offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Geen telemetrie](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Ondertekend met Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licentie: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licentie)
 
@@ -143,9 +142,8 @@ dat vraagt.
   deelmenu, donkere modus, spellingcontrole, dicteren en VoiceOver. Geen Electron en geen webweergave voor de tekst
   zelf.
 - **Snel met grote bestanden.** Het renderen van een toetsaanslag in een document van 10 MB kost ongeveer 10 ms, vóór het eigen werk van de weergave.
-- **Privé en zorgvuldig.** Splat draait in de App Sandbox, afbeeldingen van internet laden pas nadat je dat toestaat,
-  links naar andere apps vragen eerst om bevestiging en alles wat onbetrouwbare afbeeldingsdata decodeert, draait in een
-  eigen dienst in een sandbox.
+- **Privé en zorgvuldig.** Splat draait in de App Sandbox, links naar andere apps vragen eerst om bevestiging en alles
+  wat onbetrouwbare afbeeldingsdata decodeert, draait in een eigen dienst in een sandbox.
 - **In jouw taal.** De interface en de ingebouwde beknopte Markdown-naslag zijn er in 35 talen: Arabisch, Catalaans,
   Chinees (vereenvoudigd), Chinees (traditioneel), Kroatisch, Tsjechisch, Deens, Nederlands, Engels, Fins, Frans, Duits,
   Grieks, Hebreeuws, Hindi, Hongaars, Indonesisch, Italiaans, Japans, Koreaans, Maleis, Noors, Pools, Portugees
@@ -566,9 +564,8 @@ geblokkeerd.
 
 - **Lokale afbeeldingen** gebruiken paden ten opzichte van het document: `![Logo](images/logo.png)`. Splat toont PNG,
   JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF en pdf.
-- **Afbeeldingen van het web** blijven geblokkeerd totdat je ze toestaat: een balk boven de voorvertoning legt uit dat
-  het laden ervan hun servers laat weten dat en wanneer je het document opent. **Laad afbeeldingen** staat ze toe voor
-  dit document; Splat onthoudt de keuze per bestand.
+- **Afbeeldingen van het web** laden zodra een document ze toont, via `https` en tot 10 MB per stuk. Net als
+  afbeeldingen in een e-mail laten ze hun servers weten dat en wanneer het document wordt geopend.
 - **Afmeting.** `<img width="200">` bepaalt de grootte van een afbeelding; anders passen afbeeldingen in de breedte van
   de voorvertoning.
 - **Wijzigingen op schijf.** Een afbeelding die je vervangt, of een die verschijnt nadat het document haar noemde, wordt
@@ -639,7 +636,7 @@ evenmin.
 | **Markdown** | De knop **Deel** in de knoppenbalk | Het document als `.md`-bestand voor Mail, Berichten, AirDrop en elke andere deelservice. |
 
 Het menu **Archief › Deel** biedt dit alles op één plek. Exports gebruiken de instelling voor typografische leestekens en
-de afbeeldingen van het web die je hebt toegestaan; afbeeldingen van het web blijven in HTML links.
+de afbeeldingen van het web die de voorvertoning heeft geladen; afbeeldingen van het web blijven in HTML links.
 
 **Archief › Exportopties…** bepaalt wat pdf, afdrukken en Word aan de tekst toevoegen, voor alle documenten:
 
@@ -730,12 +727,12 @@ Splat laat de standaardtoetscombinaties van Apple ongemoeid.
 
 Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document als onbetrouwbaar.
 
-- **Standaard geen netwerk.** Splat heeft geen telemetrie. Het zoekt alleen naar updates nadat je daarmee akkoord gaat
-  of **Zoek naar updates…** kiest: dan laadt het een klein feedbestand van GitHub en noemt het verzoek niets
-  anders dan de app en haar versie. Formules en diagrammen worden lokaal weergegeven; de webweergaven die dat doen,
-  hebben geen toegang tot het netwerk. **Help › Meld een probleem…** opent een formulier op GitHub in je browser; het adres bevat de versie van Splat en macOS en het type Mac, niets uit je documenten.
-- **Afbeeldingen van het web** laden pas na jouw toestemming, alleen via `https`, nooit van hosts in je lokale
-  netwerk, hooguit 10 MB per stuk en in een privésessie zonder cookies.
+- **Geen telemetrie.** Splat meldt niets over hoe je het gebruikt. Het zoekt alleen naar updates nadat je daarmee
+  akkoord gaat of **Zoek naar updates…** kiest: dan laadt het een klein feedbestand van GitHub en noemt het verzoek
+  niets anders dan de app en haar versie. Formules en diagrammen worden lokaal weergegeven; de webweergaven die dat
+  doen, hebben geen toegang tot het netwerk. **Help › Meld een probleem…** opent een formulier op GitHub in je browser; het adres bevat de versie van Splat en macOS en het type Mac, niets uit je documenten.
+- **Afbeeldingen van het web** laden zodra een document ze toont, van elke host, alleen via `https`, hooguit 10 MB per
+  stuk en in een privésessie zonder cookies. Hun servers komen te weten dat en wanneer het document wordt geopend.
 - **Geïsoleerd decoderen.** Afbeeldingen en de afbeeldingen van formules en diagrammen worden gedecodeerd in een eigen
   dienst, die macOS in een eigen sandbox start: geen van je bestanden, geen netwerk. Die dienst geeft alleen pixels
   terug, waarvan de afmeting wordt gecontroleerd, en stopt zichzelf als een decodering langer dan 10 seconden duurt of
@@ -769,8 +766,8 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
   GitHub, plus een contentbeveiligingsbeleid. Word-bestanden linken alleen `http`-, `https`- en `mailto`-adressen,
   afgezien van de links die een door jou gekozen Word-sjabloon meebrengt.
 - **Codeondertekening** met de Hardened Runtime en de App Sandbox. Splat mag de documenten die je opent en de mappen
-  waartoe je toegang geeft lezen en schrijven, het netwerk gebruiken voor afbeeldingen van het web die je hebt
-  toegestaan en voor updates, en afdrukken; verder niets.
+  waartoe je toegang geeft lezen en schrijven, het netwerk gebruiken voor afbeeldingen van het web en voor updates, en
+  afdrukken; verder niets.
 
 ## Grote documenten
 
@@ -845,8 +842,8 @@ je map Programma's noemt.
 **Er is geen Zoek naar updates… in het menu Splat.** Alleen de versie van de schijfkopie of van Homebrew werkt
 zichzelf bij; een eigen build heeft geen updater.
 
-**Afbeeldingen van het web verschijnen niet.** Klik op **Laad afbeeldingen** in de balk boven de voorvertoning. Alleen
-`https`-afbeeldingen van openbare hosts laden.
+**Afbeeldingen van het web verschijnen niet.** Alleen `https`-afbeeldingen laden, tot 10 MB per stuk. Een afbeelding die
+door het netwerk mislukte, wordt opnieuw geprobeerd zolang het document haar toont.
 
 **Een schermafbeelding plakken vraagt me eerst te bewaren.** Geplakte afbeeldingen worden als bestanden naast het
 document bewaard, wat een plek op schijf vraagt. Bewaar het en plak opnieuw.

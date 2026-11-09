@@ -4,7 +4,7 @@
 
 **A macOS-es Markdown-szerkesztő, amelyben a forráskódban és közvetlenül az előnézetben is írhat.**
 
-A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra élő, teljesen szerkeszthető előnézetet. Bármelyikben gépelhet: amit az előnézetben ír, az a forráskódban a lehető legkisebb módosításként jelenik meg, így az érintetlen sorok bájtra pontosan változatlanok maradnak, a Git-diffek pedig tiszták. A Splat érti a már megszokott Markdownt: a CommonMarkot és a GitHub Flavored Markdownt, a GitHub-figyelmeztetéseket, az Obsidian wikilinkjeit, beágyazásait és megjegyzésdobozait, a Pandoc és a Typora bővítéseit, a beágyazott HTML-t, a LaTeX-képleteket, valamint a Mermaid-, Graphviz- és PlantUML-diagramokat, mindezt offline megjelenítve. Böngészhet és kereshet egy teljes jegyzetmappában, megnézheti, mi változott a legutóbbi Git-commit óta, Markdownként illeszthet be Wordből vagy weboldalról, és egy kattintással exportálhat PDF-be, HTML-be vagy Wordbe. Rustban íródott, valódi AppKit-vezérlőkre épül, 35 nyelven szól, és semmit nem küld a hálózaton, hacsak Ön nem kéri.
+A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra élő, teljesen szerkeszthető előnézetet. Bármelyikben gépelhet: amit az előnézetben ír, az a forráskódban a lehető legkisebb módosításként jelenik meg, így az érintetlen sorok bájtra pontosan változatlanok maradnak, a Git-diffek pedig tiszták. A Splat érti a már megszokott Markdownt: a CommonMarkot és a GitHub Flavored Markdownt, a GitHub-figyelmeztetéseket, az Obsidian wikilinkjeit, beágyazásait és megjegyzésdobozait, a Pandoc és a Typora bővítéseit, a beágyazott HTML-t, a LaTeX-képleteket, valamint a Mermaid-, Graphviz- és PlantUML-diagramokat, mindezt offline megjelenítve. Böngészhet és kereshet egy teljes jegyzetmappában, megnézheti, mi változott a legutóbbi Git-commit óta, Markdownként illeszthet be Wordből vagy weboldalról, és egy kattintással exportálhat PDF-be, HTML-be vagy Wordbe. Rustban íródott, valódi AppKit-vezérlőkre épül, 35 nyelven szól, és nem küld telemetriát.
  
 
 
@@ -29,7 +29,7 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 [![Graphviz a Viz.js 3.24-gyel](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
 [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
 ![35 felületi nyelv](https://img.shields.io/badge/languages-35-4C9A2A)
-![Alapból offline](https://img.shields.io/badge/network-offline_by_default-4C9A2A)
+![Nincs telemetria](https://img.shields.io/badge/telemetry-none-4C9A2A)
 ![Hardened Runtime-mal aláírva](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
 [![Licenc: MIT vagy Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licenc)
 
@@ -123,7 +123,7 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 - **Exportálás veszteség nélkül.** PDF, egyetlen önálló HTML-fájl vagy Word-dokumentum valódi címsorokkal, listákkal, táblázatokkal, lábjegyzetekkel és képekkel. Hozzáadhat oldalszámokat, fejléceket és címoldalt, vagy használhatja a cége Word-sablonját.
 - **Tősgyökeresen natív.** Valódi AppKit-ablakok, lapok, menük, előugró panelek, Verziók, Automatikus mentés, a megosztási menü, sötét mód, helyesírás-ellenőrzés, diktálás és VoiceOver. Nincs Electron, és magához a szöveghez sem webnézet tartozik.
 - **Gyors nagy fájloknál is.** Egy billentyűleütés megjelenítése egy 10 MB-os dokumentumban nagyjából 10 ms, a nézet saját munkája előtt.
-- **Diszkrét és körültekintő.** A Splat az App Sandboxban fut, az internetes képek csak az Ön engedélye után töltődnek be, a más appokra mutató linkek előbb rákérdeznek, és minden, ami megbízhatatlan képadatot dekódol, egy saját, homokozóba zárt szolgáltatásban fut.
+- **Diszkrét és körültekintő.** A Splat az App Sandboxban fut, a más appokra mutató linkek előbb rákérdeznek, és minden, ami megbízhatatlan képadatot dekódol, egy saját, homokozóba zárt szolgáltatásban fut.
 - **Az Ön nyelvén.** A felület és a beépített Markdown-gyorsreferencia 35 nyelven érhető el: angol, arab, katalán, kínai (egyszerűsített), kínai (hagyományos), horvát, cseh, dán, holland, finn, francia, német, görög, héber, hindi, magyar, indonéz, olasz, japán, koreai, maláj, norvég, lengyel, portugál (Brazília), portugál (Portugália), román, orosz, szlovák, szlovén, spanyol, svéd, thai, török, ukrán és vietnami.
 
 ## Rendszerkövetelmények
@@ -438,7 +438,7 @@ Az indítás utáni első diagram nagyjából egy másodpercig tart, mert a megj
 ## Képek
 
 - A **helyi képek** a dokumentumhoz viszonyított útvonalat használnak: `![Logó](images/logo.png)`. A Splat PNG, JPEG, GIF, WebP, BMP, SVG, HEIC, TIFF, AVIF és PDF formátumot jelenít meg.
-- Az **internetes képek** blokkolva maradnak, amíg engedélyezi őket: az előnézet fölötti sáv elmagyarázza, hogy betöltésükkor a szervereik megtudják, hogy és mikor nyitja meg a dokumentumot. A **Képek betöltése** engedélyezi őket ehhez a dokumentumhoz; a Splat fájlonként megjegyzi a választást.
+- Az **internetes képek** betöltődnek, amint egy dokumentum megjeleníti őket, `https` felett és egyenként legfeljebb 10 MB méretig. Az e-mailekben lévő képekhez hasonlóan elárulják a szervereiknek, hogy és mikor nyitják meg a dokumentumot.
 - **Méret.** Az `<img width="200">` méretezi a képet; egyébként a képek az előnézet szélességéhez igazodnak.
 - **Módosítások a lemezen.** A lecserélt kép, vagy az, amelyik azután jelenik meg, hogy a dokumentum megnevezte, a dokumentum újranyitása nélkül látszik. A hálózat miatt sikertelen internetes képeket a Splat újra megpróbálja, amíg egy dokumentum mutatja őket.
 - **Memória.** A képek a leghosszabb oldalukon legfeljebb 2560 képpontig jelennek meg, ami egy A4-es oldalt is kitölt. Kisebbre dekódolódnak, ha a Mac memóriájának egynyolcadát kitöltik, és amíg a macOS memóriaterhelést jelez.
@@ -483,7 +483,7 @@ A csak a sorvégükben eltérő sorok nem számítanak, így egy CRLF-es fájl L
 | **Word** | **Fájl › Exportálás Word-dokumentumként…** vagy a Megosztás menü | Egy `.docx` a Word címsorstílusaival, valódi listákkal és táblázatokkal (az egyesített cellákat is beleértve), a lábjegyzetek Word-lábjegyzetként, beágyazott képekkel, képletekkel és diagramokkal. |
 | **Markdown** | Az eszközsor **Megosztás** gombja | A dokumentum `.md` fájlként a Mailhez, az Üzenetekhez, az AirDrophoz és minden más megosztási szolgáltatáshoz. |
 
-A **Fájl › Megosztás** menü ezeket mind egy helyen kínálja. Az exportok a tipográfiai írásjelek beállítását és az Ön által engedélyezett internetes képeket használják; az internetes képek HTML-ben linkek maradnak.
+A **Fájl › Megosztás** menü ezeket mind egy helyen kínálja. Az exportok a tipográfiai írásjelek beállítását és az előnézet által betöltött internetes képeket használják; az internetes képek HTML-ben linkek maradnak.
 
 A **Fájl › Exportálási beállítások…** az összes dokumentumra beállítja, mit ad a szöveghez a PDF, a nyomtatás és a Word:
 
@@ -554,8 +554,8 @@ A Splat az Apple szabványos billentyűparancsait érintetlenül hagyja.
 
 Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot megbízhatatlannak tekint.
 
-- **Alapból nincs hálózat.** A Splat nem küld telemetriát. Csak akkor keres frissítéseket, ha beleegyezik, vagy a **Frissítések keresése…** parancsot választja: ilyenkor egy kis hírcsatorna-fájlt tölt be a GitHubról, és a kérés csak az appot és a verzióját nevezi meg. A képletek és a diagramok helyben jelennek meg; az ezt végző webnézetek nem érik el a hálózatot. A **Súgó › Probléma jelentése…** megnyit egy űrlapot a GitHubon a böngészőben; a címe tartalmazza a Splat és a macOS verzióját és a Mac típusát, de semmit az Ön dokumentumaiból.
-- Az **internetes képek** csak az Ön engedélye után töltődnek be, csak `https` felett, soha nem a helyi hálózat gépeiről, egyenként legfeljebb 10 MB méretig, és sütik nélküli privát munkamenetben.
+- **Nincs telemetria.** A Splat semmit nem jelent arról, hogyan használja. Csak akkor keres frissítéseket, ha beleegyezik, vagy a **Frissítések keresése…** parancsot választja: ilyenkor egy kis hírcsatorna-fájlt tölt be a GitHubról, és a kérés csak az appot és a verzióját nevezi meg. A képletek és a diagramok helyben jelennek meg; az ezt végző webnézetek nem érik el a hálózatot. A **Súgó › Probléma jelentése…** megnyit egy űrlapot a GitHubon a böngészőben; a címe tartalmazza a Splat és a macOS verzióját és a Mac típusát, de semmit az Ön dokumentumaiból.
+- Az **internetes képek** betöltődnek, amint egy dokumentum megjeleníti őket, bármely gépről, csak `https` felett, egyenként legfeljebb 10 MB méretig, és sütik nélküli privát munkamenetben. A szervereik megtudják, hogy és mikor nyitják meg a dokumentumot.
 - **Elszigetelt dekódolás.** A képeket, valamint a képletek és a diagramok grafikáit egy saját szolgáltatás dekódolja, amelyet a macOS saját homokozóban indít el: az Ön egyik fájljához sem fér hozzá, és hálózata sincs. Csak képpontokat ad vissza, amelyek méretét ellenőrzik, és magától kilép, ha egy dekódolás 10 másodpercnél tovább tart, vagy túl sok memóriát igényel. Az Apple saját képdekódolói csak a HEIC, TIFF, AVIF és PDF adatokat látják, és csak ha az adat valóban ilyen formátumú. Az SVG-k, a képletek és a diagramok is ezen a szolgáltatáson haladnak át, ezért a Splatban rögzített felbontású képek: pontonként négy képpont, a hosszabb oldalon legfeljebb 2560.
 - A **helyi fájlok** csak a dokumentum által megnevezett útvonalon jutnak el hozzá, és csak olyan mappából, amelyhez hozzáférést adott: a Splat olvashatja a megnyitott dokumentumot, a körülötte lévő képeket, jegyzeteket, szakirodalmi jegyzéket és tárolót azonban csak akkor, ha az előnézet fölötti sáv **Hozzáférés megadása a mappához…** gombjával hozzáférést ad a mappájukhoz. A hozzáférés minden almappára érvényes, és megmarad. A beágyazások a dokumentum mappájából és az alatta lévőkből mutatnak Markdown-jegyzeteket, és a hiányzó képet is csak ott keresik. Máshol lévő, abszolút vagy `~` jellel kezdődő képútvonal az előnézetben olyan mappából töltődik be, amelyhez hozzáférést adott; a HTML- és Word-exportok, a nyomtatás és a PDF-ek csak azt viszik magukkal, ami a dokumentum mappájában vagy Git-tárolójában van, hacsak ez a tároló nem tartalmazza a Saját mappádat is, így egy idegen dokumentum nem húzhatja bele a fájljaidat egy továbbadott exportba.
 - A **jegyzetmappákat** a Splat csak addig olvassa, amíg az oldalsáv mutatja őket, és egy jegyzet átnevezése csak azután módosít más fájlokat, hogy Ön megerősítette, hányat.
@@ -565,7 +565,7 @@ Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot me
 - A **linkek** egy kattintásra soha nem indítanak el programot. A webes és e-mail-linkek a szokásos módon nyílnak meg; a más alkalmazásokba vezető linkek előbb rákérdeznek.
 - A **dokumentumokban lévő HTML-t** a Splat saját elemzője olvassa. Szkriptek, stílusok, keretek és űrlapok soha nem futnak.
 - Az **exportok** nem tartalmaznak szkripteket. A HTML-oldalak a GitHubhoz hasonlóan csak az ártalmatlan címkék és attribútumok rögzített listáját tartják meg, és tartalombiztonsági szabályzatot (Content Security Policy) kapnak. A Word-fájlok csak `http`-, `https`- és `mailto`-címekre mutató linkeket tartalmaznak, kivéve azokat a linkeket, amelyeket az Ön által választott Word-sablon hoz magával.
-- **Kódaláírás** Hardened Runtime-mal és App Sandboxszal. A Splat olvashatja és írhatja a megnyitott dokumentumokat és azokat a mappákat, amelyekhez hozzáférést ad, a hálózatot az Ön által engedélyezett internetes képekhez és a frissítésekhez használhatja, és nyomtathat; semmi mást.
+- **Kódaláírás** Hardened Runtime-mal és App Sandboxszal. A Splat olvashatja és írhatja a megnyitott dokumentumokat és azokat a mappákat, amelyekhez hozzáférést ad, a hálózatot az internetes képekhez és a frissítésekhez használhatja, és nyomtathat; semmi mást.
 
 ## Nagy dokumentumok
 
@@ -610,7 +610,7 @@ Néhány módosítást teljes egészében feldolgoz, 10 MB-nál nagyjából 300 
 
 **Nincs Frissítések keresése… a Splat menüben.** Csak a lemezképből vagy Homebrew-val telepített változat frissíti magát; a saját fordításnak nincs frissítője.
 
-**Az internetes képek nem jelennek meg.** Kattintson az előnézet fölötti sávban a **Képek betöltése** gombra. Csak a nyilvános gépekről származó `https` képek töltődnek be.
+**Az internetes képek nem jelennek meg.** Csak a `https` képek töltődnek be, egyenként legfeljebb 10 MB méretig. A hálózat miatt sikertelen képet a Splat újra megpróbálja, amíg a dokumentum mutatja.
 
 **Egy képernyőkép beillesztésekor előbb mentést kér.** A beillesztett képek fájlként a dokumentum mellé kerülnek, ehhez hely kell a lemezen. Mentse a dokumentumot, majd illessze be újra.
 
