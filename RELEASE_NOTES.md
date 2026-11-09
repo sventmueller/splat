@@ -1,8 +1,2 @@
-Splat 1.0.13 replaces 1.0.12 with the same changes and is the version that goes to the Mac App Store.
-
-- **Splat now runs in the App Sandbox**, as apps from the Mac App Store do: it reaches only the documents you open and the folders you grant. For the pictures, notes and Git data next to a document, the bar above the preview offers **Grant Access to Folder…**, and Splat keeps that access, also after a restart.
-- Your settings and unsaved texts come along on the first launch. **Open Recent** starts empty once; opening a document adds it again.
-- **Images from the web load without asking**, from any host, as soon as a document shows them. Like images in an email, they tell their servers that and when the document is opened.
-- An embed no longer follows a link out of the document's folder, and a bibliography outside the folder or its repository stays out of exports and printing.
-- A source over 1 MB colours what shows at once and the rest in steps, so the window answers right away.
-- The disk image shows its background sharp on Retina screens.
+- **Splat installs its updates again.** Splat 1.0.12 and 1.0.13 could not install an update on a Mac where an older version had run before: installing stopped with an error about connecting to the installer.
+- **On 1.0.12 or 1.0.13**, if installing this update stops with that error, download Splat once from [GitHub](https://github.com/sventmueller/splat/releases/latest) and drag it into Applications, replacing the old one. Your settings and texts stay, and from 1.0.14 on, updates install by themselves again.
