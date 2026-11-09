@@ -126,6 +126,20 @@ Sparkle lacks the code for either processor. `make universal` builds only the pr
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
 permissions for the two.
 
+### Updates at a used path
+
+launchd learns which XPC services an app's frameworks hold only the first time an app runs from a path, and keeps that
+answer for the path. Replacing the bundle, registering it again with Launch Services, a new framework version or another
+folder name for the framework do not change it; whether restarting the Mac does is not known. Builds up to 1.0.11
+carried Sparkle without its services, so wherever one of them ran, such as `/Applications/Splat.app` on every Mac that
+updated from 1.0.11, launchd never offered 1.0.12 and 1.0.13 Sparkle's installer service, and their updates failed with
+"An error occurred while connecting to the installer".
+
+`Contents/XPCServices` launchd reads at every launch. The bundle therefore carries `SparkleInstaller.xpc` there, a link
+to the installer service in the framework: the service resolves the link and finds Sparkle's tools beside it, and Sparkle
+refuses a service named `Installer.xpc` in that folder. The probe in `make test` fails when launchd does not offer the
+service to the self-test app, whose path under `target/` saw such builds as well.
+
 ### Mac App Store
 
 `cargo xtask appstore` (or `make appstore`, after `make test` and `make coverage-library`) builds the same universal app

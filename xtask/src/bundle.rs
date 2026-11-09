@@ -106,6 +106,10 @@ pub(crate) fn decoder_entitlements(build: Build) -> String {
 /// The bundle of the decoding service inside the app's, which macOS starts it from.
 pub(crate) const DECODER_BUNDLE: &str = "Contents/XPCServices/SplatDecoder.xpc";
 
+/// Sparkle's installer service once more, as a link: the service finds Sparkle's tools beside where the link leads, and
+/// Sparkle refuses one named `Installer.xpc` there.
+pub(crate) const INSTALLER_LINK: &str = "Contents/XPCServices/SparkleInstaller.xpc";
+
 /// The identifier of a build of the app; the decoding service's adds `.decoder`, which the app looks for.
 fn bundle_id(variant: Option<&str>) -> String {
     match variant {
@@ -446,6 +450,14 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
         files::copy(sparkle.join("LICENSE"), resources.join("LICENSE-sparkle"))?;
         // The sandboxed app installs through Sparkle's installer service; it downloads with its own network access.
         files::remove_dir_all(framework.join("Versions/B/XPCServices/Downloader.xpc"))?;
+        // launchd reads Contents/XPCServices at every launch but a framework's services only at a path's first, see
+        // "Updates at a used path" in docs/development.md.
+        let link = app.join(INSTALLER_LINK);
+        std::os::unix::fs::symlink(
+            "../Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc",
+            &link,
+        )
+        .map_err(|e| format!("{}: {e}", link.display()))?;
         bundled_sparkle = Some(sparkle);
     }
     files::write(

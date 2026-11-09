@@ -60,7 +60,9 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
     });
     let started = std::time::Instant::now();
     let mut asked_to_front = 0;
+    let mut installer_offered = None;
     loop {
+        ask_launchd(&mut installer_offered, mode, started, child.id());
         // Started from a shell, the app cannot bring itself to the front while another is there.
         if mode == "typing" && asked_to_front < 8 && started.elapsed().as_secs() > asked_to_front {
             asked_to_front += 1;
@@ -102,6 +104,9 @@ pub(crate) fn run_selftest(args: &[String]) -> Result<(), String> {
                 }
                 return Ok(());
             }
+            installer_offered
+                .map_or(Ok(()), |(_, r)| r)
+                .map_err(|e| format!("selftest {mode}: {e}"))?;
             return verdict(mode, part, status.success(), &report).map_err(|e| format!("selftest {mode}: {e}"));
         }
         if started.elapsed() > std::time::Duration::from_secs(600) {
@@ -137,6 +142,33 @@ fn run_for_the_app(request: &str) {
     let partial = answer.with_extension("partial");
     if fs::write(&partial, text).is_ok() {
         let _ = fs::rename(&partial, answer);
+    }
+}
+
+/// Asks launchd about the installer service once a second of the probe until it is offered, since launchd learns an
+/// app's services only some time after its start.
+fn ask_launchd(answer: &mut Option<(u64, Result<(), String>)>, mode: &str, started: std::time::Instant, pid: u32) {
+    let second = started.elapsed().as_secs();
+    let due = match answer {
+        None => true,
+        Some((asked, result)) => result.is_err() && *asked < second,
+    };
+    if mode == "probe" && due {
+        *answer = Some((second, launchd_offers_installer(pid)));
+    }
+}
+
+/// Whether launchd lets the process reach Sparkle's installer service, without which no update installs.
+fn launchd_offers_installer(pid: u32) -> Result<(), String> {
+    let listed = stdout(Command::new("launchctl").arg("print").arg(format!("pid/{pid}")))?;
+    if listed.contains("org.sparkle-project.InstallerLauncher") {
+        Ok(())
+    } else {
+        Err(
+            "launchd does not offer the app Sparkle's installer service, so no update could install; see \"Updates \
+             at a used path\" in docs/development.md"
+                .into(),
+        )
     }
 }
 
