@@ -525,6 +525,7 @@ impl EditorController {
     pub(in crate::editor) fn setting_changed(&self) {
         self.word_counter().setting_changed();
         self.change_marks().look();
+        self.updater().update_offer();
     }
 
     pub(in crate::editor) fn look_at_repository(&self) {

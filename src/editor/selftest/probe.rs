@@ -151,6 +151,7 @@ pub(super) fn run(mtm: MainThreadMarker) {
     rendering_takes_what_it_is_given(mtm);
     undo_is_back_on_after_a_panic(mtm);
     a_closed_folder_is_offered_for_a_grant(mtm);
+    a_repository_asks_for_its_folder_only_for_change_marks(mtm);
     a_granted_folder_is_kept_and_taken_up_again(mtm);
     another_thread_gets_an_answer_from_the_main_thread();
     let name = "a document without formulas or diagrams starts no web view";
@@ -244,6 +245,44 @@ fn a_closed_folder_is_offered_for_a_grant(mtm: MainThreadMarker) {
     check(name, offered && gone, &format!("offered {offered}, gone {gone}"));
     document.close();
     let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
+}
+
+/// A repository around a closed folder offers it only for the change marks: switched off, they take the offer away.
+fn a_repository_asks_for_its_folder_only_for_change_marks(mtm: MainThreadMarker) {
+    let name = "a repository around a closed folder offers it while change marks are on, and not while they are off";
+    let root = std::env::temp_dir().join(format!("splat-probe-repository-{}", std::process::id()));
+    let dir = root.join("Gesperrt");
+    let path = dir.join("Notiz.md");
+    if std::fs::create_dir_all(&dir).is_err()
+        || std::fs::create_dir_all(root.join(".git")).is_err()
+        || std::fs::write(&path, "# Notiz\n\nNur Text und ein [Link](anderes.md).\n").is_err()
+    {
+        check(name, false, "no test document");
+        return;
+    }
+    let marks_were_on = super::super::changes::is_on();
+    let switch_marks = |on: bool| {
+        super::super::changes::set_on(on);
+        super::super::setting_changed_everywhere();
+    };
+    switch_marks(true);
+    crate::test_hooks::play_closed_folders(true);
+    let (document, e) = super::documents::opened(mtm, &path);
+    let grant = crate::i18n::t("Ordner freigeben …");
+    let offered = super::controller::until(|| e.pictures().banner_offers().as_deref() == Some(grant));
+    switch_marks(false);
+    let gone = super::controller::until(|| e.pictures().banner_offers().is_none());
+    switch_marks(true);
+    let back = super::controller::until(|| e.pictures().banner_offers().as_deref() == Some(grant));
+    crate::test_hooks::play_closed_folders(false);
+    switch_marks(marks_were_on);
+    check(
+        name,
+        offered && gone && back,
+        &format!("offered {offered}, gone when off {gone}, back when on {back}"),
+    );
+    document.close();
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 /// A folder picked in the panel is kept as a bookmark and taken up again at the next start, and the panel itself shows

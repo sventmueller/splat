@@ -541,14 +541,15 @@ impl Updater<'_> {
     }
 
     /// What the bar above the preview offers: the document's folder while the sandbox keeps it closed and something needs
-    /// it.
+    /// it. Links such as `#12` into a repository are not worth the question on their own, only its change marks are.
     pub(super) fn update_offer(&self) {
         let local = self
             .host
             .model()
             .read(|st| crate::markdown::remote::has_local_files(st.doc()));
         let env = super::env::Env::known(self.host.doc_dir(), "");
-        let needs_folder = local || env.repository_around || self.host.panes().sidebar_visible();
+        let marks_need_it = env.repository_around && super::changes::is_on();
+        let needs_folder = local || marks_need_it || self.host.panes().sidebar_visible();
         let offer = (env.folder_closed && needs_folder).then_some(super::images::Offer::GrantFolder);
         self.host.pictures().show_banner(offer);
     }
