@@ -1,0 +1,25 @@
+[package]
+name = "splat-decoder"
+version = "0.0.0"
+description = "The sandboxed service that turns untrusted image data into pixels and PDFs, and the app's side of it; macOS only"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2.workspace = true
+libc.workspace = true
+objc2 = { workspace = true, features = ["catch-all"] }
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+krilla.workspace = true
+krilla-svg.workspace = true
+usvg.workspace = true
+image = { workspace = true, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+
+[features]
+# What only the window self-tests of the apps call.
+selftest = []

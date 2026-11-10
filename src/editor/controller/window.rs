@@ -95,6 +95,7 @@ impl EditorController {
             changes: Default::default(),
             notes: Default::default(),
             closed: Default::default(),
+            viewer: Default::default(),
         };
         let this = Self::alloc(mtm).set_ivars(ivars);
         // SAFETY: NSWindowController's initializer, called once on the newly allocated object.

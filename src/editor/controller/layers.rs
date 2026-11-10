@@ -6,7 +6,8 @@
 //! open window, its own among them, goes through what the controller offers the rest of the program.
 
 use std::ops::Deref;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use dispatch2::MainThreadBound;
@@ -18,6 +19,7 @@ use objc2_app_kit::{
     NSWindowController,
 };
 use objc2_foundation::NSUndoManager;
+use splat_render::Viewer;
 
 use super::EditorController;
 use crate::editor::actions::Action;
@@ -26,13 +28,12 @@ use crate::editor::changes::{ChangeMarks, ChangesAnswer};
 use crate::editor::counter::WordCounter;
 use crate::editor::editing::Editing;
 use crate::editor::export::{ExportFailure, ExportKind, Sharing};
-use crate::editor::images::{ImageFile, ImageStore, Pictures};
+use crate::editor::images::{ImageFile, Pictures};
 use crate::editor::js::Renderer;
 use crate::editor::mathfield::MathField;
 use crate::editor::model::Model;
 use crate::editor::notes::{NoteAnswer, Notes, RenameRequest};
 use crate::editor::panes::Panes;
-use crate::editor::picture::Rendered;
 use crate::editor::progressive::Progressive;
 use crate::editor::render_queue::Owner;
 use crate::editor::scroll::ScrollSync;
@@ -180,28 +181,17 @@ impl<'a> Object<'a> {
 
     /// Asks `renderer` to tell this editor what it finishes; the number it asks under.
     pub(in crate::editor) fn listen_to(self, renderer: &Renderer) -> Owner {
-        renderer.listen(self.0)
+        renderer.listen(&self.0.viewer())
     }
 
     /// Tells the renderer that this editor waits for nothing anymore.
     pub(in crate::editor) fn asks_for_no_renders(self) {
-        crate::editor::js::asks_for_nothing(self.0);
+        crate::editor::js::asks_for_nothing(&self.0.viewer());
     }
 
-    /// A picture from the web, as `remote::get` answers for this editor, which hears when it arrives.
-    pub(in crate::editor) fn web_picture(self, url: &str) -> Option<Option<Rendered>> {
-        crate::editor::remote::get(url, Some(self.0))
-    }
-
-    /// The image `url` names, as `ImageStore::file` gives it to this editor, which hears when it arrives.
-    pub(in crate::editor) fn image_file(
-        self,
-        images: &mut ImageStore,
-        url: &str,
-        doc_dir: Option<&Path>,
-        dark: bool,
-    ) -> Option<Rendered> {
-        images.file(url, doc_dir, dark, Some(self.0))
+    /// The controller as the render path knows it, which hears through it what arrives.
+    pub(in crate::editor) fn viewer(self) -> Rc<dyn Viewer> {
+        self.0.viewer()
     }
 
     /// Gives `field` to this editor's formula `latex`.

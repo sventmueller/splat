@@ -14,7 +14,7 @@ use objc2_foundation::{
     NSAttributedString, NSAttributedStringKey, NSDictionary, NSMutableAttributedString, NSNumber, NSRange, NSURL,
 };
 
-use crate::util::{constant, ns, obj};
+use crate::appkit::{constant, ns, obj};
 
 pub struct Attribute {
     key: &'static NSAttributedStringKey,

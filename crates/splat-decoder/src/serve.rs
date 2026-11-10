@@ -12,10 +12,10 @@ use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSDeviceRGBColorSpa
 use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSSize};
 use usvg::fontdb;
 
-use super::super::safe_image;
 use super::protocol::{
     Decoded, EXPORT_SIDE, MAX_SIDE, NATURAL_SIDE, Request, TIMEOUT, memory_of, most_memory, read_request, write_answer,
 };
+use super::safe_image;
 
 /// A vector picture becomes this many pixels per point, enough for a Retina display at twice the size and for print.
 const VECTOR_SCALE: f64 = 4.0;

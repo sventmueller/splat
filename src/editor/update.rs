@@ -691,8 +691,9 @@ impl Updater<'_> {
         };
         let eager = eager_blocks(changed.clone(), || self.host.progressive().visible_preview_block());
         let doc_dir = self.host.doc_dir();
+        let viewer = self.host.object().viewer();
         let live = Live {
-            requester: Some(self.host.object()),
+            requester: Some(&viewer),
         };
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
@@ -701,8 +702,8 @@ impl Updater<'_> {
             images: self.host.pictures().store(),
             max_image_width: self.host.panes().preview_image_width(),
             dark: self.host.is_dark(),
-            controller: Some(self.host.object()),
-            leaves_the_mac: false,
+            requester: Some(&viewer),
+            leaves_the_mac: None,
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,
         };

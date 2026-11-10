@@ -12,13 +12,16 @@ use objc2_app_kit::{NSBackingStoreType, NSImage, NSPanel, NSWindowStyleMask};
 use objc2_foundation::{NSDictionary, NSNumber, NSObjectProtocol, NSPoint, NSRect, NSSize, NSString};
 use objc2_web_kit::{WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationDelegate, WKWebView};
 
-use super::EditorController;
-use super::decoder::Decoded;
-use super::picture::{Rendered, Sizing, allowed_side, count_decoded, room_for_more};
-use super::render_queue::{Owner, RenderQueue};
-use super::webkit::{self, ScriptValue};
-use crate::markdown::doc::DiagramKind;
-use crate::util::{guarded, main_after, main_soon, ns, to_isize};
+use splat_decoder::Decoded;
+pub use splat_editor_state::render_queue::Owner;
+use splat_editor_state::render_queue::RenderQueue;
+use splat_markdown::doc::{DiagramKind, Doc, Figure, figures, macros_of};
+
+use crate::appkit::{ns, to_isize};
+use crate::lanes::{guarded, main_after, main_soon};
+use crate::picture::{Rendered, Sizing, allowed_side, count_decoded, room_for_more};
+use crate::viewer::{Held, Viewer};
+use crate::webkit::{self, ScriptValue};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Key {
@@ -41,7 +44,7 @@ pub struct Renderer {
     web: RefCell<Retained<WKWebView>>,
     _delegate: Retained<NavDelegate>,
     queue: RefCell<RenderQueue<Key, Rendered>>,
-    listeners: RefCell<Vec<(Owner, Weak<EditorController>)>>,
+    listeners: RefCell<Vec<(Owner, Held)>>,
 }
 
 /// Beyond this many rendered formulas and diagrams, or this many bytes of their pictures, those no open document asked for
@@ -120,7 +123,7 @@ fn load_page(window: &NSPanel, web: &WKWebView) {
 const TURN_FOR_KEYS: std::time::Duration = std::time::Duration::from_millis(16);
 
 /// A render that has not answered by then counts as failed, and a new web view takes over.
-pub(super) const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 fn renderer_if_started() -> Option<Rc<Renderer>> {
     RENDERER.with(|r| r.get().cloned())
@@ -151,40 +154,40 @@ thread_local! {
 }
 
 #[cfg(feature = "selftest")]
-pub(super) fn had_its_page_at_once() -> bool {
+pub fn had_its_page_at_once() -> bool {
     HAD_ITS_PAGE_AT_ONCE.get()
 }
 
 #[cfg(feature = "selftest")]
-pub(super) fn started() -> bool {
+pub fn started() -> bool {
     renderer_if_started().is_some()
 }
 
 #[cfg(feature = "selftest")]
-pub(super) fn idle() -> bool {
+pub fn idle() -> bool {
     renderer_if_started().is_none_or(|r| r.idle())
 }
 
 #[cfg(feature = "selftest")]
 impl Renderer {
     /// The page itself, for what the selftest tries against it.
-    pub(super) fn web(&self) -> Retained<WKWebView> {
+    pub fn web(&self) -> Retained<WKWebView> {
         self.web.borrow().clone()
     }
 }
 
 /// A document has closed.
-pub(super) fn forget(controller: &EditorController) {
+pub fn forget(viewer: &Rc<dyn Viewer>) {
     if let Some(r) = renderer_if_started() {
-        let owner = r.owner_of(controller);
+        let owner = r.owner_of(viewer);
         r.forget(owner);
     }
 }
 
 /// A document that shows no formula or diagram any more, which is no reason to start the renderer.
-pub(super) fn asks_for_nothing(controller: &EditorController) {
+pub fn asks_for_nothing(viewer: &Rc<dyn Viewer>) {
     if let Some(r) = renderer_if_started()
-        && let Some(owner) = r.owner_of(controller)
+        && let Some(owner) = r.owner_of(viewer)
     {
         r.request(owner, Vec::new());
     }
@@ -211,7 +214,13 @@ pub fn ready(key: &Key) -> bool {
         .is_some_and(|r| r.as_ref().is_some_and(|set| set.contains(key)))
 }
 
-pub(super) fn set_ready(key: &Key, on: bool) {
+/// Marks `key` as rendered or not without rendering it, as a window self-test does to see what an arrival changes.
+#[cfg(feature = "selftest")]
+pub fn set_ready(key: &Key, on: bool) {
+    mark_ready(key, on);
+}
+
+fn mark_ready(key: &Key, on: bool) {
     if let Ok(mut r) = READY.lock() {
         let set = r.get_or_insert_with(HashSet::new);
         if on {
@@ -225,7 +234,7 @@ pub(super) fn set_ready(key: &Key, on: bool) {
 /// What a finished render reports: `None` while the key is still queued, else the MathJax or Mermaid error.
 pub fn outcome(key: &Key) -> Option<Result<(), String>> {
     let outcome = renderer_if_started()?.queue.borrow().outcome(key)?;
-    Some(outcome.map_err(|message| message.unwrap_or_else(|| crate::i18n::t("Darstellung fehlgeschlagen").to_string())))
+    Some(outcome.map_err(|message| message.unwrap_or_else(|| splat_i18n::t("Darstellung fehlgeschlagen").to_string())))
 }
 
 impl Key {
@@ -244,6 +253,55 @@ impl Key {
             kind,
             dark,
         }
+    }
+
+    /// The key of a formula or diagram of a document, for one appearance.
+    pub fn of(figure: &Figure, dark: bool, macros: &Arc<str>) -> Key {
+        match figure {
+            Figure::Math { tex, display } => Key::math(tex, *display, dark, macros),
+            Figure::Diagram { source, kind } => Key::diagram(source, *kind, dark),
+        }
+    }
+}
+
+/// Beyond this many formulas and diagrams, a document renders only for the appearance it shows.
+const RENDERED_AHEAD: usize = 200;
+
+/// What a document needs rendered, in the order it needs it, and the definitions its formulas share.
+pub struct Wanted {
+    pub keys: Vec<Key>,
+    pub macros: Arc<str>,
+}
+
+/// The formulas and diagrams of `doc` for its appearance, then for the other one: rendering ahead makes switching
+/// instant, but not at the price of doubling the work for documents full of formulas.
+pub fn wanted(doc: &Doc, dark: bool) -> Wanted {
+    let all = figures(doc);
+    let macros: Arc<str> = macros_of(all.iter().map(|(_, f)| f)).into();
+    let (mut keys, other): (Vec<_>, Vec<_>) = all
+        .iter()
+        .map(|(_, f)| (Key::of(f, dark, &macros), Key::of(f, !dark, &macros)))
+        .unzip();
+    if keys.len() <= RENDERED_AHEAD {
+        keys.extend(other);
+    }
+    Wanted { keys, macros }
+}
+
+/// A layout's answer to whether a formula or diagram shows as a picture: once it is rendered. Everything else a
+/// resolver may know stays at its default.
+pub struct Ready {
+    pub dark: bool,
+    pub macros: Arc<str>,
+}
+
+impl splat_preview::layout::Resolver for Ready {
+    fn math_ready(&self, tex: &str, display: bool) -> bool {
+        ready(&Key::math(tex, display, self.dark, &self.macros))
+    }
+
+    fn diagram_ready(&self, source: &str, kind: DiagramKind) -> bool {
+        ready(&Key::diagram(source, kind, self.dark))
     }
 }
 
@@ -279,8 +337,8 @@ impl Renderer {
         }
     }
 
-    /// `controller` hears when renders arrive; what it asks for goes by the owner this returns.
-    pub fn listen(&self, controller: &EditorController) -> Owner {
+    /// `viewer` hears when renders arrive; what it asks for goes by the owner this returns.
+    pub fn listen(&self, viewer: &Rc<dyn Viewer>) -> Owner {
         let (owner, gone) = {
             let mut listeners = self.listeners.borrow_mut();
             let gone: Vec<Owner> = listeners
@@ -289,13 +347,10 @@ impl Renderer {
                 .map(|(owner, _)| *owner)
                 .collect();
             listeners.retain(|(_, w)| w.load().is_some());
-            let known = listeners
-                .iter()
-                .find(|(_, w)| w.load().is_some_and(|l| std::ptr::eq(&*l, controller)))
-                .map(|(owner, _)| *owner);
+            let known = listeners.iter().find(|(_, w)| w.is(viewer)).map(|(owner, _)| *owner);
             let owner = known.unwrap_or_else(|| {
                 let owner = Owner::unique();
-                listeners.push((owner, Weak::from(controller)));
+                listeners.push((owner, Held::of(viewer)));
                 owner
             });
             (owner, gone)
@@ -306,13 +361,12 @@ impl Renderer {
         owner
     }
 
-    /// The owner `controller` asks as, while it listens. A weak reference that still loads is the controller itself, so
-    /// one that is freed and another that comes to its address are never taken for each other.
-    fn owner_of(&self, controller: &EditorController) -> Option<Owner> {
+    /// The owner `viewer` asks as, while it listens.
+    fn owner_of(&self, viewer: &Rc<dyn Viewer>) -> Option<Owner> {
         self.listeners
             .borrow()
             .iter()
-            .find(|(_, w)| w.load().is_some_and(|l| std::ptr::eq(&*l, controller)))
+            .find(|(_, w)| w.is(viewer))
             .map(|(owner, _)| *owner)
     }
 
@@ -405,7 +459,7 @@ impl Renderer {
     fn store(&self, key: Key, result: Option<Rendered>) {
         let key_for_layout = key.clone();
         if self.queue.borrow_mut().store(key, result) {
-            set_ready(&key_for_layout, true);
+            mark_ready(&key_for_layout, true);
         }
     }
 
@@ -433,7 +487,7 @@ impl Renderer {
         };
         count_decoded(-to_isize(freed));
         for key in gone {
-            set_ready(&key, false);
+            mark_ready(&key, false);
         }
     }
 
@@ -486,9 +540,9 @@ impl Renderer {
                 height: h,
                 valign: va,
             };
-            let description = crate::i18n::tf("Formel: {}", &[&label]);
+            let description = splat_i18n::tf("Formel: {}", &[&label]);
             r.convert(key.clone(), description, sizing, move || {
-                super::decoder::svg_to_pixels(&svg, allowed_side())
+                splat_decoder::svg_to_pixels(&svg, allowed_side())
             });
         });
     }
@@ -513,7 +567,7 @@ impl Renderer {
         background(move || {
             // The answer must arrive whatever happens, or the renderer never counts as idle again.
             let pixels = room_for_more()
-                .then(|| crate::util::contained(pixels).flatten())
+                .then(|| crate::lanes::contained(pixels).flatten())
                 .flatten();
             main_soon(move || {
                 let Some(r) = renderer_if_started() else { return };
@@ -544,7 +598,7 @@ impl Renderer {
         ];
         // Weak: WebKit keeps this handler until the script answers, and a view held by it could never close.
         let web = Weak::from_retained(&self.web.borrow());
-        let label = source.lines().next().unwrap_or(crate::i18n::t("Diagramm")).to_string();
+        let label = source.lines().next().unwrap_or(splat_i18n::t("Diagramm")).to_string();
         self.call("renderDiagram", &args, move |answer: Answer<PlacedPicture>| {
             let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) else {
                 return;
@@ -567,9 +621,9 @@ impl Renderer {
                     size: NSSize::new(w, h),
                     descent: 0.0,
                 };
-                let description = crate::i18n::tf("Diagramm: {}", &[&label]);
+                let description = splat_i18n::tf("Diagramm: {}", &[&label]);
                 r.convert(key.clone(), description, sizing, move || {
-                    super::decoder::pdf_to_pixels(&pdf?, allowed_side())
+                    splat_decoder::pdf_to_pixels(&pdf?, allowed_side())
                 });
             });
         });
@@ -578,18 +632,18 @@ impl Renderer {
 
 /// Runs CPU work off the main thread.
 pub fn background(job: impl FnOnce() + Send + 'static) {
-    crate::util::BACKGROUND.run(job);
+    crate::lanes::BACKGROUND.run(job);
 }
 
 /// What a function of render.js answers. `FIELDS` is what the selftest holds that function to, in a real page.
-pub(super) trait PageAnswer: Sized {
+pub trait PageAnswer: Sized {
     #[cfg(feature = "selftest")]
     const FIELDS: &'static [&'static str];
     fn read(fields: &Fields) -> Option<Self>;
 }
 
 /// The object a function of render.js returned.
-pub(super) struct Fields<'a>(&'a NSDictionary);
+pub struct Fields<'a>(&'a NSDictionary);
 
 impl Fields<'_> {
     fn text(&self, key: &str) -> Option<String> {
@@ -630,7 +684,7 @@ impl<T: PageAnswer> Answer<T> {
 
 /// What `renderMath` draws.
 #[derive(Debug, PartialEq)]
-pub(super) struct MathAnswer {
+pub struct MathAnswer {
     svg: String,
     w: f64,
     h: f64,
@@ -653,7 +707,7 @@ impl PageAnswer for MathAnswer {
 
 /// Where `renderDiagram` placed its picture on the page.
 #[derive(Debug, PartialEq)]
-pub(super) struct PlacedPicture {
+pub struct PlacedPicture {
     x: f64,
     y: f64,
     w: f64,
@@ -677,7 +731,7 @@ impl PageAnswer for PlacedPicture {
 
 /// The image of pixels from a helper, named for those who cannot see it.
 fn labeled_image(pixels: Decoded, description: &str) -> Option<Retained<NSImage>> {
-    let image = super::decoder::image(pixels)?;
+    let image = splat_decoder::image(pixels)?;
     image.setAccessibilityDescription(Some(&ns(description)));
     Some(image)
 }
@@ -685,7 +739,6 @@ fn labeled_image(pixels: Decoded, description: &str) -> Option<Retained<NSImage>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::ns;
 
     fn answer(fields: &[(&str, &AnyObject)]) -> Retained<NSDictionary> {
         let keys: Vec<Retained<NSString>> = fields.iter().map(|(k, _)| ns(k)).collect();

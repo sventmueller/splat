@@ -4,11 +4,9 @@
 
 pub mod actions;
 mod atom;
-pub(crate) mod attributes;
 mod changes;
 mod controller;
 mod counter;
-pub mod decoder;
 mod dialogs;
 mod editing;
 mod env;
@@ -16,17 +14,13 @@ mod export;
 mod export_options;
 mod geometry;
 mod images;
-mod js;
 mod mathfield;
 mod metadata;
 mod navigation;
 mod notes;
 mod outline;
 mod panes;
-mod picture;
 mod progressive;
-mod remote;
-mod render;
 mod scroll;
 mod selection;
 #[cfg(feature = "selftest")]
@@ -37,7 +31,6 @@ mod style;
 mod toolbar;
 mod update;
 mod views;
-mod webkit;
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -51,7 +44,10 @@ use objc2_foundation::NSRange;
 use crate::util::ns;
 use actions::Action;
 use controller::{layers, window};
+pub use splat_decoder as decoder;
 use splat_editor_state::{links, model, render_queue, state, sync};
+pub(crate) use splat_render::attributes;
+use splat_render::{js, picture, remote, render, webkit};
 
 pub use crate::util::panic_is_contained;
 pub use controller::EditorController;

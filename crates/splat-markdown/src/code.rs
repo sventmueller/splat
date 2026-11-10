@@ -32,6 +32,13 @@ struct Lang {
     labels: bool,
     /// Identifiers may start with `\`, as TeX commands do.
     backslash_words: bool,
+    /// A key in front of `=`, at the start of a line or of an entry of an inline table, and a `[table]` or `[[array]]`
+    /// header on a line of its own are keywords.
+    equals_keys: bool,
+    /// Numbers may hold `-`, `:` and `+`, as dates and times do.
+    dates: bool,
+    /// The quote of strings that know no escapes, as TOML's literal strings.
+    literal_quote: Option<char>,
 }
 
 const fn lang(names: &'static [&'static str], keywords: &'static [&'static str]) -> Lang {
@@ -47,6 +54,9 @@ const fn lang(names: &'static [&'static str], keywords: &'static [&'static str])
         line_keys: false,
         labels: false,
         backslash_words: false,
+        equals_keys: false,
+        dates: false,
+        literal_quote: None,
     }
 }
 
@@ -621,6 +631,7 @@ const CSS_WORDS: &[&str] = &[
     "@supports",
 ];
 const JSON_WORDS: &[&str] = &["true", "false", "null"];
+const TOML_WORDS: &[&str] = &["true", "false", "inf", "nan"];
 const YAML_WORDS: &[&str] = &["true", "false", "null", "yes", "no", "on", "off"];
 const MERMAID_WORDS: &[&str] = &[
     "flowchart",
@@ -735,6 +746,15 @@ const LANGS: &[Lang] = &[
     },
     lang(&["swift"], SWIFT_WORDS),
     Lang {
+        line_comments: &["#"],
+        block_comment: None,
+        triple_quotes: true,
+        equals_keys: true,
+        dates: true,
+        literal_quote: Some('\''),
+        ..lang(&["toml"], TOML_WORDS)
+    },
+    Lang {
         quotes: &['"', '\'', '`'],
         ..lang(&["typescript", "ts", "tsx"], TS_WORDS)
     },
@@ -845,6 +865,14 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
             i = end;
             continue;
         }
+        if lang.equals_keys
+            && let Some(len) = toml_key_or_header(code, i, line_start)
+        {
+            out.push((i..i + len, CodeToken::Keyword));
+            i += len;
+            line_start = false;
+            continue;
+        }
         if lang.triple_quotes && (rest.starts_with("\"\"\"") || rest.starts_with("'''")) {
             let fence = &rest[..3];
             let end = rest[3..].find(fence).map_or(code.len(), |k| i + 3 + k + 3);
@@ -881,7 +909,7 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
             continue;
         }
         if quoted {
-            let end = string_end(code, i, c);
+            let end = string_end(code, i, c, lang.literal_quote != Some(c));
             out.push((i..end, CodeToken::String));
             i = end;
             continue;
@@ -907,8 +935,9 @@ pub fn tokens(info: &str, code: &str) -> Vec<(Range<usize>, CodeToken)> {
             }
         }
         if c.is_ascii_digit() && !prev.is_some_and(is_word) {
+            let date_mark = |ch: char| lang.dates && matches!(ch, '-' | ':' | '+');
             let len = rest
-                .find(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '.' || ch == '_'))
+                .find(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '.' || ch == '_' || date_mark(ch)))
                 .unwrap_or(rest.len());
             out.push((i..i + len, CodeToken::Number));
             i += len;
@@ -975,14 +1004,15 @@ fn rust_char_len(rest: &str) -> Option<usize> {
     body[len..].starts_with('\'').then_some(1 + len + 1)
 }
 
-/// End of a quoted string starting at `start`, honouring backslash escapes; unterminated strings end with the line.
-fn string_end(code: &str, start: usize, quote: char) -> usize {
+/// End of a quoted string starting at `start`, honouring backslash escapes where the string has them; unterminated
+/// strings end with the line.
+fn string_end(code: &str, start: usize, quote: char, escapes: bool) -> usize {
     let mut escaped = false;
     for (k, ch) in code[start + quote.len_utf8()..].char_indices() {
         let at = start + quote.len_utf8() + k;
         if escaped {
             escaped = false;
-        } else if ch == '\\' {
+        } else if ch == '\\' && escapes {
             escaped = true;
         } else if ch == quote {
             return at + ch.len_utf8();
@@ -991,6 +1021,68 @@ fn string_end(code: &str, start: usize, quote: char) -> usize {
         }
     }
     code.len()
+}
+
+/// How long the TOML key or table header is that starts at `at`: a key where `=` follows it, at the start of a line or
+/// of an entry of an inline table, or a header that has its line to itself but for a comment.
+fn toml_key_or_header(code: &str, at: usize, line_start: bool) -> Option<usize> {
+    let rest = &code[at..];
+    if line_start && rest.starts_with('[') {
+        let open = if rest.starts_with("[[") { 2 } else { 1 };
+        let inner = rest[open..].trim_start_matches([' ', '\t']);
+        let key_at = rest.len() - inner.len();
+        let key_end = key_at + toml_key_len(inner)?;
+        let close_at = key_end + (rest[key_end..].len() - rest[key_end..].trim_start_matches([' ', '\t']).len());
+        let len = close_at + open;
+        let closed = rest[close_at..].starts_with(&"]]"[..open]);
+        let after = rest[len.min(rest.len())..].trim_start_matches([' ', '\t', '\r']);
+        return (closed && (after.is_empty() || after.starts_with(['\n', '#']))).then_some(len);
+    }
+    let starts_key = rest.starts_with(|ch: char| toml_bare(ch) || ch == '"' || ch == '\'');
+    if !starts_key || !(line_start || code[..at].trim_end_matches([' ', '\t']).ends_with(['{', ','])) {
+        return None;
+    }
+    let len = toml_key_len(rest)?;
+    let after = rest[len..].trim_start_matches([' ', '\t']);
+    (after.starts_with('=') && !after.starts_with("==")).then_some(len)
+}
+
+/// How long the dotted key is that `rest` starts with: bare and quoted parts, the dots between them and the blanks
+/// around the dots, all on one line.
+fn toml_key_len(rest: &str) -> Option<usize> {
+    let mut at = 0;
+    loop {
+        let part = &rest[at..];
+        at += match part.chars().next()? {
+            quote @ ('"' | '\'') => toml_quoted_len(part, quote)?,
+            ch if toml_bare(ch) => part.find(|ch: char| !toml_bare(ch)).unwrap_or(part.len()),
+            _ => return None,
+        };
+        let after = rest[at..].trim_start_matches([' ', '\t']);
+        let Some(next) = after.strip_prefix('.') else {
+            return Some(at);
+        };
+        at = rest.len() - next.trim_start_matches([' ', '\t']).len();
+    }
+}
+
+fn toml_bare(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-'
+}
+
+/// How long the quoted key part is that `part` starts with, if it closes on its line; only `"` knows escapes.
+fn toml_quoted_len(part: &str, quote: char) -> Option<usize> {
+    let mut escaped = false;
+    for (k, ch) in part.char_indices().skip(1) {
+        match ch {
+            '\n' => return None,
+            _ if escaped => escaped = false,
+            '\\' if quote == '"' => escaped = true,
+            _ if ch == quote => return Some(k + 1),
+            _ => {}
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -1023,6 +1115,7 @@ mod tests {
             ("sql", "SELECT a FROM b", "SELECT"),
             ("mysql", "select a from b", "select"),
             ("mermaid", "flowchart TD", "flowchart"),
+            ("toml", "a = true", "true"),
         ] {
             assert!(
                 tokens_of(info, code).contains(&(keyword, CodeToken::Keyword)),
@@ -1108,6 +1201,64 @@ mod tests {
         assert_eq!(rust_char_len("'"), None);
         assert_eq!(rust_char_len(r"'\u{}'"), None);
         assert_eq!(rust_char_len(r"'\x7"), None);
+    }
+
+    #[test]
+    fn toml_keys_and_tables_are_keywords_and_dates_are_numbers() {
+        let t = tokens_of(
+            "toml",
+            "[server] # Haupt\nhost = \"localhost\"\nport = 8080\nwhen = 1979-05-27T07:32:00-08:00\non = true\n[[bin]]\n\
+             site.\"example.org\" = { name = 'x', max-age = 1e-3 }\n",
+        );
+        assert_eq!(
+            t,
+            vec![
+                ("[server]", CodeToken::Keyword),
+                ("# Haupt", CodeToken::Comment),
+                ("host", CodeToken::Keyword),
+                ("\"localhost\"", CodeToken::String),
+                ("port", CodeToken::Keyword),
+                ("8080", CodeToken::Number),
+                ("when", CodeToken::Keyword),
+                ("1979-05-27T07:32:00-08:00", CodeToken::Number),
+                ("on", CodeToken::Keyword),
+                ("true", CodeToken::Keyword),
+                ("[[bin]]", CodeToken::Keyword),
+                ("site.\"example.org\"", CodeToken::Keyword),
+                ("name", CodeToken::Keyword),
+                ("'x'", CodeToken::String),
+                ("max-age", CodeToken::Keyword),
+                ("1e-3", CodeToken::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn toml_literal_strings_know_no_escapes_and_triple_quotes_span_lines() {
+        let t = tokens_of(
+            "toml",
+            "path = 'C:\\dir\\' # c\ntext = \"\"\"\nsays \"hi\"\n\"\"\"\nraw = '''\n\\n\n'''\n",
+        );
+        assert!(t.contains(&("'C:\\dir\\'", CodeToken::String)), "{t:?}");
+        assert!(t.contains(&("# c", CodeToken::Comment)), "{t:?}");
+        assert!(t.contains(&("\"\"\"\nsays \"hi\"\n\"\"\"", CodeToken::String)), "{t:?}");
+        assert!(t.contains(&("'''\n\\n\n'''", CodeToken::String)), "{t:?}");
+    }
+
+    #[test]
+    fn toml_rows_of_an_array_are_neither_keys_nor_tables() {
+        let t = tokens_of("toml", "x = [\n  [1, 2],\n  \"a\", { b = 1 },\n]\n[t] x\n");
+        assert_eq!(
+            t,
+            vec![
+                ("x", CodeToken::Keyword),
+                ("1", CodeToken::Number),
+                ("2", CodeToken::Number),
+                ("\"a\"", CodeToken::String),
+                ("b", CodeToken::Keyword),
+                ("1", CodeToken::Number),
+            ]
+        );
     }
 
     #[test]

@@ -2,27 +2,9 @@
 //! and without the network; the app hands it a socket per helper it wants and reads pixels and PDFs back. With `--stdio`
 //! it answers on its standard streams instead, for the tests, without a sandbox.
 
-mod editor {
-    pub mod safe_image;
-
-    pub mod decoder {
-        #[allow(
-            dead_code,
-            reason = "the app reads the answers and the service the requests; each uses its half"
-        )]
-        pub mod protocol;
-        pub mod serve;
-    }
-}
-
-mod util {
-    #[allow(dead_code, reason = "the app connects and the service serves; each uses its half")]
-    pub mod xpc;
-}
-
 use std::os::fd::OwnedFd;
 
-use editor::decoder::serve;
+use splat_decoder::{serve, xpc};
 
 fn main() {
     match std::env::args().nth(1).as_deref() {
@@ -32,7 +14,7 @@ fn main() {
             #[cfg(coverage)]
             measuring::start();
             serve::watch(end);
-            util::xpc::serve(take, end);
+            xpc::serve(take, end);
         }
     }
 }

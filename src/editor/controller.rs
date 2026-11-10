@@ -5,6 +5,7 @@ pub(super) mod layers;
 pub(super) mod window;
 
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, ProtocolObject, Sel};
@@ -36,7 +37,7 @@ use super::sidebar::NoteEvent;
 use super::state::{Invalidate, State};
 use super::sync::Snapshot;
 use super::update::{self, Updater};
-use super::{js, remote, string_of, style, toolbar};
+use super::{string_of, style, toolbar};
 use crate::document::MdDocument;
 use crate::util::guarded;
 use layers::{
@@ -44,6 +45,7 @@ use layers::{
     ForSelection, ForSharing, ForUpdater, Message,
 };
 use splat_editor_state::progress;
+use splat_render::Viewer;
 
 pub struct Ivars {
     document: Weak<MdDocument>,
@@ -61,6 +63,45 @@ pub struct Ivars {
     notes: notes::NotesState,
     /// The window has closed, while what is under way can still hold on to the controller for a moment.
     closed: std::cell::Cell<bool>,
+    /// The controller as the render path knows it, made when it first asks.
+    viewer: std::cell::OnceCell<Rc<dyn Viewer>>,
+}
+
+/// The controller as the render path reaches it, which does not keep it alive.
+struct Shown(Weak<EditorController>);
+
+impl Viewer for Shown {
+    fn renders_arrived(&self) {
+        if let Some(controller) = self.0.load() {
+            controller.renders_arrived();
+        }
+    }
+
+    fn image_arrived(&self, url: String) {
+        if let Some(controller) = self.0.load() {
+            controller.image_arrived(url);
+        }
+    }
+
+    fn image_loaded(&self, path: PathBuf, file: images::ImageFile) {
+        if let Some(controller) = self.0.load() {
+            controller.handle(Message::ImageLoaded(path, file));
+        }
+    }
+
+    fn images_changed(&self, changed: Vec<(PathBuf, crate::util::Stamp)>) {
+        if let Some(controller) = self.0.load() {
+            controller.handle(Message::ImagesChanged(changed));
+        }
+    }
+
+    fn web_images_shown(&self) -> Vec<String> {
+        self.0.load().map(|c| c.web_images_shown()).unwrap_or_default()
+    }
+
+    fn has_closed(&self) -> bool {
+        self.0.load().is_none_or(|c| c.has_closed())
+    }
 }
 
 /// `define_class!` with `body` and, for every row of `actions::commands!`, the method AppKit finds the command's target by:
@@ -470,6 +511,14 @@ impl EditorController {
         self.updater().renders_arrived();
     }
 
+    /// The controller as the render path knows it.
+    pub(in crate::editor) fn viewer(&self) -> Rc<dyn Viewer> {
+        self.ivars()
+            .viewer
+            .get_or_init(|| Rc::new(Shown(Weak::from(self))))
+            .clone()
+    }
+
     pub(in crate::editor) fn web_images_shown(&self) -> Vec<String> {
         self.updater().web_images_shown()
     }
@@ -650,8 +699,7 @@ impl EditorController {
     /// The window closes: formulas and images only this document waited for are of no use to anybody.
     fn stops_showing(&self) {
         self.ivars().closed.set(true);
-        js::forget(self);
-        remote::stops_showing(self);
+        splat_render::stops_showing(&self.viewer());
     }
 
     /// Nobody will see what this document asks for from now on.

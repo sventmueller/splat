@@ -119,6 +119,12 @@ pub fn answer_from<T: Send + 'static>(
 /// Volumes something is under way on, so that it does not pile up behind one that stopped answering while the others go on.
 pub struct BusyVolumes(Mutex<Vec<String>>);
 
+impl Default for BusyVolumes {
+    fn default() -> BusyVolumes {
+        BusyVolumes::new()
+    }
+}
+
 /// Says that a volume is free again when dropped, so a panic on the way cannot leave it busy for good.
 pub struct OnVolume {
     busy: &'static BusyVolumes,

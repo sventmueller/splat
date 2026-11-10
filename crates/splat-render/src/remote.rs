@@ -6,7 +6,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use objc2::rc::{Retained, Weak};
+use std::rc::Rc;
+
+use objc2::rc::Retained;
 use objc2::runtime::{NSObject, ProtocolObject};
 use objc2::{AnyThread, define_class, msg_send};
 use objc2_foundation::{
@@ -15,10 +17,12 @@ use objc2_foundation::{
     NSURLSessionResponseDisposition, NSURLSessionTask, NSURLSessionTaskDelegate,
 };
 
-use super::EditorController;
-use super::decoder::{Decoded, MAX_BYTES};
-use super::picture::{Rendered, Sizing};
-use crate::util::{guarded, main_soon, ns};
+use splat_decoder::{Decoded, MAX_BYTES};
+
+use crate::appkit::{ns, to_isize};
+use crate::lanes::{guarded, main_soon};
+use crate::picture::{Rendered, Sizing};
+use crate::viewer::{Held, Viewer, number_of};
 
 #[derive(Default)]
 struct Remote {
@@ -32,7 +36,7 @@ struct Remote {
     tasks: HashMap<String, Retained<NSURLSessionDataTask>>,
     /// The documents that wait for what is loading or waiting to load.
     askers: HashMap<String, HashSet<usize>>,
-    listeners: Vec<Weak<EditorController>>,
+    listeners: Vec<Held>,
 }
 
 struct Stored {
@@ -43,7 +47,6 @@ struct Stored {
 }
 
 const MAX_RUNNING: usize = 6;
-const FIRST_RETRY: Duration = crate::test_hooks::FIRST_RETRY;
 const LAST_RETRY: Duration = Duration::from_secs(15 * 60);
 
 thread_local! {
@@ -68,7 +71,7 @@ pub fn idle() -> bool {
 }
 
 pub fn is_remote(url: &str) -> bool {
-    crate::markdown::url::is_https(url)
+    splat_markdown::url::is_https(url)
 }
 
 /// Starts the next downloads as far as connections are free.
@@ -106,7 +109,7 @@ pub fn try_failed_again() {
             // The last document that showed them has closed.
             release(&mut r);
         }
-        let listeners: Vec<_> = r.listeners.iter().filter_map(Weak::load).collect();
+        let listeners: Vec<_> = r.listeners.iter().filter_map(Held::load).collect();
         (due_for_retry(&r.images, Instant::now()), listeners)
     });
     if due.is_empty() || listeners.is_empty() {
@@ -144,17 +147,16 @@ pub fn forget_unused() {
     });
 }
 
-fn asker(controller: &EditorController) -> usize {
-    std::ptr::from_ref(controller) as usize
+fn asker(viewer: &Rc<dyn Viewer>) -> usize {
+    number_of(viewer)
 }
 
 /// A document has closed, and a document decides which hosts hear from Splat.
-pub(super) fn stops_showing(controller: &EditorController) {
+pub fn stops_showing(viewer: &Rc<dyn Viewer>) {
     REMOTE.with(|r| {
         let mut r = r.borrow_mut();
-        r.listeners
-            .retain(|w| w.load().is_some_and(|l| !std::ptr::eq(&*l, controller)));
-        forget_asker(&mut r, asker(controller));
+        r.listeners.retain(|w| w.load().is_some() && !w.is(viewer));
+        forget_asker(&mut r, asker(viewer));
         if r.listeners.is_empty() {
             release(&mut r);
         }
@@ -188,7 +190,7 @@ fn forget_asker(r: &mut Remote, gone: usize) {
 
 fn release(r: &mut Remote) {
     for (_, stored) in r.images.drain() {
-        super::picture::count_decoded(-crate::util::to_isize(stored.bytes));
+        crate::picture::count_decoded(-to_isize(stored.bytes));
     }
     let Remote { waiting, loading, .. } = &mut *r;
     for url in waiting.drain(..) {
@@ -201,7 +203,7 @@ fn release(r: &mut Remote) {
 }
 
 /// `Some(None)` means loading failed; `None` means not loaded yet (a load is started).
-pub fn get(url: &str, requester: Option<&EditorController>) -> Option<Option<Rendered>> {
+pub fn get(url: &str, requester: Option<&Rc<dyn Viewer>>) -> Option<Option<Rendered>> {
     if !is_remote(url) || NSURL::URLWithString(&ns(url)).is_none() {
         return Some(None);
     }
@@ -210,13 +212,10 @@ pub fn get(url: &str, requester: Option<&EditorController>) -> Option<Option<Ren
     let (found, start) = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         if let Some(c) = requester
-            && !r
-                .listeners
-                .iter()
-                .any(|w| w.load().is_some_and(|l| std::ptr::eq(&*l, c)))
+            && !r.listeners.iter().any(|w| w.is(c))
         {
             r.listeners.retain(|w| w.load().is_some());
-            r.listeners.push(Weak::from(c));
+            r.listeners.push(Held::of(c));
         }
         match r.images.get(url) {
             Some(stored) => (Some(stored.found.clone()), false),
@@ -234,7 +233,7 @@ pub fn get(url: &str, requester: Option<&EditorController>) -> Option<Option<Ren
     found
 }
 
-pub(super) fn load(url: &str) {
+fn load(url: &str) {
     REMOTE.with(|r| r.borrow_mut().waiting.push_back(url.to_string()));
     start_waiting();
 }
@@ -266,7 +265,7 @@ fn session() -> Retained<NSURLSession> {
     config.setHTTPCookieStorage(None);
     config.setTimeoutIntervalForRequest(20.0);
     config.setTimeoutIntervalForResource(60.0);
-    crate::test_hooks::serve_the_web_inside(&config);
+    (crate::host().web_session)(&config);
     // SAFETY: NSObject's initializer, called once on the newly allocated object.
     let delegate: Retained<Loader> = unsafe { msg_send![super(Loader::alloc().set_ivars(())), init] };
     // The session keeps its delegate; its callbacks arrive on a background queue of its own.
@@ -309,11 +308,11 @@ define_class!(
                     return;
                 }
                 // The session's queue also delivers the data of all other downloads, so decoding must not hold it up.
-                super::picture::load_in_background(move || {
-                    let room = super::picture::room_for_more();
+                crate::picture::load_in_background(move || {
+                    let room = crate::picture::room_for_more();
                     let decoded = room
                         .then(|| {
-                            crate::util::contained(|| super::decoder::decode(&bytes, super::picture::allowed_side()))
+                            crate::lanes::contained(|| splat_decoder::decode(&bytes, crate::picture::allowed_side()))
                         })
                         .flatten()
                         .flatten();
@@ -397,8 +396,8 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
         Some(Decoded::Rgba { pixels, .. }) => pixels.len(),
         _ => 0,
     };
-    super::picture::count_decoded(crate::util::to_isize(bytes));
-    let rendered = decoded.and_then(super::decoder::image).map(|image| {
+    crate::picture::count_decoded(to_isize(bytes));
+    let rendered = decoded.and_then(splat_decoder::image).map(|image| {
         let size = image.size();
         Rendered {
             image,
@@ -411,7 +410,7 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
             .images
             .get(&url)
             .and_then(|old| old.retry)
-            .map_or(FIRST_RETRY, |(_, pause)| (pause * 2).min(LAST_RETRY));
+            .map_or(crate::host().first_retry, |(_, pause)| (pause * 2).min(LAST_RETRY));
         let retry = (rendered.is_none() && failure == Failure::Passing).then(|| (Instant::now() + pause, pause));
         let stored = Stored {
             found: rendered,
@@ -419,9 +418,9 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
             retry,
         };
         if let Some(old) = r.images.insert(url.clone(), stored) {
-            super::picture::count_decoded(-crate::util::to_isize(old.bytes));
+            crate::picture::count_decoded(-to_isize(old.bytes));
         }
-        r.listeners.iter().filter_map(Weak::load).collect::<Vec<_>>()
+        r.listeners.iter().filter_map(Held::load).collect::<Vec<_>>()
     });
     start_waiting();
     for l in listeners {

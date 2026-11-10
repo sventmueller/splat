@@ -138,8 +138,8 @@ impl Sharing<'_> {
             images: self.host.pictures().store(),
             max_image_width: width - 20.0,
             dark: false,
-            controller: None,
-            leaves_the_mac: true,
+            requester: None,
+            leaves_the_mac: Some(super::env::may_carry_along),
             macros,
             drawn: &live,
         };

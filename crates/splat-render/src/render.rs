@@ -1,6 +1,11 @@
+//! The preview's layout as native text: fonts, paragraph styles, text blocks for code, quotes and rules, tables, and
+//! attachments for pictures, formulas and diagrams. The text needs a TextKit 1 view, as text blocks and tables lay out
+//! nowhere else.
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 
 use objc2::rc::Retained;
 use objc2::{AnyThread, MainThreadMarker};
@@ -13,23 +18,24 @@ use objc2_foundation::{
     NSArray, NSAttributedString, NSDictionary, NSMutableAttributedString, NSPoint, NSRect, NSRectEdge, NSSize, NSURL,
 };
 
-use super::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
-use super::env::may_carry_along;
-use super::images::{ImageStore, resolve_path};
-use super::layers::Object;
-use super::links::locate;
-use super::picture::{Rendered, Sizing};
-use super::style::{PREVIEW_SIZE, token_color};
-use super::{js, remote};
-use crate::markdown::code;
-use crate::markdown::doc::AlertKind;
-use crate::markdown::doc::Align;
-use crate::markdown::style::Baseline;
-use crate::markdown::text::{Utf16Map, bytes};
-use crate::preview::layout::{Atom, ItemMarker, Link, Para, ParaKind, ParaStyle, Run, RunMap, RunStyle, TopBlock};
-use crate::util::byte_range_to_ns;
-use crate::util::constant;
-use crate::util::ns;
+use splat_editor_state::links::locate;
+use splat_markdown::code;
+use splat_markdown::doc::AlertKind;
+use splat_markdown::doc::Align;
+use splat_markdown::style::Baseline;
+use splat_markdown::text::{Utf16Map, bytes};
+use splat_preview::layout::{Atom, ItemMarker, Link, Para, ParaKind, ParaStyle, Run, RunMap, RunStyle, TopBlock};
+
+use crate::appkit::{byte_range_to_ns, constant, ns, to_isize};
+use crate::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
+use crate::images::{ImageStore, resolve_path};
+use crate::picture::{Rendered, Sizing};
+use crate::style::{PREVIEW_SIZE, token_color};
+use crate::viewer::Viewer;
+use crate::{js, remote};
+
+/// Whether a local file, located beside the document in the folder given, may go along with what leaves the Mac.
+pub type CarriesAlong = fn(&Path, Option<&Path>) -> bool;
 
 pub struct RenderCtx<'a> {
     pub mtm: MainThreadMarker,
@@ -39,9 +45,9 @@ pub struct RenderCtx<'a> {
     pub max_image_width: f64,
     pub dark: bool,
     /// Receives a re-render once a remote image has loaded; print rendering passes `None`.
-    pub controller: Option<Object<'a>>,
-    /// What leaves the Mac as a file shows only the local images `may_carry_along` allows.
-    pub leaves_the_mac: bool,
+    pub requester: Option<&'a Rc<dyn Viewer>>,
+    /// What leaves the Mac as a file shows only the local images this allows; what stays shows them all.
+    pub leaves_the_mac: Option<CarriesAlong>,
     /// What the formulas of the document define for each other.
     pub macros: std::sync::Arc<str>,
     /// Pictures from the web and what WebKit drew, which the preview shows but does not make.
@@ -58,16 +64,12 @@ pub trait Drawn {
 
 /// The app's downloads and WebKit's drawings; `requester` hears when a picture it asked for arrives.
 pub struct Live<'a> {
-    pub requester: Option<Object<'a>>,
+    pub requester: Option<&'a Rc<dyn Viewer>>,
 }
 
 impl Drawn for Live<'_> {
     fn web_picture(&self, url: &str) -> Option<Rendered> {
-        match self.requester {
-            Some(requester) => requester.web_picture(url),
-            None => remote::get(url, None),
-        }
-        .flatten()
+        remote::get(url, self.requester).flatten()
     }
 
     fn drawing(&self, key: &js::Key) -> Option<Rendered> {
@@ -506,9 +508,9 @@ impl RenderCtx<'_> {
                         t,
                         s,
                         (
-                            crate::util::to_isize(*row as usize),
-                            crate::util::to_isize(column as usize),
-                            crate::util::to_isize(span as usize),
+                            to_isize(*row as usize),
+                            to_isize(column as usize),
+                            to_isize(span as usize),
                         ),
                         *header,
                     );
@@ -576,15 +578,15 @@ impl RenderCtx<'_> {
             attributes.push(Attribute::background(
                 &NSColor::controlAccentColor().colorWithAlphaComponent(0.12),
             ));
-            attributes.push(Attribute::tool_tip(crate::i18n::t("⌘-Klick sucht den Tag im Dokument")));
+            attributes.push(Attribute::tool_tip(splat_i18n::t("⌘-Klick sucht den Tag im Dokument")));
         }
         if matches!(run.style.link, Some(Link::Reference(_))) {
-            attributes.push(Attribute::tool_tip(crate::i18n::t("⌘-Klick öffnet den Verweis")));
+            attributes.push(Attribute::tool_tip(splat_i18n::t("⌘-Klick öffnet den Verweis")));
         }
         match text_background(&run.style, &para.style.kind) {
             Some(TextBackground::Spoiler) => {
                 attributes.push(Attribute::background(&spoiler_color()));
-                attributes.push(Attribute::tool_tip(crate::i18n::t(
+                attributes.push(Attribute::tool_tip(splat_i18n::t(
                     "Verborgener Text: Zum Lesen markieren",
                 )));
             }
@@ -603,7 +605,7 @@ impl RenderCtx<'_> {
                 attributes.push(Attribute::underline());
                 attributes.push(Attribute::tool_tip(&format!(
                     "{address}\n{}",
-                    crate::i18n::t("⌘-Klick öffnet den Link")
+                    splat_i18n::t("⌘-Klick öffnet den Link")
                 )));
             }
         }
@@ -641,14 +643,14 @@ impl RenderCtx<'_> {
                     self.drawn
                         .web_picture(url)
                         .map(|r| self.images.borrow_mut().for_appearance(url, r, self.dark))
-                } else if self.leaves_the_mac && !may_leave_with_the_document(url, self.doc_dir) {
+                } else if let Some(carries) = self.leaves_the_mac
+                    && !may_leave_with_the_document(url, self.doc_dir, carries)
+                {
                     None
                 } else {
-                    let mut images = self.images.borrow_mut();
-                    match self.controller {
-                        Some(controller) => controller.image_file(&mut images, url, self.doc_dir, self.dark),
-                        None => images.file(url, self.doc_dir, self.dark, None),
-                    }
+                    self.images
+                        .borrow_mut()
+                        .file(url, self.doc_dir, self.dark, self.requester)
                 };
                 let r = found
                     .map(|r| sized(r, image.width, image.height))
@@ -667,20 +669,25 @@ impl RenderCtx<'_> {
                 let r = placeholder(alert_symbol(*kind), font)?;
                 let tint = NSImageSymbolConfiguration::configurationWithHierarchicalColor(&alert_color(*kind));
                 let image = r.image.imageWithSymbolConfiguration(&tint)?;
-                image.setAccessibilityDescription(Some(&ns(crate::i18n::t(kind.label()))));
+                image.setAccessibilityDescription(Some(&ns(splat_i18n::t(kind.label()))));
                 Rendered { image, ..r }
             }
             _ => return None,
         };
-        let att = NSTextAttachment::new();
-        att.setImage(Some(&rendered.image));
-        att.setBounds(attachment_bounds(rendered.sizing, font.xHeight(), self.max_image_width));
-        Some(att)
+        Some(attachment(&rendered, font, self.max_image_width))
     }
 }
 
-fn may_leave_with_the_document(url: &str, doc_dir: Option<&Path>) -> bool {
-    resolve_path(url, doc_dir).is_some_and(|path| may_carry_along(&locate(&path, doc_dir), doc_dir))
+/// An attachment showing `rendered` in a line set in `font`, no wider than `max_width`.
+pub fn attachment(rendered: &Rendered, font: &NSFont, max_width: f64) -> Retained<NSTextAttachment> {
+    let att = NSTextAttachment::new();
+    att.setImage(Some(&rendered.image));
+    att.setBounds(attachment_bounds(rendered.sizing, font.xHeight(), max_width));
+    att
+}
+
+fn may_leave_with_the_document(url: &str, doc_dir: Option<&Path>, carries: CarriesAlong) -> bool {
+    resolve_path(url, doc_dir).is_some_and(|path| carries(&locate(&path, doc_dir), doc_dir))
 }
 
 /// Where an attachment stands against its line and how large it is, no wider than `max_width`.
@@ -889,9 +896,9 @@ mod tests {
     use objc2_app_kit::NSFontDescriptorSymbolicTraits;
 
     use super::*;
-    use crate::markdown::reader::parse;
-    use crate::markdown::style::TextStyle;
-    use crate::preview::layout::{CharMap, NoImages, layout};
+    use splat_markdown::reader::parse;
+    use splat_markdown::style::TextStyle;
+    use splat_preview::layout::{CharMap, NoImages, layout};
 
     fn style(kind: ParaKind) -> ParaStyle {
         ParaStyle {
@@ -938,8 +945,8 @@ mod tests {
             text: "x".into(),
             style,
             map: RunMap::Text {
-                chars: CharMap::Verbatim(crate::markdown::text::Byte::new(0)),
-                end: crate::markdown::text::Byte::new(1),
+                chars: CharMap::Verbatim(splat_markdown::text::Byte::new(0)),
+                end: splat_markdown::text::Byte::new(1),
             },
         }
     }
@@ -948,8 +955,8 @@ mod tests {
         Para {
             style,
             runs: Vec::new(),
-            src: crate::markdown::text::bytes(0..0),
-            insert_at: crate::markdown::text::Byte::new(0),
+            src: splat_markdown::text::bytes(0..0),
+            insert_at: splat_markdown::text::Byte::new(0),
         }
     }
 
@@ -1128,7 +1135,7 @@ mod tests {
         let marker = Run {
             map: RunMap::Atom {
                 atom: Atom::Marker,
-                src: crate::markdown::text::bytes(0..1),
+                src: splat_markdown::text::bytes(0..1),
             },
             ..run(RunStyle::default())
         };

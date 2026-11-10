@@ -91,6 +91,9 @@ fn the_modules_of_every_crate_depend_downwards_only() {
         if name.contains("splat-preview") {
             assert!(graph["map"].contains("layout"), "{graph:?}");
         }
+        if name.contains("splat-render") {
+            assert!(graph["remote"].contains("picture"), "{graph:?}");
+        }
         if let Some(found) = cycle(&graph) {
             ways_round.push(format!("{name}: {}", found.join(" -> ")));
         }
@@ -102,7 +105,7 @@ fn the_modules_of_every_crate_depend_downwards_only() {
 fn the_modules_of_the_editor_depend_downwards_only() {
     let app = Crate::read(&root().join("src/main.rs"), Without::Tests);
     let graph = graph(&app, &["editor"], &["layers", "selftest"]);
-    assert!(graph["remote"].contains("picture"), "{:?}", graph["remote"]);
+    assert!(graph["export"].contains("export_options"), "{:?}", graph["export"]);
     assert_eq!(cycle(&graph), None);
 }
 
@@ -319,14 +322,41 @@ fn private_calls(text: &str) -> Vec<usize> {
 fn the_app_calls_no_private_method() {
     let root = root();
     let selftest = root.join("src/editor/selftest");
-    let files: Vec<_> = sources::rust_files(&root.join("src"))
-        .into_iter()
+    let files: Vec<_> = ["src", "crates/splat-render/src", "crates/splat-decoder/src"]
+        .iter()
+        .flat_map(|dir| sources::rust_files(&root.join(dir)))
         .filter(|file| !file.starts_with(&selftest) && *file != root.join("src/editor/selftest.rs"))
         .collect();
     assert!(files.len() > 50, "{} files found", files.len());
     for file in files {
         let found = private_calls(&std::fs::read_to_string(&file).unwrap());
         assert!(found.is_empty(), "{}: lines {found:?}", file.display());
+    }
+}
+
+#[test]
+fn only_the_service_hands_bytes_to_the_systems_decoders() {
+    let root = root();
+    let calls = [
+        "imageRepWithData",
+        "imageRepsWithData",
+        "initWithData(",
+        "CGImageSource",
+    ];
+    let files: Vec<_> = ["src", "crates/splat-render/src", "crates/splat-decoder/src"]
+        .iter()
+        .flat_map(|dir| sources::rust_files(&root.join(dir)))
+        .filter(|file| !file.to_string_lossy().contains("selftest"))
+        .collect();
+    assert!(files.len() > 50, "{} files found", files.len());
+    for file in files {
+        let text = std::fs::read_to_string(&file).unwrap();
+        let product = text.split("#[cfg(test)]").next().unwrap_or("");
+        for call in &calls {
+            let allowed = file.ends_with("crates/splat-decoder/src/serve.rs")
+                && matches!(*call, "initWithData(" | "imageRepWithData");
+            assert!(allowed || !product.contains(call), "{} calls {call}", file.display());
+        }
     }
 }
 

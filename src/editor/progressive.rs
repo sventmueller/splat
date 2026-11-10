@@ -98,8 +98,9 @@ impl Progressive<'_> {
         let Some((zoom, waiting)) = self.host.model().read(move |st| waiting_blocks(st, wanted, from)) else {
             return false;
         };
+        let viewer = self.host.object().viewer();
         let live = Live {
-            requester: Some(self.host.object()),
+            requester: Some(&viewer),
         };
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
@@ -108,8 +109,8 @@ impl Progressive<'_> {
             images: self.host.pictures().store(),
             max_image_width: max_width,
             dark,
-            controller: Some(self.host.object()),
-            leaves_the_mac: false,
+            requester: Some(&viewer),
+            leaves_the_mac: None,
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,
         };

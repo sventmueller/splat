@@ -40,6 +40,11 @@ fn main() {
         }
         report(info);
     }));
+    splat_render::start(splat_render::Host {
+        first_retry: test_hooks::FIRST_RETRY,
+        web_session: test_hooks::serve_the_web_inside,
+        ..splat_render::Host::of_main_bundle(|what, detail| diag::report(what, detail))
+    });
     // NSDocumentController looks the class up by its Info.plist name, which only works once it is registered.
     document::MdDocument::class();
     let _documents = document::DocumentController::install(mtm);

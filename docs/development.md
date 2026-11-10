@@ -191,9 +191,9 @@ from outside: the randomised tests in `robustness.rs`, which share the generator
 `sync.rs` in `splat-editor-state`, the documents built to hurt in `hostile.rs`, and the seeds of the fuzz targets in
 `fuzz_seeds.rs`. `tests/` holds what looks at all of the program: its sources, its translations and the decoder test,
 which starts the built program. What the window decides without needing one lives in `crates/splat-editor-state/`, whose
-tests `make coverage-library` holds to the higher floors; in `src/editor/` the rest are free functions with tests of
-their own: paragraph styles, fonts and colours as values in `render.rs`, what toolbar identifiers stand for in
-`toolbar.rs`.
+tests `make coverage-library` holds to the higher floors; in `src/editor/` and `crates/splat-render/` the rest are free
+functions with tests of their own: paragraph styles, fonts and colours as values in `render.rs`, what toolbar
+identifiers stand for in `toolbar.rs`.
 
 A step of the window self-test waits for a named condition, not for a time; only what gives no signal, like the absence of something, keeps a pause with its reason. The self-test build runs panes and popovers without their animations, which never end without a display, and no check looks at an animation. Waiting in vain is a failed check that names what never came, a step that panics is a failed check as well, and the run goes on either way. A check that cannot say anything in this run reports `SELFTEST SKIP`: xtask lists it, and it neither passes nor fails. xtask holds each mode, and `--scenarios` of its own, to about nine tenths of its checks. The window
 self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios/`: every formatting and
@@ -263,6 +263,14 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `crates/splat-i18n/` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table
   of the interface language at its start.
 - `crates/splat-testkit/`: the generator of the randomised tests and the checks of the fuzz targets.
+- `crates/splat-render/`: the preview's render path, which other apps share: the layout as native text (`render.rs`,
+  text attributes in `attributes.rs`), WebKit for MathJax, Mermaid, Graphviz and PlantUML in a hidden window (`js.rs`,
+  calls into WebKit in `webkit.rs`), local images (`images.rs`) and pictures from the web (`remote.rs`), all within one
+  memory budget (`picture.rs`); worker threads (`lanes.rs`) and volumes that may stop answering (`volumes.rs`). A
+  document asks as a `Viewer` and hears through it what arrives for it. macOS only, outside `check-library`.
+- `crates/splat-decoder/`: the decoding service, which decodes images and graphics in a sandbox of its own, and the
+  app's side of it: what both sides say in `protocol.rs`, the service's side in `serve.rs` and `safe_image.rs`, the
+  sockets it gets through libxpc in `xpc.rs`. It needs no WebKit, so the service's program does not load it.
 - `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views and forwards to
   components, small structs over the controller and the state they own, whose fields the other modules cannot reach:
 
@@ -280,16 +288,13 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `atom.rs`, `atom/edit.rs` | `AtomEditor`: the formula and diagram editor |
 | `navigation.rs` | `Links`: links, wiki links, tags, task checkboxes, folding, footnotes |
 | `env.rs` | what the preview reads from outside the text: typographic punctuation, the repository for `@name` and `#12`, the BibTeX file, embedded notes |
-| `render.rs`, `images.rs`, `picture.rs`, `remote.rs`, `safe_image.rs` | preview text, local and remote images; `Pictures` in `images.rs` |
-| `attributes.rs` | text attributes; each key only gets a value of the type it expects |
+| `images.rs` | `Pictures`: the images of the preview from `splat-render`, and the bar that offers the folder around a document |
 | `counter.rs`, `changes.rs` | `WordCounter`, `ChangeMarks`: the word count in the corner and the marks for what changed since the last commit |
 | `notes.rs`, `sidebar.rs` | `Notes`: the folder of notes, searching, opening and renaming; the views of the sidebar |
 | `metadata.rs`, `export_options.rs` | the metadata form; what exports add to the text |
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |
-| `decoder.rs` | the app's side of the decoding service, which decodes images and graphics in a sandbox of its own; `decoder/protocol.rs` what both sides say, `decoder/serve.rs` the service's side |
 | `export.rs`, `outline.rs` | `Sharing`: HTML and Word export, the share file, printing; the outline sidebar |
-| `js.rs`, `mathfield.rs` | WebKit for MathJax, Mermaid, Graphviz, PlantUML and the visual formula editor |
-| `webkit.rs` | calls into WebKit; only the navigation delegate's lifetime stays with `js.rs` and `mathfield.rs` |
+| `mathfield.rs` | the visual formula editor in WebKit; formulas and diagrams render through `splat-render` |
 | `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
@@ -297,9 +302,8 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
   the folders the user granted, kept as security-scoped bookmarks; the bar above the preview offers the folder around a
   document while the App Sandbox keeps it closed.
 - `src/decoder_main.rs`: the program of the decoding service, `SplatDecoder.xpc` in the app bundle, which macOS starts
-  in a sandbox without the user's files and without the network; `src/util/xpc.rs` hands it a socket per helper.
-- `src/util/`: worker threads (`lanes.rs`), volumes that may stop answering (`volumes.rs`), AppKit helpers, files and
-  processes. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
+  in a sandbox without the user's files and without the network; `splat-decoder` hands it a socket per helper.
+- `src/util/`: AppKit helpers, files and processes, and what moved to `splat-render` under its old names. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
   returns after big edits.
 - `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](../vendor.lock).
