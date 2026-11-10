@@ -115,8 +115,8 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
             images: &images,
             max_image_width: 400.0,
             dark: false,
-            controller: None,
-            leaves_the_mac: false,
+            requester: None,
+            leaves_the_mac: None,
             macros: std::sync::Arc::from(""),
             drawn: &given,
         };
@@ -332,11 +332,12 @@ fn with_web_views_started(mtm: MainThreadMarker) {
     sandbox_of_the_helper();
     // With a document asking, which keeps them in memory and tries failures again.
     let editor = document.editor();
+    let viewer = editor.as_ref().map(|editor| editor.viewer());
     for path in REMOTE_PICTURES {
-        super::super::remote::get(&url_in_probe(path), editor.as_deref());
+        super::super::remote::get(&url_in_probe(path), viewer.as_ref());
     }
-    super::super::remote::get(&in_capitals(), editor.as_deref());
-    super::super::remote::get(&at_home(), editor.as_deref());
+    super::super::remote::get(&in_capitals(), viewer.as_ref());
+    super::super::remote::get(&at_home(), viewer.as_ref());
     let documents = NSDocumentController::sharedDocumentController(mtm);
     let recent = std::env::temp_dir().join("splat-probe-recent.md");
     let _ = std::fs::write(&recent, "# Recent\n");

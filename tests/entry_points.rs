@@ -60,9 +60,15 @@ const UNREAD_MACROS: [(&str, &str); 1] = [(
 /// Calls whose arguments run behind a guard of ours.
 const GUARDS: [&str; 4] = ["guarded", "contained", "main_soon", "main_after"];
 
-/// What ships of the app, without tests and self-tests.
+/// What ships of the app, without tests and self-tests: its own sources and the render path it shares with others.
 fn product() -> Crate {
-    Crate::read(&root().join("src/main.rs"), Without::TestsAndSelftest)
+    let mut product = Crate::read(&root().join("src/main.rs"), Without::TestsAndSelftest);
+    for shared in ["crates/splat-render/src/lib.rs", "crates/splat-decoder/src/lib.rs"] {
+        let shared = Crate::read(&root().join(shared), Without::TestsAndSelftest);
+        product.sources.extend(shared.sources);
+        product.modules.extend(shared.modules);
+    }
+    product
 }
 
 fn scanned(source: &Source) -> Found {
@@ -398,7 +404,7 @@ fn every_function_the_system_calls_is_guarded() {
 fn only_the_guarded_helpers_go_to_the_main_queue() {
     let found: Vec<String> = across_the_product(|f| f.raw_dispatches)
         .into_iter()
-        .filter(|at| !at.starts_with("src/util/lanes.rs:"))
+        .filter(|at| !at.starts_with("crates/splat-render/src/lanes.rs:"))
         .collect();
     assert!(found.is_empty(), "{found:#?}");
 }
@@ -745,6 +751,8 @@ fn addresses_are_read_in_one_place() {
         "src/main.rs",
         "crates/splat-markdown/src/lib.rs",
         "crates/splat-preview/src/lib.rs",
+        "crates/splat-render/src/lib.rs",
+        "crates/splat-decoder/src/lib.rs",
     ];
     let sources: Vec<Source> = crates
         .iter()

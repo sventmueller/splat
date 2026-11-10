@@ -1,8 +1,9 @@
 //! Images, SVGs and rendered formulas are decoded in a service of their own that may neither read the user's files nor
 //! use the network: a flaw in a decoder that a crafted document triggers then stays inside a process that can only hand
-//! back pixels. macOS starts the service, `SplatDecoder.xpc` in the app bundle, in a sandbox of its own; the app hands it
-//! a socket for each helper it wants, and turns no untrusted bytes into a picture itself. What only the system's decoders
-//! read, TIFF, HEIC, AVIF and PDF, goes over sockets of their own.
+//! back pixels. macOS starts the service from the app bundle (`Contents/XPCServices/`, identifier: the app's with
+//! `.decoder`) in a sandbox of its own; the app hands it a socket for each helper it wants, and turns no untrusted bytes
+//! into a picture itself. What only the system's decoders read, TIFF, HEIC, AVIF and PDF, goes over sockets of their
+//! own. The service's program calls `serve` and `xpc`; the app calls the functions of this module.
 
 #[cfg(feature = "selftest")]
 use std::io::Read;
@@ -16,20 +17,57 @@ use objc2::rc::Retained;
 use objc2_app_kit::{NSBitmapFormat, NSBitmapImageRep, NSDeviceRGBColorSpace, NSImage};
 use objc2_foundation::{NSBundle, NSSize};
 
-#[allow(
-    dead_code,
-    reason = "the app reads the answers and the service the requests; each uses its half"
-)]
-pub(crate) mod protocol;
+pub mod protocol;
+mod safe_image;
+pub mod serve;
+pub mod xpc;
 
 pub use protocol::{Decoded, EXPORT_SIDE, MAX_BYTES, MAX_FILE_BYTES, SHOWN_SIDE};
 use protocol::{Request, TIMEOUT, memory_of, most_memory, read_answer};
 
-use crate::util::xpc::{Connection, Order};
+use xpc::{Connection, Order};
 
 /// What a decode can take in the worst case: both tries reach their limit.
 #[cfg(feature = "selftest")]
 pub const LONGEST_WAIT: Duration = Duration::from_secs(21);
+
+/// Where what fails out of the user's sight goes: what failed and a detail, never any text of a document.
+pub type Report = fn(&str, &dyn std::fmt::Display);
+
+static REPORT: std::sync::OnceLock<Report> = std::sync::OnceLock::new();
+
+/// Sends what fails here, and in the crates built on this one, to `report`; before that it goes to standard error.
+pub fn report_to(report: Report) {
+    let _ = REPORT.set(report);
+}
+
+/// Reports `what` failed, with `detail`.
+pub fn report(what: &str, detail: impl std::fmt::Display) {
+    match REPORT.get() {
+        Some(report) => report(what, &detail),
+        None => eprintln!("{what}: {detail}"),
+    }
+}
+
+/// The whole program of a service that measures nothing: launchd starts it and it answers each socket the app hands
+/// over; with `--stdio`, or `--stdio-native` for the system's decoders, it answers on its standard streams, as tests run it.
+pub fn service_main() {
+    match std::env::args().nth(1).as_deref() {
+        Some("--stdio") => serve::answer(std::io::stdin().lock(), std::io::stdout().lock(), false),
+        Some("--stdio-native") => serve::answer(std::io::stdin().lock(), std::io::stdout().lock(), true),
+        _ => {
+            serve::watch(|code| std::process::exit(code));
+            xpc::serve(answer_socket, |code| std::process::exit(code));
+        }
+    }
+}
+
+fn answer_socket(stream: std::os::fd::OwnedFd, native: bool) {
+    let stream = UnixStream::from(stream);
+    if let Ok(output) = stream.try_clone() {
+        serve::answer(stream, output, native);
+    }
+}
 
 /// The connection to the service, made on first use; the service itself starts with the first socket it gets.
 static SERVICE: Mutex<Option<Connection>> = Mutex::new(None);
@@ -207,7 +245,7 @@ fn asked(kind: Request, side: Option<u32>, payload: &[u8]) -> Result<Option<Deco
 /// What a helper answers; why there is none goes to the log, as a picture that does not show says nothing about that.
 fn request(kind: Request, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
     asked(kind, side, payload).unwrap_or_else(|failure| {
-        crate::diag::report("a decoder helper gave no answer", format!("{failure:?}"));
+        report("a decoder helper gave no answer", format!("{failure:?}"));
         None
     })
 }
@@ -289,8 +327,8 @@ pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
             natural,
         } => {
             let (w, h) = (
-                crate::util::to_isize(width as usize),
-                crate::util::to_isize(height as usize),
+                isize::try_from(width).unwrap_or(isize::MAX),
+                isize::try_from(height).unwrap_or(isize::MAX),
             );
             // SAFETY: without plane pointers the image rep allocates its own buffer of the given size.
             let rep = unsafe {
@@ -310,7 +348,7 @@ pub fn image(decoded: Decoded) -> Option<Retained<NSImage>> {
                 )
             }?;
             let target = rep.bitmapData();
-            if target.is_null() || pixels.len() != crate::util::to_usize(w * h * 4) {
+            if target.is_null() || pixels.len() != usize::try_from(w * h * 4).unwrap_or(0) {
                 return None;
             }
             // SAFETY: the buffer holds width × height × 4 bytes, the length of `pixels` checked above.
@@ -347,43 +385,6 @@ mod tests {
             None,
             "a request that has ended"
         );
-    }
-
-    /// Every Rust file under `dir`.
-    fn sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
-        let mut found = Vec::new();
-        for entry in std::fs::read_dir(dir).unwrap().flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                found.extend(sources(&path));
-            } else if path.extension().is_some_and(|e| e == "rs") {
-                found.push(path);
-            }
-        }
-        found
-    }
-
-    #[test]
-    fn only_the_service_hands_bytes_to_the_systems_decoders() {
-        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let calls = [
-            "imageRepWithData",
-            "imageRepsWithData",
-            "initWithData(",
-            "CGImageSource",
-        ];
-        for file in sources(&src)
-            .iter()
-            .filter(|f| !f.to_string_lossy().contains("selftest"))
-        {
-            let text = std::fs::read_to_string(file).unwrap();
-            let product = text.split("#[cfg(test)]").next().unwrap_or("");
-            for call in &calls {
-                let allowed =
-                    file.ends_with("editor/decoder/serve.rs") && matches!(*call, "initWithData(" | "imageRepWithData");
-                assert!(allowed || !product.contains(call), "{} calls {call}", file.display());
-            }
-        }
     }
 
     #[test]

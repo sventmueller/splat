@@ -1,79 +1,17 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ptr::NonNull;
-
-use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2_app_kit::{
-    NSAppearance, NSAppearanceNameAccessibilityHighContrastAqua, NSAppearanceNameAccessibilityHighContrastDarkAqua,
-    NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSColor, NSFont, NSFontManager, NSFontTraitMask, NSFontWeightBold,
-    NSFontWeightRegular, NSMutableParagraphStyle, NSParagraphStyleAttributeName, NSTextStorage, NSWritingDirection,
+    NSColor, NSFont, NSFontManager, NSFontTraitMask, NSFontWeightBold, NSFontWeightRegular, NSMutableParagraphStyle,
+    NSParagraphStyleAttributeName, NSTextStorage, NSWritingDirection,
 };
-use objc2_foundation::{NSArray, NSRange};
+use objc2_foundation::NSRange;
+pub use splat_render::style::{appearance_of, token_color};
 
 use super::attributes::{Attribute, Attributes, add_attribute, set_attributes};
-use crate::markdown::highlight::{Style, Token, changed_region, right_to_left_behind_markers};
-use crate::markdown::palette::{self, Appearance, Rgb};
+use crate::markdown::highlight::{Style, changed_region, right_to_left_behind_markers};
 use crate::markdown::text::{Byte, TextAt, Utf16Cursor, line_start};
 use crate::util::constant;
 
 pub const SOURCE_SIZE: f64 = 13.0;
-pub const PREVIEW_SIZE: f64 = 15.0;
-
-pub fn appearance_of(appearance: &NSAppearance) -> Appearance {
-    let names = NSArray::from_slice(&[
-        constant!(NSAppearanceNameAqua),
-        constant!(NSAppearanceNameDarkAqua),
-        constant!(NSAppearanceNameAccessibilityHighContrastAqua),
-        constant!(NSAppearanceNameAccessibilityHighContrastDarkAqua),
-    ]);
-    let best = appearance.bestMatchFromAppearancesWithNames(&names);
-    appearance_named(&best.map(|n| n.to_string()).unwrap_or_default())
-}
-
-fn appearance_named(name: &str) -> Appearance {
-    if name == constant!(NSAppearanceNameAccessibilityHighContrastDarkAqua).to_string() {
-        Appearance::DarkHighContrast
-    } else if name == constant!(NSAppearanceNameAccessibilityHighContrastAqua).to_string() {
-        Appearance::LightHighContrast
-    } else if name == constant!(NSAppearanceNameDarkAqua).to_string() {
-        Appearance::Dark
-    } else {
-        Appearance::Light
-    }
-}
-
-fn srgb(c: Rgb) -> Retained<NSColor> {
-    NSColor::colorWithSRGBRed_green_blue_alpha(c.0 as f64 / 255.0, c.1 as f64 / 255.0, c.2 as f64 / 255.0, 1.0)
-}
-
-thread_local! {
-    static TOKEN_COLORS: RefCell<HashMap<Token, Retained<NSColor>>> = RefCell::new(HashMap::new());
-}
-
-/// A color that resolves per appearance, including the Increase Contrast variants.
-pub fn token_color(token: Token) -> Retained<NSColor> {
-    TOKEN_COLORS.with(|cache| {
-        cache
-            .borrow_mut()
-            .entry(token)
-            .or_insert_with(|| {
-                let block = RcBlock::new(move |appearance: NonNull<NSAppearance>| -> NonNull<NSColor> {
-                    let color = crate::util::guarded(NSColor::labelColor(), || {
-                        // SAFETY: `NonNull` rules out null, and AppKit keeps the appearance alive while it asks for its
-                        // color.
-                        let appearance = unsafe { appearance.as_ref() };
-                        srgb(palette::color(token, appearance_of(appearance)))
-                    });
-                    NonNull::new(Retained::autorelease_return(color)).unwrap()
-                });
-                // SAFETY: The provider only reads the appearance it is given and returns a color.
-                unsafe { NSColor::colorWithName_dynamicProvider(None, &block) }
-            })
-            .clone()
-    })
-}
-
 #[derive(Clone)]
 pub struct SourceFonts {
     regular: Retained<NSFont>,
@@ -228,88 +166,11 @@ fn set_line_directions(storage: &NSTextStorage, text: &str, region: std::ops::Ra
 
 #[cfg(test)]
 mod tests {
-    use objc2_app_kit::{NSColorSpace, NSFontDescriptorSymbolicTraits};
+    use objc2_app_kit::NSFontDescriptorSymbolicTraits;
 
     use super::*;
     use crate::markdown::text::bytes;
     use crate::util::ns;
-
-    fn named(name: &objc2_app_kit::NSAppearanceName) -> Retained<NSAppearance> {
-        NSAppearance::appearanceNamed(name).expect("an appearance of the system")
-    }
-
-    #[test]
-    fn each_appearance_of_the_system_has_its_palette() {
-        assert_eq!(
-            appearance_of(&named(constant!(NSAppearanceNameAqua))),
-            Appearance::Light
-        );
-        assert_eq!(
-            appearance_of(&named(constant!(NSAppearanceNameDarkAqua))),
-            Appearance::Dark
-        );
-        let by_name = |name: &objc2_app_kit::NSAppearanceName| appearance_named(&name.to_string());
-        assert_eq!(by_name(constant!(NSAppearanceNameAqua)), Appearance::Light);
-        assert_eq!(by_name(constant!(NSAppearanceNameDarkAqua)), Appearance::Dark);
-        assert_eq!(
-            by_name(constant!(NSAppearanceNameAccessibilityHighContrastAqua)),
-            Appearance::LightHighContrast
-        );
-        assert_eq!(
-            by_name(constant!(NSAppearanceNameAccessibilityHighContrastDarkAqua)),
-            Appearance::DarkHighContrast
-        );
-        assert_eq!(appearance_named(""), Appearance::Light, "no match among them");
-    }
-
-    /// The components of `color` as the given appearance resolves it.
-    fn resolved(color: &NSColor, name: &objc2_app_kit::NSAppearanceName) -> Rgb {
-        let out = std::cell::Cell::new(Rgb(0, 0, 0));
-        let block = RcBlock::new(|| {
-            let c = color
-                .colorUsingColorSpace(&NSColorSpace::sRGBColorSpace())
-                .expect("an sRGB color");
-            #[expect(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "components are 0 to 1"
-            )]
-            let byte = |v: f64| (v * 255.0).round() as u8;
-            out.set(Rgb(
-                byte(c.redComponent()),
-                byte(c.greenComponent()),
-                byte(c.blueComponent()),
-            ));
-        });
-        named(name).performAsCurrentDrawingAppearance(&block);
-        out.get()
-    }
-
-    #[test]
-    fn a_token_takes_its_color_from_the_palette_of_the_appearance() {
-        for token in [Token::Heading, Token::Code, Token::LinkText] {
-            let color = token_color(token);
-            for (name, appearance) in [
-                (constant!(NSAppearanceNameAqua), Appearance::Light),
-                (constant!(NSAppearanceNameDarkAqua), Appearance::Dark),
-            ] {
-                assert_eq!(
-                    resolved(&color, name),
-                    palette::color(token, appearance),
-                    "{token:?} {appearance:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn colors_of_the_palette_reach_appkit_unchanged() {
-        let c = srgb(Rgb(255, 128, 0));
-        assert_eq!(c.redComponent(), 1.0);
-        assert_eq!(c.greenComponent(), 128.0 / 255.0);
-        assert_eq!(c.blueComponent(), 0.0);
-        assert_eq!(c.alphaComponent(), 1.0);
-    }
 
     #[test]
     fn a_style_picks_its_cut_of_the_source_font() {

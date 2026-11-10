@@ -1,0 +1,31 @@
+[package]
+name = "splat-render"
+version = "0.0.0"
+description = "The preview's render path that Splat shares with other apps: native text from the layout, formulas and diagrams from a hidden WebKit view, images; macOS only"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+splat-decoder.workspace = true
+splat-editor-state.workspace = true
+splat-file-state.workspace = true
+splat-i18n.workspace = true
+splat-markdown.workspace = true
+splat-preview.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2.workspace = true
+dispatch2.workspace = true
+libc.workspace = true
+objc2 = { workspace = true, features = ["catch-all"] }
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+objc2-web-kit.workspace = true
+
+[features]
+# What only the window self-tests of the apps call.
+selftest = ["splat-decoder/selftest", "splat-editor-state/selftest"]

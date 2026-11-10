@@ -1,3 +1,5 @@
+//! Worker threads, and the way back to the main thread, where whatever runs is guarded against panics.
+
 #[cfg(feature = "selftest")]
 pub use splat_editor_state::lanes::uncontained;
 pub use splat_editor_state::lanes::{

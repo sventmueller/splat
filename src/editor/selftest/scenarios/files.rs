@@ -42,7 +42,7 @@ pub(super) fn image_file_steps() -> Vec<Step> {
                 let _ = std::fs::write(doc_dir(c).join("druck.png"), png_of_side(3));
                 let dir = doc_dir(c);
                 let mut images = c.e.pictures().store().borrow_mut();
-                let loading = images.file("druck.png", Some(&dir), false, Some(&c.e));
+                let loading = images.file("druck.png", Some(&dir), false, Some(&c.e.viewer()));
                 let printed = images.file("druck.png", Some(&dir), false, None);
                 check(
                     "printing does not leave out an image that is still loading",
@@ -87,7 +87,7 @@ pub(super) fn image_file_steps() -> Vec<Step> {
 
 pub(super) fn memory_steps() -> Vec<Step> {
     vec![applied(|c| {
-        crate::editor::images::memory_pressure_changed(true);
+        splat_render::images::memory_pressure_changed(true);
         check(
             "while memory is short, images decode smaller",
             crate::editor::picture::allowed_side() == 640,
@@ -99,7 +99,7 @@ pub(super) fn memory_steps() -> Vec<Step> {
             matches!(small, Some(crate::editor::decoder::Decoded::Rgba { width: 640, .. })),
             "",
         );
-        crate::editor::images::memory_pressure_changed(false);
+        splat_render::images::memory_pressure_changed(false);
         check(
             "once memory is back, images decode at full size again",
             crate::editor::picture::allowed_side() == crate::editor::decoder::SHOWN_SIDE,

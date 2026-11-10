@@ -8,16 +8,17 @@ use block2::{DynBlock, RcBlock};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{MainThreadMarker, MainThreadOnly, Message};
-use objc2_foundation::{NSBundle, NSData, NSDictionary, NSError, NSNumber, NSRect, NSString};
+use objc2_foundation::{NSData, NSDictionary, NSError, NSNumber, NSRect, NSString, NSURL};
 use objc2_web_kit::{
     WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKNavigationAction, WKNavigationActionPolicy,
     WKPDFConfiguration, WKScriptMessage, WKScriptMessageHandler, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
 };
 
-use crate::util::{guarded, ns, obj};
+use crate::appkit::{ns, obj};
+use crate::lanes::guarded;
 
 /// A script argument, of a type WebKit hands to the script as a plain value.
-pub(super) enum ScriptValue<'a> {
+pub enum ScriptValue<'a> {
     Text(&'a str),
     Flag(bool),
 }
@@ -37,7 +38,7 @@ fn script_arguments(args: &[(&str, ScriptValue)]) -> Retained<NSDictionary<NSStr
 }
 
 /// A configuration whose pages keep no cookies or storage between documents.
-pub(super) fn configuration(mtm: MainThreadMarker) -> Retained<WKWebViewConfiguration> {
+pub fn configuration(mtm: MainThreadMarker) -> Retained<WKWebViewConfiguration> {
     // SAFETY: A plain configuration object, created on the main thread.
     let config = unsafe { WKWebViewConfiguration::new(mtm) };
     // SAFETY: A fresh non-persistent store, set before the configuration is used.
@@ -45,7 +46,7 @@ pub(super) fn configuration(mtm: MainThreadMarker) -> Retained<WKWebViewConfigur
     config
 }
 
-pub(super) fn add_message_handler(
+pub fn add_message_handler(
     config: &WKWebViewConfiguration,
     handler: &ProtocolObject<dyn WKScriptMessageHandler>,
     name: &str,
@@ -58,31 +59,30 @@ pub(super) fn add_message_handler(
     };
 }
 
-pub(super) fn new_view(mtm: MainThreadMarker, frame: NSRect, config: &WKWebViewConfiguration) -> Retained<WKWebView> {
+pub fn new_view(mtm: MainThreadMarker, frame: NSRect, config: &WKWebViewConfiguration) -> Retained<WKWebView> {
     // SAFETY: The configuration is complete and the frame finite.
     unsafe { WKWebView::initWithFrame_configuration(WKWebView::alloc(mtm), frame, config) }
 }
 
-pub(super) fn detach_delegate(web: &WKWebView) {
+pub fn detach_delegate(web: &WKWebView) {
     // SAFETY: Without a delegate no lifetime is at stake.
     unsafe { web.setNavigationDelegate(None) };
 }
 
-/// Loads a page of the app bundle, which may read the bundle's other resources, once the view refuses the network.
-pub(super) fn load_bundled_page(web: &WKWebView, name: &str) {
+/// Loads a page of the app's resources, which may read the other resources, once the view refuses the network.
+pub fn load_bundled_page(web: &WKWebView, name: &str) {
     let (page_web, name) = (web.retain(), name.to_string());
     when_offline(web, move || {
-        if let Some(resources) = NSBundle::mainBundle().resourceURL()
-            && let Some(page) = resources.URLByAppendingPathComponent(&ns(&name))
-        {
-            // SAFETY: Both URLs are file URLs inside the app bundle, the page within the readable folder.
+        let resources = NSURL::fileURLWithPath_isDirectory(&ns(&crate::host().resources.to_string_lossy()), true);
+        if let Some(page) = resources.URLByAppendingPathComponent(&ns(&name)) {
+            // SAFETY: Both URLs are file URLs of the resources, the page within the readable folder.
             unsafe { page_web.loadFileURL_allowingReadAccessToURL(&page, &resources) };
         }
     });
 }
 
 /// Runs `then` once `web` holds the offline rules.
-pub(super) fn when_offline(web: &WKWebView, then: impl FnOnce() + 'static) {
+pub fn when_offline(web: &WKWebView, then: impl FnOnce() + 'static) {
     let web = web.retain();
     offline(move |rules| {
         if let Some(rules) = rules {
@@ -139,7 +139,7 @@ fn compile_offline_rules(mtm: MainThreadMarker) {
     let done = completion::<WKContentRuleList>(|list, error| {
         let list = list.map(Message::retain);
         if list.is_none() {
-            crate::diag::report(
+            splat_decoder::report(
                 "the offline rules of the web views did not compile",
                 error.map_or(0, |e| e.code()),
             );
@@ -168,10 +168,10 @@ fn compile_offline_rules(mtm: MainThreadMarker) {
 
 /// Only the bundled page itself may load: rendered formulas and diagrams come from documents, and a link or script
 /// in them must not lead the view anywhere else.
-pub(super) fn navigation_policy(action: &WKNavigationAction, page: &str) -> WKNavigationActionPolicy {
+pub fn navigation_policy(action: &WKNavigationAction, page: &str) -> WKNavigationActionPolicy {
     // SAFETY: The navigation action carries its request while WebKit asks about it.
     let target = unsafe { action.request() }.URL();
-    let expected = NSBundle::mainBundle().resourcePath().map(|r| format!("{r}/{page}"));
+    let expected = Some(crate::host().resources.join(page).to_string_lossy().into_owned());
     let allowed = target.is_some_and(|u| u.isFileURL() && u.path().map(|p| p.to_string()) == expected);
     if allowed {
         WKNavigationActionPolicy::Allow
@@ -180,7 +180,7 @@ pub(super) fn navigation_policy(action: &WKNavigationAction, page: &str) -> WKNa
     }
 }
 
-pub(super) fn message_body(message: &WKScriptMessage) -> Retained<AnyObject> {
+pub fn message_body(message: &WKScriptMessage) -> Retained<AnyObject> {
     // SAFETY: The message is valid for the duration of this callback.
     unsafe { message.body() }
 }
@@ -222,7 +222,7 @@ fn completion<T: objc2::Message + 'static>(
 /// only its number goes to the log.
 fn failure(error: Option<&NSError>, what: &'static str) -> Option<String> {
     let error = error?;
-    crate::diag::report(what, error.code());
+    splat_decoder::report(what, error.code());
     Some(thrown_message(error).unwrap_or_else(|| error.localizedDescription().to_string()))
 }
 
@@ -232,7 +232,7 @@ fn thrown_message(error: &NSError) -> Option<String> {
     Some(message.downcast::<NSString>().ok()?.to_string())
 }
 
-pub(super) fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue)]) {
+pub fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue)]) {
     let block = completion::<AnyObject>(|_, error| {
         failure(error, "a script failed");
     });
@@ -240,7 +240,7 @@ pub(super) fn run_script(web: &WKWebView, body: &str, args: &[(&str, ScriptValue
 }
 
 /// `done` gets what the script returned, or the message of its failure.
-pub(super) fn call_script(
+pub fn call_script(
     web: &WKWebView,
     body: &str,
     args: &[(&str, ScriptValue)],
@@ -254,7 +254,7 @@ pub(super) fn call_script(
 }
 
 /// A PDF of `rect` of the page, without a background of its own.
-pub(super) fn transparent_pdf(web: &WKWebView, rect: NSRect, done: impl Fn(Option<&NSData>) + 'static) {
+pub fn transparent_pdf(web: &WKWebView, rect: NSRect, done: impl Fn(Option<&NSData>) + 'static) {
     // SAFETY: A plain configuration object, created on the main thread.
     let config = unsafe { WKPDFConfiguration::new(web.mtm()) };
     // SAFETY: A rect within the rendered page and a plain flag.

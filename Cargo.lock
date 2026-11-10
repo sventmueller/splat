@@ -1053,6 +1053,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-uniform-type-identifiers",
  "objc2-web-kit",
+ "splat-decoder",
  "splat-editor-state",
  "splat-file-state",
  "splat-git",
@@ -1062,7 +1063,23 @@ dependencies = [
  "splat-notes",
  "splat-ooxml",
  "splat-preview",
+ "splat-render",
  "splat-testkit",
+ "usvg",
+]
+
+[[package]]
+name = "splat-decoder"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "image",
+ "krilla",
+ "krilla-svg",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "usvg",
 ]
 
@@ -1144,6 +1161,25 @@ version = "0.0.0"
 dependencies = [
  "splat-i18n",
  "splat-markdown",
+]
+
+[[package]]
+name = "splat-render"
+version = "0.0.0"
+dependencies = [
+ "block2",
+ "dispatch2",
+ "libc",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
+ "splat-decoder",
+ "splat-editor-state",
+ "splat-file-state",
+ "splat-i18n",
+ "splat-markdown",
+ "splat-preview",
 ]
 
 [[package]]

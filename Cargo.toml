@@ -8,6 +8,7 @@ exclude = ["fuzz", "vendor/comrak"]
 comrak = { path = "vendor/comrak" }
 
 [workspace.dependencies]
+splat-decoder = { path = "crates/splat-decoder" }
 splat-editor-state = { path = "crates/splat-editor-state" }
 splat-file-state = { path = "crates/splat-file-state" }
 splat-git = { path = "crates/splat-git" }
@@ -17,6 +18,7 @@ splat-markdown = { path = "crates/splat-markdown" }
 splat-notes = { path = "crates/splat-notes" }
 splat-ooxml = { path = "crates/splat-ooxml" }
 splat-preview = { path = "crates/splat-preview" }
+splat-render = { path = "crates/splat-render" }
 splat-testkit = { path = "crates/splat-testkit" }
 block2 = "0.6.2"
 caseless = "0.2"
@@ -84,6 +86,7 @@ path = "src/decoder_main.rs"
 workspace = true
 
 [dependencies]
+splat-decoder.workspace = true
 splat-editor-state.workspace = true
 splat-file-state.workspace = true
 splat-git.workspace = true
@@ -92,6 +95,7 @@ splat-import.workspace = true
 splat-markdown.workspace = true
 splat-notes.workspace = true
 splat-preview.workspace = true
+splat-render.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2.workspace = true
@@ -113,7 +117,13 @@ splat-ooxml.workspace = true
 splat-testkit = { workspace = true, features = ["sources"] }
 
 [features]
-selftest = ["splat-editor-state/selftest", "splat-markdown/selftest", "dep:objc2-core-graphics"]
+selftest = [
+    "splat-decoder/selftest",
+    "splat-editor-state/selftest",
+    "splat-markdown/selftest",
+    "splat-render/selftest",
+    "dep:objc2-core-graphics",
+]
 
 # What ships does what the tests saw: an overflow ends in `contained` instead of a wrong offset. A keystroke costs the same;
 # measured on a full layout of 10 MB, about a fifth more.

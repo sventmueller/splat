@@ -1,5 +1,6 @@
 //! A picture as the previews hold it, whoever made it, and what all of them together may take of the memory.
 
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -7,8 +8,10 @@ use objc2::rc::Retained;
 use objc2_app_kit::NSImage;
 use objc2_foundation::NSSize;
 
-use super::decoder::SHOWN_SIDE;
-use crate::util::Lane;
+use splat_decoder::{Decoded, SHOWN_SIDE};
+use splat_file_state::Stamp;
+
+use crate::lanes::Lane;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Sizing {
@@ -24,13 +27,33 @@ pub struct Rendered {
     pub sizing: Sizing,
 }
 
+/// What became of reading an image file.
+pub struct ImageFile {
+    pub(crate) loaded: Option<Decoded>,
+    pub(crate) file: PathBuf,
+    pub(crate) seen: Stamp,
+    pub(crate) side: u32,
+}
+
+impl ImageFile {
+    /// What a load that ended in a panic leaves: nothing to show, and no reason to wait for it any longer.
+    pub(crate) fn failed(file: PathBuf) -> ImageFile {
+        ImageFile {
+            loaded: None,
+            file,
+            seen: Stamp::UNREACHABLE,
+            side: allowed_side(),
+        }
+    }
+}
+
 /// Decoded pixels held by all open documents; attachments in the previews keep them alive as well.
 static DECODED: AtomicUsize = AtomicUsize::new(0);
 static LOW_MEMORY: AtomicBool = AtomicBool::new(false);
 
-pub(super) fn count_decoded(bytes: isize) {
+pub fn count_decoded(bytes: isize) {
     if bytes >= 0 {
-        DECODED.fetch_add(crate::util::to_usize(bytes), Ordering::Relaxed);
+        DECODED.fetch_add(crate::appkit::to_usize(bytes), Ordering::Relaxed);
     } else {
         DECODED.fetch_sub(bytes.unsigned_abs(), Ordering::Relaxed);
     }
@@ -53,7 +76,7 @@ fn budget() -> usize {
     *BUDGET.get_or_init(|| (objc2_foundation::NSProcessInfo::processInfo().physicalMemory() / 8) as usize)
 }
 
-pub(super) fn allowed_side() -> u32 {
+pub fn allowed_side() -> u32 {
     side_for(
         DECODED.load(Ordering::Relaxed),
         budget(),
@@ -67,7 +90,7 @@ fn has_room(decoded: usize, budget: usize, low_memory: bool) -> bool {
 
 /// Whether one more picture may decode. A document can name any number of them, so smaller pictures alone set no limit;
 /// what is shown stays, and what comes on top shows no picture until there is room again.
-pub(super) fn room_for_more() -> bool {
+pub fn room_for_more() -> bool {
     has_room(
         DECODED.load(Ordering::Relaxed),
         budget(),
@@ -76,15 +99,15 @@ pub(super) fn room_for_more() -> bool {
 }
 
 /// The system says that memory is short, or no longer so.
-pub(super) fn set_low_memory(low: bool) {
+pub fn set_low_memory(low: bool) {
     LOW_MEMORY.store(low, Ordering::Relaxed);
 }
 
 /// Image files and downloads are decoded by as many threads as there are decoder helpers, so a document with hundreds
 /// of pictures holds only a few of the files in memory at a time.
-pub(super) static LOADERS: Lane = Lane::new("splat-image").with_workers(super::decoder::HELPER_COUNT);
+pub(crate) static LOADERS: Lane = Lane::new("splat-image").with_workers(splat_decoder::HELPER_COUNT);
 
-pub(super) fn load_in_background(job: impl FnOnce() + Send + 'static) {
+pub(crate) fn load_in_background(job: impl FnOnce() + Send + 'static) {
     LOADERS.run(job);
 }
 

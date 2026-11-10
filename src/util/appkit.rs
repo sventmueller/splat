@@ -10,8 +10,9 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSError, NSRange, NSString, NSUndoManager};
 
-use crate::markdown::text::{Byte, U16, Utf16Map};
+use crate::markdown::text::U16;
 use crate::preview::map::Shown;
+pub use splat_render::appkit::{byte_range_to_ns, ns, obj, to_isize, to_usize};
 
 /// Reads a constant that AppKit, Foundation or WebKit exports.
 macro_rules! constant {
@@ -22,21 +23,6 @@ macro_rules! constant {
     };
 }
 pub(crate) use constant;
-
-/// A size as AppKit's signed counts have it; no text or table comes near the difference.
-pub fn to_isize(n: usize) -> isize {
-    isize::try_from(n).unwrap_or(isize::MAX)
-}
-
-/// A count from AppKit as a size; a negative one, which says "none", counts nothing.
-pub fn to_usize(n: isize) -> usize {
-    usize::try_from(n).unwrap_or(0)
-}
-
-/// Upcasts any Objective-C object for heterogeneous containers such as attribute dictionaries.
-pub fn obj<T: objc2::ClassType + 'static>(r: Retained<T>) -> Retained<objc2::runtime::AnyObject> {
-    r.into()
-}
 
 /// How many arguments the method behind `selector` takes: its name has one colon for each.
 fn arguments_of(selector: Sel) -> usize {
@@ -153,10 +139,6 @@ pub fn now(format: &str) -> String {
     formatter.stringFromDate(&objc2_foundation::NSDate::now()).to_string()
 }
 
-pub fn ns(s: &str) -> Retained<NSString> {
-    NSString::from_str(s)
-}
-
 pub fn to_nsrange(r: Range<U16>) -> NSRange {
     NSRange::new(r.start.get(), r.end.get().saturating_sub(r.start.get()))
 }
@@ -173,10 +155,6 @@ pub fn shown_to_ns(r: Range<Shown>) -> NSRange {
 /// A range of the preview view's text.
 pub fn shown_from_ns(r: NSRange) -> Range<Shown> {
     Shown::new(r.location)..Shown::new(r.location + r.length)
-}
-
-pub fn byte_range_to_ns(map: &Utf16Map, r: &Range<Byte>) -> NSRange {
-    to_nsrange(map.to_u16(r.start)..map.to_u16(r.end))
 }
 
 /// The modifiers and the key of a key equivalent; the key can be `+` itself, the separator.

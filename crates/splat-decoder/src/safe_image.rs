@@ -10,7 +10,7 @@ use krilla::page::PageSettings;
 use krilla::{Document, SerializeSettings};
 use krilla_svg::{SurfaceExt, SvgSettings};
 
-use super::decoder::protocol::{Decoded, MAX_BYTES, MAX_FILE_BYTES, MAX_SIDE};
+use super::protocol::{Decoded, MAX_BYTES, MAX_FILE_BYTES, MAX_SIDE};
 
 /// Pixels an SVG filter may be rasterised to.
 const MAX_PIXELS: f64 = 16_000_000.0;
@@ -140,7 +140,7 @@ fn filter_scale(tree: &usvg::Tree) -> Option<f32> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::decoder::protocol::{EXPORT_SIDE, SHOWN_SIDE};
+    use super::super::protocol::{EXPORT_SIDE, SHOWN_SIDE};
     use super::*;
 
     fn fonts() -> Arc<usvg::fontdb::Database> {
