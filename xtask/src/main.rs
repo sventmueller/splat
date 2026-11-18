@@ -58,6 +58,13 @@ fn main() -> ExitCode {
             };
             bundle(build).map(|p| println!("{}", p.display()))
         }
+        Some("run") if !selftest => {
+            let build = if release { Build::Release } else { Build::Debug };
+            bundle(build).and_then(|app| {
+                println!("{}", app.display());
+                run(Command::new("open").arg("-n").arg(&app))
+            })
+        }
         Some("dmg") => dmg().map(|p| println!("{}", p.display())),
         Some("appstore") => app_store().map(|p| println!("{}", p.display())),
         Some("universal") => {
@@ -98,7 +105,7 @@ const FLAGS: [&str; 11] = [
 ];
 
 pub(crate) const USAGE: &str =
-    "usage: cargo xtask bundle [--release] [--selftest] | dmg | appstore | universal | check-library | icon | vendor [check|fetch]
+    "usage: cargo xtask bundle [--release] [--selftest] | run [--release] | dmg | appstore | universal | check-library | icon | vendor [check|fetch]
        cargo xtask selftest probe | gui [--stop-after <check>] [--scenarios] [--only <group>] [--in-back] | resize | typing [--by-hand] | bench <file.md> [--keystroke-ms <n>] [--profile], with --record to write what a run made into xtask/checks
        cargo xtask coverage [--library]";
 

@@ -22,6 +22,7 @@ The [Makefile](../Makefile) holds short entry points; `make help` lists them all
 
 ```sh
 make build                  # target/release/Splat.app, same as cargo xtask bundle --release
+make run                    # target/debug/Splat Debug.app, built and opened, same as cargo xtask run
 make universal              # target/splat-universal for Apple Silicon and Intel, as the disk image carries it
 make check                  # formatting, clippy without warnings, all tests, vendored libraries; CI runs it before coverage-library
 make test                   # make check, then the self-test without a window
@@ -42,6 +43,7 @@ The build logic itself lives in the Rust crate [xtask](../xtask/src/main.rs):
 ```sh
 cargo xtask bundle --release   # target/release/Splat.app, Hardened Runtime, signed with "Splat Local Signing"
 cargo xtask bundle             # target/debug/Splat Debug.app, a separate app that never opens Markdown files
+cargo xtask run [--release]    # bundle, then open the app; with --release the build number goes up as in make build
 cargo xtask dmg                # the store package, then dist/Splat-<version>.dmg for distribution, Developer ID, notarized
 cargo xtask appstore           # ~/Downloads/Splat-<version>.pkg for the Mac App Store, Apple Distribution
 cargo xtask icon               # rebuild assets/AppIcon.icns and the README icon from assets/icon-1024.png
