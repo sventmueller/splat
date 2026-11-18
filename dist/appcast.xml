@@ -4,17 +4,18 @@
     <title>Splat</title>
     <item>
       <title>Splat 1.0.15</title>
-      <pubDate>Wed, 18 Nov 2026 16:37:02 +0000</pubDate>
+      <pubDate>Wed, 18 Nov 2026 17:39:25 +0000</pubDate>
       <sparkle:version>1.0.15</sparkle:version>
       <sparkle:shortVersionString>1.0.15</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <description sparkle:format="markdown"><![CDATA[- **Line numbers.** **View › Line Numbers** shows the number of each line beside the Markdown source, in every window; a wrapped paragraph keeps one number. Splat remembers the choice.
 - **The text size stays.** **Zoom In**, **Zoom Out** and **Actual Size** (⌘+, ⌘−, ⌘0) now set one size for every window, and Splat keeps it for new windows and the next start.
+- **Pictures show sooner.** A document with many photos shows them about three times as fast, and pictures on iCloud Drive, an external disk or a network share load three at a time instead of one after the other.
 - Code blocks in **TOML** are highlighted.
 - With **View › Changes Since Last Commit** switched off, a document in a Git repository no longer asks for access to its folder unless it shows pictures or notes from it.
 
 Something wrong or missing? [Report it on GitHub](https://github.com/sventmueller/splat/issues/new/choose).]]></description>
-      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.15.dmg" sparkle:edSignature="LUGnkzKf8ABIWEKwJku1TbJ6sHFmdgeDRNU9eqz4a1JSEomjVn71qZ+QaCeoj15qDBrK1WPWdgby68bMoamTAQ==" length="18909025" type="application/octet-stream"/>
+      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.15.dmg" sparkle:edSignature="y0GqXP72b0wIn5xkMYtkA+asz4rsqVCHLWpok/MvkOGY56y4tzZI/JJJSirJMhpYJwLkEhzPbsAk0BB0cTMyAA==" length="19881622" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>
