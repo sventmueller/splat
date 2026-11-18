@@ -19,6 +19,7 @@ krilla.workspace = true
 krilla-svg.workspace = true
 usvg.workspace = true
 image = { workspace = true, features = ["png", "jpeg", "gif", "webp", "bmp"] }
+fast_image_resize.workspace = true
 
 [features]
 # What only the window self-tests of the apps call.

@@ -77,21 +77,28 @@ const MAX_VOLUME_LANES: usize = 16;
 /// Where work on the files of `volume` runs: on a thread of its own, since whoever touches a network volume that stopped
 /// answering hangs with it, and that must stay the problem of its own files.
 pub fn lane_of_volume(volume: &str) -> &'static Lane {
-    static LANES: Mutex<Option<std::collections::HashMap<String, &'static Lane>>> = Mutex::new(None);
+    static LANES: LanesByVolume = Mutex::new(None);
     if volume == "/" {
         return &DISK;
     }
-    let mut lanes = LANES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    own_lane(&LANES, volume, || Lane::new("splat-disk-volume")).unwrap_or(&DISK)
+}
+
+pub type LanesByVolume = Mutex<Option<std::collections::HashMap<String, &'static Lane>>>;
+
+/// The lane of `volume` among `lanes`, made by `new` when first asked for; `None` once `MAX_VOLUME_LANES` volumes have one.
+pub fn own_lane(lanes: &LanesByVolume, volume: &str, new: impl FnOnce() -> Lane) -> Option<&'static Lane> {
+    let mut lanes = lanes.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let lanes = lanes.get_or_insert_default();
     if let Some(lane) = lanes.get(volume) {
-        return lane;
+        return Some(lane);
     }
     if lanes.len() >= MAX_VOLUME_LANES {
-        return &DISK;
+        return None;
     }
-    let lane: &'static Lane = Box::leak(Box::new(Lane::new("splat-disk-volume")));
+    let lane: &'static Lane = Box::leak(Box::new(new()));
     lanes.insert(volume.to_string(), lane);
-    lane
+    Some(lane)
 }
 
 pub fn lane_of(path: &Path) -> &'static Lane {

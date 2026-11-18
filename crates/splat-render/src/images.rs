@@ -22,7 +22,7 @@ use crate::appkit::to_isize;
 use crate::files::{read_regular_file, stamp};
 use crate::lanes::{guarded, main_soon};
 pub use crate::picture::ImageFile;
-use crate::picture::{LOADERS, Rendered, Sizing, allowed_side, count_decoded, room_for_more, set_low_memory};
+use crate::picture::{Rendered, Sizing, allowed_side, count_decoded, loaders_of, room_for_more, set_low_memory};
 use crate::viewer::{Messenger, Viewer};
 use crate::volumes::{BusyVolumes, answer_from, lane_of_volume, volume_of};
 
@@ -321,15 +321,8 @@ impl ImageStore {
 pub fn read_again(path: PathBuf, doc_dir: Option<&Path>, requester: &Rc<dyn Viewer>) {
     let requester = Messenger::of(requester);
     let doc_dir = doc_dir.map(Path::to_path_buf);
-    let volume = volume_of(&path);
-    // An image on a volume that may stop answering must not take up a place that other images wait for.
-    let lane = if volume == "/" {
-        &LOADERS
-    } else {
-        lane_of_volume(&volume)
-    };
     let asked = path.clone();
-    lane.ask(
+    loaders_of(&volume_of(&path)).ask(
         move || {
             if room_for_more() {
                 load(&asked, doc_dir.as_deref(), allowed_side())
