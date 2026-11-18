@@ -1,2 +1,4 @@
-- **Splat installs its updates again.** Splat 1.0.12 and 1.0.13 could not install an update on a Mac where an older version had run before: installing stopped with an error about connecting to the installer.
-- **On 1.0.12 or 1.0.13**, if installing this update stops with that error, download Splat once from [GitHub](https://github.com/sventmueller/splat/releases/latest) and drag it into Applications, replacing the old one. Your settings and texts stay, and from 1.0.14 on, updates install by themselves again.
+- **Line numbers.** **View › Line Numbers** shows the number of each line beside the Markdown source, in every window; a wrapped paragraph keeps one number. Splat remembers the choice.
+- **The text size stays.** **Zoom In**, **Zoom Out** and **Actual Size** (⌘+, ⌘−, ⌘0) now set one size for every window, and Splat keeps it for new windows and the next start.
+- Code blocks in **TOML** are highlighted.
+- With **View › Changes Since Last Commit** switched off, a document in a Git repository no longer asks for access to its folder unless it shows pictures or notes from it.
