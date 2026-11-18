@@ -156,6 +156,28 @@ mod tests {
     }
 
     #[test]
+    fn a_lane_made_while_running_names_its_threads() {
+        // The statics are built by the compiler, so only a lane made here runs its constructors where coverage sees it.
+        let name = std::hint::black_box("splat-test-made");
+        let one = Lane::new(name);
+        let two = Lane::new(name).with_workers(2).with_stack(1 << 20);
+        let (named, names) = std::sync::mpsc::channel();
+        for lane in [&one, &two] {
+            let named = named.clone();
+            lane.run(move || named.send(std::thread::current().name().map(str::to_string)).unwrap());
+        }
+        drop(named);
+        let mut seen: Vec<String> = names.iter().flatten().collect();
+        seen.sort_unstable();
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        assert_eq!(seen[0], "splat-test-made");
+        assert!(
+            ["splat-test-made-0", "splat-test-made-1"].contains(&seen[1].as_str()),
+            "{seen:?}"
+        );
+    }
+
+    #[test]
     fn whoever_asks_a_lane_hears_back_even_after_a_panic() {
         static LANE: Lane = Lane::new("splat-test-answers").with_stack(1 << 20);
         let (answered, answers) = std::sync::mpsc::channel();

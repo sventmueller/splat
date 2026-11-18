@@ -83,6 +83,7 @@ a remote answer that is no picture counts as failed
 a remote picture loads
 a remote picture over the size limit is not loaded
 a remote picture that is missing counts as failed
+a repository around a closed folder offers it while change marks are on, and not while they are off
 a restored draft is marked
 a rule is undone in one step
 a rule writes exactly its text
