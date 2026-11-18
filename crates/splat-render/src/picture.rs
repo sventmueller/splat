@@ -1,8 +1,8 @@
 //! A picture as the previews hold it, whoever made it, and what all of them together may take of the memory.
 
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 use objc2::rc::Retained;
 use objc2_app_kit::NSImage;
@@ -12,6 +12,7 @@ use splat_decoder::{Decoded, SHOWN_SIDE};
 use splat_file_state::Stamp;
 
 use crate::lanes::Lane;
+use crate::volumes::{LanesByVolume, lane_of_volume, own_lane};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Sizing {
@@ -107,6 +108,19 @@ pub fn set_low_memory(low: bool) {
 /// of pictures holds only a few of the files in memory at a time.
 pub(crate) static LOADERS: Lane = Lane::new("splat-image").with_workers(splat_decoder::HELPER_COUNT);
 
+/// Where an image file on `volume` loads. One that may stop answering gets threads of its own, as many as `LOADERS`, so that
+/// a hang there holds up only its own pictures and not the others.
+pub(crate) fn loaders_of(volume: &str) -> &'static Lane {
+    static LANES: LanesByVolume = Mutex::new(None);
+    if volume == "/" {
+        return &LOADERS;
+    }
+    own_lane(&LANES, volume, || {
+        Lane::new("splat-image-volume").with_workers(splat_decoder::HELPER_COUNT)
+    })
+    .unwrap_or_else(|| lane_of_volume(volume))
+}
+
 pub(crate) fn load_in_background(job: impl FnOnce() + Send + 'static) {
     LOADERS.run(job);
 }
@@ -132,5 +146,58 @@ mod tests {
         assert!(!has_room(2 * budget, budget, false));
         assert!(has_room(budget - 1, budget, true));
         assert!(!has_room(budget, budget, true));
+    }
+
+    #[test]
+    fn pictures_on_another_volume_load_side_by_side_and_a_hang_there_holds_up_only_its_own() {
+        use std::sync::mpsc::channel;
+        use std::sync::{Arc, Condvar};
+        use std::time::Duration;
+        let wait = Duration::from_secs(5);
+        let started = Arc::new((Mutex::new(0), Condvar::new()));
+        let (seen, all_seen) = channel();
+        for _ in 0..splat_decoder::HELPER_COUNT {
+            let (started, seen) = (started.clone(), seen.clone());
+            loaders_of("/Volumes/Fotos").run(move || {
+                let (count, changed) = &*started;
+                let mut count = count.lock().unwrap();
+                *count += 1;
+                changed.notify_all();
+                let (count, _) = changed
+                    .wait_timeout_while(count, wait, |n| *n < splat_decoder::HELPER_COUNT)
+                    .unwrap();
+                seen.send(*count).unwrap();
+            });
+        }
+        for _ in 0..splat_decoder::HELPER_COUNT {
+            assert_eq!(
+                all_seen.recv_timeout(wait * 2),
+                Ok(splat_decoder::HELPER_COUNT),
+                "one loads while the others load"
+            );
+        }
+
+        let (release, hung) = channel::<()>();
+        let hung = Arc::new(Mutex::new(hung));
+        for _ in 0..splat_decoder::HELPER_COUNT {
+            let hung = hung.clone();
+            loaders_of("/Volumes/Haengt").run(move || {
+                let _ = hung.lock().unwrap().recv();
+            });
+        }
+        let (done, finished) = channel();
+        for volume in ["/Volumes/Anderes", "/"] {
+            let done = done.clone();
+            loaders_of(volume).run(move || done.send(()).unwrap());
+        }
+        for _ in 0..2 {
+            finished.recv_timeout(wait).expect("pictures elsewhere go on");
+        }
+        assert!(std::ptr::eq(loaders_of("/"), &LOADERS));
+        assert!(std::ptr::eq(
+            loaders_of("/Volumes/Haengt"),
+            loaders_of("/Volumes/Haengt")
+        ));
+        drop(release);
     }
 }
