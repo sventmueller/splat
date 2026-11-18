@@ -137,6 +137,14 @@ debug-assertions = true
 lto = "thin"
 overflow-checks = true
 
+# Unoptimized, the image libraries take 3 to 8 seconds for a camera photo that a release build decodes in 0.1 to 0.3.
+[profile.dev.package."*"]
+opt-level = 3
+
+# Their generic code is compiled into the decoder, which otherwise still takes a second for a photo.
+[profile.dev.package.splat-decoder]
+opt-level = 3
+
 # Parsing and layout otherwise change by a fifth with how the compiler happens to split these crates, which an unrelated new
 # module can move; measured 228 and 146 ms against up to 295 and 155 ms at 10 MB.
 [profile.release.package.splat-markdown]
