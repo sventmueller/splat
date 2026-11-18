@@ -10,11 +10,11 @@ use objc2_app_kit::{
     NSApplication, NSBitmapImageRep, NSColor, NSMenu, NSSegmentedControl, NSToolbarDisplayMode,
     NSUserInterfaceItemIdentification, NSView, NSWindowButton,
 };
-use objc2_foundation::{NSData, NSRange};
+use objc2_foundation::{NSData, NSPoint, NSRange};
 
 use super::super::{
     Ctx, Step, append, applied, check, check_in_front, pause, perform, select_in_source, settle, source,
-    type_in_preview, type_in_source, when,
+    type_in_preview, type_in_source, when, window_image,
 };
 use super::{before, remember, sizes, undo, undone};
 use crate::editor::actions::Action;
@@ -94,6 +94,12 @@ pub(super) fn view_steps() -> Vec<Step> {
                 perform(&c.e, Action::ZoomIn.spec().selector, 0);
                 let zoom = c.e.model().read(|st| st.zoom());
                 check("zooming in enlarges", zoom > 1.0, &format!("{zoom}"));
+                let kept = crate::editor::style::chosen_zoom();
+                check(
+                    "the zoom is kept for new windows and the next start",
+                    kept == zoom,
+                    &format!("{kept} kept, {zoom} shown"),
+                );
                 perform(&c.e, Action::ZoomOut.spec().selector, 0);
                 perform(&c.e, Action::ZoomOut.spec().selector, 0);
                 let zoom = c.e.model().read(|st| st.zoom());
@@ -101,8 +107,8 @@ pub(super) fn view_steps() -> Vec<Step> {
                 perform(&c.e, Action::ZoomReset.spec().selector, 0);
                 let zoom = c.e.model().read(|st| st.zoom());
                 check(
-                    "the actual size comes back",
-                    (zoom - 1.0).abs() < 1e-9,
+                    "the actual size comes back, and stays",
+                    zoom == 1.0 && crate::editor::style::chosen_zoom() == 1.0,
                     &format!("{zoom}"),
                 );
                 check(
@@ -133,6 +139,83 @@ pub(super) fn view_steps() -> Vec<Step> {
         applied(|c| {
             undo(c);
             check("the typing is undone", source(&c.e) == before(c), &sizes(c));
+        }),
+    ]
+}
+
+/// The line numbers beside the source, from the top of a text to its end, and the room they take.
+pub(super) fn line_number_steps() -> Vec<Step> {
+    vec![
+        applied(|c| {
+            c.e.source().scrollPoint(NSPoint::new(0.0, 0.0));
+            perform(&c.e, Action::ToggleLineNumbers.spec().selector, 0);
+        }),
+        applied(|c| {
+            let window = c.e.window().unwrap();
+            window.layoutIfNeeded();
+            window_image(&window, &c.out.join("line-numbers-top.png"));
+            let drawn = c.e.line_numbers().drawn();
+            let width = c.e.line_numbers().width();
+            check(
+                "line numbers take a column beside the source",
+                width > 0.0,
+                &format!("{width}"),
+            );
+            let scroll = c.e.source().enclosingScrollView().map(|s| s.frame().origin.x);
+            check(
+                "the source moves aside for the numbers",
+                scroll.is_some_and(|x| (x - width).abs() < 0.5),
+                &format!("{scroll:?} for {width}"),
+            );
+            let text = source(&c.e);
+            let top = c.e.panes().source().top_offset().unwrap_or(0);
+            let expected = text.encode_utf16().take(top).filter(|&u| u == u16::from(b'\n')).count() + 1;
+            check(
+                "the first number is the line at the top of the source",
+                drawn.first().map(|&(line, _)| line) == Some(expected),
+                &format!("{:?}, top at {top}", drawn.first()),
+            );
+            check(
+                "the numbers count up line by line, downwards",
+                drawn.len() > 3 && drawn.windows(2).all(|w| w[1].0 == w[0].0 + 1 && w[1].1 > w[0].1),
+                &format!("{drawn:?}"),
+            );
+            let items = menu_items(c.e.mtm(), Action::ToggleLineNumbers.spec().selector);
+            for item in &items {
+                c.e.editing().validate(item.action(), item.tag(), Some(item));
+            }
+            check(
+                "the View menu checks the line numbers",
+                !items.is_empty() && items.iter().all(|i| i.state() == objc2_app_kit::NSControlStateValueOn),
+                &format!("{} items", items.len()),
+            );
+            c.e.source()
+                .scrollRangeToVisible(NSRange::new(storage(c.e.source()).length(), 0));
+        }),
+        applied(|c| {
+            let window = c.e.window().unwrap();
+            window.layoutIfNeeded();
+            window_image(&window, &c.out.join("line-numbers-end.png"));
+            let drawn = c.e.line_numbers().drawn();
+            let lines = source(&c.e).matches('\n').count() + 1;
+            check(
+                "the last line has its number, also when it is the empty one after a final line break",
+                drawn.last().map(|&(line, _)| line) == Some(lines),
+                &format!("{:?} of {lines}", drawn.last()),
+            );
+            c.e.source().scrollPoint(NSPoint::new(0.0, 0.0));
+            perform(&c.e, Action::ToggleLineNumbers.spec().selector, 0);
+        }),
+        applied(|c| {
+            if let Some(window) = c.e.window() {
+                window.layoutIfNeeded();
+            }
+            let scroll = c.e.source().enclosingScrollView().map(|s| s.frame().origin.x);
+            check(
+                "switching the numbers off gives their room back",
+                c.e.line_numbers().width() == 0.0 && scroll == Some(0.0),
+                &format!("{scroll:?}"),
+            );
         }),
     ]
 }

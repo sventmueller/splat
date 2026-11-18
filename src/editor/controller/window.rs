@@ -84,6 +84,7 @@ impl EditorController {
             document: Weak::from(document),
             model: Model::new(),
             panes: Default::default(),
+            line_numbers: Default::default(),
             updates: Default::default(),
             scroll: Default::default(),
             marks: Default::default(),
@@ -193,6 +194,9 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     if let Some(lm) = layout_manager(&*preview) {
         lm.setAllowsNonContiguousLayout(true);
     }
+    let numbers = source
+        .enclosingScrollView()
+        .map(|scroll| crate::editor::line_numbers::column_beside(controller.mtm(), controller, &scroll));
     if let (Some(left), Some(right)) = (source.enclosingScrollView(), preview.enclosingScrollView()) {
         let bars = |side, scroll: &NSScrollView| {
             crate::editor::changes::bars_beside(controller.mtm(), controller, side, scroll)
@@ -204,8 +208,11 @@ fn build(controller: &EditorController, window: &NSWindow, text: &str) {
     controller
         .panes()
         .install_views(source.clone(), preview, [left_item, right_item]);
+    if let Some((column, width)) = numbers {
+        controller.line_numbers().install(column, width);
+    }
     controller.word_counter().install();
-    controller.updater().set_zoom(1.0);
+    controller.updater().set_zoom(crate::editor::style::chosen_zoom());
     controller.updater().replace_all_text(text);
     window.setInitialFirstResponder(Some(&source));
 }

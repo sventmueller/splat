@@ -122,6 +122,7 @@ keys right after a save can be undone
 keys right after a save outlive the look at the file
 left alignment is undone in one step
 left alignment writes exactly its text
+line numbers take a column beside the source
 links to other apps are links
 links to other documents are links
 nothing of a closed editor reaches the reloaded text
@@ -149,6 +150,7 @@ subscript is undone in one step
 subscript writes exactly its text
 superscript is undone in one step
 superscript writes exactly its text
+switching the numbers off gives their room back
 tab bar shows no plus button of its own
 tab in a table moves between its cells
 tags are links
@@ -162,6 +164,7 @@ the HTML export embeds the svg image as image/svg+xml
 the HTML export embeds the tif image as image/png
 the HTML export is written
 the Markdown file is proposed under the name of the Word document
+the View menu checks the line numbers
 the View menu hides the count
 the View menu switches the marks off
 the Word export carries the jpg image as jpeg
@@ -171,11 +174,12 @@ the Word export carries the svg image as png
 the Word export carries the tif image as png
 the Word export has a file for each image
 the Word export is written
-the actual size comes back
+the actual size comes back, and stays
 the bold button sits in a toolbar group
 the count leaves out the metadata and the link's address
 the count stands in the rightmost pane
 the files show the notes of the folder and no other file
+the first number is the line at the top of the source
 the footnote reference is a link
 the form commits
 the form shows the fields it can change
@@ -186,6 +190,7 @@ the huge text is undone in one step
 the image dialog opens
 the image line is undone in one step
 the large change is undone in one step
+the last line has its number, also when it is the empty one after a final line break
 the link dialog asks for address and text
 the link dialog links the selection
 the links to a note are found by wiki link and by address
@@ -198,6 +203,7 @@ the new text is committed
 the next page has the header, the text and its number
 the next start says once where the copies are
 the next start takes over the copies of a crashed run
+the numbers count up line by line, downwards
 the options can be taken over
 the outline check leaves the text
 the outline closes
@@ -223,6 +229,7 @@ the shown image survives
 the sidebar button stands between the window buttons and the title
 the sidebar takes its room beside the source
 the source draws each mark, from the top down
+the source moves aside for the numbers
 the table dialog inserts a table of three by three
 the table dialog opens
 the text typed for the crash goes again
@@ -232,6 +239,7 @@ the toolbar with symbols keeps its place at the edge
 the typing is undone
 the unsaved text can be taken back
 the word count stands in the corner of its smaller pane
+the zoom is kept for new windows and the next start
 typing in the preview while the source is parsed shows the source again
 typographic punctuation switches
 underline is undone in one step

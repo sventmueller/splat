@@ -26,6 +26,7 @@ use super::counter::{self, WordCounter};
 use super::editing::{self, Editing};
 use super::export::{self, Sharing};
 use super::images::{self, Pictures};
+use super::line_numbers::{self, LineNumbers};
 use super::model::Model;
 use super::navigation::Links;
 use super::notes::{self, Inherited, NoteAnswer, Notes};
@@ -41,8 +42,8 @@ use super::{string_of, style, toolbar};
 use crate::document::MdDocument;
 use crate::util::guarded;
 use layers::{
-    ForAtoms, ForChanges, ForCounter, ForEditing, ForLinks, ForNotes, ForPanes, ForPictures, ForProgressive, ForScroll,
-    ForSelection, ForSharing, ForUpdater, Message,
+    ForAtoms, ForChanges, ForCounter, ForEditing, ForLineNumbers, ForLinks, ForNotes, ForPanes, ForPictures,
+    ForProgressive, ForScroll, ForSelection, ForSharing, ForUpdater, Message,
 };
 use splat_editor_state::progress;
 use splat_render::Viewer;
@@ -50,6 +51,7 @@ use splat_render::Viewer;
 pub struct Ivars {
     document: Weak<MdDocument>,
     panes: panes::PaneState,
+    line_numbers: line_numbers::LineNumberState,
     model: Model,
     updates: update::UpdateState,
     marks: selection::SelectionMarks,
@@ -360,6 +362,7 @@ super::actions::commands!(class_with_commands, [
                 self.panes().remember_sidebar();
                 self.word_counter().place();
                 self.change_marks().redraw();
+                self.line_numbers().redraw();
             });
         }
 
@@ -369,12 +372,18 @@ super::actions::commands!(class_with_commands, [
                 self.updater().color_visible_source();
                 self.scroll_sync().view_scrolled(notification);
                 self.change_marks().redraw();
+                self.line_numbers().redraw();
             });
         }
 
         #[unsafe(method(countWords))]
         fn count_words(&self) {
             guarded((), || self.word_counter().count_now());
+        }
+
+        #[unsafe(method(fitLineNumbers))]
+        fn fit_line_numbers(&self) {
+            guarded((), || self.line_numbers().fit());
         }
 
         #[unsafe(method(compareWithCommit))]
@@ -398,11 +407,7 @@ super::actions::commands!(class_with_commands, [
         fn restore_state(&self, coder: &NSCoder) {
             // SAFETY: The superclass's implementation, with this method's signature.
             let _: () = unsafe { msg_send![super(self), restoreStateWithCoder: coder] };
-            guarded((), || {
-                if let Some(zoom) = self.panes().restore_state(coder) {
-                    self.updater().set_zoom(zoom);
-                }
-            });
+            guarded((), || self.panes().restore_state(coder));
         }
     }
 ]);
@@ -426,6 +431,7 @@ macro_rules! within_the_controller {
 within_the_controller! {
     fn model(self) -> &Model { &self.ivars().model }
     fn panes(self) -> Panes<'_> { Panes::new(ForPanes::of(self), &self.ivars().panes) }
+    fn line_numbers(self) -> LineNumbers<'_> { LineNumbers::new(ForLineNumbers::of(self), &self.ivars().line_numbers) }
     fn selection(self) -> Selection<'_> { Selection::new(ForSelection::of(self), &self.ivars().marks) }
     fn pictures(self) -> Pictures<'_> { Pictures::new(ForPictures::of(self), &self.ivars().pictures) }
     fn progressive(self) -> Progressive<'_> { Progressive::new(ForProgressive::of(self)) }
@@ -573,12 +579,24 @@ impl EditorController {
 
     pub(in crate::editor) fn setting_changed(&self) {
         self.word_counter().setting_changed();
+        self.line_numbers().fit();
         self.change_marks().look();
         self.updater().update_offer();
     }
 
+    pub(in crate::editor) fn zoom_chosen(&self) {
+        let zoom = style::chosen_zoom();
+        if self.model().read(|st| st.zoom()) != zoom {
+            self.updater().set_zoom(zoom);
+        }
+    }
+
     pub(in crate::editor) fn look_at_repository(&self) {
         self.change_marks().look();
+    }
+
+    pub(in crate::editor) fn draw_line_numbers(&self, column: &objc2_app_kit::NSView) {
+        self.line_numbers().draw(column);
     }
 
     pub(in crate::editor) fn draw_change_bars(&self, side: Side, bars: &objc2_app_kit::NSView) {

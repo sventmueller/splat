@@ -30,6 +30,7 @@ use crate::editor::editing::Editing;
 use crate::editor::export::{ExportFailure, ExportKind, Sharing};
 use crate::editor::images::{ImageFile, Pictures};
 use crate::editor::js::Renderer;
+use crate::editor::line_numbers::LineNumbers;
 use crate::editor::mathfield::MathField;
 use crate::editor::model::Model;
 use crate::editor::notes::{NoteAnswer, Notes, RenameRequest};
@@ -364,7 +365,8 @@ macro_rules! layer {
     };
 }
 
-layer!(ForSelection above ForPanes, reaches panes -> Panes);
+layer!(ForLineNumbers above ForPanes, reaches panes -> Panes);
+layer!(ForSelection above ForLineNumbers, reaches line_numbers -> LineNumbers);
 layer!(ForPictures above ForSelection, reaches selection -> Selection);
 layer!(ForProgressive above ForPictures, reaches pictures -> Pictures);
 layer!(ForCounter above ForProgressive, reaches progressive -> Progressive);

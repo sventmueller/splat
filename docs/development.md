@@ -292,6 +292,7 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `env.rs` | what the preview reads from outside the text: typographic punctuation, the repository for `@name` and `#12`, the BibTeX file, embedded notes |
 | `images.rs` | `Pictures`: the images of the preview from `splat-render`, and the bar that offers the folder around a document |
 | `counter.rs`, `changes.rs` | `WordCounter`, `ChangeMarks`: the word count in the corner and the marks for what changed since the last commit |
+| `line_numbers.rs` | `LineNumbers`: the line numbers in a column beside the source, counted by `splat_editor_state::line_numbers` from the top line in view |
 | `notes.rs`, `sidebar.rs` | `Notes`: the folder of notes, searching, opening and renaming; the views of the sidebar |
 | `metadata.rs`, `export_options.rs` | the metadata form; what exports add to the text |
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |

@@ -175,6 +175,10 @@ impl<'a> ViewReader<'a> {
         geometry::top_offset(self.0)
     }
 
+    pub(super) fn paragraphs_in_view(self) -> Vec<(usize, f64)> {
+        geometry::paragraphs_in_view(self.0)
+    }
+
     pub(super) fn offset_at(self, y: f64) -> Option<usize> {
         geometry::offset_at(self.0, y)
     }
@@ -596,24 +600,19 @@ impl<'a> Panes<'a> {
             coder.encodeBool_forKey(collapsed, &ns("previewCollapsed"));
             coder.encodeBool_forKey(sidebar, &ns("outlineShown"));
             coder.encodeInteger_forKey(tab, &ns("sidebarTab"));
-            coder.encodeDouble_forKey(self.host.model().read(|st| st.zoom()), &ns("zoom"));
         }
     }
 
-    /// The zoom the window had, if any.
-    pub(super) fn restore_state(&self, coder: &NSCoder) -> Option<f64> {
+    pub(super) fn restore_state(&self, coder: &NSCoder) {
         if let Some(item) = self.state.preview_item.get() {
             // SAFETY: Window restoration always passes a keyed coder.
             item.setCollapsed(unsafe { coder.decodeBoolForKey(&ns("previewCollapsed")) });
         }
         // SAFETY: Window restoration always passes a keyed coder.
-        let zoom = unsafe { coder.decodeDoubleForKey(&ns("zoom")) };
-        // SAFETY: Window restoration always passes a keyed coder.
         let tab = SidebarTab::of_segment(unsafe { coder.decodeIntegerForKey(&ns("sidebarTab")) });
         // SAFETY: Window restoration always passes a keyed coder.
         let shown = unsafe { coder.decodeBoolForKey(&ns("outlineShown")) };
         self.put_sidebar(shown, tab);
-        (zoom > 0.3).then_some(zoom)
     }
 }
 

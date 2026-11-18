@@ -3,15 +3,28 @@ use objc2_app_kit::{
     NSColor, NSFont, NSFontManager, NSFontTraitMask, NSFontWeightBold, NSFontWeightRegular, NSMutableParagraphStyle,
     NSParagraphStyleAttributeName, NSTextStorage, NSWritingDirection,
 };
-use objc2_foundation::NSRange;
+use objc2_foundation::{NSRange, NSUserDefaults};
+use splat_editor_state::zoom;
 pub use splat_render::style::{appearance_of, token_color};
 
 use super::attributes::{Attribute, Attributes, add_attribute, set_attributes};
 use crate::markdown::highlight::{Style, changed_region, right_to_left_behind_markers};
 use crate::markdown::text::{Byte, TextAt, Utf16Cursor, line_start};
-use crate::util::constant;
+use crate::util::{constant, ns};
 
 pub const SOURCE_SIZE: f64 = 13.0;
+/// User defaults key of the zoom every window shows.
+const ZOOM_KEY: &str = "TextZoom";
+
+/// The zoom the user chose last, which every window shows.
+pub fn chosen_zoom() -> f64 {
+    zoom::kept(NSUserDefaults::standardUserDefaults().doubleForKey(&ns(ZOOM_KEY)))
+}
+
+pub fn choose_zoom(zoom: f64) {
+    NSUserDefaults::standardUserDefaults().setDouble_forKey(zoom, &ns(ZOOM_KEY));
+}
+
 #[derive(Clone)]
 pub struct SourceFonts {
     regular: Retained<NSFont>,

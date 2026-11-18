@@ -273,6 +273,7 @@ pub fn install(app: &NSApplication, mtm: MainThreadMarker) {
             actions::item(mtm, Action::ToggleOutline),
             actions::item(mtm, Action::ToggleFiles),
             actions::item(mtm, Action::ToggleWordCount),
+            actions::item(mtm, Action::ToggleLineNumbers),
             actions::item(mtm, Action::ToggleChanges),
             separator(mtm),
             actions::item(mtm, Action::Typography),

@@ -118,6 +118,7 @@ impl Updater<'_> {
         self.host
             .model()
             .source_edited(from_nsrange(range), delta, &inserted, storage.length());
+        self.host.line_numbers().edited(range.location);
         self.host.tell_document_text_changed();
     }
 
@@ -329,7 +330,7 @@ impl Updater<'_> {
             });
             self.host.invalidate(Invalidate::Zoom);
         }
-        self.host.object().invalidate_restorable_state();
+        self.host.line_numbers().fit();
     }
 
     pub(super) fn appearance_changed(&self) {

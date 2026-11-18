@@ -26,6 +26,7 @@ use crate::markdown::text::{Byte, Direction, TextAt, U16, units, utf16_len};
 use crate::util::{answer_from, constant, contained, ns, shown_from_ns, to_nsrange};
 use splat_editor_state::editing::{Announced, Dropped, compared_change, dropped_markdown, fitting_announcement};
 use splat_editor_state::files::write_new_file;
+use splat_editor_state::zoom;
 use splat_import::{Converted, ImageSource, Pasted, Placement, paste_as_markdown};
 
 /// How long a paste waits for the picture to reach the document's folder, which may lie on a volume that hangs.
@@ -226,15 +227,15 @@ impl Editing<'_> {
                 super::env::set_typography(!super::env::typography_on());
                 super::relayout_all();
             }
-            ZoomIn => {
-                let z = self.host.model().read(|st| st.zoom());
-                self.host.updater().set_zoom((z * 1.1).min(3.0));
+            ZoomIn | ZoomOut | ZoomReset => {
+                let shown = self.host.model().read(|st| st.zoom());
+                super::style::choose_zoom(match action {
+                    ZoomIn => zoom::larger(shown),
+                    ZoomOut => zoom::smaller(shown),
+                    _ => zoom::NORMAL,
+                });
+                super::zoom_everywhere();
             }
-            ZoomOut => {
-                let z = self.host.model().read(|st| st.zoom());
-                self.host.updater().set_zoom((z / 1.1).max(0.5));
-            }
-            ZoomReset => self.host.updater().set_zoom(1.0),
             NewTab => super::window::new_tab(self.host.mtm(), self.host.window().as_deref()),
             GrantFolder => self.grant_folder(),
             ExportHtml => self.host.sharing().export(super::export::ExportKind::Html),
@@ -273,6 +274,10 @@ impl Editing<'_> {
             }
             ToggleChanges => {
                 super::changes::set_on(!super::changes::is_on());
+                super::setting_changed_everywhere();
+            }
+            ToggleLineNumbers => {
+                super::line_numbers::set_on(!super::line_numbers::is_on());
                 super::setting_changed_everywhere();
             }
         }
@@ -478,6 +483,9 @@ impl Editing<'_> {
         }
         if action == Action::ToggleChanges {
             set_state(super::changes::is_on());
+        }
+        if action == Action::ToggleLineNumbers {
+            set_state(super::line_numbers::is_on());
         }
         let applies = action.spec().applies;
         match applies {
