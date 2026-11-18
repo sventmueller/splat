@@ -291,7 +291,7 @@ checkmark for the formatting at the cursor.
 | **Format** | Quote, Code Block (No Language or one of 20 languages; also changes the language of an existing block), Callout (Note, Tip, Important, Warning, Caution; the same type again removes it), Edit Formula or Diagram…, Clear Formatting |
 | **Insert** | Link…, Image…, Table…, Formula, Diagram (Flowchart, Sequence Diagram, Gantt Chart), Table of Contents, Footnote, Horizontal Rule |
 | **Table** | Insert Row Above/Below, Insert Column Left/Right, Delete Row, Delete Column, Alignment (Left, Center, Right, Default), Align Table Columns |
-| **View** | Hide/Show Preview, Show/Hide Outline, Typographic Punctuation, Zoom In/Out, Actual Size, toolbar, tab bar, full screen |
+| **View** | Hide/Show Preview, Show/Hide Outline, Line Numbers, Typographic Punctuation, Zoom In/Out, Actual Size, toolbar, tab bar, full screen |
 
 Underline, highlight, superscript and subscript are written as `<ins>`, `<mark>`, `<sup>` and `<sub>`, which GitHub
 shows as well. Splat also reads `<u>`, which GitHub removes, and the shorter `==highlight==`, `^sup^` and `~sub~`.
@@ -640,7 +640,8 @@ with a password are refused.
 
 - **Dark mode** follows the system. Formulas and diagrams are rendered for each appearance.
 - **Increase Contrast** in System Settings switches the syntax colours to high-contrast palettes.
-- **Zoom.** ⌘+, ⌘− and ⌘0 scale both panes.
+- **Zoom.** ⌘+, ⌘− and ⌘0 scale both panes, in every window; the size stays for the next start.
+- **Line numbers.** **View › Line Numbers** shows them beside the source, in every window.
 - **Full screen, tabs and a customizable toolbar**, as in every Mac app.
 - **VoiceOver.** The panes are labelled "Markdown source" and "Preview", formulas read as their code and diagrams as
   their title. Every command is reachable from the keyboard.

@@ -7,8 +7,9 @@ use std::cell::Cell;
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
 use objc2_app_kit::{
-    NSLayoutManager, NSTextContainer, NSTextContentManager, NSTextElementProvider, NSTextLayoutManager,
-    NSTextLayoutManagerSegmentOptions, NSTextLayoutManagerSegmentType, NSTextLocation, NSTextRange, NSTextView,
+    NSLayoutManager, NSTextContainer, NSTextContentManager, NSTextElementProvider, NSTextLayoutFragment,
+    NSTextLayoutFragmentEnumerationOptions, NSTextLayoutManager, NSTextLayoutManagerSegmentOptions,
+    NSTextLayoutManagerSegmentType, NSTextLineFragment, NSTextLocation, NSTextRange, NSTextView,
 };
 use objc2_foundation::{NSAttributedStringKey, NSPoint, NSRange, NSRect, NSSize};
 
@@ -114,6 +115,61 @@ impl<'a> TextGeometry<'a> {
         }
     }
 
+    /// The paragraphs in view, from the first that shows: where each starts as a UTF-16 offset, and the baseline of its
+    /// first line in view coordinates. After a final line break the empty last line counts as one more, starting at the
+    /// end. Only TextKit 2 lays text out by paragraphs, so the preview has none.
+    pub(super) fn paragraphs_in_view(&self) -> Vec<(usize, f64)> {
+        let TextGeometry::Kit2 { view, layout } = self else {
+            return Vec::new();
+        };
+        let Some(content) = layout.textContentManager() else {
+            return Vec::new();
+        };
+        let origin = view.textContainerOrigin();
+        let visible = view.visibleRect();
+        let bottom = visible.origin.y + visible.size.height;
+        let document = content.documentRange().location();
+        let start = layout
+            .textLayoutFragmentForPosition(NSPoint::new(0.0, (visible.origin.y - origin.y).max(0.0)))
+            .map_or_else(|| document.clone(), |fragment| fragment.rangeInElement().location());
+        let offset_of = |location: &ProtocolObject<dyn NSTextLocation>| {
+            crate::util::to_usize(content.offsetFromLocation_toLocation(&document, location).max(0))
+        };
+        let found = std::cell::RefCell::new(Vec::new());
+        let block = block2::StackBlock::new(|fragment: std::ptr::NonNull<NSTextLayoutFragment>| {
+            crate::util::guarded(objc2::runtime::Bool::NO, || {
+                // SAFETY: TextKit keeps the fragment alive for the call.
+                let fragment = unsafe { fragment.as_ref() };
+                let frame = fragment.layoutFragmentFrame();
+                let top = frame.origin.y + origin.y;
+                if top > bottom {
+                    return objc2::runtime::Bool::NO;
+                }
+                let baseline =
+                    |line: &NSTextLineFragment| top + line.typographicBounds().origin.y + line.glyphOrigin().y;
+                let range = fragment.rangeInElement();
+                let lines = fragment.textLineFragments();
+                let mut found = found.borrow_mut();
+                if let Some(first) = lines.firstObject() {
+                    found.push((offset_of(&range.location()), baseline(&first)));
+                }
+                if let Some(last) = lines
+                    .lastObject()
+                    .filter(|last| lines.count() > 1 && last.characterRange().length == 0)
+                {
+                    found.push((offset_of(&range.endLocation()), baseline(&last)));
+                }
+                objc2::runtime::Bool::YES
+            })
+        });
+        layout.enumerateTextLayoutFragmentsFromLocation_options_usingBlock(
+            Some(&start),
+            NSTextLayoutFragmentEnumerationOptions::EnsuresLayout,
+            &block,
+        );
+        found.into_inner()
+    }
+
     /// A TextKit 1 view with non-contiguous layout knows its height only as far as it laid out, so a jump below that ends
     /// at the end it estimates: this lays out down to `y`.
     pub(super) fn make_room(&self, y: f64) {
@@ -201,6 +257,11 @@ pub(super) fn char_rect(view: &NSTextView, index: usize) -> NSRect {
 /// UTF-16 offset of the line at height `y` of `view`.
 pub(super) fn offset_at(view: &NSTextView, y: f64) -> Option<usize> {
     TextGeometry::of(view)?.offset_at(y)
+}
+
+/// See `TextGeometry::paragraphs_in_view`.
+pub(super) fn paragraphs_in_view(view: &NSTextView) -> Vec<(usize, f64)> {
+    TextGeometry::of(view).map_or_else(Vec::new, |geometry| geometry.paragraphs_in_view())
 }
 
 /// UTF-16 offset of the line at the top of the visible part of `view`.

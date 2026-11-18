@@ -329,6 +329,9 @@ pub fn start(mtm: MainThreadMarker) {
     super::panes::forget_sidebar();
     // The checks look at the count in the corner, which windows hide until someone asks for it.
     super::counter::set_on(true);
+    // The checks measure the views at the normal size without line numbers, whatever a run that ended early left.
+    super::line_numbers::set_on(false);
+    super::style::choose_zoom(splat_editor_state::zoom::NORMAL);
     // App Nap holds back the timers of an app behind other windows, and a check waiting on one then fails for nothing.
     std::mem::forget(
         objc2_foundation::NSProcessInfo::processInfo().beginActivityWithOptions_reason(

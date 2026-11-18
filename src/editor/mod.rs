@@ -14,6 +14,7 @@ mod export;
 mod export_options;
 mod geometry;
 mod images;
+mod line_numbers;
 mod mathfield;
 mod metadata;
 mod navigation;
@@ -81,6 +82,13 @@ fn open_editors() -> Vec<Retained<EditorController>> {
 fn setting_changed_everywhere() {
     for editor in open_editors() {
         editor.setting_changed();
+    }
+}
+
+/// Shows every window at the zoom the user chose last.
+fn zoom_everywhere() {
+    for editor in open_editors() {
+        editor.zoom_chosen();
     }
 }
 

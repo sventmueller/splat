@@ -72,6 +72,7 @@ macro_rules! commands {
             SearchFolder = mdSearchFolder, Always { title: n("In allen Notizen suchen …"), key: "shift+cmd+f", symbol: "magnifyingglass" };
             ToggleWordCount = mdToggleWordCount, Always { title: n("Wortanzahl ausblenden") };
             ToggleChanges = mdToggleChanges, Always { title: n("Änderungen seit dem letzten Commit") };
+            ToggleLineNumbers = mdToggleLineNumbers, Always { title: n("Zeilennummern") };
             EditAtomAt = mdEditAtomAt, Always {};
             AtomSnippet = mdAtomSnippet, Always {};
             AtomMode = mdAtomMode, Always {};

@@ -36,7 +36,7 @@ use saving::{
     typing_through_a_save_steps, unsaved_copy_steps,
 };
 use tables::table_steps;
-use view::{marks_on_screen_steps, outline_without_preview_steps, toolbar_steps, view_steps};
+use view::{line_number_steps, marks_on_screen_steps, outline_without_preview_steps, toolbar_steps, view_steps};
 
 pub(super) const SECTION: &str = "\n\n## Prüfstand\n\nWort **fett** eins zwei drei.\n\n\
     Links: [Netz](https://example.com/pruefstand) #pruefstand [Andere](andere.md) [Fehlt](fehlt.md) \
@@ -583,6 +583,7 @@ fn groups() -> Vec<(&'static str, Vec<Step>)> {
         ("typing through a save", typing_through_a_save_steps()),
         ("tables", table_steps()),
         ("view", view_steps()),
+        ("line numbers", line_number_steps()),
         ("dialogs", dialog_steps()),
         ("links", link_steps()),
         ("paste", paste_steps()),
