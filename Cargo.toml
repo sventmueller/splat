@@ -27,6 +27,7 @@ dispatch2 = "0.3"
 emojis = "0.9"
 encoding_rs = "0.8"
 entities = "1"
+fast_image_resize = { version = "6.1", default-features = false, features = ["image"] }
 image = { version = "0.25", default-features = false }
 krilla = "0.8"
 krilla-svg = "0.8"

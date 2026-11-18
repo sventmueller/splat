@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use fast_image_resize::{FilterType, ResizeAlg, ResizeOptions, Resizer};
 use krilla::geom::Size;
 use krilla::page::PageSettings;
 use krilla::{Document, SerializeSettings};
@@ -42,7 +43,7 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
     image.apply_orientation(orientation);
     let natural = (image.width(), image.height());
     if image.width().max(image.height()) > side {
-        image = image.resize(side, side, image::imageops::FilterType::Triangle);
+        image = scaled_down(&image, side)?;
     }
     let image = image.into_rgba8();
     Some(Decoded::Rgba {
@@ -51,6 +52,23 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
         pixels: image.into_raw(),
         natural,
     })
+}
+
+/// The image no wider or higher than `side`, bilinear as `image`'s Triangle filter, whose resizing without the processor's
+/// vector instructions took two thirds of the time of a camera photo.
+fn scaled_down(image: &image::DynamicImage, side: u32) -> Option<image::DynamicImage> {
+    let (width, height) = (image.width(), image.height());
+    let scale = f64::from(side) / f64::from(width.max(height));
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "between 1 and `side`"
+    )]
+    let fit = |v: u32| ((f64::from(v) * scale).round() as u32).max(1);
+    let mut scaled = image::DynamicImage::new(fit(width), fit(height), image.color());
+    let options = ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
+    Resizer::new().resize(image, &mut scaled, &options).ok()?;
+    Some(scaled)
 }
 
 /// Converts an SVG without reading any file it references; embedded images may only be PNG or SVG, which are
@@ -299,6 +317,63 @@ mod tests {
         big[16..20].copy_from_slice(&100_000u32.to_be_bytes());
         big[20..24].copy_from_slice(&100_000u32.to_be_bytes());
         assert!(decode(&big, fonts(), SHOWN_SIDE).is_none());
+    }
+
+    #[test]
+    fn a_picture_scaled_down_keeps_its_colours_in_every_pixel_format() {
+        let scaled = |image: image::DynamicImage| {
+            let mut png = Vec::new();
+            image
+                .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+                .unwrap();
+            match decode(&png, fonts(), 300) {
+                Some(Decoded::Rgba {
+                    width: 300,
+                    height: 2,
+                    pixels,
+                    natural: (3000, 20),
+                }) => pixels,
+                other => panic!("{:?}", other.map(|d| d.bytes())),
+            }
+        };
+        let near = |pixels: &[u8], expected: [u8; 4]| {
+            pixels
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| pixel.iter().zip(expected).all(|(&a, b)| a.abs_diff(b) <= 1))
+        };
+        use image::{DynamicImage as D, ImageBuffer, Luma, Rgb, Rgba};
+        for (image, expected) in [
+            (
+                D::ImageLuma8(ImageBuffer::from_pixel(3000, 20, Luma([77]))),
+                [77, 77, 77, 255],
+            ),
+            (
+                D::ImageRgb8(ImageBuffer::from_pixel(3000, 20, Rgb([200, 100, 50]))),
+                [200, 100, 50, 255],
+            ),
+            (
+                D::ImageRgba8(ImageBuffer::from_pixel(3000, 20, Rgba([200, 100, 50, 128]))),
+                [200, 100, 50, 128],
+            ),
+            (
+                D::ImageRgba16(ImageBuffer::from_pixel(
+                    3000,
+                    20,
+                    Rgba([51_400, 25_700, 12_850, 65_535]),
+                )),
+                [200, 100, 50, 255],
+            ),
+        ] {
+            let color = image.color();
+            assert!(near(&scaled(image), expected), "{color:?}");
+        }
+        let halves = D::ImageRgb8(ImageBuffer::from_fn(3000, 20, |x, _| {
+            Rgb([if x < 1500 { 0 } else { 255 }; 3])
+        }));
+        let pixels = scaled(halves);
+        assert!(near(&pixels[..4], [0, 0, 0, 255]) && near(&pixels[296 * 4..300 * 4], [255, 255, 255, 255]));
     }
 
     #[test]
