@@ -59,7 +59,12 @@ pub(crate) const LIBRARY: [&str; 9] = [
 pub(crate) fn coverage(library: bool) -> Result<(), String> {
     let root = root();
     let target = root.join("target/coverage");
-    let mut env = vec![("CARGO_TARGET_DIR".to_string(), target.display().to_string())];
+    // cargo-llvm-cov finds the measured programs only in the target dir, so a build dir set elsewhere in a cargo config
+    // would leave it with no measurements.
+    let mut env = vec![
+        ("CARGO_TARGET_DIR".to_string(), target.display().to_string()),
+        ("CARGO_BUILD_BUILD_DIR".to_string(), target.display().to_string()),
+    ];
     // Homebrew's Rust lacks the llvm-tools component; then Homebrew's LLVM reads the measurements, while the major
     // versions match.
     if std::env::var_os("LLVM_COV").is_none()
