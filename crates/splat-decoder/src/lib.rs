@@ -246,8 +246,26 @@ struct Helper {
     output: BufReader<UnixStream>,
 }
 
+/// A service that has just ended takes a moment to go, and what reaches it meanwhile gets no answer: a helper that does
+/// not start is tried again over a new connection this many times, after this pause.
+const START_TRIES: u32 = 5;
+const START_PAUSE: Duration = Duration::from_millis(200);
+
 impl Helper {
     fn start(native: bool) -> Option<Helper> {
+        for attempt in 0..START_TRIES {
+            if attempt > 0 {
+                drop(lock(&SERVICE).take());
+                std::thread::sleep(START_PAUSE);
+            }
+            if let Some(helper) = Helper::start_once(native) {
+                return Some(helper);
+            }
+        }
+        None
+    }
+
+    fn start_once(native: bool) -> Option<Helper> {
         let (ours, theirs) = UnixStream::pair().ok()?;
         // A service that was taken over may stop answering; reading gives up a little after it should have ended itself.
         ours.set_read_timeout(Some(TIMEOUT + Duration::from_secs(1))).ok()?;
