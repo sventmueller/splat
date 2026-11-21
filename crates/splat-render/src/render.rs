@@ -29,7 +29,7 @@ use splat_preview::layout::{Atom, ItemMarker, Link, Para, ParaKind, ParaStyle, R
 use crate::appkit::{byte_range_to_ns, constant, ns, to_isize};
 use crate::attributes::{Attribute, Attributes, add_attribute, attributed, attributed_mut};
 use crate::images::{ImageStore, resolve_path};
-use crate::picture::{Rendered, Sizing};
+use crate::picture::{Fit, Rendered, Sizing, needed};
 use crate::style::{PREVIEW_SIZE, token_color};
 use crate::viewer::Viewer;
 use crate::{js, remote};
@@ -43,6 +43,9 @@ pub struct RenderCtx<'a> {
     pub doc_dir: Option<&'a Path>,
     pub images: &'a RefCell<ImageStore>,
     pub max_image_width: f64,
+    /// Pixels per point of the screen the text shows on, whose pictures decode to what they cover there; `None` on
+    /// paper, whose pictures get the most they may have.
+    pub scale: Option<f64>,
     pub dark: bool,
     /// Receives a re-render once a remote image has loaded; print rendering passes `None`.
     pub requester: Option<&'a Rc<dyn Viewer>>,
@@ -56,8 +59,8 @@ pub struct RenderCtx<'a> {
 
 /// What the preview shows but others make: pictures from the web and the formulas and diagrams WebKit drew.
 pub trait Drawn {
-    /// A picture from the web, once it has loaded.
-    fn web_picture(&self, url: &str) -> Option<Rendered>;
+    /// A picture from the web with the pixels `need` asks for, once it has loaded.
+    fn web_picture(&self, url: &str, need: Fit) -> Option<Rendered>;
     /// A formula or diagram as WebKit drew it, once it has.
     fn drawing(&self, key: &js::Key) -> Option<Rendered>;
 }
@@ -68,8 +71,8 @@ pub struct Live<'a> {
 }
 
 impl Drawn for Live<'_> {
-    fn web_picture(&self, url: &str) -> Option<Rendered> {
-        remote::get(url, self.requester).flatten()
+    fn web_picture(&self, url: &str, need: Fit) -> Option<Rendered> {
+        remote::get_for(url, self.requester, need).flatten()
     }
 
     fn drawing(&self, key: &js::Key) -> Option<Rendered> {
@@ -639,9 +642,13 @@ impl RenderCtx<'_> {
         let rendered = match atom {
             Atom::Image(image) => {
                 let (url, alt) = (&image.url, &image.alt);
+                let need = match self.scale {
+                    Some(scale) => needed((image.width, image.height), self.zoom, self.max_image_width, scale),
+                    None => Fit::within(splat_decoder::SHOWN_SIDE),
+                };
                 let found = if remote::is_remote(url) {
                     self.drawn
-                        .web_picture(url)
+                        .web_picture(url, need)
                         .map(|r| self.images.borrow_mut().for_appearance(url, r, self.dark))
                 } else if let Some(carries) = self.leaves_the_mac
                     && !may_leave_with_the_document(url, self.doc_dir, carries)
@@ -650,7 +657,7 @@ impl RenderCtx<'_> {
                 } else {
                     self.images
                         .borrow_mut()
-                        .file(url, self.doc_dir, self.dark, self.requester)
+                        .file(url, self.doc_dir, self.dark, self.requester, need)
                 };
                 let r = found
                     .map(|r| sized(r, image.width, image.height))

@@ -6,8 +6,6 @@ use std::hash::Hash;
 
 /// Tries to load the page before formulas stay as source text for this run of the app.
 const MAX_LOADS: u32 = 3;
-/// A key counts as in use for this many requests after the last that named it.
-const IN_USE_FOR: u64 = 8;
 
 /// Who asks for renders: one document, by a number that no other gets while the app runs.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -136,7 +134,7 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
     }
 
     /// `owner` is gone: what only it asked for leaves the queue, what another asked for too goes to that one, and all it
-    /// holds counts as no longer in use.
+    /// holds counts as no longer wanted.
     pub fn forget(&mut self, owner: Owner) {
         self.wanted.remove(&owner);
         self.turns.retain(|o| *o != owner);
@@ -148,7 +146,6 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
                 }
             }
         }
-        self.tick += IN_USE_FOR + 1;
     }
 
     fn owner_of(&self, key: &K) -> Option<Owner> {
@@ -269,6 +266,11 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         self.waiting.values().all(VecDeque::is_empty) && self.current.is_none() && self.converting == 0
     }
 
+    /// Something waits for the page, which has to start if it is not there.
+    pub fn waits(&self) -> bool {
+        self.waiting.values().any(|queue| !queue.is_empty())
+    }
+
     /// The result for `key`, once it is rendered.
     pub fn rendered(&self, key: &K) -> Option<&V> {
         self.done.get(key)
@@ -286,29 +288,45 @@ impl<K: Clone + Eq + Hash, V: Clone> RenderQueue<K, V> {
         self.failed.contains(key).then_some(Err(None))
     }
 
-    /// Above `limit` results or `budget` bytes, drops what no open document needs or asked for in its last few requests, and
-    /// returns it. Results still in use stay, however many there are: dropping them would only make the documents request
-    /// them again.
+    /// Drops the results no open document wants, the least recently asked for first, until at most `limit` of them
+    /// holding at most `budget` bytes are left, and returns them. What a document wants stays, however much it is:
+    /// dropping it would only make the document request it again.
     pub fn evict(&mut self, limit: usize, budget: usize) -> Vec<K> {
         if self.done.len() + self.failed.len() <= limit && self.bytes <= budget {
             return Vec::new();
         }
-        let recent = self.tick.saturating_sub(IN_USE_FOR);
-        let stale: Vec<K> = self
-            .done
-            .keys()
-            .chain(self.failed.iter())
-            .filter(|k| self.used.get(*k).copied().unwrap_or(0) < recent && self.owner_of(k).is_none())
-            .cloned()
-            .collect();
-        for key in &stale {
+        let gone: Vec<K> = {
+            let wanted: HashSet<&K> = self.wanted.values().flatten().collect();
+            let mut unwanted: Vec<(u64, &K)> = self
+                .done
+                .keys()
+                .chain(self.failed.iter())
+                .filter(|key| !wanted.contains(key))
+                .map(|key| (self.used.get(key).copied().unwrap_or(0), key))
+                .collect();
+            unwanted.sort_unstable_by_key(|(used, _)| *used);
+            let size = |key: &K| self.sizes.get(key).copied().unwrap_or(0);
+            let mut count = unwanted.len();
+            let mut bytes: usize = unwanted.iter().map(|(_, key)| size(key)).sum();
+            let mut gone = Vec::new();
+            for (_, key) in unwanted {
+                if count <= limit && bytes <= budget {
+                    break;
+                }
+                count -= 1;
+                bytes -= size(key);
+                gone.push(key.clone());
+            }
+            gone
+        };
+        for key in &gone {
             self.done.remove(key);
             self.failed.remove(key);
             self.errors.remove(key);
             self.used.remove(key);
             self.bytes -= self.sizes.remove(key).unwrap_or(0);
         }
-        stale
+        gone
     }
 }
 
@@ -443,48 +461,90 @@ mod tests {
         assert_eq!(q.outcome(&"b"), None);
     }
 
-    #[test]
-    fn only_what_nobody_asked_for_lately_is_dropped() {
-        let mut q = ready();
-        q.request(ONE, vec!["alt"]);
-        q.next().unwrap();
-        q.release(&"alt");
-        q.store("alt", Some(1));
-        for _ in 0..=IN_USE_FOR {
-            q.request(ONE, vec!["neu"]);
+    /// Renders `keys` one after the other for `ONE`, each asked for alone as a formula being typed is, with its size.
+    fn typed(q: &mut RenderQueue<&'static str, u32>, keys: &[(&'static str, usize)]) {
+        for &(key, size) in keys {
+            q.request(ONE, vec![key]);
+            let (key, _) = q.next().unwrap();
+            q.release(&key);
+            q.store(key, Some(0));
+            q.note_size(key, size);
         }
-        q.next().unwrap();
-        q.release(&"neu");
-        q.store("neu", Some(2));
-        assert!(q.evict(10, 100).is_empty(), "below the limit nothing goes");
-        assert_eq!(q.evict(1, 100), ["alt"]);
-        assert_eq!(q.rendered(&"neu"), Some(&2));
-        assert_eq!(q.outcome(&"alt"), None);
+    }
+
+    #[test]
+    fn what_no_document_wants_goes_least_recently_asked_for_first() {
+        let mut q = ready();
+        typed(&mut q, &[("a", 0), ("b", 0), ("c", 0)]);
+        assert!(q.evict(2, 100).is_empty(), "below the limit nothing goes");
+        assert_eq!(q.evict(1, 100), ["a"]);
+        assert_eq!(q.outcome(&"a"), None);
+        assert_eq!(q.rendered(&"b"), Some(&0));
+        assert_eq!(q.evict(0, 100), ["b"]);
+        assert_eq!(q.rendered(&"c"), Some(&0), "what a document wants stays");
     }
 
     #[test]
     fn few_large_results_are_dropped_like_many_small_ones() {
         let mut q = ready();
-        q.request(ONE, vec!["alt"]);
-        q.next().unwrap();
-        q.release(&"alt");
-        q.store("alt", Some(1));
-        q.note_size("alt", 90);
-        for _ in 0..=IN_USE_FOR {
-            q.request(ONE, vec!["neu"]);
-        }
-        q.next().unwrap();
-        q.release(&"neu");
-        q.store("neu", Some(2));
-        q.note_size("neu", 20);
-        q.note_size("neu", 30);
-        assert!(q.evict(10, 120).is_empty(), "within the budget");
-        assert_eq!(q.evict(10, 100), ["alt"]);
+        typed(&mut q, &[("alt", 90), ("mittel", 20), ("neu", 30)]);
         assert!(
-            q.evict(10, 100).is_empty(),
-            "what is in use stays, and the bytes went with the other"
+            q.evict(10, 110).is_empty(),
+            "only what no document wants counts against the budget"
         );
-        assert_eq!(q.rendered(&"neu"), Some(&2));
+        assert_eq!(
+            q.evict(10, 100),
+            ["alt"],
+            "the oldest goes first, and only until the rest fits"
+        );
+        assert_eq!(q.evict(10, 0), ["mittel"]);
+        assert!(q.evict(10, 0).is_empty(), "what is wanted stays, however large");
+        assert_eq!(q.bytes(), 30, "the bytes went with the others");
+    }
+
+    #[test]
+    fn a_failure_counts_against_the_limit_and_goes_with_its_error() {
+        let mut q = ready();
+        q.request(ONE, vec!["kaputt"]);
+        q.next().unwrap();
+        q.note_error("kaputt", "Syntaxfehler".into());
+        q.release(&"kaputt");
+        q.store("kaputt", None);
+        typed(&mut q, &[("neu", 0)]);
+        assert_eq!(q.evict(0, 100), ["kaputt"]);
+        assert_eq!(q.outcome(&"kaputt"), None);
+    }
+
+    #[test]
+    fn only_what_waits_asks_for_the_page() {
+        let mut q: RenderQueue<&str, u32> = RenderQueue::default();
+        q.request(ONE, Vec::new());
+        assert!(!q.waits());
+        q.request(ONE, vec!["a"]);
+        assert!(q.waits(), "also before the page is there");
+        q.page_ready();
+        let (key, _) = q.next().unwrap();
+        assert!(!q.waits(), "what renders waits no longer");
+        q.release(&key);
+        q.store(key, Some(1));
+        q.request(ONE, vec!["a"]);
+        assert!(!q.waits(), "what is rendered needs no page");
+    }
+
+    #[test]
+    fn what_was_rendered_stays_when_the_page_ends() {
+        let mut q = ready();
+        q.request(ONE, vec!["a"]);
+        let (key, job) = q.next().unwrap();
+        q.release(&key);
+        q.store(key, Some(1));
+        q.lost_page();
+        assert!(!q.answer_counts(job) && q.idle());
+        assert_eq!(q.rendered(&"a"), Some(&1));
+        q.request(ONE, vec!["a", "b"]);
+        assert!(q.waits() && q.next().is_none(), "a new page has to load first");
+        q.page_ready();
+        assert_eq!(q.next().unwrap().0, "b");
     }
 
     #[test]

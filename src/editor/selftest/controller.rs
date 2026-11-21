@@ -18,7 +18,7 @@ use super::source;
 use super::{after, check, compose, guarded, type_in_preview, type_in_source};
 use crate::document::MdDocument;
 use crate::editor::actions::Action;
-use crate::editor::{EditorController, Invalidate, js};
+use crate::editor::{EditorController, Invalidate, js, mathfield};
 use crate::markdown::text::Byte;
 use crate::util::ns;
 
@@ -306,6 +306,62 @@ fn the_formula_editor_keeps_the_text_whole(mtm: MainThreadMarker) {
     document.close();
 
     KEEP_EDITOR.set(false);
+}
+
+/// The visual editor's web view goes a while after its popover closed, and opening it again builds one that works.
+pub(super) fn the_formula_editor_lets_its_web_view_go(mtm: MainThreadMarker, then: impl Fn() + 'static) {
+    KEEP_EDITOR.set(true);
+    crate::test_hooks::keep_formula_field_for(Some(std::time::Duration::from_millis(300)));
+    let (document, e) = open(mtm, "Formel $x$ und Rest\n");
+    // What AppKit autoreleases while opening and closing would keep the view until this turn of the run loop ends.
+    let web = objc2::rc::autoreleasepool(|_| {
+        open_editor(&e);
+        e.atom_editor().set_visual(true);
+        let web = objc2::rc::Weak::from_retained(&mathfield::field(mtm).web);
+        step(&e, || e.atom_editor().editor_closed());
+        web
+    });
+    KEEP_EDITOR.set(false);
+    // AppKit lets go of a view that was in a window only in a turn of the main run loop itself, which `until` never ends.
+    super::wait(
+        0.0,
+        15.0,
+        1,
+        {
+            let web = web.clone();
+            move || !mathfield::started() && web.load().is_none()
+        },
+        move |gone| {
+            check(
+                "the formula editor lets its web view go a while after it closed",
+                gone,
+                &format!(
+                    "field kept {}, view kept {}",
+                    mathfield::started(),
+                    web.load().is_some()
+                ),
+            );
+            crate::test_hooks::keep_formula_field_for(None);
+            KEEP_EDITOR.set(true);
+            open_editor(&e);
+            e.atom_editor().set_visual(true);
+            let loaded = until(|| mathfield::started() && mathfield::field(mtm).loaded.get());
+            mathfield::field(mtm).run(
+                "mf.value = latex; mf.dispatchEvent(new Event('input', { bubbles: true }));",
+                "z",
+            );
+            let edited = until(|| source(&e).contains("$z$"));
+            step(&e, || e.atom_editor().editor_closed());
+            check(
+                "the formula editor works again when it opens after its web view went",
+                loaded && edited && source(&e) == "Formel $z$ und Rest\n",
+                &format!("loaded {loaded}, {:?}", source(&e)),
+            );
+            document.close();
+            KEEP_EDITOR.set(false);
+            then();
+        },
+    );
 }
 
 /// Half transparent white over black, as the decoder's straight alpha asks for it.

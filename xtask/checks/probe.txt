@@ -62,6 +62,7 @@ a look at the file after a save leaves what was typed since
 a look at the file leaves the undo steps
 a look that came too late leaves the other program's file alone
 a lost connection passes: the picture loads on the next try
+a new formula after the renderer's web view ended starts it again as the first did and shows
 a numbered list is undone in one step
 a numbered list writes exactly its text
 a panic does not copy a document without changes
@@ -199,13 +200,16 @@ the Word export has a file for each image
 the Word export holds its document and pictures
 the Word export is written
 the decoder helper reads no files and reaches no network
+the decoding service ends after a while without a request, and the next picture starts it again
 the defaults of a graph go behind its brace, not into a comment or name
 the draft of a named document stays marked until it is saved
 the first formula starts the web view and shows
 the first save of a new document writes its text and clears the mark
 the first web view loads its page in a later turn of the main loop
 the formula editor has an undo history of its own
+the formula editor lets its web view go a while after it closed
 the formula editor shows its formula again after its web process ended
+the formula editor works again when it opens after its web view went
 the formula editor's page loads
 the formula editor's script runs
 the formula editor's web view draws no background
@@ -223,6 +227,8 @@ the preview takes input again once the text is small enough
 the problem form names the version of Splat and of macOS
 the recent documents list a document just noted
 the reloaded document can be saved
+the renderer's scheme serves its resources and nothing beside them
+the renderer's web view ends after a while without a render, and a formula shown keeps its picture without starting it
 the save after Save As goes to the new file
 the save after a move goes to where the file is now
 the save after a panic in a reload writes all there is

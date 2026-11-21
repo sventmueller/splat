@@ -151,7 +151,7 @@ telemetry.
 - macOS 14 Sonoma or later. Splat is developed and tested on macOS 27, where it picks up the Liquid Glass design
   automatically.
 - A Mac with Apple Silicon or an Intel processor.
-- About 45 MB of disk space.
+- About 35 MB of disk space.
 
 ## Installation
 
@@ -538,8 +538,9 @@ diagram or a Gantt chart. Building blocks help with the three most common Mermai
 
 Other diagram types are edited as code. VoiceOver reads a diagram's title or alternative text.
 
-The first diagram after launch takes about a second, because the rendering engine starts in the background. A diagram
-that takes longer than 10 seconds shows an error, and the rendering engine starts afresh for the next one.
+The first diagram after launch, and the first after two minutes without one, takes about a second, because the rendering
+engine starts in the background. A diagram that takes longer than 10 seconds shows an error, and the rendering engine
+starts afresh for the next one.
 PlantUML's engine (3 MB) loads only with the first PlantUML diagram. A PlantUML `!include` from the web is blocked.
 
 ## Images
@@ -552,8 +553,9 @@ PlantUML's engine (3 MB) loads only with the first PlantUML diagram. A PlantUML 
 - **Changes on disk.** An image you replace, or one that appears after the document named it, shows without opening
   the document again. Images from the web that failed because of the network are tried again while a document shows
   them.
-- **Memory.** Images show at up to 2560 pixels on their longest side, which also fills an A4 page. They decode smaller
-  once they fill an eighth of the Mac's memory, and while macOS reports memory pressure.
+- **Memory.** Images decode to the pixels they cover on screen, at most 2560 on their longest side, and again when they
+  show larger; on paper they have up to 2560, which fills an A4 page. They decode smaller once they fill an eighth of the
+  Mac's memory, and while macOS reports memory pressure.
 - **Dark mode.** Images with a white background are slightly dimmed in the dark preview.
 - **Pasting and dropping.** See [In the source](#in-the-source).
 
@@ -716,8 +718,7 @@ A Markdown file can come from anyone, so Splat treats every document as untruste
   macOS starts in a sandbox of its own: none of your files, no network. It hands back only pixels, whose size is
   checked, and ends itself when a decode takes more than 10 seconds or too much memory. Apple's own image decoders only
   see HEIC, TIFF, AVIF and PDF, and only when the data really is that format. SVGs, formulas and diagrams pass that
-  service as well, so they are pictures with a fixed resolution in Splat: four pixels per point, up to 2560 on the
-  longer side.
+  service as well, so they are pictures in Splat: at most four pixels per point and 2560 on the longer side.
 - **Local files** reach a document only by the path it names, and only from a folder you granted: Splat may read a
   document you open, but the pictures, notes, bibliography and repository around it only once you grant their folder
   with **Grant Access to Folder…** in the bar above the preview. A grant covers all subfolders and is remembered.
@@ -756,7 +757,7 @@ Splat stays responsive with documents of several megabytes:
   whole keystroke in its preview about 30 ms with the view's own work.
 - Large previews render the visible part first and the rest while the app is idle. Blocks scrolled into view are
   rendered before they are drawn.
-- In the source of larger documents, parsing for the preview runs in the background while you type.
+- In the source of larger documents, the same runs in the background while you type.
 - A document stays plain text once it would take about 4 GB of memory, which is roughly 50 to 120 MB of ordinary
   Markdown but only 10 to 20 MB of nothing but tables or headings: the source has no colours and the preview says why
   it stays empty. Exports still work.

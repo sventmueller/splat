@@ -4,7 +4,8 @@
 //! within one memory budget (`picture`). A document asks as a `Viewer` and hears through it what arrives for it.
 //!
 //! `start` says once, before anything else runs, where the page and its libraries lie and where failures go; the page
-//! is `render.html` in that folder, with the libraries in `js/` beside it.
+//! is `render.html` in that folder, with the libraries in `js/` beside it. The pages read that folder through a scheme
+//! of their own (`scheme`), which unpacks a library the folder holds compressed as `<name>.lzfse`.
 
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -22,6 +23,7 @@ pub mod lanes;
 pub mod picture;
 pub mod remote;
 pub mod render;
+pub mod scheme;
 pub mod style;
 pub mod viewer;
 pub mod volumes;

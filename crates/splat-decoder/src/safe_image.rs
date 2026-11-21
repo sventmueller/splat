@@ -11,16 +11,15 @@ use krilla::page::PageSettings;
 use krilla::{Document, SerializeSettings};
 use krilla_svg::{SurfaceExt, SvgSettings};
 
-use super::protocol::{Decoded, MAX_BYTES, MAX_FILE_BYTES, MAX_SIDE};
+use super::protocol::{Decoded, Fit, MAX_BYTES, MAX_FILE_BYTES, MAX_SIDE};
 
 /// Pixels an SVG filter may be rasterised to.
 const MAX_PIXELS: f64 = 16_000_000.0;
 /// Memory an image may decode to.
 const MAX_DECODED_BYTES: u64 = 512 << 20;
 
-/// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become pixels no wider or higher than `side`; anything else is
-/// refused.
-pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Option<Decoded> {
+/// SVG becomes a PDF; PNG, JPEG, GIF, WebP and BMP become the pixels `fit` asks for; anything else is refused.
+pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, fit: Fit) -> Option<Decoded> {
     if bytes.len() > MAX_FILE_BYTES {
         return None;
     }
@@ -42,8 +41,9 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
     let mut image = image::DynamicImage::from_decoder(decoder).ok()?;
     image.apply_orientation(orientation);
     let natural = (image.width(), image.height());
-    if image.width().max(image.height()) > side {
-        image = scaled_down(&image, side)?;
+    let (width, height) = fit.pixels(f64::from(natural.0), f64::from(natural.1));
+    if (width, height) != natural {
+        image = scaled_down(&image, width, height)?;
     }
     let image = image.into_rgba8();
     Some(Decoded::Rgba {
@@ -54,18 +54,10 @@ pub fn decode(bytes: &[u8], fonts: Arc<usvg::fontdb::Database>, side: u32) -> Op
     })
 }
 
-/// The image no wider or higher than `side`, bilinear as `image`'s Triangle filter, whose resizing without the processor's
-/// vector instructions took two thirds of the time of a camera photo.
-fn scaled_down(image: &image::DynamicImage, side: u32) -> Option<image::DynamicImage> {
-    let (width, height) = (image.width(), image.height());
-    let scale = f64::from(side) / f64::from(width.max(height));
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "between 1 and `side`"
-    )]
-    let fit = |v: u32| ((f64::from(v) * scale).round() as u32).max(1);
-    let mut scaled = image::DynamicImage::new(fit(width), fit(height), image.color());
+/// The image at `width` × `height`, bilinear as `image`'s Triangle filter, whose resizing without the processor's vector
+/// instructions took two thirds of the time of a camera photo.
+fn scaled_down(image: &image::DynamicImage, width: u32, height: u32) -> Option<image::DynamicImage> {
+    let mut scaled = image::DynamicImage::new(width, height, image.color());
     let options = ResizeOptions::new().resize_alg(ResizeAlg::Convolution(FilterType::Bilinear));
     Resizer::new().resize(image, &mut scaled, &options).ok()?;
     Some(scaled)
@@ -282,20 +274,20 @@ mod tests {
             .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
             .unwrap();
         assert!(matches!(
-            decode(&png, fonts(), SHOWN_SIDE),
+            decode(&png, fonts(), Fit::within(SHOWN_SIDE)),
             Some(Decoded::Rgba {
                 width: 3,
                 height: 2,
                 ..
             })
         ));
-        assert!(decode(b"%PDF-1.7 not an image", fonts(), SHOWN_SIDE).is_none());
+        assert!(decode(b"%PDF-1.7 not an image", fonts(), Fit::within(SHOWN_SIDE)).is_none());
         let mut wide = Vec::new();
         image::RgbaImage::new(5000, 10)
             .write_to(&mut std::io::Cursor::new(&mut wide), image::ImageFormat::Png)
             .unwrap();
         assert!(matches!(
-            decode(&wide, fonts(), EXPORT_SIDE),
+            decode(&wide, fonts(), Fit::within(EXPORT_SIDE)),
             Some(Decoded::Rgba {
                 width: EXPORT_SIDE,
                 height: 8,
@@ -304,7 +296,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            decode(&wide, fonts(), 500),
+            decode(&wide, fonts(), Fit::within(500)),
             Some(Decoded::Rgba {
                 width: 500,
                 height: 1,
@@ -312,11 +304,32 @@ mod tests {
                 ..
             })
         ));
+        let mut portrait = Vec::new();
+        image::RgbaImage::new(300, 400)
+            .write_to(&mut std::io::Cursor::new(&mut portrait), image::ImageFormat::Png)
+            .unwrap();
+        let column = Fit {
+            width: 150,
+            height: 0,
+            side: SHOWN_SIDE,
+        };
+        assert!(
+            matches!(
+                decode(&portrait, fonts(), column),
+                Some(Decoded::Rgba {
+                    width: 150,
+                    height: 200,
+                    natural: (300, 400),
+                    ..
+                })
+            ),
+            "as wide as asked, as high as that makes it"
+        );
         // A PNG header claiming 100000 x 100000 pixels.
         let mut big = png.clone();
         big[16..20].copy_from_slice(&100_000u32.to_be_bytes());
         big[20..24].copy_from_slice(&100_000u32.to_be_bytes());
-        assert!(decode(&big, fonts(), SHOWN_SIDE).is_none());
+        assert!(decode(&big, fonts(), Fit::within(SHOWN_SIDE)).is_none());
     }
 
     #[test]
@@ -326,7 +339,7 @@ mod tests {
             image
                 .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
                 .unwrap();
-            match decode(&png, fonts(), 300) {
+            match decode(&png, fonts(), Fit::within(300)) {
                 Some(Decoded::Rgba {
                     width: 300,
                     height: 2,

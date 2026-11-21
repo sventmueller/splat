@@ -130,7 +130,7 @@ A Splat balra szintaxiskiemeléssel mutatja a Markdown-forráskódot, jobbra él
 
 - macOS 14 Sonoma vagy újabb. A Splatot macOS 27 alatt fejlesztik és tesztelik, ahol automatikusan átveszi a Liquid Glass dizájnt.
 - Apple Silicon vagy Intel processzoros Mac.
-- Körülbelül 45 MB szabad tárhely.
+- Körülbelül 35 MB szabad tárhely.
 
 ## Telepítés
 
@@ -433,7 +433,7 @@ A **diagram szerkesztése** a képlet szerkesztéséhez hasonlóan működik: ka
 
 A többi diagramtípust kódként kell szerkeszteni. A VoiceOver felolvassa a diagram címét vagy alternatív szövegét.
 
-Az indítás utáni első diagram nagyjából egy másodpercig tart, mert a megjelenítő motor a háttérben indul. A 10 másodpercnél tovább tartó diagram hibát mutat, és a motor a következőhöz újraindul. A PlantUML motorja (3 MB) csak az első PlantUML-diagrammal töltődik be. A weben található PlantUML `!include` le van tiltva.
+Az indítás utáni első diagram, valamint egy kétperces, diagram nélküli szünet utáni első nagyjából egy másodpercig tart, mert a megjelenítő motor a háttérben indul. A 10 másodpercnél tovább tartó diagram hibát mutat, és a motor a következőhöz újraindul. A PlantUML motorja (3 MB) csak az első PlantUML-diagrammal töltődik be. A weben található PlantUML `!include` le van tiltva.
 
 ## Képek
 
@@ -441,7 +441,7 @@ Az indítás utáni első diagram nagyjából egy másodpercig tart, mert a megj
 - Az **internetes képek** betöltődnek, amint egy dokumentum megjeleníti őket, `https` felett és egyenként legfeljebb 10 MB méretig. Az e-mailekben lévő képekhez hasonlóan elárulják a szervereiknek, hogy és mikor nyitják meg a dokumentumot.
 - **Méret.** Az `<img width="200">` méretezi a képet; egyébként a képek az előnézet szélességéhez igazodnak.
 - **Módosítások a lemezen.** A lecserélt kép, vagy az, amelyik azután jelenik meg, hogy a dokumentum megnevezte, a dokumentum újranyitása nélkül látszik. A hálózat miatt sikertelen internetes képeket a Splat újra megpróbálja, amíg egy dokumentum mutatja őket.
-- **Memória.** A képek a leghosszabb oldalukon legfeljebb 2560 képpontig jelennek meg, ami egy A4-es oldalt is kitölt. Kisebbre dekódolódnak, ha a Mac memóriájának egynyolcadát kitöltik, és amíg a macOS memóriaterhelést jelez.
+- **Memória.** A képek annyi képpontra dekódolódnak, amennyit a képernyőn elfoglalnak, a leghosszabb oldalukon legfeljebb 2560-ra, és újra, amikor nagyobban jelennek meg; papíron legfeljebb 2560 képpontjuk van, ami kitölt egy A4-es oldalt. Kisebbre dekódolódnak, ha a Mac memóriájának egynyolcadát kitöltik, és amíg a macOS memóriaterhelést jelez.
 - **Sötét mód.** A fehér hátterű képek a sötét előnézetben kissé elhalványulnak.
 - **Beillesztés és ejtés.** Lásd [A forráskódban](#a-forráskódban).
 
@@ -556,7 +556,7 @@ Egy Markdown-fájl bárkitől származhat, ezért a Splat minden dokumentumot me
 
 - **Nincs telemetria.** A Splat semmit nem jelent arról, hogyan használja. Csak akkor keres frissítéseket, ha beleegyezik, vagy a **Frissítések keresése…** parancsot választja: ilyenkor egy kis hírcsatorna-fájlt tölt be a GitHubról, és a kérés csak az appot és a verzióját nevezi meg. A képletek és a diagramok helyben jelennek meg; az ezt végző webnézetek nem érik el a hálózatot. A **Súgó › Probléma jelentése…** megnyit egy űrlapot a GitHubon a böngészőben; a címe tartalmazza a Splat és a macOS verzióját és a Mac típusát, de semmit az Ön dokumentumaiból.
 - Az **internetes képek** betöltődnek, amint egy dokumentum megjeleníti őket, bármely gépről, csak `https` felett, egyenként legfeljebb 10 MB méretig, és sütik nélküli privát munkamenetben. A szervereik megtudják, hogy és mikor nyitják meg a dokumentumot.
-- **Elszigetelt dekódolás.** A képeket, valamint a képletek és a diagramok grafikáit egy saját szolgáltatás dekódolja, amelyet a macOS saját homokozóban indít el: az Ön egyik fájljához sem fér hozzá, és hálózata sincs. Csak képpontokat ad vissza, amelyek méretét ellenőrzik, és magától kilép, ha egy dekódolás 10 másodpercnél tovább tart, vagy túl sok memóriát igényel. Az Apple saját képdekódolói csak a HEIC, TIFF, AVIF és PDF adatokat látják, és csak ha az adat valóban ilyen formátumú. Az SVG-k, a képletek és a diagramok is ezen a szolgáltatáson haladnak át, ezért a Splatban rögzített felbontású képek: pontonként négy képpont, a hosszabb oldalon legfeljebb 2560.
+- **Elszigetelt dekódolás.** A képeket, valamint a képletek és a diagramok grafikáit egy saját szolgáltatás dekódolja, amelyet a macOS saját homokozóban indít el: az Ön egyik fájljához sem fér hozzá, és hálózata sincs. Csak képpontokat ad vissza, amelyek méretét ellenőrzik, és magától kilép, ha egy dekódolás 10 másodpercnél tovább tart, vagy túl sok memóriát igényel. Az Apple saját képdekódolói csak a HEIC, TIFF, AVIF és PDF adatokat látják, és csak ha az adat valóban ilyen formátumú. Az SVG-k, a képletek és a diagramok is ezen a szolgáltatáson haladnak át, ezért a Splatban képek: pontonként legfeljebb négy képpont és a hosszabb oldalon 2560.
 - A **helyi fájlok** csak a dokumentum által megnevezett útvonalon jutnak el hozzá, és csak olyan mappából, amelyhez hozzáférést adott: a Splat olvashatja a megnyitott dokumentumot, a körülötte lévő képeket, jegyzeteket, szakirodalmi jegyzéket és tárolót azonban csak akkor, ha az előnézet fölötti sáv **Hozzáférés megadása a mappához…** gombjával hozzáférést ad a mappájukhoz. A hozzáférés minden almappára érvényes, és megmarad. A beágyazások a dokumentum mappájából és az alatta lévőkből mutatnak Markdown-jegyzeteket, és a hiányzó képet is csak ott keresik. Máshol lévő, abszolút vagy `~` jellel kezdődő képútvonal az előnézetben olyan mappából töltődik be, amelyhez hozzáférést adott; a HTML- és Word-exportok, a nyomtatás és a PDF-ek csak azt viszik magukkal, ami a dokumentum mappájában vagy Git-tárolójában van, hacsak ez a tároló nem tartalmazza a Saját mappádat is, így egy idegen dokumentum nem húzhatja bele a fájljaidat egy továbbadott exportba.
 - A **jegyzetmappákat** a Splat csak addig olvassa, amíg az oldalsáv mutatja őket, és egy jegyzet átnevezése csak azután módosít más fájlokat, hogy Ön megerősítette, hányat.
 - A **Git-tárolókat** maga a Splat olvassa. Soha nem futtatja a `git` programot, amelynek a konfigurációja egy idegen tárolóban más programokat indíthat el, és nem olvas többet a megnyitott dokumentum legutóbbi commitban lévő változatánál. Oda semmit nem ír, és hálózatra sem megy ki.
@@ -574,7 +574,7 @@ A Splat több megabájtos dokumentumoknál is reszponzív marad:
 - A forráskód a TextKit 2-t használja, amely csak a látható részt tördeli.
 - Amíg az előnézetben gépel, valamint a legfeljebb 2 MB-os dokumentumok forráskódjában csak az érintett bekezdéseket elemzi, színezi és tördeli újra. Egy 10 MB-os dokumentumban az elemzés és a színezés nagyjából 3 ms, a megjelenítés nagyjából 10 ms, egy teljes billentyűleütés pedig az előnézetében nagyjából 30 ms, a nézet saját munkájával együtt.
 - A nagy előnézetek előbb a látható részt jelenítik meg, a többit akkor, amikor az app tétlen. A látótérbe görgetett blokkok a kirajzolás előtt megjelenítésre kerülnek.
-- Nagyobb dokumentumok forráskódjában az előnézet elemzése a háttérben fut, miközben gépel.
+- Nagyobb dokumentumok forráskódjában ugyanez a háttérben fut, miközben gépel.
 - A dokumentum egyszerű szöveg marad, ha körülbelül 4 GB memóriát igényelne, ami nagyjából 50–120 MB szokásos Markdown, de csak 10–20 MB, ha kizárólag táblázatokból vagy címsorokból áll: a forráskódnak nincsenek színei, az előnézet pedig megmondja, miért marad üres. Az exportok továbbra is működnek.
 - Nagyjából 200 KB-tól a dokumentum az elemzés előtt megnyitja az ablakát; 5 MB-nál a színek és az előnézet nagyjából negyed másodperccel később követik.
 - Az összes kép együtt, a képleteket és a diagramokat is beleértve, legfeljebb a Mac memóriájának negyedét foglalja el, és ennek a felét, amíg kevés a memória. Ezen felül a további képek helyőrzőként jelennek meg, amíg újra nem lesz hely.

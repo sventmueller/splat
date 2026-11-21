@@ -130,7 +130,7 @@ Splat prikazuje izvorno besedilo Markdown z barvanjem sintakse na levi ter sprot
 
 - macOS 14 Sonoma ali novejši. Splat je razvit in preizkušen v macOS 27, kjer samodejno prevzame videz Liquid Glass.
 - Mac z Applovim čipom ali procesorjem Intel.
-- Približno 45 MB prostora na disku.
+- Približno 35 MB prostora na disku.
 
 ## Namestitev
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Druge vrste diagramov se urejajo kot koda. VoiceOver prebere naslov ali nadomestno besedilo diagrama.
 
-Prvi diagram po zagonu traja približno sekundo, ker se pogon za upodabljanje zažene v ozadju. Diagram, ki traja dlje kot 10 sekund, prikaže napako, pogon za upodabljanje pa se za naslednjega zažene znova. Pogon PlantUML (3 MB) se naloži šele s prvim diagramom PlantUML. `!include` v PlantUML iz spleta je blokiran.
+Prvi diagram po zagonu, pa tudi prvi po dveh minutah brez diagrama, traja približno sekundo, ker se pogon za upodabljanje zažene v ozadju. Diagram, ki traja dlje kot 10 sekund, prikaže napako, pogon za upodabljanje pa se za naslednjega zažene znova. Pogon PlantUML (3 MB) se naloži šele s prvim diagramom PlantUML. `!include` v PlantUML iz spleta je blokiran.
 
 ## Slike
 
@@ -441,7 +441,7 @@ Prvi diagram po zagonu traja približno sekundo, ker se pogon za upodabljanje za
 - **Slike iz spleta** se naložijo, takoj ko jih dokument prikaže, prek `https` in do 10 MB vsaka. Tako kot slike v e-poštnem sporočilu svojim strežnikom izdajo, da in kdaj se dokument odpre.
 - **Velikost.** `<img width="200">` določi velikost slike; sicer se slike prilegajo širini predogleda.
 - **Spremembe na disku.** Slika, ki jo zamenjate, ali slika, ki se pojavi, potem ko jo je dokument poimenoval, se prikaže brez ponovnega odpiranja dokumenta. Slike iz spleta, ki zaradi omrežja niso uspele, se poskusijo znova, dokler jih dokument prikazuje.
-- **Pomnilnik.** Slike se prikažejo z do 2560 slikovnimi pikami na daljši strani, kar zapolni tudi stran A4. Dekodirajo se manjše, ko zapolnijo osmino pomnilnika Maca in dokler macOS poroča o pomanjkanju pomnilnika.
+- **Pomnilnik.** Slike se dekodirajo na toliko slikovnih pik, kolikor jih pokrivajo na zaslonu, največ 2560 na daljši strani, in znova, ko se prikažejo večje; na papirju imajo do 2560 slikovnih pik, kar zapolni stran A4. Dekodirajo se manjše, ko zapolnijo osmino pomnilnika Maca in dokler macOS poroča o pomanjkanju pomnilnika.
 - **Temni način.** Slike z belim ozadjem so v temnem predogledu rahlo zatemnjene.
 - **Lepljenje in spuščanje.** Glejte [V izvornem besedilu](#v-izvornem-besedilu).
 
@@ -556,7 +556,7 @@ Datoteka Markdown lahko pride od kogar koli, zato Splat ne zaupa nobenemu dokume
 
 - **Brez telemetrije.** Splat ne sporoča ničesar o tem, kako ga uporabljate. Posodobitve išče šele, ko se strinjate ali izberete **Preveri, ali so na voljo posodobitve …**: nato z GitHuba naloži majhno datoteko vira, zahteva pa ne navaja ničesar razen aplikacije in njene različice. Formule in diagrami se upodobijo lokalno; spletni pogledi, ki to počnejo, ne dosežejo omrežja. **Pomoč › Prijavi težavo …** v brskalniku odpre obrazec na GitHubu; njegov naslov vsebuje različico Splata, različico macOS in vrsto Maca, nič iz vaših dokumentov.
 - **Slike iz spleta** se naložijo, takoj ko jih dokument prikaže, s katerega koli gostitelja, samo prek `https`, največ 10 MB vsaka in v zasebni seji brez piškotkov. Njihovi strežniki izvejo, da in kdaj se dokument odpre.
-- **Izolirano dekodiranje.** Slike ter grafike formul in diagramov se dekodirajo v lastni storitvi, ki jo macOS zažene v lastnem peskovniku: nobena od vaših datotek, brez omrežja. Vrne samo piksle, katerih velikost se preveri, in se sama ustavi, kadar dekodiranje traja več kot 10 sekund ali porabi preveč pomnilnika. Applovi lastni dekodirniki slik vidijo samo HEIC, TIFF, AVIF in PDF, in to le, kadar so podatki res v tej obliki. Tudi SVG-ji, formule in diagrami gredo skozi to storitev, zato so v Splatu slike s fiksno ločljivostjo: štiri slikovne pike na točko, do 2560 na daljši strani.
+- **Izolirano dekodiranje.** Slike ter grafike formul in diagramov se dekodirajo v lastni storitvi, ki jo macOS zažene v lastnem peskovniku: nobena od vaših datotek, brez omrežja. Vrne samo piksle, katerih velikost se preveri, in se sama ustavi, kadar dekodiranje traja več kot 10 sekund ali porabi preveč pomnilnika. Applovi lastni dekodirniki slik vidijo samo HEIC, TIFF, AVIF in PDF, in to le, kadar so podatki res v tej obliki. Tudi SVG-ji, formule in diagrami gredo skozi to storitev, zato so v Splatu slike: največ štiri slikovne pike na točko in 2560 na daljši strani.
 - **Lokalne datoteke** dosežejo dokument samo po poti, ki jo ta navaja, in samo iz mape, do katere ste dodelili dostop: Splat sme brati dokument, ki ga odprete, slike, zapiske, bibliografijo in repozitorij okoli njega pa šele, ko z gumbom **Dodeli dostop do mape …** v vrstici nad predogledom dodelite dostop do njihove mape. Dostop velja za vse podmape in se zapomni. Vdelave prikažejo zapiske Markdown iz mape dokumenta in niže, manjkajoča slika pa se išče samo tam. Pot do slike drugje, absolutna ali z začetkom `~`, se v predogledu naloži iz mape, do katere je dodeljen dostop; izvoza v HTML in Word, tiskanje in PDF-ji vzamejo le tisto, kar je v mapi dokumenta ali v njegovem repozitoriju Git, razen če ta repozitorij vsebuje tudi vašo domačo mapo, zato tuj dokument ne more povleči vaših datotek v izvoz, ki ga posredujete naprej.
 - **Mape z zapiski** se berejo samo, dokler jih stranska vrstica prikazuje, preimenovanje zapiska pa spremeni druge datoteke šele, ko potrdite, koliko jih je.
 - **Repozitorije Git** bere Splat sam. Nikoli ne zažene programa `git`, katerega nastavitve v tujem repozitoriju lahko zaženejo druge programe, in ne prebere več kot različico odprtega dokumenta iz zadnjega commita. Tja ne zapiše ničesar in ne dostopa do omrežja.
@@ -574,7 +574,7 @@ Splat ostaja odziven tudi pri dokumentih z več megabajti:
 - Izvorno besedilo uporablja TextKit 2, ki razporedi samo vidni del.
 - Medtem ko tipkate v predogledu in v izvornem besedilu dokumentov do 2 MB, se znova razčlenijo, obarvajo in razporedijo samo prizadeti odstavki. V dokumentu velikosti 10 MB razčlenjevanje in barvanje trajata okoli 3 ms, izris okoli 10 ms, celoten pritisk tipke v njegovem predogledu pa okoli 30 ms z lastnim delom pogleda.
 - Veliki predogledi najprej upodobijo vidni del, preostalo pa, ko je aplikacija nedejavna. Bloki, ki jih pomaknete v vidno polje, se upodobijo, preden se narišejo.
-- V izvornem besedilu večjih dokumentov razčlenjevanje za predogled med tipkanjem teče v ozadju.
+- V izvornem besedilu večjih dokumentov isto delo med tipkanjem teče v ozadju.
 - Dokument ostane navadno besedilo, ko bi potreboval približno 4 GB pomnilnika, kar je približno 50 do 120 MB običajnega Markdowna, a le 10 do 20 MB, če vsebuje samo tabele ali naslove: izvorno besedilo nima barv, predogled pa pove, zakaj ostaja prazen. Izvozi še vedno delujejo.
 - Od približno 200 KB naprej dokument odpre okno, preden je razčlenjen; pri 5 MB barve in predogled sledijo približno četrt sekunde pozneje.
 - Vse slike skupaj, vključno s formulami in diagrami, zasedejo največ četrtino pomnilnika Maca in polovico tega, dokler je pomnilnika malo. Nad tem se nadaljnje slike prikažejo kot nadomestni znaki, dokler spet ni prostora.

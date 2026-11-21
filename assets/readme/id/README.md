@@ -130,7 +130,7 @@ Splat menampilkan sumber Markdown Anda dengan pewarnaan sintaks di sebelah kiri 
 
 - macOS 14 Sonoma atau yang lebih baru. Splat dikembangkan dan diuji di macOS 27, tempat desain Liquid Glass diterapkan secara otomatis.
 - Mac dengan Apple Silicon atau prosesor Intel.
-- Sekitar 45 MB ruang disk.
+- Sekitar 35 MB ruang disk.
 
 ## Instalasi
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Jenis diagram lain diedit sebagai kode. VoiceOver membacakan judul atau teks alternatif diagram.
 
-Diagram pertama setelah peluncuran memerlukan sekitar satu detik, karena mesin penampil dimulai di latar belakang. Diagram yang memerlukan lebih dari 10 detik menampilkan kesalahan, dan mesin penampil dimulai dari awal untuk diagram berikutnya. Mesin PlantUML (3 MB) dimuat hanya bersama diagram PlantUML pertama. `!include` PlantUML dari web diblokir.
+Diagram pertama setelah peluncuran, dan diagram pertama setelah dua menit tanpa diagram, memerlukan sekitar satu detik, karena mesin penampil dimulai di latar belakang. Diagram yang memerlukan lebih dari 10 detik menampilkan kesalahan, dan mesin penampil dimulai dari awal untuk diagram berikutnya. Mesin PlantUML (3 MB) dimuat hanya bersama diagram PlantUML pertama. `!include` PlantUML dari web diblokir.
 
 ## Gambar
 
@@ -441,7 +441,7 @@ Diagram pertama setelah peluncuran memerlukan sekitar satu detik, karena mesin p
 - **Gambar dari web** dimuat begitu dokumen menampilkannya, melalui `https` dan paling banyak 10 MB per gambar. Seperti gambar dalam email, gambar ini memberi tahu servernya bahwa dan kapan dokumen dibuka.
 - **Ukuran.** `<img width="200">` mengatur ukuran gambar; jika tidak, gambar menyesuaikan lebar pratinjau.
 - **Perubahan di disk.** Gambar yang Anda ganti, atau yang muncul setelah dokumen menyebutnya, tampil tanpa membuka dokumen lagi. Gambar dari web yang gagal karena jaringan dicoba lagi selama dokumen menampilkannya.
-- **Memori.** Gambar ditampilkan hingga 2560 piksel pada sisi terpanjangnya, yang juga memenuhi halaman A4. Gambar didekode lebih kecil begitu memenuhi seperdelapan memori Mac, dan selama macOS melaporkan tekanan memori.
+- **Memori.** Gambar didekode ke piksel yang ditempatinya di layar, paling banyak 2560 pada sisi terpanjangnya, dan didekode lagi saat ditampilkan lebih besar; di kertas gambar memiliki hingga 2560 piksel, yang memenuhi halaman A4. Gambar didekode lebih kecil begitu memenuhi seperdelapan memori Mac, dan selama macOS melaporkan tekanan memori.
 - **Mode gelap.** Gambar berlatar putih sedikit diredupkan di pratinjau gelap.
 - **Menempel dan melepas.** Lihat [Di sumber](#di-sumber).
 
@@ -556,7 +556,7 @@ File Markdown bisa datang dari siapa saja, jadi Splat memperlakukan setiap dokum
 
 - **Tanpa telemetri.** Splat tidak melaporkan apa pun tentang cara Anda menggunakannya. Splat mencari pembaruan hanya setelah Anda setuju atau memilih **Periksa Pembaruan…**: saat itu Splat memuat file feed kecil dari GitHub, dan permintaannya hanya menyebut app dan versinya. Rumus dan diagram ditampilkan secara lokal; web view yang melakukannya tidak dapat menjangkau jaringan. **Bantuan › Laporkan Masalah…** membuka formulir di GitHub pada browser Anda; alamatnya memuat versi Splat, versi macOS, dan jenis Mac, tanpa apa pun dari dokumen Anda.
 - **Gambar dari web** dimuat begitu dokumen menampilkannya, dari host mana pun, hanya melalui `https`, paling banyak 10 MB per gambar, dan dalam sesi privat tanpa cookie. Servernya mengetahui bahwa dan kapan dokumen dibuka.
-- **Dekode terisolasi.** Gambar serta grafik rumus dan diagram didekode di layanan tersendiri, yang dijalankan macOS dalam sandbox tersendiri: tanpa satu pun file Anda, tanpa jaringan. Layanan itu hanya mengembalikan piksel, yang ukurannya diperiksa, dan menghentikan dirinya sendiri jika suatu dekode memakan waktu lebih dari 10 detik atau terlalu banyak memori. Dekoder gambar bawaan Apple hanya melihat HEIC, TIFF, AVIF, dan PDF, dan hanya jika datanya memang berformat itu. SVG, rumus, dan diagram juga melewati layanan itu, sehingga di Splat semuanya berupa gambar dengan resolusi tetap: empat piksel per poin, hingga 2560 pada sisi yang lebih panjang.
+- **Dekode terisolasi.** Gambar serta grafik rumus dan diagram didekode di layanan tersendiri, yang dijalankan macOS dalam sandbox tersendiri: tanpa satu pun file Anda, tanpa jaringan. Layanan itu hanya mengembalikan piksel, yang ukurannya diperiksa, dan menghentikan dirinya sendiri jika suatu dekode memakan waktu lebih dari 10 detik atau terlalu banyak memori. Dekoder gambar bawaan Apple hanya melihat HEIC, TIFF, AVIF, dan PDF, dan hanya jika datanya memang berformat itu. SVG, rumus, dan diagram juga melewati layanan itu, sehingga di Splat semuanya berupa gambar: paling banyak empat piksel per poin dan 2560 pada sisi yang lebih panjang.
 - **File lokal** sampai ke dokumen hanya melalui path yang disebutnya, dan hanya dari folder yang telah Anda beri akses: Splat boleh membaca dokumen yang Anda buka, tetapi gambar, catatan, bibliografi, dan repositori di sekitarnya baru setelah Anda memberikan akses ke foldernya dengan **Beri Akses ke Folder…** di bar di atas pratinjau. Akses berlaku untuk semua subfolder dan diingat. Embed menampilkan catatan Markdown dari folder dokumen dan di bawahnya, dan gambar yang hilang dicari hanya di sana. Path gambar di tempat lain, absolut atau diawali `~`, dimuat di pratinjau dari folder yang telah diberi akses; ekspor HTML dan Word, pencetakan, dan PDF hanya membawa yang ada di folder dokumen atau repositori Git-nya, kecuali repositori itu juga memuat folder Utama Anda, sehingga dokumen dari orang lain tidak bisa menarik file Anda ke dalam ekspor yang Anda teruskan.
 - **Folder catatan** dibaca hanya selama bilah samping menampilkannya, dan mengubah nama catatan mengubah file lain hanya setelah Anda mengonfirmasi berapa banyak.
 - **Repositori Git** dibaca oleh Splat sendiri. Splat tidak pernah menjalankan program `git`, yang konfigurasinya di repositori dari orang lain dapat memulai program lain, dan tidak membaca lebih dari versi dokumen yang terbuka di commit terakhir. Splat tidak menulis apa pun di sana dan tidak mengakses jaringan.
@@ -574,7 +574,7 @@ Splat tetap responsif dengan dokumen berukuran beberapa megabyte:
 - Sumber memakai TextKit 2, yang hanya menata bagian yang terlihat.
 - Saat Anda mengetik di pratinjau, dan di sumber dokumen hingga 2 MB, hanya paragraf yang terpengaruh yang diurai, diwarnai, dan ditata ulang. Di dokumen 10 MB, penguraian dan pewarnaan memerlukan sekitar 3 ms, perenderan sekitar 10 ms, dan satu ketukan tombol utuh di pratinjaunya sekitar 30 ms termasuk pekerjaan view itu sendiri.
 - Pratinjau besar menampilkan bagian yang terlihat lebih dahulu dan sisanya saat app menganggur. Blok yang digulir ke tampilan ditampilkan sebelum digambar.
-- Di sumber dokumen yang lebih besar, penguraian untuk pratinjau berjalan di latar belakang saat Anda mengetik.
+- Di sumber dokumen yang lebih besar, hal yang sama berjalan di latar belakang saat Anda mengetik.
 - Dokumen tetap berupa teks biasa jika akan memerlukan sekitar 4 GB memori, yaitu sekitar 50 hingga 120 MB Markdown biasa, tetapi hanya 10 hingga 20 MB jika isinya hanya tabel atau judul: sumber tanpa warna dan pratinjau menyatakan mengapa tetap kosong. Ekspor tetap berfungsi.
 - Mulai sekitar 200 KB, dokumen membuka jendelanya sebelum diurai; pada 5 MB, warna dan pratinjau menyusul sekitar seperempat detik kemudian.
 - Semua gambar bersama-sama, termasuk rumus dan diagram, memakai paling banyak seperempat memori Mac, dan setengahnya saat memori sedang sedikit. Di luar itu, gambar berikutnya ditampilkan sebagai placeholder sampai ada ruang lagi.

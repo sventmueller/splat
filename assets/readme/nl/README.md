@@ -155,7 +155,7 @@ geschreven in Rust op echte AppKit-besturingselementen, spreekt 35 talen en heef
 - macOS 14 Sonoma of nieuwer. Splat wordt ontwikkeld en getest op macOS 27, waar het automatisch het Liquid
   Glass-ontwerp overneemt.
 - Een Mac met Apple Silicon of een Intel-processor.
-- Ongeveer 45 MB schijfruimte.
+- Ongeveer 35 MB schijfruimte.
 
 ## Installatie
 
@@ -555,8 +555,9 @@ stroomdiagram, een sequentiediagram of een Gantt-diagram. Bouwstenen helpen bij 
 
 Andere diagramtypen bewerk je als code. VoiceOver leest de titel of alternatieve tekst van een diagram voor.
 
-Het eerste diagram na het opstarten duurt ongeveer een seconde, omdat de weergave-engine op de achtergrond start. Een
-diagram dat langer dan 10 seconden duurt, toont een fout en de weergave-engine start opnieuw voor het volgende.
+Het eerste diagram na het opstarten, en het eerste na twee minuten zonder diagram, duurt ongeveer een seconde, omdat de
+weergave-engine op de achtergrond start. Een diagram dat langer dan 10 seconden duurt, toont een fout en de
+weergave-engine start opnieuw voor het volgende.
 De engine van PlantUML (3 MB) laadt pas bij het eerste PlantUML-diagram. Een PlantUML-`!include` van het web wordt
 geblokkeerd.
 
@@ -571,7 +572,8 @@ geblokkeerd.
 - **Wijzigingen op schijf.** Een afbeelding die je vervangt, of een die verschijnt nadat het document haar noemde, wordt
   getoond zonder het document opnieuw te openen. Afbeeldingen van het web die door het netwerk mislukten, worden
   opnieuw geprobeerd zolang een document ze toont.
-- **Geheugen.** Afbeeldingen worden getoond tot 2560 pixels langs hun langste zijde, wat ook een A4-pagina vult. Ze
+- **Geheugen.** Afbeeldingen worden gedecodeerd naar de pixels die ze op het scherm beslaan, hooguit 2560 langs hun
+  langste zijde, en opnieuw als ze groter worden getoond; op papier hebben ze tot 2560, wat een A4-pagina vult. Ze
   worden kleiner gedecodeerd zodra ze een achtste van het geheugen van de Mac vullen, en zolang macOS geheugendruk
   meldt.
 - **Donkere modus.** Afbeeldingen met een witte achtergrond worden in de donkere voorvertoning iets gedimd.
@@ -738,7 +740,7 @@ Een Markdown-bestand kan van iedereen komen, dus Splat behandelt elk document al
   terug, waarvan de afmeting wordt gecontroleerd, en stopt zichzelf als een decodering langer dan 10 seconden duurt of
   te veel geheugen vraagt. De eigen afbeeldingsdecoders van Apple zien alleen HEIC, TIFF, AVIF en pdf, en alleen als de
   data echt dat formaat heeft. SVG's, formules en diagrammen lopen ook door die dienst, dus ze zijn in Splat
-  afbeeldingen met een vaste resolutie: vier pixels per punt, tot 2560 langs de langste zijde.
+  afbeeldingen: hooguit vier pixels per punt en 2560 langs de langste zijde.
 - **Lokale bestanden** bereiken een document alleen via het pad dat het noemt, en alleen uit een map waartoe je toegang
   hebt gegeven: Splat mag een document lezen dat je opent, maar de afbeeldingen, notities, bibliografie en repository
   eromheen pas als je toegang geeft tot hun map met **Geef toegang tot map…** in de balk boven de voorvertoning. Toegang
@@ -780,7 +782,7 @@ Splat blijft vlot reageren met documenten van meerdere megabytes:
   weergave.
 - Grote voorvertoningen geven eerst het zichtbare deel weer en de rest zodra de app niets te doen heeft. Blokken die in
   beeld scrollen, worden weergegeven voordat ze worden getekend.
-- In de bron van grotere documenten draait het parseren voor de voorvertoning op de achtergrond terwijl je typt.
+- In de bron van grotere documenten gebeurt hetzelfde op de achtergrond terwijl je typt.
 - Een document blijft platte tekst zodra het ongeveer 4 GB geheugen zou kosten, dat is zo’n 50 tot 120 MB gewone
   Markdown, maar slechts 10 tot 20 MB als het alleen uit tabellen of koppen bestaat: de bron heeft geen kleuren en de
   voorvertoning zegt waarom ze leeg blijft. Exports werken nog steeds.

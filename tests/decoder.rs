@@ -50,9 +50,17 @@ fn bmp() -> Vec<u8> {
     b
 }
 
-/// An image request: the longest side wanted, then the image.
+/// An image request for as many pixels as fit within `side`, then the image.
 fn image(side: u32, bytes: &[u8]) -> Vec<u8> {
-    let mut payload = side.to_le_bytes().to_vec();
+    sized(side, (side, side), bytes)
+}
+
+/// An image request: the longest side allowed, the width and height that are enough, then the image.
+fn sized(side: u32, (width, height): (u32, u32), bytes: &[u8]) -> Vec<u8> {
+    let mut payload = Vec::new();
+    for value in [side, width, height] {
+        payload.extend_from_slice(&value.to_le_bytes());
+    }
     payload.extend_from_slice(bytes);
     payload
 }
@@ -76,6 +84,13 @@ fn images_decode_to_pixels_and_svgs_to_pdf() {
         read(&mut child, 17),
         [2, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0],
         "scaled down to one pixel, and still naming its size"
+    );
+    read(&mut child, 4);
+    send(&mut child, 1, &sized(2560, (1, 0), &bmp()));
+    assert_eq!(
+        read(&mut child, 17),
+        [2, 1, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0],
+        "as wide as asked for"
     );
     read(&mut child, 4);
     send(&mut child, 1, &image(2560, b"not an image"));
@@ -158,8 +173,13 @@ type Picture = (u32, u32, (u32, u32), Vec<u8>);
 
 /// The answer to an image request of the native helper.
 fn pixels_of(child: &mut Child, bytes: &[u8], side: u32) -> Option<Picture> {
+    pixels_sized(child, bytes, side, (side, side))
+}
+
+/// The answer of the native helper to a request for `enough` pixels within `side`.
+fn pixels_sized(child: &mut Child, bytes: &[u8], side: u32, enough: (u32, u32)) -> Option<Picture> {
     const NATIVE_IMAGE: u8 = 4;
-    send(child, NATIVE_IMAGE, &image(side, bytes));
+    send(child, NATIVE_IMAGE, &sized(side, enough, bytes));
     if read(child, 1) != [2] {
         return None;
     }
@@ -223,6 +243,12 @@ fn a_vector_picture_is_drawn_at_four_pixels_per_point_within_the_limit() {
         (w, h, natural),
         (100, 20, (200, 40)),
         "scaled to fit, and still naming its size"
+    );
+    let (w, h, natural, _) = pixels_sized(&mut child, pdf, 2560, (400, 0)).unwrap();
+    assert_eq!(
+        (w, h, natural),
+        (400, 80, (200, 40)),
+        "as wide as asked for, and still naming its size"
     );
 }
 

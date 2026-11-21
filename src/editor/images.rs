@@ -105,16 +105,20 @@ impl<'a> Pictures<'a> {
 
     pub(super) fn read_images_again(&self, changed: Vec<(PathBuf, Stamp)>) {
         let doc_dir = self.host.doc_dir();
+        let viewer = self.host.object().viewer();
+        let mut images = self.state.images.borrow_mut();
         for (path, now) in changed {
-            self.state.images.borrow_mut().note_seen(&path, now);
-            splat_render::images::read_again(path, doc_dir.as_deref(), &self.host.object().viewer());
+            images.note_seen(&path, now);
+            images.read_again(path, doc_dir.as_deref(), &viewer);
         }
     }
 
     pub(super) fn image_loaded(&self, path: PathBuf, file: ImageFile) {
         let key = path.to_string_lossy().into_owned();
-        self.state.images.borrow_mut().finish(path, file);
-        self.host.image_arrived(key);
+        let changed = self.state.images.borrow_mut().finish(path, file);
+        if changed {
+            self.host.image_arrived(key);
+        }
     }
 
     pub(super) fn build_banner(&self, size: NSSize) -> Retained<NSView> {

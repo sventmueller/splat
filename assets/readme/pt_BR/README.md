@@ -130,7 +130,7 @@ O Splat mostra à esquerda o código-fonte Markdown com cores de sintaxe e, à d
 
 - macOS 14 Sonoma ou posterior. O Splat é desenvolvido e testado no macOS 27, onde adota o design Liquid Glass automaticamente.
 - Um Mac com Apple Silicon ou processador Intel.
-- Cerca de 45 MB de espaço em disco.
+- Cerca de 35 MB de espaço em disco.
 
 ## Instalação
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Os outros tipos de diagrama são editados como código. O VoiceOver lê o título ou o texto alternativo de um diagrama.
 
-O primeiro diagrama depois da abertura leva cerca de um segundo, porque o motor de renderização inicia em segundo plano. Um diagrama que leva mais de 10 segundos mostra um erro, e o motor de renderização reinicia do zero para o próximo. O motor do PlantUML (3 MB) só é carregado com o primeiro diagrama PlantUML. Um `!include` do PlantUML vindo da web é bloqueado.
+O primeiro diagrama depois da abertura, e o primeiro depois de dois minutos sem nenhum, leva cerca de um segundo, porque o motor de renderização inicia em segundo plano. Um diagrama que leva mais de 10 segundos mostra um erro, e o motor de renderização reinicia do zero para o próximo. O motor do PlantUML (3 MB) só é carregado com o primeiro diagrama PlantUML. Um `!include` do PlantUML vindo da web é bloqueado.
 
 ## Imagens
 
@@ -441,7 +441,7 @@ O primeiro diagrama depois da abertura leva cerca de um segundo, porque o motor 
 - **Imagens da web** carregam assim que um documento as exibe, por `https` e com até 10 MB cada. Como imagens em um e-mail, elas informam aos servidores delas que e quando o documento é aberto.
 - **Tamanho.** `<img width="200">` define o tamanho de uma imagem; caso contrário, as imagens se ajustam à largura da pré-visualização.
 - **Alterações no disco.** Uma imagem que você substitui, ou uma que aparece depois que o documento a citou, é exibida sem abrir o documento de novo. Imagens da web que falharam por causa da rede são tentadas de novo enquanto um documento as exibe.
-- **Memória.** As imagens são exibidas com até 2560 pixels no lado mais longo, o que também preenche uma página A4. Elas são decodificadas menores quando ocupam um oitavo da memória do Mac e enquanto o macOS informa pressão de memória.
+- **Memória.** As imagens são decodificadas nos pixels que ocupam na tela, no máximo 2560 no lado mais longo, e de novo quando são exibidas maiores; no papel elas têm até 2560, o que preenche uma página A4. Elas são decodificadas menores quando ocupam um oitavo da memória do Mac e enquanto o macOS informa pressão de memória.
 - **Modo escuro.** Imagens com fundo branco ficam levemente escurecidas na pré-visualização escura.
 - **Colar e soltar.** Veja [No código-fonte](#no-código-fonte).
 
@@ -556,7 +556,7 @@ Um arquivo Markdown pode vir de qualquer pessoa, por isso o Splat trata todo doc
 
 - **Sem telemetria.** O Splat não informa nada sobre como você o usa. Ele só busca atualizações depois que você concorda ou escolhe **Buscar Atualizações…**: nesse caso, carrega um pequeno arquivo de feed do GitHub, e a requisição informa apenas o app e a versão dele. Fórmulas e diagramas são renderizados localmente; as web views que fazem isso não alcançam a rede. **Ajuda › Relatar um Problema…** abre um formulário do GitHub no navegador; o endereço leva a versão do Splat, a do macOS e o tipo de Mac, nada dos seus documentos.
 - **As imagens da web** carregam assim que um documento as exibe, de qualquer host, só por `https`, com no máximo 10 MB cada e em uma sessão privada, sem cookies. Os servidores delas ficam sabendo que e quando o documento é aberto.
-- **Decodificação isolada.** Imagens e os gráficos de fórmulas e diagramas são decodificados em um serviço próprio, que o macOS inicia em uma sandbox própria: nenhum dos seus arquivos, sem rede. Ele devolve apenas pixels, cujo tamanho é verificado, e se encerra sozinho quando uma decodificação leva mais de 10 segundos ou usa memória demais. Os decodificadores de imagem da própria Apple só veem HEIC, TIFF, AVIF e PDF, e apenas quando os dados realmente têm esse formato. SVGs, fórmulas e diagramas também passam por esse serviço, então no Splat são imagens com resolução fixa: quatro pixels por ponto, até 2560 no lado mais longo.
+- **Decodificação isolada.** Imagens e os gráficos de fórmulas e diagramas são decodificados em um serviço próprio, que o macOS inicia em uma sandbox própria: nenhum dos seus arquivos, sem rede. Ele devolve apenas pixels, cujo tamanho é verificado, e se encerra sozinho quando uma decodificação leva mais de 10 segundos ou usa memória demais. Os decodificadores de imagem da própria Apple só veem HEIC, TIFF, AVIF e PDF, e apenas quando os dados realmente têm esse formato. SVGs, fórmulas e diagramas também passam por esse serviço, então no Splat são imagens: no máximo quatro pixels por ponto e 2560 no lado mais longo.
 - **Arquivos locais** chegam a um documento apenas pelo caminho que ele cita, e apenas de uma pasta à qual você concedeu acesso: o Splat pode ler um documento que você abre, mas as imagens, notas, bibliografia e repositório ao redor dele só depois que você concede acesso à pasta em que estão com **Conceder Acesso à Pasta…** na barra acima da pré-visualização. Um acesso vale para todas as subpastas e fica lembrado. Os embeds mostram notas Markdown da pasta do documento e abaixo, e uma imagem ausente só é procurada ali. Um caminho de imagem em outro lugar, absoluto ou começando com `~`, carrega na pré-visualização a partir de uma pasta com acesso concedido; as exportações HTML e Word, a impressão e os PDFs levam apenas o que está na pasta do documento ou no repositório Git dele, a menos que esse repositório também contenha a sua pasta pessoal, para que um documento de outra pessoa não puxe seus arquivos para uma exportação que você repassa.
 - **Pastas de notas** são lidas apenas enquanto a barra lateral as mostra, e renomear uma nota altera outros arquivos só depois que você confirma quantos.
 - **Repositórios Git** são lidos pelo próprio Splat. Ele nunca executa o programa `git`, cuja configuração em um repositório de outra pessoa pode iniciar outros programas, e não lê mais do que a versão do documento aberto no último commit. Ele não grava nada ali e não acessa nenhuma rede.
@@ -574,7 +574,7 @@ O Splat continua responsivo com documentos de vários megabytes:
 - O código-fonte usa o TextKit 2, que faz o layout apenas da parte visível.
 - Enquanto você digita na pré-visualização, e no código-fonte de documentos de até 2 MB, só os parágrafos afetados são analisados, coloridos e diagramados de novo. Em um documento de 10 MB, analisar e colorir leva cerca de 3 ms, renderizar cerca de 10 ms, e uma tecla inteira na pré-visualização dele cerca de 30 ms, com o trabalho da própria view.
 - Pré-visualizações grandes renderizam primeiro a parte visível e o resto enquanto o app está ocioso. Os blocos que entram na área visível pela rolagem são renderizados antes de serem desenhados.
-- No código-fonte de documentos maiores, a análise para a pré-visualização roda em segundo plano enquanto você digita.
+- No código-fonte de documentos maiores, o mesmo roda em segundo plano enquanto você digita.
 - Um documento continua sendo texto simples quando precisaria de cerca de 4 GB de memória, ou seja, cerca de 50 a 120 MB de Markdown comum, mas apenas de 10 a 20 MB se tiver só tabelas ou títulos: o código-fonte fica sem cores e a pré-visualização diz por que continua vazia. As exportações ainda funcionam.
 - A partir de cerca de 200 KB, um documento abre a janela antes de ser analisado; com 5 MB, as cores e a pré-visualização vêm cerca de um quarto de segundo depois.
 - Todas as imagens juntas, incluindo fórmulas e diagramas, ocupam no máximo um quarto da memória do Mac, e metade disso enquanto a memória está escassa. Além disso, as demais imagens aparecem como marcadores de posição até que haja espaço de novo.

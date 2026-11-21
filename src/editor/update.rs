@@ -15,17 +15,15 @@ use super::panes::Side;
 use super::panes::Views;
 use super::render::{Live, RenderCtx};
 use super::state::{
-    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, laid_out,
+    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, parse_in_background,
 };
 use super::style::{self, SourceFonts};
 use super::{js, string_of};
 use crate::markdown::commands::Edit;
 use crate::markdown::doc::{DiagramKind, Figure, figures, macros_of};
 use crate::markdown::highlight::Style;
-use crate::markdown::incremental::{Parsed, parse_shared_and_color};
-use crate::markdown::text::{Byte, TextAt, byte_at_u16, common_prefix, common_suffix};
-use crate::preview::layout::{Layout, Resolver, TopBlock};
-use crate::preview::map::Index;
+use crate::markdown::text::{Byte, TextAt, U16, byte_at_u16, common_prefix, common_suffix};
+use crate::preview::layout::{Resolver, TopBlock};
 use crate::util::{
     Lane, contained, free_in_background, from_nsrange, insert_text, ns, shown_to_ns, storage, to_nsrange,
 };
@@ -42,6 +40,9 @@ pub(super) struct UpdateState {
 }
 
 type Spans = Arc<Vec<(std::ops::Range<Byte>, Style)>>;
+
+/// Where the source view starts, which colouring a part of it far from any edit counts from.
+const TEXT_START: (Byte, U16) = (Byte::new(0), U16::new(0));
 
 /// A large source on its way to the colours of its text.
 struct Coloring {
@@ -301,18 +302,24 @@ impl Updater<'_> {
         }
         let doc_dir = self.host.doc_dir();
         let shows_arrived = |block: &TopBlock| {
-            images_of(block).any(|url| {
-                let key = if super::remote::is_remote(url) {
-                    Some(url.to_string())
-                } else {
-                    super::images::resolve_path(url, doc_dir.as_deref()).map(|p| p.to_string_lossy().into_owned())
-                };
-                key.is_some_and(|k| arrived.contains(&k))
-            })
+            images_of(block).any(|url| picture_key(url, doc_dir.as_deref()).is_some_and(|k| arrived.contains(&k)))
         };
         if self.host.model().change(move |st| st.mark_arrived(shows_arrived)) {
             self.host.progressive().render_visible_blocks();
             self.host.progressive().schedule_pending_blocks();
+        }
+    }
+
+    /// The window moved to a screen with other pixels per point: the pictures render again, as if they had arrived,
+    /// and those that now cover more pixels decode again.
+    pub(super) fn render_pictures_again(&self) {
+        let doc_dir = self.host.doc_dir();
+        let keys: Vec<String> = self.host.model().read(move |st| {
+            let urls = st.layout().blocks.iter().flat_map(|block| images_of(block));
+            urls.filter_map(|url| picture_key(url, doc_dir.as_deref())).collect()
+        });
+        for key in keys {
+            self.image_arrived(key);
         }
     }
 
@@ -433,32 +440,14 @@ impl Updater<'_> {
         let env = super::env::Env::known(self.host.doc_dir(), &text);
         let macros = self.host.model().read(|st| st.macros());
         let with_layout = self.host.panes().preview_visible();
+        let base = self.host.model().read(|st| st.parse_base());
         let messenger = self.host.object().messenger();
         PARSER.run(move || {
             let current = || latest.load(std::sync::atomic::Ordering::SeqCst) == generation;
-            let work = || {
-                if !current() {
-                    return None;
-                }
-                let parsed = contained(|| parse_shared_and_color(text.clone()));
-                let mut failed = parsed.is_none();
-                let parsed = parsed.unwrap_or_else(|| Parsed::failed(text.clone()));
-                // A newer text is waiting; the layout of this one would be thrown away.
-                if !current() {
-                    free_in_background(parsed);
-                    return None;
-                }
-                let layout = with_layout.then(|| {
-                    let l = laid_out(&parsed.doc, &Images { dark, env, macros }, None);
-                    failed |= l.is_none();
-                    let l = l.unwrap_or_else(|| Layout::nothing_of(&parsed.doc));
-                    let index = Index::new(&l);
-                    (l, index)
-                });
-                Some(Background { parsed, layout, failed })
-            };
+            let images = with_layout.then_some(Images { dark, env, macros });
+            let resolver = images.as_ref().map(|images| images as &dyn Resolver);
             // Whatever became of it, the main thread hears: the next parse waits for that.
-            let background = contained(work).flatten();
+            let background = contained(|| parse_in_background(base, text.clone(), resolver, current)).flatten();
             messenger.send_soon(Message::Parsed {
                 generation,
                 text,
@@ -544,14 +533,16 @@ impl Updater<'_> {
     /// What the bar above the preview offers: the document's folder while the sandbox keeps it closed and something needs
     /// it. Links such as `#12` into a repository are not worth the question on their own, only its change marks are.
     pub(super) fn update_offer(&self) {
-        let local = self
-            .host
-            .model()
-            .read(|st| crate::markdown::remote::has_local_files(st.doc()));
         let env = super::env::Env::known(self.host.doc_dir(), "");
-        let marks_need_it = env.repository_around && super::changes::is_on();
-        let needs_folder = local || marks_need_it || self.host.panes().sidebar_visible();
-        let offer = (env.folder_closed && needs_folder).then_some(super::images::Offer::GrantFolder);
+        let needs_folder = || {
+            (env.repository_around && super::changes::is_on())
+                || self.host.panes().sidebar_visible()
+                || self
+                    .host
+                    .model()
+                    .read(|st| crate::markdown::remote::has_local_files(st.doc()))
+        };
+        let offer = (env.folder_closed && needs_folder()).then_some(super::images::Offer::GrantFolder);
         self.host.pictures().show_banner(offer);
     }
 
@@ -572,7 +563,8 @@ impl Updater<'_> {
             if whole && recolor.text.len() > COLOR_AT_ONCE {
                 let shown = shown_bytes(views.source, &recolor.text);
                 let region = Byte::new(shown.start)..Byte::new(shown.end);
-                style::apply_highlight_in(&storage(views.source), &recolor.text, &recolor.spans, region, fonts);
+                let (text, spans) = (&recolor.text, &recolor.spans);
+                style::apply_highlight_in(&storage(views.source), text, spans, region, TEXT_START, fonts);
                 *self.state.uncolored.borrow_mut() = Some(Coloring {
                     left: Uncolored::all_but(recolor.text.len(), shown),
                     text: recolor.text.clone(),
@@ -580,12 +572,12 @@ impl Updater<'_> {
                 });
                 self.host.object().perform_later(sel!(colorPendingSource), 0.0, true);
             } else {
-                style::apply_highlight_changes(
+                style::apply_highlight_in(
                     &storage(views.source),
-                    &recolor.old_text,
-                    &recolor.old_spans,
                     &recolor.text,
                     &recolor.spans,
+                    recolor.region.clone(),
+                    recolor.anchor,
                     fonts,
                 );
                 self.follow_edit(&recolor.text, &recolor.spans);
@@ -658,7 +650,7 @@ impl Updater<'_> {
         self.host.panes().silently(|views| {
             for piece in pieces {
                 let region = Byte::new(piece.start)..Byte::new(piece.end);
-                style::apply_highlight_in(&storage(views.source), &text, &spans, region, &fonts);
+                style::apply_highlight_in(&storage(views.source), &text, &spans, region, TEXT_START, &fonts);
             }
         });
     }
@@ -702,6 +694,7 @@ impl Updater<'_> {
             doc_dir: doc_dir.as_deref(),
             images: self.host.pictures().store(),
             max_image_width: self.host.panes().preview_image_width(),
+            scale: Some(self.host.panes().backing_scale()),
             dark: self.host.is_dark(),
             requester: Some(&viewer),
             leaves_the_mac: None,
@@ -740,6 +733,15 @@ impl Updater<'_> {
     /// Whether what is typed into the preview can reach the source: a notice in its place stands for no text.
     pub(super) fn preview_takes_input(&self) -> bool {
         self.host.model().read(|st| st.preview_mode()) == PreviewMode::Shows
+    }
+}
+
+/// What an arrival names the picture at `url` by: its address on the web, or its path.
+fn picture_key(url: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
+    if super::remote::is_remote(url) {
+        Some(url.to_string())
+    } else {
+        super::images::resolve_path(url, doc_dir).map(|p| p.to_string_lossy().into_owned())
     }
 }
 

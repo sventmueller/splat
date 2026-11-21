@@ -253,7 +253,7 @@ pub(crate) fn disk_image(app: &Path) -> Result<PathBuf, String> {
     }
     laid_out.map_err(|e| format!("laying out the disk image window: {e}"))?;
     run(Command::new("hdiutil")
-        .args(["convert", "-format", "UDZO", "-imagekey", "zlib-level=9", "-o"])
+        .args(["convert", "-format", "ULMO", "-o"])
         .arg(&image)
         .arg(&writable)
         .stdout(std::process::Stdio::null()))?;

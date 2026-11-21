@@ -1,13 +1,30 @@
 //! Partial parses and layouts after an edit match a full parse of the new text.
 
-use splat_markdown::highlight::highlight;
-use splat_markdown::incremental::{parse_and_color, reparse_and_color};
+use std::ops::Range;
+
+use splat_markdown::highlight::{Style, changed_region, changed_region_in, highlight};
+use splat_markdown::incremental::{Parsed, parse_and_color, reparse_and_color};
 use splat_markdown::reader::parse;
-use splat_markdown::text::offsets;
+use splat_markdown::text::{Byte, offsets};
 use splat_preview::layout::{NoImages, caret_shapes_layout, layout, relayout, reusable, reusable_behind_caret};
 use splat_testkit::{Reporting, Rng, rounds};
 
 use super::common::{PIECES, document, limited, ordinary_document};
+
+/// Whether the partial parse kept the colours outside its window, which then give the region to recolour that comparing all
+/// of them gives.
+fn kept_colors_hold(old: &str, old_spans: &[(Range<Byte>, Style)], new: &str, parsed: &Parsed, what: &str) -> bool {
+    let Some(splice) = parsed.splice.as_ref().filter(|_| parsed.kept_colors) else {
+        return false;
+    };
+    let fast = changed_region_in(old, old_spans, new, &parsed.spans, &splice.window, splice.delta);
+    assert_eq!(
+        fast,
+        Some(changed_region(old, old_spans, new, &parsed.spans)),
+        "region to recolor: {what}"
+    );
+    true
+}
 
 /// A caret that moves changes a layout only where `caret_shapes_layout` says, and only the block it left has to go.
 #[test]
@@ -50,7 +67,7 @@ fn a_caret_that_moves_leaves_the_layout_where_it_does_not_shape_it() {
 fn reparsing_around_an_edit_matches_a_full_parse() {
     let _limit = limited();
     let mut rng = Rng::new(0x5eed_1ac2_0005);
-    let mut spliced = 0;
+    let (mut spliced, mut kept) = (0, 0);
     for round in 0..rounds(3000) {
         // Several paragraphs, so most edits leave blocks on both sides untouched.
         // Footnotes mostly take a full parse here, so most documents leave them out; the others hold a reference.
@@ -89,6 +106,7 @@ fn reparsing_around_an_edit_matches_a_full_parse() {
         let full = parse_and_color(&new);
         assert_eq!(parsed.doc.blocks(), full.doc.blocks(), "{what}");
         assert_eq!(parsed.spans, full.spans, "colors: {what}");
+        kept += usize::from(kept_colors_hold(&old, &old_spans, &new, &parsed, &what));
         let Some(splice) = &parsed.splice else {
             continue;
         };
@@ -100,6 +118,10 @@ fn reparsing_around_an_edit_matches_a_full_parse() {
         assert_eq!(relaid.blocks, fresh.blocks, "layout: {what}");
     }
     assert!(spliced > rounds(3000) / 5, "only {spliced} edits were parsed in part");
+    assert!(
+        kept > spliced / 2,
+        "only {kept} of {spliced} partial parses kept their colours"
+    );
 }
 
 const TYPED_INTO: [&str; 45] = [
@@ -424,7 +446,7 @@ fn reparsing_around_footnotes_matches_a_full_parse() {
         "```",
     ];
     let mut rng = Rng::new(0x5eed_1ac2_0007);
-    let mut spliced = 0;
+    let (mut spliced, mut kept) = (0, 0);
     for _ in 0..rounds(3000) {
         let old = document_with_footnotes(&mut rng);
         let typing = rng.below(2) == 0;
@@ -446,6 +468,7 @@ fn reparsing_around_footnotes_matches_a_full_parse() {
         let full = parse_and_color(&new);
         assert_eq!(parsed.doc.blocks(), full.doc.blocks(), "{what}");
         assert_eq!(parsed.spans, full.spans, "colors: {what}");
+        kept += usize::from(kept_colors_hold(&old, &old_spans, &new, &parsed, &what));
         let Some(splice) = &parsed.splice else {
             continue;
         };
@@ -457,4 +480,8 @@ fn reparsing_around_footnotes_matches_a_full_parse() {
         assert_eq!(relaid.blocks, fresh.blocks, "layout: {what}");
     }
     assert!(spliced > rounds(3000) / 5, "only {spliced} edits were parsed in part");
+    assert!(
+        kept > spliced / 2,
+        "only {kept} of {spliced} partial parses kept their colours"
+    );
 }

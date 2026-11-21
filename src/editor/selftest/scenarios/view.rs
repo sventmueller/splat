@@ -369,6 +369,18 @@ fn show_preview(c: &Ctx, shown: bool) {
     c.e.updater().update_now();
 }
 
+/// The title and the start of every heading, read from all of the document.
+fn headings_of(c: &Ctx) -> Vec<(String, crate::markdown::text::Byte)> {
+    c.e.model().read(|st| {
+        let headings = splat_editor_state::outline::Headings::of(st.doc());
+        headings
+            .list()
+            .iter()
+            .map(|h| (h.title.clone(), h.range.start))
+            .collect()
+    })
+}
+
 /// The outline stays in the window while the preview is hidden, and so must follow the text.
 pub(super) fn outline_without_preview_steps() -> Vec<Step> {
     let rows = |c: &Ctx| c.e.panes().outline_rows().unwrap_or(0);
@@ -401,6 +413,28 @@ pub(super) fn outline_without_preview_steps() -> Vec<Step> {
                     rows(c) == ROWS.with(Cell::get) + 1,
                     &format!("{} rows, before {}", rows(c), ROWS.with(Cell::get)),
                 );
+                let at = source(&c.e).rfind("# Neu in der Gliederung").unwrap_or(0);
+                c.e.editing().apply_edit(
+                    crate::markdown::commands::Edit {
+                        range: crate::markdown::text::bytes(at..at),
+                        replacement: "Davor\n\n".to_string(),
+                        selection: crate::markdown::text::bytes(at..at),
+                    },
+                    None,
+                    false,
+                );
+            },
+        ),
+        when(
+            "the outline to move along with the text in front of a heading",
+            |c| c.e.panes().outline_nodes() == headings_of(c),
+            move |c| {
+                check(
+                    "the outline moves its headings along with the text in front of them",
+                    c.e.panes().outline_nodes() == headings_of(c) && rows(c) == ROWS.with(Cell::get) + 1,
+                    &format!("{:?}", c.e.panes().outline_nodes().last()),
+                );
+                undo(c);
                 undo(c);
                 show_outline(c, false);
             },

@@ -283,7 +283,7 @@ impl ChangeMarks<'_> {
             return;
         }
         self.state.compared.set(Some((version, base.commit)));
-        let text = self.host.source_text();
+        let text = self.host.shared_source_text();
         if text.len() > MOST_BYTES || base.text.len() > MOST_BYTES {
             self.forget();
             return;

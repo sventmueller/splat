@@ -130,7 +130,7 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 
 - macOS 14 Sonoma alebo novší. Splat sa vyvíja a testuje na macOS 27, kde automaticky preberá dizajn Liquid Glass.
 - Mac s procesorom Apple Silicon alebo Intel.
-- Asi 45 MB miesta na disku.
+- Asi 35 MB miesta na disku.
 
 ## Inštalácia
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Ostatné typy diagramov sa upravujú ako kód. VoiceOver číta názov diagramu alebo jeho alternatívny text.
 
-Prvý diagram po spustení trvá asi sekundu, pretože vykresľovací engine sa spúšťa na pozadí. Diagram, ktorý trvá dlhšie ako 10 sekúnd, zobrazí chybu a vykresľovací engine sa pre ďalší spustí odznova. Engine PlantUML (3 MB) sa načíta až s prvým diagramom PlantUML. Príkaz `!include` z webu v PlantUML je zablokovaný.
+Prvý diagram po spustení, rovnako ako prvý po dvoch minútach bez diagramu, trvá asi sekundu, pretože vykresľovací engine sa spúšťa na pozadí. Diagram, ktorý trvá dlhšie ako 10 sekúnd, zobrazí chybu a vykresľovací engine sa pre ďalší spustí odznova. Engine PlantUML (3 MB) sa načíta až s prvým diagramom PlantUML. Príkaz `!include` z webu v PlantUML je zablokovaný.
 
 ## Obrázky
 
@@ -441,7 +441,7 @@ Prvý diagram po spustení trvá asi sekundu, pretože vykresľovací engine sa 
 - **Obrázky z webu** sa načítajú, hneď ako ich dokument zobrazí, cez `https` a najviac po 10 MB. Podobne ako obrázky v e-maile prezradia svojim serverom, že a kedy sa dokument otvára.
 - **Veľkosť.** `<img width="200">` nastaví veľkosť obrázka; inak sa obrázky prispôsobia šírke náhľadu.
 - **Zmeny na disku.** Obrázok, ktorý nahradíte, alebo taký, ktorý sa objaví po tom, čo ho dokument uviedol, sa zobrazí bez opätovného otvorenia dokumentu. Obrázky z webu, ktoré zlyhali kvôli sieti, sa skúšajú znova, kým ich dokument zobrazuje.
-- **Pamäť.** Obrázky sa zobrazujú do 2560 pixelov na dlhšej strane, čo vyplní aj stranu A4. Dekódujú sa menšie, keď zaberú osminu pamäte Macu a kým macOS hlási nedostatok pamäte.
+- **Pamäť.** Obrázky sa dekódujú na toľko pixelov, koľko zaberajú na obrazovke, najviac 2560 na dlhšej strane, a znova, keď sa zobrazia väčšie; na papieri majú až 2560 pixelov, čo vyplní stranu A4. Dekódujú sa menšie, keď zaberú osminu pamäte Macu a kým macOS hlási nedostatok pamäte.
 - **Tmavý režim.** Obrázky s bielym pozadím sa v tmavom náhľade mierne stlmia.
 - **Vkladanie a pretiahnutie.** Pozri [V zdrojovom texte](#v-zdrojovom-texte).
 
@@ -556,7 +556,7 @@ Súbor Markdown môže pochádzať od kohokoľvek, preto Splat považuje každý
 
 - **Bez telemetrie.** Splat nehlási nič o tom, ako ho používate. Aktualizácie vyhľadáva, až keď s tým súhlasíte alebo zvolíte **Vyhľadať aktualizácie…**: potom načíta malý súbor kanála z GitHubu a požiadavka uvádza len aplikáciu a jej verziu. Vzorce a diagramy sa vykresľujú lokálne; webové zobrazenia, ktoré to robia, nemajú prístup k sieti. **Pomocník › Nahlásiť problém…** otvorí v prehliadači formulár na GitHube; jeho adresa obsahuje verziu Splatu, verziu macOS a typ Macu, nič z vašich dokumentov.
 - **Obrázky z webu** sa načítajú, hneď ako ich dokument zobrazí, z ľubovoľného hostiteľa, len cez `https`, najviac po 10 MB a v súkromnej relácii bez cookies. Ich servery sa dozvedia, že a kedy sa dokument otvára.
-- **Izolované dekódovanie.** Obrázky a grafiku vzorcov a diagramov dekóduje vlastná služba, ktorú macOS spúšťa vo vlastnom sandboxe: žiadny z vašich súborov, žiadna sieť. Vracia iba pixely, ktorých veľkosť sa kontroluje, a sama sa ukončí, keď dekódovanie trvá dlhšie ako 10 sekúnd alebo potrebuje príliš veľa pamäte. Dekodéry obrázkov od Applu vidia iba HEIC, TIFF, AVIF a PDF, a to len vtedy, keď dáta naozaj majú tento formát. Touto službou prechádzajú aj SVG, vzorce a diagramy, takže v Splate sú to obrázky s pevným rozlíšením: štyri pixely na bod, najviac 2560 na dlhšej strane.
+- **Izolované dekódovanie.** Obrázky a grafiku vzorcov a diagramov dekóduje vlastná služba, ktorú macOS spúšťa vo vlastnom sandboxe: žiadny z vašich súborov, žiadna sieť. Vracia iba pixely, ktorých veľkosť sa kontroluje, a sama sa ukončí, keď dekódovanie trvá dlhšie ako 10 sekúnd alebo potrebuje príliš veľa pamäte. Dekodéry obrázkov od Applu vidia iba HEIC, TIFF, AVIF a PDF, a to len vtedy, keď dáta naozaj majú tento formát. Touto službou prechádzajú aj SVG, vzorce a diagramy, takže v Splate sú to obrázky: najviac štyri pixely na bod a 2560 na dlhšej strane.
 - **Lokálne súbory** sa do dokumentu dostanú len cez cestu, ktorú uvádza, a len z priečinka, ku ktorému ste udelili prístup: Splat smie čítať dokument, ktorý otvoríte, ale obrázky, poznámky, bibliografiu a repozitár okolo neho až potom, čo k ich priečinku udelíte prístup tlačidlom **Udeliť prístup k priečinku…** v lište nad náhľadom. Udelený prístup platí pre všetky podpriečinky a zostane zapamätaný. Vloženia zobrazujú poznámky Markdown z priečinka dokumentu a pod ním a chýbajúci obrázok sa hľadá len tam. Cesta k obrázku inde, absolútna alebo začínajúca `~`, sa v náhľade načíta z priečinka, ku ktorému ste udelili prístup; exporty do HTML a Wordu, tlač a PDF berú len to, čo leží v priečinku dokumentu alebo v jeho repozitári Git, pokiaľ tento repozitár neobsahuje aj váš domovský priečinok, takže cudzí dokument nemôže vtiahnuť vaše súbory do exportu, ktorý odovzdáte ďalej.
 - **Priečinky s poznámkami** sa čítajú iba vtedy, keď ich bočný panel zobrazuje, a premenovanie poznámky zmení iné súbory až potom, ako potvrdíte, koľko ich je.
 - **Repozitáre Git** číta Splat sám. Nikdy nespúšťa program `git`, ktorého konfigurácia v cudzom repozitári môže spustiť iné programy, a nečíta viac než verziu otvoreného dokumentu z posledného commitu. Nič tam nezapisuje a nepristupuje k sieti.
@@ -574,7 +574,7 @@ Splat zostáva pohotový aj pri dokumentoch s veľkosťou niekoľkých megabajto
 - Zdrojový text používa TextKit 2, ktorý rozvrhuje len viditeľnú časť.
 - Počas písania v náhľade a v zdrojovom texte dokumentov do 2 MB sa len dotknuté odseky znova parsujú, farbia a rozvrhujú. V dokumente s veľkosťou 10 MB trvá parsovanie a farbenie asi 3 ms, vykreslenie asi 10 ms a celé stlačenie klávesu v jeho náhľade asi 30 ms s vlastnou prácou zobrazenia.
 - Veľké náhľady vykresľujú najprv viditeľnú časť a zvyšok, keď aplikácia nič nerobí. Bloky, ktoré sa posunú do zobrazenia, sa vykreslia pred vykreslením na obrazovku.
-- V zdrojovom texte väčších dokumentov beží parsovanie pre náhľad na pozadí, kým píšete.
+- V zdrojovom texte väčších dokumentov beží to isté na pozadí, kým píšete.
 - Dokument zostane čistým textom, keď by potreboval asi 4 GB pamäte, čo je približne 50 až 120 MB bežného Markdownu, ale len 10 až 20 MB samých tabuliek alebo nadpisov: zdrojový text nemá farby a náhľad uvádza, prečo zostáva prázdny. Exporty stále fungujú.
 - Od približne 200 KB sa okno dokumentu otvorí pred parsovaním; pri 5 MB nasledujú farby a náhľad asi o štvrť sekundy neskôr.
 - Všetky obrázky spolu, vrátane vzorcov a diagramov, zaberajú najviac štvrtinu pamäte Macu a polovicu z toho, kým je pamäte málo. Nad túto hranicu sa ďalšie obrázky zobrazujú ako zástupné symboly, kým nebude znova miesto.

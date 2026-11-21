@@ -1,13 +1,14 @@
 //! A picture as the previews hold it, whoever made it, and what all of them together may take of the memory.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use objc2::rc::Retained;
 use objc2_app_kit::NSImage;
 use objc2_foundation::NSSize;
 
+pub use splat_decoder::Fit;
 use splat_decoder::{Decoded, SHOWN_SIDE};
 use splat_file_state::Stamp;
 
@@ -33,7 +34,9 @@ pub struct ImageFile {
     pub(crate) loaded: Option<Decoded>,
     pub(crate) file: PathBuf,
     pub(crate) seen: Stamp,
-    pub(crate) side: u32,
+    pub(crate) fit: Fit,
+    /// Read for more pixels than a picture already shown has: without new ones, that picture stays.
+    pub(crate) grows: bool,
 }
 
 impl ImageFile {
@@ -43,7 +46,115 @@ impl ImageFile {
             loaded: None,
             file,
             seen: Stamp::UNREACHABLE,
-            side: allowed_side(),
+            fit: Fit::within(allowed_side()),
+            grows: false,
+        }
+    }
+}
+
+/// A picture as it shows, from what a decoder made of its file.
+pub(crate) fn rendered(loaded: Decoded) -> Option<Rendered> {
+    let image = splat_decoder::image(loaded)?;
+    let size = image.size();
+    Some(Rendered {
+        image,
+        sizing: Sizing::Points { size, descent: 0.0 },
+    })
+}
+
+/// Pixels are decoded in steps of this many, so that a window resized a little keeps the pictures it has.
+const STEP: u32 = 256;
+
+/// The pixels a picture needs to look sharp in the preview: the size in points the document asks for, or for one that asks
+/// for none the width of the column, which no picture there goes beyond, at `zoom` and `scale` pixels per point.
+pub fn needed(asked: (Option<u32>, Option<u32>), zoom: f64, column: f64, scale: f64) -> Fit {
+    on_screen(asked, zoom, column, scale, allowed_side())
+}
+
+fn on_screen(asked: (Option<u32>, Option<u32>), zoom: f64, column: f64, scale: f64, side: u32) -> Fit {
+    let (width, height) = match (asked.0.map(f64::from), asked.1.map(f64::from)) {
+        (Some(w), Some(h)) if w * zoom > column => (column, h * column / w),
+        (Some(w), Some(h)) => (w * zoom, h * zoom),
+        (Some(w), None) => ((w * zoom).min(column), 0.0),
+        (None, Some(h)) => (0.0, h * zoom),
+        (None, None) => (column, 0.0),
+    };
+    let pixels = |points: f64| {
+        let steps = (points * scale / f64::from(STEP)).ceil();
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "steps of a picture, of which `side` takes the most"
+        )]
+        let steps = if steps.is_finite() && steps > 0.0 {
+            steps.min(f64::from(side)) as u32
+        } else {
+            0
+        };
+        steps.saturating_mul(STEP).min(side)
+    };
+    Fit {
+        width: pixels(width),
+        height: pixels(height),
+        side,
+    }
+}
+
+/// What a picture was decoded for, and the pixels that came of it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Decode {
+    pub(crate) fit: Fit,
+    pub(crate) pixels: (u32, u32),
+}
+
+impl Decode {
+    /// The decode of pixels from `decoded`, asked for with `fit`.
+    pub(crate) fn of(decoded: &Decoded, fit: Fit) -> Option<Decode> {
+        match decoded {
+            Decoded::Rgba { width, height, .. } => Some(Decode {
+                fit,
+                pixels: (*width, *height),
+            }),
+            Decoded::Pdf(_) | Decoded::Png(_) => None,
+        }
+    }
+
+    /// Whether these pixels serve `need` as well as decoding again would: they cover it, a new decode may have no longer
+    /// side, or they fell short of what they were asked for below their limit, and so are all the file holds.
+    pub(crate) fn serves(self, need: Fit) -> bool {
+        let (width, height) = self.pixels;
+        let longest = width.max(height);
+        let covers = width >= need.width && height >= need.height;
+        let whole = longest < self.fit.side && (width < self.fit.width || height < self.fit.height);
+        covers || longest >= need.side || whole
+    }
+}
+
+/// The most pixels the views of a picture asked for, raised as they ask and read when its decode begins.
+#[derive(Default, Debug)]
+pub(crate) struct Wanted {
+    width: AtomicU32,
+    height: AtomicU32,
+}
+
+impl Wanted {
+    pub(crate) fn of(need: Fit) -> Arc<Wanted> {
+        let wanted = Arc::new(Wanted::default());
+        wanted.raise(need);
+        wanted
+    }
+
+    pub(crate) fn raise(&self, need: Fit) {
+        self.width.fetch_max(need.width, Ordering::Relaxed);
+        self.height.fetch_max(need.height, Ordering::Relaxed);
+    }
+
+    /// What a decode asks for, within `side`.
+    pub(crate) fn fit(&self, side: u32) -> Fit {
+        Fit {
+            width: self.width.load(Ordering::Relaxed),
+            height: self.height.load(Ordering::Relaxed),
+            side,
         }
     }
 }
@@ -136,6 +247,120 @@ mod tests {
         assert_eq!(side_for(budget / 2, budget, false), 1280);
         assert_eq!(side_for(budget, budget, false), 640);
         assert_eq!(side_for(0, budget, true), 640);
+    }
+
+    fn fit(width: u32, height: u32, side: u32) -> Fit {
+        Fit { width, height, side }
+    }
+
+    #[test]
+    fn a_picture_needs_the_pixels_of_the_column_in_steps() {
+        let column = |width: f64, scale: f64| on_screen((None, None), 1.0, width, scale, SHOWN_SIDE);
+        assert_eq!(column(700.0, 2.0), fit(1536, 0, SHOWN_SIDE), "1400 pixels, a step up");
+        assert_eq!(column(640.0, 2.0), fit(1280, 0, SHOWN_SIDE), "on a step");
+        assert_eq!(column(641.0, 2.0), fit(1536, 0, SHOWN_SIDE));
+        assert_eq!(
+            column(700.0, 1.0),
+            fit(768, 0, SHOWN_SIDE),
+            "on a screen without Retina"
+        );
+        assert_eq!(
+            column(690.0, 2.0),
+            column(700.0, 2.0),
+            "a little narrower decodes nothing"
+        );
+        assert_eq!(
+            column(1500.0, 2.0),
+            fit(SHOWN_SIDE, 0, SHOWN_SIDE),
+            "never above the limit"
+        );
+        assert_eq!(
+            on_screen((None, None), 1.0, 700.0, 2.0, 1280),
+            fit(1280, 0, 1280),
+            "nor above the one of short memory"
+        );
+        assert_eq!(
+            on_screen((None, None), 3.0, 700.0, 2.0, SHOWN_SIDE),
+            column(700.0, 2.0),
+            "a zoom shows no picture wider than the column"
+        );
+    }
+
+    #[test]
+    fn a_size_the_document_asks_for_follows_the_zoom_up_to_the_column() {
+        let asked = |asked, zoom| on_screen(asked, zoom, 700.0, 2.0, SHOWN_SIDE);
+        assert_eq!(asked((Some(200), None), 1.0), fit(512, 0, SHOWN_SIDE));
+        assert_eq!(asked((Some(200), None), 1.331), fit(768, 0, SHOWN_SIDE), "zoomed in");
+        assert_eq!(
+            asked((Some(2000), None), 1.0),
+            fit(1536, 0, SHOWN_SIDE),
+            "within the column"
+        );
+        assert_eq!(asked((None, Some(300)), 1.0), fit(0, 768, SHOWN_SIDE), "by its height");
+        assert_eq!(
+            asked((Some(100), Some(400)), 1.0),
+            fit(256, 1024, SHOWN_SIDE),
+            "stretched"
+        );
+        assert_eq!(
+            asked((Some(1400), Some(700)), 1.0),
+            fit(1536, 768, SHOWN_SIDE),
+            "stretched, then made as narrow as the column"
+        );
+        assert_eq!(
+            asked((Some(u32::MAX), None), 3.0),
+            fit(1536, 0, SHOWN_SIDE),
+            "any number a document gives"
+        );
+        assert_eq!(
+            on_screen((None, None), 1.0, f64::NAN, 2.0, SHOWN_SIDE),
+            fit(0, 0, SHOWN_SIDE)
+        );
+    }
+
+    #[test]
+    fn pixels_decoded_large_enough_are_kept_and_others_decoded_again() {
+        let column = fit(1536, 0, SHOWN_SIDE);
+        let photo = Decode {
+            fit: column,
+            pixels: (1536, 1152),
+        };
+        assert!(photo.serves(column), "as large as needed");
+        assert!(photo.serves(fit(1280, 0, SHOWN_SIDE)), "a narrower window");
+        assert!(!photo.serves(fit(2048, 0, SHOWN_SIDE)), "a wider column");
+        assert!(!photo.serves(fit(0, 1280, SHOWN_SIDE)), "a size asking for more height");
+        assert!(
+            !photo.serves(Fit::within(SHOWN_SIDE)),
+            "paper takes the most a picture may have"
+        );
+        assert!(
+            photo.serves(fit(2048, 0, 1280)),
+            "while memory is short, a new decode would be smaller"
+        );
+        let small = Decode {
+            fit: column,
+            pixels: (800, 600),
+        };
+        assert!(small.serves(Fit::within(SHOWN_SIDE)), "the file holds no more");
+        let capped = Decode {
+            fit: fit(1536, 0, 640),
+            pixels: (640, 480),
+        };
+        assert!(capped.serves(fit(1536, 0, 640)), "the limit still holds");
+        assert!(!capped.serves(column), "memory is back");
+        let full = Decode {
+            fit: Fit::within(SHOWN_SIDE),
+            pixels: (SHOWN_SIDE, 1920),
+        };
+        assert!(full.serves(Fit::within(SHOWN_SIDE)) && full.serves(column));
+    }
+
+    #[test]
+    fn a_decode_asks_for_the_most_any_view_wanted() {
+        let wanted = Wanted::of(fit(512, 0, SHOWN_SIDE));
+        wanted.raise(fit(256, 768, 640));
+        assert_eq!(wanted.fit(SHOWN_SIDE), fit(512, 768, SHOWN_SIDE));
+        assert_eq!(wanted.fit(640).side, 640, "the side is the one of the moment it begins");
     }
 
     #[test]

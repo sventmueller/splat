@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use std::rc::Rc;
@@ -17,16 +17,18 @@ use objc2_foundation::{
     NSURLSessionResponseDisposition, NSURLSessionTask, NSURLSessionTaskDelegate,
 };
 
-use splat_decoder::{Decoded, MAX_BYTES};
+use splat_decoder::{Decoded, MAX_BYTES, SHOWN_SIDE};
 
 use crate::appkit::{ns, to_isize};
-use crate::lanes::{guarded, main_soon};
-use crate::picture::{Rendered, Sizing};
+use crate::lanes::{contained, guarded, main_soon};
+use crate::picture::{Decode, Fit, Rendered, Wanted, allowed_side, count_decoded, rendered, room_for_more};
 use crate::viewer::{Held, Viewer, number_of};
 
 #[derive(Default)]
 struct Remote {
     images: HashMap<String, Stored>,
+    /// The most pixels the documents asked for of each picture, read when its decode begins.
+    wanted: HashMap<String, Arc<Wanted>>,
     loading: HashSet<String>,
     /// Waiting for a free connection: the time limit of a download runs from its start, so hundreds of images on one
     /// slow host would otherwise run out of time in the queue.
@@ -41,9 +43,20 @@ struct Remote {
 
 struct Stored {
     found: Option<Rendered>,
+    /// Its pixels and its download.
     bytes: usize,
     /// When to try again after a failure the network may be to blame for, and the pause after that.
     retry: Option<(Instant, Duration)>,
+    source: Option<Source>,
+    /// A decode with more pixels is under way.
+    growing: bool,
+}
+
+/// What a picture shown was decoded from: its download, kept so that it decodes larger without asking its host again,
+/// and what its pixels were decoded for.
+struct Source {
+    data: Arc<[u8]>,
+    decode: Decode,
 }
 
 const MAX_RUNNING: usize = 6;
@@ -57,6 +70,7 @@ thread_local! {
 struct Download {
     url: String,
     bytes: Vec<u8>,
+    wanted: Arc<Wanted>,
 }
 
 /// Keyed by task identifier.
@@ -68,6 +82,16 @@ static DOWNLOADS: Mutex<Option<Downloads>> = Mutex::new(None);
 #[cfg(feature = "selftest")]
 pub fn idle() -> bool {
     REMOTE.with(|r| r.borrow().loading.is_empty())
+}
+
+/// The pixels the picture at `url` was decoded to, once it shows, and whether more are on their way.
+#[cfg(feature = "selftest")]
+pub fn decoded(url: &str) -> Option<((u32, u32), bool)> {
+    REMOTE.with(|r| {
+        let r = r.borrow();
+        let stored = r.images.get(url)?;
+        Some((stored.source.as_ref()?.decode.pixels, stored.growing))
+    })
 }
 
 pub fn is_remote(url: &str) -> bool {
@@ -190,8 +214,9 @@ fn forget_asker(r: &mut Remote, gone: usize) {
 
 fn release(r: &mut Remote) {
     for (_, stored) in r.images.drain() {
-        crate::picture::count_decoded(-to_isize(stored.bytes));
+        count_decoded(-to_isize(stored.bytes));
     }
+    r.wanted.clear();
     let Remote { waiting, loading, .. } = &mut *r;
     for url in waiting.drain(..) {
         loading.remove(&url);
@@ -204,12 +229,31 @@ fn release(r: &mut Remote) {
 
 /// `Some(None)` means loading failed; `None` means not loaded yet (a load is started).
 pub fn get(url: &str, requester: Option<&Rc<dyn Viewer>>) -> Option<Option<Rendered>> {
+    looked_up(url, requester, None)
+}
+
+/// Like `get`, with the pixels `need` asks for: a picture shown with fewer decodes again from its download, for the
+/// `requester` in the background and without one, as paper needs, right away and only for the caller.
+pub fn get_for(url: &str, requester: Option<&Rc<dyn Viewer>>, need: Fit) -> Option<Option<Rendered>> {
+    looked_up(url, requester, Some(need))
+}
+
+/// What becomes of a picture someone asked for.
+enum Asked {
+    Found(Option<Rendered>),
+    Load,
+    Wait,
+    Grow(Arc<[u8]>, Arc<Wanted>, Option<Rendered>),
+    OnPaper(Arc<[u8]>, Fit, Option<Rendered>),
+}
+
+fn looked_up(url: &str, requester: Option<&Rc<dyn Viewer>>, need: Option<Fit>) -> Option<Option<Rendered>> {
     if !is_remote(url) || NSURL::URLWithString(&ns(url)).is_none() {
         return Some(None);
     }
     let requester = requester.filter(|c| !c.has_closed());
     let owner = requester.map(asker);
-    let (found, start) = REMOTE.with(|r| {
+    let asked = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         if let Some(c) = requester
             && !r.listeners.iter().any(|w| w.is(c))
@@ -217,20 +261,61 @@ pub fn get(url: &str, requester: Option<&Rc<dyn Viewer>>) -> Option<Option<Rende
             r.listeners.retain(|w| w.load().is_some());
             r.listeners.push(Held::of(c));
         }
-        match r.images.get(url) {
-            Some(stored) => (Some(stored.found.clone()), false),
+        let Remote {
+            images,
+            wanted,
+            loading,
+            askers,
+            ..
+        } = &mut *r;
+        if let (Some(need), true) = (need, requester.is_some()) {
+            wanted.entry(url.to_string()).or_default().raise(need);
+        }
+        match images.get_mut(url) {
+            Some(stored) => {
+                let found = stored.found.clone();
+                let short = need
+                    .zip(stored.source.as_ref())
+                    .filter(|(need, source)| !source.decode.serves(*need));
+                match short {
+                    Some((need, source)) if requester.is_none() => Asked::OnPaper(source.data.clone(), need, found),
+                    // While memory is short a larger decode would only be refused, and the refusal shown again.
+                    Some((_, source)) if !stored.growing && room_for_more() => {
+                        stored.growing = true;
+                        let wanted = wanted.entry(url.to_string()).or_default().clone();
+                        Asked::Grow(source.data.clone(), wanted, found)
+                    }
+                    _ => Asked::Found(found),
+                }
+            }
             None => {
                 if let Some(owner) = owner {
-                    r.askers.entry(url.to_string()).or_default().insert(owner);
+                    askers.entry(url.to_string()).or_default().insert(owner);
                 }
-                (None, requester.is_some() && r.loading.insert(url.to_string()))
+                if requester.is_some() && loading.insert(url.to_string()) {
+                    Asked::Load
+                } else {
+                    Asked::Wait
+                }
             }
         }
     });
-    if start {
-        load(url);
+    match asked {
+        Asked::Found(found) => Some(found),
+        Asked::Load => {
+            load(url);
+            None
+        }
+        Asked::Wait => None,
+        Asked::Grow(data, wanted, found) => {
+            grow(url, data, wanted);
+            Some(found)
+        }
+        Asked::OnPaper(data, need, found) => {
+            let decoded = contained(|| splat_decoder::decode_to(&data, need)).flatten();
+            Some(decoded.and_then(rendered).or(found))
+        }
     }
-    found
 }
 
 fn load(url: &str) {
@@ -245,10 +330,19 @@ fn start(url: &str) {
         return;
     };
     let task = SESSION.with(|s| s.dataTaskWithURL(&nsurl));
+    // Asked for without a size: as many pixels as it may have.
+    let wanted = REMOTE.with(|r| {
+        r.borrow_mut()
+            .wanted
+            .entry(url.clone())
+            .or_insert_with(|| Wanted::of(Fit::within(SHOWN_SIDE)))
+            .clone()
+    });
     if let Ok(mut d) = DOWNLOADS.lock() {
         let download = Download {
             url: url.clone(),
             bytes: Vec::new(),
+            wanted,
         };
         d.get_or_insert_with(HashMap::new)
             .insert(task.taskIdentifier(), download);
@@ -291,7 +385,7 @@ define_class!(
         #[unsafe(method(URLSession:task:didCompleteWithError:))]
         fn completed(&self, _session: &NSURLSession, task: &NSURLSessionTask, error: Option<&NSError>) {
             guarded((), || {
-                let Some(Download { url, bytes }) = DOWNLOADS
+                let Some(Download { url, bytes, wanted }) = DOWNLOADS
                     .lock()
                     .ok()
                     .and_then(|mut d| d.as_mut()?.remove(&task.taskIdentifier()))
@@ -309,15 +403,19 @@ define_class!(
                 }
                 // The session's queue also delivers the data of all other downloads, so decoding must not hold it up.
                 crate::picture::load_in_background(move || {
-                    let room = crate::picture::room_for_more();
+                    let room = room_for_more();
+                    let fit = wanted.fit(allowed_side());
                     let decoded = room
-                        .then(|| {
-                            crate::lanes::contained(|| splat_decoder::decode(&bytes, crate::picture::allowed_side()))
-                        })
+                        .then(|| contained(|| splat_decoder::decode_to(&bytes, fit)))
                         .flatten()
                         .flatten();
                     let failure = if room { Failure::Final } else { Failure::Passing };
-                    main_soon(move || finish(url, decoded, failure));
+                    let arrived = decoded.map(|decoded| Arrived {
+                        decoded,
+                        fit,
+                        data: bytes.into(),
+                    });
+                    main_soon(move || finish(url, arrived, failure));
                 });
             });
         }
@@ -380,7 +478,27 @@ fn failure_of(error: Option<isize>, status: Option<isize>) -> Failure {
     }
 }
 
-fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
+/// A download as its decoder left it.
+struct Arrived {
+    decoded: Decoded,
+    fit: Fit,
+    data: Arc<[u8]>,
+}
+
+/// What arrived as it shows: the picture, where it came from, and what both hold of the memory; `None` for what shows
+/// nothing.
+fn shown_of(arrived: Arrived) -> Option<(Rendered, Source, usize)> {
+    let decode = Decode::of(&arrived.decoded, arrived.fit)?;
+    let bytes = arrived.decoded.bytes() + arrived.data.len();
+    let found = rendered(arrived.decoded)?;
+    let source = Source {
+        data: arrived.data,
+        decode,
+    };
+    Some((found, source, bytes))
+}
+
+fn finish(url: String, arrived: Option<Arrived>, failure: Failure) {
     let shown = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         r.loading.remove(&url);
@@ -392,18 +510,11 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
         start_waiting();
         return;
     }
-    let bytes = match &decoded {
-        Some(Decoded::Rgba { pixels, .. }) => pixels.len(),
-        _ => 0,
+    let (found, source, bytes) = match arrived.and_then(shown_of) {
+        Some((found, source, bytes)) => (Some(found), Some(source), bytes),
+        None => (None, None, 0),
     };
-    crate::picture::count_decoded(to_isize(bytes));
-    let rendered = decoded.and_then(splat_decoder::image).map(|image| {
-        let size = image.size();
-        Rendered {
-            image,
-            sizing: Sizing::Points { size, descent: 0.0 },
-        }
-    });
+    count_decoded(to_isize(bytes));
     let listeners = REMOTE.with(|r| {
         let mut r = r.borrow_mut();
         let pause = r
@@ -411,20 +522,56 @@ fn finish(url: String, decoded: Option<Decoded>, failure: Failure) {
             .get(&url)
             .and_then(|old| old.retry)
             .map_or(crate::host().first_retry, |(_, pause)| (pause * 2).min(LAST_RETRY));
-        let retry = (rendered.is_none() && failure == Failure::Passing).then(|| (Instant::now() + pause, pause));
+        let retry = (found.is_none() && failure == Failure::Passing).then(|| (Instant::now() + pause, pause));
         let stored = Stored {
-            found: rendered,
+            found,
             bytes,
             retry,
+            source,
+            growing: false,
         };
         if let Some(old) = r.images.insert(url.clone(), stored) {
-            crate::picture::count_decoded(-to_isize(old.bytes));
+            count_decoded(-to_isize(old.bytes));
         }
         r.listeners.iter().filter_map(Held::load).collect::<Vec<_>>()
     });
     start_waiting();
     for l in listeners {
         l.image_arrived(url.clone());
+    }
+}
+
+/// Decodes a picture shown again from its download, for as many pixels as `wanted` holds when that begins.
+fn grow(url: &str, data: Arc<[u8]>, wanted: Arc<Wanted>) {
+    let url = url.to_string();
+    crate::picture::load_in_background(move || {
+        let fit = wanted.fit(allowed_side());
+        let decoded = room_for_more()
+            .then(|| contained(|| splat_decoder::decode_to(&data, fit)))
+            .flatten()
+            .flatten();
+        let arrived = decoded.map(|decoded| Arrived { decoded, fit, data });
+        main_soon(move || grown(&url, arrived));
+    });
+}
+
+/// A picture shown got more pixels, or keeps those it has.
+fn grown(url: &str, arrived: Option<Arrived>) {
+    let listeners = REMOTE.with(|r| {
+        let mut r = r.borrow_mut();
+        let listeners: Vec<_> = r.listeners.iter().filter_map(Held::load).collect();
+        // What nobody shows any more was let go while it grew.
+        let stored = r.images.get_mut(url)?;
+        stored.growing = false;
+        let (found, source, bytes) = arrived.and_then(shown_of)?;
+        count_decoded(to_isize(bytes) - to_isize(stored.bytes));
+        stored.found = Some(found);
+        stored.source = Some(source);
+        stored.bytes = bytes;
+        Some(listeners)
+    });
+    for l in listeners.into_iter().flatten() {
+        l.image_arrived(url.to_string());
     }
 }
 
@@ -473,6 +620,8 @@ mod tests {
             found: None,
             bytes: 0,
             retry,
+            source: None,
+            growing: false,
         };
         let pause = Duration::from_secs(30);
         let images = HashMap::from([

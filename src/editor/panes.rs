@@ -12,6 +12,7 @@ use objc2_app_kit::{
     NSScrollView, NSSplitViewItem, NSTextInputClient, NSTextView, NSView, NSWindowStyleMask,
 };
 use objc2_foundation::{NSArray, NSCoder, NSEdgeInsets, NSPoint, NSRange, NSRect, NSSize, NSString, NSUserDefaults};
+use splat_editor_state::outline::{Followed, Headings};
 
 use super::layers::ForPanes;
 use super::sidebar::{Sidebar, SidebarTab};
@@ -345,6 +346,11 @@ impl<'a> Panes<'a> {
         (self.preview().bounds().size.width - 60.0).max(200.0)
     }
 
+    /// Pixels per point of the screen the window shows on, as on a Retina screen while there is no window.
+    pub(super) fn backing_scale(&self) -> f64 {
+        self.host.window().map_or(2.0, |window| window.backingScaleFactor())
+    }
+
     pub(super) fn is_silent(&self) -> bool {
         self.state.busy.get()
     }
@@ -568,14 +574,12 @@ impl<'a> Panes<'a> {
         let Some(sidebar) = self.state.sidebar.get() else {
             return;
         };
-        let headings: Vec<_> = self.host.model().read(|st| {
-            crate::util::contained(|| crate::markdown::commands::heading_anchors(st.doc()))
-                .unwrap_or_default()
-                .into_iter()
-                .map(|h| (h.level, h.title, h.range))
-                .collect()
+        let known = sidebar.outline.take_headings();
+        let (headings, followed) = self.host.model().read(move |st| {
+            crate::util::contained(|| known.follow(st.doc(), st.splice()))
+                .unwrap_or((Headings::default(), Followed::Changed))
         });
-        sidebar.outline.update(&headings);
+        sidebar.outline.update(headings, followed);
     }
 
     /// Remembers where the window stands and how large it is, for the next window and the next start.
@@ -654,6 +658,11 @@ impl Panes<'_> {
 
     pub(super) fn outline_rows(&self) -> Option<isize> {
         self.state.sidebar.get().map(|s| s.outline.view.numberOfRows())
+    }
+
+    /// The title and the start in the source of every heading the outline holds.
+    pub(super) fn outline_nodes(&self) -> Vec<(String, crate::markdown::text::Byte)> {
+        self.state.sidebar.get().map(|s| s.outline.nodes()).unwrap_or_default()
     }
 }
 

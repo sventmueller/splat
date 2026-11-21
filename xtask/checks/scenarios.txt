@@ -34,6 +34,18 @@ a heading writes exactly its text
 a huge document says why it has no preview
 a key right after a save marks the document as edited
 a large change renders the part around the view first
+a large picture decoded smaller shows at its own size after zooming in
+a large picture decoded smaller shows at its own size where it shows
+a large picture decodes to the pixels it covers after zooming in
+a large picture decodes to the pixels it covers where it shows
+a large picture from the web decoded smaller shows at its own size after zooming in
+a large picture from the web decoded smaller shows at its own size where it shows
+a large picture from the web decodes to the pixels it covers after zooming in
+a large picture from the web decodes to the pixels it covers where it shows
+a large picture from the web goes to paper with the most pixels it may have
+a large picture from the web shown smaller again keeps its pixels
+a large picture goes to paper with the most pixels it may have
+a large picture shown smaller again keeps its pixels
 a link in a closed file follows the rename, and nothing else in it changes
 a link in an open document follows the rename
 a link to another app asks first
@@ -210,6 +222,7 @@ the outline closes
 the outline comes back as a tab
 the outline command switches to the outline
 the outline follows the text while the preview is hidden
+the outline moves its headings along with the text in front of them
 the outline opens
 the patched text copy matches the source view
 the preview can be captured

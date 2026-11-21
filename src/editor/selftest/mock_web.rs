@@ -44,6 +44,10 @@ pub fn requests_of(url: &str) -> usize {
 
 const BADGE: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"90\" height=\"20\"><rect width=\"90\" height=\"20\" fill=\"#07c\"/></svg>";
 
+/// A picture larger than any column shows it.
+pub const LARGE: &str = "/gross.svg";
+const LARGE_SVG: &str = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1500\" height=\"1000\"><rect width=\"1500\" height=\"1000\" fill=\"#3a7\"/></svg>";
+
 enum Answer {
     Body(u16, &'static str),
     TooLarge,
@@ -55,6 +59,7 @@ enum Answer {
 fn answer(path: &str, count: usize) -> Answer {
     match path {
         "/badge.svg" => Answer::Body(200, BADGE),
+        LARGE => Answer::Body(200, LARGE_SVG),
         "/fehlt.png" => Answer::Body(404, "nicht da"),
         "/kein-bild.png" => Answer::Body(200, "<html>keine Grafik</html>"),
         "/zu-gross.png" => Answer::TooLarge,

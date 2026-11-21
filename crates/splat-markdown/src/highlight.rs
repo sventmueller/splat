@@ -5,8 +5,8 @@ use std::ops::Range;
 use super::code::{self, CodeToken};
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, walk_blocks};
 use super::text::{
-    Byte, ContainerMark, LineStarts, TextAt, behind_quote_marks, changed, indent_len, line_marks, right_to_left,
-    shifted,
+    Byte, ContainerMark, LineStarts, TextAt, behind_quote_marks, changed, common_prefix, common_suffix, indent_len,
+    line_marks, right_to_left, shifted, signed,
 };
 
 /// What a stretch of the source is to the colors of the source view.
@@ -97,8 +97,12 @@ pub(super) fn highlight_blocks(text: &str, blocks: &[Block]) -> Vec<(Range<Byte>
 }
 
 /// The colors of `doc` after `splice` changed it: those of the re-parsed blocks are computed anew, the others taken
-/// from `old`.
-pub(crate) fn rehighlight(old: &[(Range<Byte>, Style)], doc: &Doc, splice: &Splice) -> Vec<(Range<Byte>, Style)> {
+/// from `old`, unless a color reaches across the window; whether they were.
+pub(crate) fn rehighlight(
+    old: &[(Range<Byte>, Style)],
+    doc: &Doc,
+    splice: &Splice,
+) -> (Vec<(Range<Byte>, Style)>, bool) {
     let text = doc.text();
     let window = &splice.window;
     let old_end = shifted(window.end, -splice.delta);
@@ -111,14 +115,14 @@ pub(crate) fn rehighlight(old: &[(Range<Byte>, Style)], doc: &Doc, splice: &Spli
         || old[..tail].last().is_some_and(|(r, _)| r.end > old_end)
         || fresh.iter().any(|(r, _)| r.start < window.start || r.end > window.end);
     if crosses {
-        return highlight(doc);
+        return (highlight(doc), false);
     }
     let mut out = Vec::with_capacity(head + fresh.len() + old.len() - tail);
     out.extend_from_slice(&old[..head]);
     out.extend(fresh);
     let at = |o: Byte| shifted(o, splice.delta);
     out.extend(old[tail..].iter().map(|(r, s)| (at(r.start)..at(r.end), *s)));
-    out
+    (out, true)
 }
 
 fn push(spans: &mut Vec<(Range<Byte>, Style)>, range: Range<Byte>, paint: Style) {
@@ -422,44 +426,161 @@ pub fn changed_region(
     spans: &[(Range<Byte>, Style)],
 ) -> Range<Byte> {
     // Most of a long text lies on either side of the edit and only moved with it, which a look at the ends shows quickly.
-    let (old_edit, edit) = changed(old_text, text);
-    let (prefix, old_edit_end, edit_end) = (old_edit.start, old_edit.end, edit.end);
-    let shift = |o: Byte| {
-        if o <= prefix {
-            o
-        } else if o >= old_edit_end {
-            edit_end + (o - old_edit_end)
-        } else {
-            edit_end
-        }
-    };
-    let lead = old
-        .iter()
-        .zip(spans)
-        .take_while(|(a, b)| a == b && a.0.end <= prefix)
-        .count();
+    let edit = Replaced::of(changed(old_text, text));
+    let lead = old.iter().zip(spans).take_while(|(a, b)| edit.leads(a, b)).count();
     let rest = old.len().min(spans.len()) - lead;
     let trail = old
         .iter()
         .rev()
         .zip(spans.iter().rev())
         .take(rest)
-        .take_while(|(a, b)| a.1 == b.1 && a.0.start >= old_edit_end && (shift(a.0.start)..shift(a.0.end)) == b.0)
+        .take_while(|(a, b)| edit.trails(a, b))
         .count();
-    let changed_new = &spans[lead..spans.len() - trail];
-    let changed_old = &old[lead..old.len() - trail];
-    let start = changed_new
-        .iter()
-        .map(|s| s.0.start)
-        .chain(changed_old.iter().map(|s| s.0.start.min(prefix)))
-        .fold(prefix, Byte::min);
-    let end = changed_new
-        .iter()
-        .map(|s| s.0.end)
-        .chain(changed_old.iter().map(|s| shift(s.0.end)))
-        .fold(edit_end, Byte::max)
-        .min(text.end());
-    start..end.max(start)
+    edit.region(&old[lead..old.len() - trail], &spans[lead..spans.len() - trail], text)
+}
+
+/// [`changed_region`] after a partial parse that kept the colours outside `window`, the part of `text` it parsed again,
+/// behind which `text` is `delta` bytes longer than `old_text`. Only the texts and spans around the window are looked at;
+/// `None` where they do not lie as such a parse leaves them.
+pub fn changed_region_in(
+    old_text: &str,
+    old: &[(Range<Byte>, Style)],
+    text: &str,
+    spans: &[(Range<Byte>, Style)],
+    window: &Range<Byte>,
+    delta: isize,
+) -> Option<Range<Byte>> {
+    let old_end = shifted(window.end, -delta);
+    let fits = signed(text.len()) - signed(old_text.len()) == delta
+        && window.start <= window.end
+        && window.end <= text.end()
+        && window.start <= old_end
+        && old_end <= old_text.end()
+        && text.boundary(window.start)
+        && old_text.boundary(window.start)
+        && text.boundary(window.end)
+        && old_text.boundary(old_end);
+    if !fits {
+        return None;
+    }
+    let head = old.partition_point(|(r, _)| r.start < window.start);
+    let old_tail = old.partition_point(|(r, _)| r.start < old_end);
+    let tail = spans.partition_point(|(r, _)| r.start < window.end);
+    let reaches = |list: &[(Range<Byte>, Style)], i: usize, edge: Byte| i > 0 && list[i - 1].0.end > edge;
+    let moved = |(r, s): &(Range<Byte>, Style)| (shifted(r.start, delta)..shifted(r.end, delta), *s);
+    let kept = spans.partition_point(|(r, _)| r.start < window.start) == head
+        && old.len() - old_tail == spans.len() - tail
+        && !reaches(old, head, window.start)
+        && !reaches(spans, head, window.start)
+        && !reaches(old, old_tail, old_end)
+        && !reaches(spans, tail, window.end)
+        && (head == 0 || old[head - 1] == spans[head - 1])
+        && old.get(old_tail).is_none_or(|span| moved(span) == spans[tail]);
+    if !kept {
+        return None;
+    }
+    let edit = Replaced::of(changed_within(old_text, text, window, old_end));
+    if edit.old_end > old_end || edit.end > window.end {
+        return None;
+    }
+    let within = old_tail.min(tail);
+    let lead = head
+        + old[head..within]
+            .iter()
+            .zip(&spans[head..within])
+            .take_while(|(a, b)| edit.leads(a, b))
+            .count();
+    let behind = old.len() - old_tail;
+    let rest = old.len().min(spans.len()) - lead;
+    let trail = behind
+        + old[..old_tail]
+            .iter()
+            .rev()
+            .zip(spans[..tail].iter().rev())
+            .take(rest - behind)
+            .take_while(|(a, b)| edit.trails(a, b))
+            .count();
+    Some(edit.region(&old[lead..old.len() - trail], &spans[lead..spans.len() - trail], text))
+}
+
+/// What [`changed`] finds for texts that are alike in front of `window` of `new` and behind it, where it ends at `old_end`
+/// in `old`: only what lies between is compared.
+fn changed_within(old: &str, new: &str, window: &Range<Byte>, old_end: Byte) -> (Range<Byte>, Range<Byte>) {
+    let (old_bytes, new_bytes) = (old.as_bytes(), new.as_bytes());
+    let from = window.start.get();
+    let mut prefix = from + common_prefix(&old_bytes[from..], &new_bytes[from..]);
+    while !(old.is_char_boundary(prefix) && new.is_char_boundary(prefix)) {
+        prefix -= 1;
+    }
+    let max_suffix = old.len().min(new.len()) - prefix;
+    let alike_behind = new.len() - window.end.get();
+    let mut suffix = if max_suffix <= alike_behind {
+        max_suffix
+    } else {
+        let (old_part, new_part) = (&old_bytes[..old_end.get()], &new_bytes[..window.end.get()]);
+        alike_behind + common_suffix(old_part, new_part, max_suffix - alike_behind)
+    };
+    while !(old.is_char_boundary(old.len() - suffix) && new.is_char_boundary(new.len() - suffix)) {
+        suffix -= 1;
+    }
+    (
+        Byte::new(prefix)..old.end() - suffix,
+        Byte::new(prefix)..new.end() - suffix,
+    )
+}
+
+/// Where an edit replaced text: from `start` on, up to `old_end` of the old text and `end` of the new one.
+struct Replaced {
+    start: Byte,
+    old_end: Byte,
+    end: Byte,
+}
+
+impl Replaced {
+    fn of((old, new): (Range<Byte>, Range<Byte>)) -> Replaced {
+        Replaced {
+            start: old.start,
+            old_end: old.end,
+            end: new.end,
+        }
+    }
+
+    /// Where a position of the old text lies in the new one.
+    fn moved(&self, o: Byte) -> Byte {
+        if o <= self.start {
+            o
+        } else if o >= self.old_end {
+            self.end + (o - self.old_end)
+        } else {
+            self.end
+        }
+    }
+
+    /// Whether an old span ahead of the edit is the same in the new text.
+    fn leads(&self, old: &(Range<Byte>, Style), new: &(Range<Byte>, Style)) -> bool {
+        old == new && old.0.end <= self.start
+    }
+
+    /// Whether an old span behind the edit only moved with it.
+    fn trails(&self, old: &(Range<Byte>, Style), new: &(Range<Byte>, Style)) -> bool {
+        old.1 == new.1 && old.0.start >= self.old_end && (self.moved(old.0.start)..self.moved(old.0.end)) == new.0
+    }
+
+    /// The edit and every span between the alike ones at either end, old or new.
+    fn region(&self, old: &[(Range<Byte>, Style)], new: &[(Range<Byte>, Style)], text: &str) -> Range<Byte> {
+        let start = new
+            .iter()
+            .map(|s| s.0.start)
+            .chain(old.iter().map(|s| s.0.start.min(self.start)))
+            .fold(self.start, Byte::min);
+        let end = new
+            .iter()
+            .map(|s| s.0.end)
+            .chain(old.iter().map(|s| self.moved(s.0.end)))
+            .fold(self.end, Byte::max)
+            .min(text.end());
+        start..end.max(start)
+    }
 }
 
 #[cfg(test)]
@@ -690,6 +811,144 @@ mod tests {
         let region = |a: &str, b: &str| changed_region(a, &[], b, &[]);
         assert_eq!(region("x é y", "x è y"), bytes(2..4), "the letters begin alike");
         assert_eq!(region("x éy", "x ĩy"), bytes(2..4), "the letters end alike");
+    }
+
+    /// A generator of its own, as the one in `splat-testkit` depends on this crate.
+    struct Rng(u64);
+
+    impl Rng {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            usize::try_from(self.0 % u64::try_from(n.max(1)).unwrap_or(1)).unwrap_or(0)
+        }
+
+        fn pick<'a>(&mut self, items: &[&'a str]) -> &'a str {
+            items[self.below(items.len())]
+        }
+    }
+
+    const PIECES: [&str; 32] = [
+        "Wort",
+        " ",
+        "ä",
+        "😀",
+        "**",
+        "*",
+        "`",
+        "~~",
+        "[",
+        "](u)",
+        "\n",
+        "\n\n",
+        "> ",
+        "- ",
+        "1. ",
+        "# ",
+        "Titel\n===",
+        "```\n",
+        "```rust\nlet x = 1;\n```",
+        "<div>\n",
+        "</div>",
+        "\t",
+        "    ",
+        "| a | b |\n|---|---|\n",
+        "|",
+        "<u>x</u>",
+        "\n- [ ] a\n",
+        "$",
+        "<!-- c -->",
+        "> [!NOTE]\n> ",
+        "==",
+        "<b>",
+    ];
+
+    fn paragraph(rng: &mut Rng) -> String {
+        (0..1 + rng.below(8)).map(|_| rng.pick(&PIECES)).collect()
+    }
+
+    /// The colours of a partial parse are those of a full one, so the region it finds must be the one that comparing all
+    /// of them finds.
+    #[test]
+    fn the_region_after_a_partial_parse_is_the_one_comparing_everything_finds() {
+        let mut rng = Rng(0x5eed_c010_0001);
+        let mut kept = 0;
+        for _ in 0..2000 {
+            let old = (0..2 + rng.below(8))
+                .map(|_| paragraph(&mut rng))
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            let doc = parse(&old);
+            let old_spans = highlight(&doc);
+            let start = old.floor_char_boundary(rng.below(old.len() + 1));
+            let end = old.floor_char_boundary(start + rng.below(6)).max(start);
+            let mut new = old.clone();
+            new.replace_range(start..end, if rng.below(4) == 0 { "" } else { rng.pick(&PIECES) });
+            let parsed = crate::incremental::reparse_and_color(doc, &old_spans, &new);
+            let Some(splice) = parsed.splice.as_ref().filter(|_| parsed.kept_colors) else {
+                continue;
+            };
+            kept += 1;
+            let what = format!("{old:?} -> {new:?}, {splice:?}");
+            let old_end = shifted(splice.window.end, -splice.delta);
+            assert_eq!(
+                changed_within(&old, &new, &splice.window, old_end),
+                changed(&old, &new),
+                "{what}"
+            );
+            assert_eq!(
+                changed_region_in(&old, &old_spans, &new, &parsed.spans, &splice.window, splice.delta),
+                Some(changed_region(&old, &old_spans, &new, &parsed.spans)),
+                "{what}"
+            );
+        }
+        assert!(kept > 200, "only {kept} partial parses kept their colours");
+    }
+
+    #[test]
+    fn a_window_that_does_not_fit_the_texts_or_colours_finds_no_region() {
+        let span = |r: Range<usize>| (bytes(r), Style::color(Token::Code));
+        let (old, new) = ("abc def", "abc xdef");
+        let region = |old_spans: &[(Range<Byte>, Style)], spans: &[(Range<Byte>, Style)], window, delta| {
+            changed_region_in(old, old_spans, new, spans, &bytes(window), delta)
+        };
+        assert_eq!(region(&[], &[], 4..5, 1), Some(bytes(4..5)));
+        assert_eq!(region(&[], &[], 4..5, 2), None, "another length");
+        assert_eq!(region(&[], &[], 4..9, 1), None, "beyond the text");
+        assert_eq!(region(&[], &[], 0..1, 1), None, "the change outside the window");
+        assert_eq!(region(&[span(2..5)], &[span(2..6)], 4..5, 1), None, "across the start");
+        assert_eq!(region(&[], &[span(4..6)], 4..5, 1), None, "across the end");
+        assert_eq!(
+            region(&[span(4..6)], &[], 4..6, 1),
+            None,
+            "across the end of the old window"
+        );
+        assert_eq!(region(&[span(5..6)], &[], 4..5, 1), None, "a span went missing behind");
+        assert_eq!(
+            region(&[span(0..1)], &[span(0..2)], 4..5, 1),
+            None,
+            "the one in front differs"
+        );
+        assert_eq!(
+            region(&[span(5..6)], &[span(5..7)], 4..5, 1),
+            None,
+            "the one behind did not move"
+        );
+        assert_eq!(
+            region(
+                &[span(0..1), span(5..6)],
+                &[span(0..1), span(4..5), span(6..7)],
+                4..5,
+                1
+            ),
+            Some(bytes(4..5))
+        );
+        assert_eq!(
+            changed_region_in("ä", &[], "ö", &[], &bytes(1..2), 0),
+            None,
+            "inside a letter"
+        );
     }
 
     #[test]

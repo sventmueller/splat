@@ -483,7 +483,7 @@ fn document_window_shown(mtm: MainThreadMarker) -> bool {
 /// Closes every document, with the formula renderer's hidden window in place, and sends the event a click on the
 /// Dock icon sends; AppKit must answer it with a new document window. Then closes that one too and calls `then`.
 fn dock_click_opens_a_document(mtm: MainThreadMarker, then: impl Fn() + 'static) {
-    super::js::renderer(mtm);
+    super::js::renderer(mtm).web();
     let controller = NSDocumentController::sharedDocumentController(mtm);
     for doc in controller.documents().to_vec() {
         doc.close();

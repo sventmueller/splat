@@ -209,7 +209,7 @@ pub(super) fn copy_unsaved() {
             writes.push(CopyToWrite {
                 editor: id,
                 file,
-                text: editor.source_text(),
+                text: editor.shared_source_text(),
             });
         }
     }
@@ -230,7 +230,7 @@ pub(super) fn copy_unsaved() {
 struct CopyToWrite {
     editor: usize,
     file: PathBuf,
-    text: String,
+    text: std::sync::Arc<str>,
 }
 
 /// Writes the copies and returns the editors whose copy did not reach its file.
@@ -244,7 +244,9 @@ fn write_copies(folder: &Path, writes: Vec<CopyToWrite>) -> Vec<usize> {
     for write in writes {
         // Through a second file, so a crash while writing leaves the last copy whole.
         let partial = write.file.with_extension("partial");
-        if let Err(error) = std::fs::write(&partial, write.text).and_then(|()| std::fs::rename(&partial, &write.file)) {
+        if let Err(error) =
+            std::fs::write(&partial, write.text.as_bytes()).and_then(|()| std::fs::rename(&partial, &write.file))
+        {
             crate::diag::report("copying unsaved text failed", error);
             not_written.push(write.editor);
         }
@@ -460,7 +462,7 @@ mod tests {
         let write = |folder: &Path, editor, name: &str| CopyToWrite {
             editor,
             file: folder.join(name),
-            text: "Text".to_string(),
+            text: "Text".into(),
         };
         let beneath = blocked.join("Ordner");
         assert_eq!(write_copies(&beneath, vec![write(&beneath, 1, "1.md")]), [1]);

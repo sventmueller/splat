@@ -130,7 +130,7 @@ Splat pokazuje po lewej tekst źródłowy Markdown z kolorowaniem składni, a po
 
 - macOS 14 Sonoma lub nowszy. Splat powstaje i jest testowany na macOS 27, gdzie sam przejmuje wygląd Liquid Glass.
 - Mac z procesorem Apple Silicon lub Intel.
-- Około 45 MB miejsca na dysku.
+- Około 35 MB miejsca na dysku.
 
 ## Instalacja
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Inne typy diagramów edytuje się jako kod. VoiceOver czyta tytuł diagramu lub jego tekst alternatywny.
 
-Pierwszy diagram po uruchomieniu zajmuje około sekundy, bo silnik renderowania startuje w tle. Diagram, który trwa dłużej niż 10 sekund, pokazuje błąd, a silnik renderowania startuje od nowa dla następnego. Silnik PlantUML (3 MB) ładuje się dopiero przy pierwszym diagramie PlantUML. `!include` w PlantUML z internetu jest blokowany.
+Pierwszy diagram po uruchomieniu, a także pierwszy po dwóch minutach bez diagramów, zajmuje około sekundy, bo silnik renderowania startuje w tle. Diagram, który trwa dłużej niż 10 sekund, pokazuje błąd, a silnik renderowania startuje od nowa dla następnego. Silnik PlantUML (3 MB) ładuje się dopiero przy pierwszym diagramie PlantUML. `!include` w PlantUML z internetu jest blokowany.
 
 ## Obrazki
 
@@ -441,7 +441,7 @@ Pierwszy diagram po uruchomieniu zajmuje około sekundy, bo silnik renderowania 
 - **Obrazki z internetu** wczytują się, gdy tylko dokument je pokaże, przez `https` i do 10 MB każdy. Tak jak obrazki w e-mailu informują swoje serwery, że i kiedy dokument zostaje otwarty.
 - **Rozmiar.** `<img width="200">` ustala rozmiar obrazka; poza tym obrazki dopasowują się do szerokości podglądu.
 - **Zmiany na dysku.** Obrazek, który podmienisz, albo taki, który pojawi się po tym, jak dokument go wskazał, widać bez ponownego otwierania dokumentu. Obrazki z internetu, które nie wczytały się przez sieć, są próbowane ponownie, dopóki dokument je pokazuje.
-- **Pamięć.** Obrazki są pokazywane do 2560 pikseli na dłuższym boku, co wystarcza też do wypełnienia strony A4. Dekodują się mniejsze, gdy zajmą jedną ósmą pamięci Maca oraz gdy macOS zgłasza niedobór pamięci.
+- **Pamięć.** Obrazki dekodują się do tylu pikseli, ile zajmują na ekranie, najwyżej 2560 na dłuższym boku, i ponownie, gdy są pokazywane większe; na papierze mają do 2560 pikseli, co wystarcza do wypełnienia strony A4. Dekodują się mniejsze, gdy zajmą jedną ósmą pamięci Maca oraz gdy macOS zgłasza niedobór pamięci.
 - **Tryb ciemny.** Obrazki z białym tłem są w ciemnym podglądzie lekko przyciemniane.
 - **Wklejanie i upuszczanie.** Zobacz [W tekście źródłowym](#w-tekście-źródłowym).
 
@@ -556,7 +556,7 @@ Plik Markdown może pochodzić od kogokolwiek, więc Splat traktuje każdy dokum
 
 - **Bez telemetrii.** Splat nie zgłasza niczego o tym, jak go używasz. Szuka uaktualnień dopiero wtedy, gdy się zgodzisz albo wybierzesz **Sprawdź uaktualnienia…**: wczytuje wtedy mały plik kanału z GitHuba, a żądanie podaje tylko aplikację i jej wersję. Wzory i diagramy renderują się lokalnie; widoki webowe, które to robią, nie mają dostępu do sieci. **Pomoc › Zgłoś problem…** otwiera w przeglądarce formularz w serwisie GitHub; jego adres zawiera wersję Splata, wersję macOS i rodzaj Maca, nic z twoich dokumentów.
 - **Obrazki z internetu** wczytują się, gdy tylko dokument je pokaże, z dowolnego hosta, tylko przez `https`, najwyżej po 10 MB każdy i w prywatnej sesji bez ciasteczek. Ich serwery dowiadują się, że i kiedy dokument zostaje otwarty.
-- **Izolowane dekodowanie.** Obrazy oraz grafiki wzorów i diagramów są dekodowane we własnej usłudze, którą macOS uruchamia we własnej piaskownicy: żadnego z twoich plików, bez sieci. Oddaje ona tylko piksele, których rozmiar jest sprawdzany, i sama się kończy, gdy dekodowanie trwa dłużej niż 10 sekund lub zajmuje za dużo pamięci. Własne dekodery obrazów Apple widzą tylko HEIC, TIFF, AVIF i PDF, i to tylko wtedy, gdy dane naprawdę mają ten format. Przechodzą przez nią także SVG, wzory i diagramy, więc w Splacie są obrazami o stałej rozdzielczości: cztery piksele na punkt, do 2560 na dłuższym boku.
+- **Izolowane dekodowanie.** Obrazy oraz grafiki wzorów i diagramów są dekodowane we własnej usłudze, którą macOS uruchamia we własnej piaskownicy: żadnego z twoich plików, bez sieci. Oddaje ona tylko piksele, których rozmiar jest sprawdzany, i sama się kończy, gdy dekodowanie trwa dłużej niż 10 sekund lub zajmuje za dużo pamięci. Własne dekodery obrazów Apple widzą tylko HEIC, TIFF, AVIF i PDF, i to tylko wtedy, gdy dane naprawdę mają ten format. Przechodzą przez nią także SVG, wzory i diagramy, więc w Splacie są obrazami: najwyżej cztery piksele na punkt i 2560 na dłuższym boku.
 - **Pliki lokalne** docierają do dokumentu tylko ścieżką, którą on wskazuje, i tylko z folderu, do którego udzielono dostępu: Splat może czytać dokument, który otwierasz, ale obrazki, notatki, bibliografię i repozytorium wokół niego dopiero wtedy, gdy udzielisz dostępu do ich folderu przyciskiem **Udziel dostępu do folderu…** na pasku nad podglądem. Dostęp obejmuje wszystkie podfoldery i jest zapamiętywany. Osadzenia pokazują notatki Markdown z folderu dokumentu i z niższych, a brakującego obrazka szuka się tylko tam. Ścieżka obrazu gdzie indziej, bezwzględna lub zaczynająca się od `~`, wczytuje się w podglądzie z folderu, do którego udzielono dostępu; eksporty HTML i Word, drukowanie i pliki PDF zabierają tylko to, co leży w folderze dokumentu lub w jego repozytorium Git, chyba że to repozytorium zawiera też twój folder domowy, więc cudzy dokument nie wciągnie twoich plików do eksportu, który przekazujesz dalej.
 - **Foldery notatek** są czytane tylko wtedy, gdy pokazuje je panel boczny, a zmiana nazwy notatki zmienia inne pliki dopiero po potwierdzeniu, ile ich jest.
 - **Repozytoria Git** czyta sam Splat. Nigdy nie uruchamia programu `git`, którego konfiguracja w cudzym repozytorium może uruchamiać inne programy, i czyta nie więcej niż wersję otwartego dokumentu z ostatniego commitu. Niczego tam nie zapisuje i nie korzysta z sieci.
@@ -574,7 +574,7 @@ Splat pozostaje responsywny przy dokumentach o rozmiarze kilku megabajtów:
 - Tekst źródłowy używa TextKit 2, który układa tylko widoczną część.
 - Gdy piszesz w podglądzie, a w tekście źródłowym dokumentów do 2 MB, tylko dotknięte akapity są parsowane, kolorowane i układane od nowa. W dokumencie 10 MB parsowanie i kolorowanie trwają około 3 ms, renderowanie około 10 ms, a całe naciśnięcie klawisza w jego podglądzie około 30 ms, łącznie z własną pracą widoku.
 - Duże podglądy renderują najpierw widoczną część, a resztę, gdy aplikacja jest bezczynna. Bloki przewinięte do widoku są renderowane, zanim zostaną narysowane.
-- W tekście źródłowym większych dokumentów parsowanie na potrzeby podglądu działa w tle, gdy piszesz.
+- W tekście źródłowym większych dokumentów to samo działa w tle, gdy piszesz.
 - Dokument pozostaje zwykłym tekstem, gdy wymagałby około 4 GB pamięci, czyli około 50–120 MB zwykłego Markdowna, ale tylko od 10 do 20 MB, jeśli składa się wyłącznie z tabel lub nagłówków: tekst źródłowy nie ma kolorów, a podgląd mówi, dlaczego jest pusty. Eksporty nadal działają.
 - Od około 200 KB dokument otwiera okno, zanim zostanie sparsowany; przy 5 MB kolory i podgląd pojawiają się około ćwierć sekundy później.
 - Wszystkie obrazy razem, łącznie ze wzorami i diagramami, zajmują najwyżej ćwierć pamięci Maca, a połowę tego, gdy pamięci brakuje. Powyżej tej granicy kolejne obrazy są pokazywane jako symbole zastępcze, dopóki znów nie będzie miejsca.

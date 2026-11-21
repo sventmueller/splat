@@ -130,7 +130,7 @@ Splat đặt mã nguồn Markdown có tô màu cú pháp ở bên trái và bả
 
 - macOS 14 Sonoma trở lên. Splat được phát triển và thử nghiệm trên macOS 27, nơi nó tự động áp dụng thiết kế Liquid Glass.
 - Máy Mac dùng Apple Silicon hoặc bộ xử lý Intel.
-- Khoảng 45 MB dung lượng đĩa.
+- Khoảng 35 MB dung lượng đĩa.
 
 ## Cài đặt
 
@@ -432,7 +432,7 @@ flowchart LR
 
 Các loại sơ đồ khác được sửa dưới dạng mã. VoiceOver đọc tiêu đề hoặc văn bản thay thế của sơ đồ.
 
-Sơ đồ đầu tiên sau khi mở ứng dụng mất khoảng một giây, vì bộ máy hiển thị khởi động ở chế độ nền. Sơ đồ nào mất hơn 10 giây sẽ báo lỗi, và bộ máy hiển thị khởi động lại từ đầu cho sơ đồ tiếp theo. Bộ máy của PlantUML (3 MB) chỉ được tải cùng sơ đồ PlantUML đầu tiên. `!include` của PlantUML từ web bị chặn.
+Sơ đồ đầu tiên sau khi mở ứng dụng, và sơ đồ đầu tiên sau hai phút không có sơ đồ nào, mất khoảng một giây, vì bộ máy hiển thị khởi động ở chế độ nền. Sơ đồ nào mất hơn 10 giây sẽ báo lỗi, và bộ máy hiển thị khởi động lại từ đầu cho sơ đồ tiếp theo. Bộ máy của PlantUML (3 MB) chỉ được tải cùng sơ đồ PlantUML đầu tiên. `!include` của PlantUML từ web bị chặn.
 
 ## Hình ảnh
 
@@ -440,7 +440,7 @@ Sơ đồ đầu tiên sau khi mở ứng dụng mất khoảng một giây, vì
 - **Hình ảnh từ web** được tải ngay khi tài liệu hiển thị chúng, qua `https` và tối đa 10 MB mỗi hình. Giống như hình ảnh trong email, chúng cho máy chủ của chúng biết tài liệu được mở và mở lúc nào.
 - **Kích thước.** `<img width="200">` đặt kích thước hình ảnh; nếu không, hình ảnh vừa với chiều rộng của bản xem trước.
 - **Thay đổi trên đĩa.** Hình ảnh bạn thay thế, hoặc hình xuất hiện sau khi tài liệu đã nhắc tới nó, hiển thị mà không cần mở lại tài liệu. Hình ảnh từ web bị lỗi do mạng sẽ được thử lại khi tài liệu đang hiển thị chúng.
-- **Bộ nhớ.** Hình ảnh hiển thị tới 2560 pixel ở cạnh dài nhất, cũng đủ lấp đầy một trang A4. Chúng được giải mã nhỏ hơn khi chiếm một phần tám bộ nhớ của máy Mac, và trong lúc macOS báo áp lực bộ nhớ.
+- **Bộ nhớ.** Hình ảnh được giải mã theo số pixel mà chúng chiếm trên màn hình, tối đa 2560 ở cạnh dài nhất, và được giải mã lại khi hiển thị lớn hơn; trên giấy chúng có tới 2560 pixel, đủ lấp đầy một trang A4. Chúng được giải mã nhỏ hơn khi chiếm một phần tám bộ nhớ của máy Mac, và trong lúc macOS báo áp lực bộ nhớ.
 - **Chế độ tối.** Hình ảnh có nền trắng được làm mờ nhẹ trong bản xem trước tối.
 - **Dán và thả.** Xem [Trong mã nguồn](#trong-mã-nguồn).
 
@@ -555,7 +555,7 @@ Một tệp Markdown có thể đến từ bất kỳ ai, nên Splat coi mọi t
 
 - **Không có telemetry.** Splat không báo cáo gì về cách bạn sử dụng nó. Nó chỉ tìm bản cập nhật khi bạn đồng ý hoặc chọn **Kiểm tra Bản cập nhật…**: khi đó nó tải một tệp nguồn cấp nhỏ từ GitHub, và yêu cầu chỉ nêu tên ứng dụng và phiên bản của nó. Công thức và sơ đồ được hiển thị cục bộ; các web view thực hiện việc đó không thể truy cập mạng. **Trợ giúp › Báo cáo sự cố…** mở một biểu mẫu trên GitHub trong trình duyệt; địa chỉ của nó chứa phiên bản Splat, phiên bản macOS và loại máy Mac, không có gì từ tài liệu của bạn.
 - **Hình ảnh từ web** được tải ngay khi tài liệu hiển thị chúng, từ bất kỳ máy chủ nào, chỉ qua `https`, tối đa 10 MB mỗi hình, và trong một phiên riêng tư không có cookie. Máy chủ của chúng biết tài liệu được mở và mở lúc nào.
-- **Giải mã cô lập.** Hình ảnh cùng đồ họa của công thức và sơ đồ được giải mã trong một dịch vụ riêng, được macOS khởi động trong sandbox riêng của nó: không tệp nào của bạn, không mạng. Dịch vụ chỉ trả về điểm ảnh, có kiểm tra kích thước, và tự kết thúc khi một lần giải mã mất hơn 10 giây hoặc dùng quá nhiều bộ nhớ. Bộ giải mã hình ảnh của chính Apple chỉ nhìn thấy HEIC, TIFF, AVIF và PDF, và chỉ khi dữ liệu thật sự thuộc định dạng đó. SVG, công thức và sơ đồ cũng đi qua dịch vụ đó, nên trong Splat chúng là hình ảnh có độ phân giải cố định: bốn điểm ảnh cho mỗi point, tối đa 2560 ở cạnh dài hơn.
+- **Giải mã cô lập.** Hình ảnh cùng đồ họa của công thức và sơ đồ được giải mã trong một dịch vụ riêng, được macOS khởi động trong sandbox riêng của nó: không tệp nào của bạn, không mạng. Dịch vụ chỉ trả về điểm ảnh, có kiểm tra kích thước, và tự kết thúc khi một lần giải mã mất hơn 10 giây hoặc dùng quá nhiều bộ nhớ. Bộ giải mã hình ảnh của chính Apple chỉ nhìn thấy HEIC, TIFF, AVIF và PDF, và chỉ khi dữ liệu thật sự thuộc định dạng đó. SVG, công thức và sơ đồ cũng đi qua dịch vụ đó, nên trong Splat chúng là hình ảnh: tối đa bốn điểm ảnh cho mỗi point và 2560 ở cạnh dài hơn.
 - **Tệp cục bộ** chỉ đến được tài liệu qua đường dẫn mà nó nêu, và chỉ từ một thư mục bạn đã cấp quyền truy cập: Splat được đọc tài liệu bạn mở, nhưng hình ảnh, ghi chú, danh mục tài liệu tham khảo và kho xung quanh nó thì chỉ sau khi bạn cấp quyền truy cập thư mục chứa chúng bằng **Cấp quyền truy cập thư mục…** trong thanh phía trên bản xem trước. Quyền đã cấp áp dụng cho mọi thư mục con và được ghi nhớ. Phần nhúng hiển thị các ghi chú Markdown từ thư mục của tài liệu và bên dưới, và hình ảnh bị thiếu chỉ được tìm ở đó. Đường dẫn hình ảnh ở nơi khác, tuyệt đối hoặc bắt đầu bằng `~`, được tải trong bản xem trước từ một thư mục đã được cấp quyền truy cập; các bản xuất HTML và Word, việc in và các tệp PDF chỉ mang theo những gì nằm trong thư mục của tài liệu hoặc kho Git của nó, trừ khi kho đó cũng chứa thư mục chính của bạn, nên tài liệu của người khác không thể kéo tệp của bạn vào bản xuất mà bạn chuyển đi.
 - **Thư mục ghi chú** chỉ được đọc khi thanh bên đang hiển thị chúng, và việc đổi tên ghi chú chỉ thay đổi các tệp khác sau khi bạn đã xác nhận số lượng.
 - **Kho Git** do chính Splat đọc. Splat không bao giờ chạy chương trình `git`, vì cấu hình của nó trong một kho của người khác có thể khởi chạy các chương trình khác, và không đọc gì ngoài phiên bản của tài liệu đang mở trong commit gần nhất. Splat không ghi gì vào đó và không dùng mạng.
@@ -573,7 +573,7 @@ Splat vẫn phản hồi nhanh với tài liệu vài megabyte:
 - Mã nguồn dùng TextKit 2, chỉ dàn trang phần nhìn thấy.
 - Khi bạn gõ trong bản xem trước, và trong mã nguồn của tài liệu tới 2 MB, chỉ các đoạn văn bị ảnh hưởng được phân tích, tô màu và dàn trang lại. Trong tài liệu 10 MB, phân tích và tô màu mất khoảng 3 ms, kết xuất khoảng 10 ms, và trọn một lần gõ phím trong bản xem trước của nó khoảng 30 ms, kể cả phần việc của chính view.
 - Bản xem trước lớn hiển thị phần nhìn thấy trước và phần còn lại khi ứng dụng rảnh. Các khối cuộn vào tầm nhìn được hiển thị trước khi được vẽ.
-- Trong mã nguồn của tài liệu lớn hơn, việc phân tích cho bản xem trước chạy ở chế độ nền khi bạn gõ.
+- Trong mã nguồn của tài liệu lớn hơn, công việc đó cũng chạy ở chế độ nền khi bạn gõ.
 - Tài liệu chỉ còn là văn bản thuần khi sẽ cần khoảng 4 GB bộ nhớ, tức khoảng 50 đến 120 MB Markdown thông thường, nhưng chỉ 10 đến 20 MB nếu toàn bảng hoặc tiêu đề: mã nguồn không có màu và bản xem trước nói lý do nó để trống. Việc xuất vẫn hoạt động.
 - Từ khoảng 200 KB, tài liệu mở cửa sổ trước khi được phân tích; ở 5 MB, màu sắc và bản xem trước theo sau khoảng một phần tư giây.
 - Tất cả hình ảnh cộng lại, kể cả công thức và sơ đồ, chiếm tối đa một phần tư bộ nhớ của máy Mac, và một nửa mức đó khi bộ nhớ thiếu. Vượt quá mức đó, các hình ảnh tiếp theo hiển thị dưới dạng phần giữ chỗ cho đến khi lại có chỗ.

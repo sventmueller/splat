@@ -22,8 +22,8 @@ use super::super::decoder;
 use super::super::decoder::Decoded;
 use super::super::images::ImageStore;
 use super::super::js::{self, Key, PageAnswer};
-use super::super::mathfield::{self, MathField};
-use super::super::picture::{Rendered, Sizing};
+use super::super::mathfield;
+use super::super::picture::{Fit, Rendered, Sizing};
 use super::super::render::{Drawn, RenderCtx};
 use super::super::webkit;
 use super::mock_web::{HOST, requests_of};
@@ -70,7 +70,6 @@ struct Probe {
     local: PathBuf,
     changed: PathBuf,
     changed_url: Retained<NSURL>,
-    field: std::rc::Rc<MathField>,
 }
 
 /// What the preview shows but does not make comes only from what rendering is given.
@@ -80,7 +79,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
         asked_for_web: Cell<usize>,
     }
     impl Drawn for Given {
-        fn web_picture(&self, _: &str) -> Option<Rendered> {
+        fn web_picture(&self, _: &str, _: Fit) -> Option<Rendered> {
             self.asked_for_web.set(self.asked_for_web.get() + 1);
             Some(self.picture.clone())
         }
@@ -114,6 +113,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
             doc_dir: None,
             images: &images,
             max_image_width: 400.0,
+            scale: None,
             dark: false,
             requester: None,
             leaves_the_mac: None,
@@ -186,17 +186,66 @@ pub(super) fn run(mtm: MainThreadMarker) {
                     );
                     check(
                         "the first formula starts the web view and shows",
-                        crate::util::storage(editor.preview())
-                            .string()
-                            .to_string()
-                            .contains('\u{FFFC}'),
+                        pictures_in(&editor) > 0,
                         "no picture in the preview",
                     );
-                    document.updateChangeCount(NSDocumentChangeType::ChangeCleared);
-                    document.close();
-                    with_web_views_started(mtm);
+                    let document = document.clone();
+                    the_renderer_ends_when_unused(editor.clone(), move || {
+                        document.updateChangeCount(NSDocumentChangeType::ChangeCleared);
+                        document.close();
+                        with_web_views_started(mtm);
+                    });
                 },
             );
+        },
+    );
+}
+
+/// How many pictures the preview of `e` shows.
+fn pictures_in(e: &EditorController) -> usize {
+    crate::util::storage(e.preview())
+        .string()
+        .to_string()
+        .matches('\u{FFFC}')
+        .count()
+}
+
+/// The renderer's web view ends after a while without a render while a document with a formula stays open: the formula
+/// keeps its picture through the next update without starting it, and a new formula starts it as the first one did.
+fn the_renderer_ends_when_unused(editor: Retained<EditorController>, then: impl Fn() + 'static) {
+    js::end_unused_after(Some(std::time::Duration::from_millis(300)));
+    let then = std::rc::Rc::new(then);
+    once(
+        0.0,
+        "the renderer's web view to end",
+        || !js::started(),
+        move || {
+            js::end_unused_after(None);
+            super::type_in_source(&editor, "Mehr ");
+            let shown = editor.clone();
+            let (editor, then) = (editor.clone(), then.clone());
+            let updated =
+                move || super::settled(&shown) && super::source(&shown).contains("Mehr") && pictures_in(&shown) > 0;
+            once(0.0, "the document to show its text again", updated, move || {
+                let started = js::started();
+                check(
+                    "the renderer's web view ends after a while without a render, and a formula shown keeps its picture without starting it",
+                    !started && pictures_in(&editor) == 1,
+                    &format!("web view started {started}, {} pictures", pictures_in(&editor)),
+                );
+                super::type_in_source(&editor, "$y^3$ ");
+                let rendered = editor.clone();
+                let (editor, then) = (editor.clone(), then.clone());
+                let again = move || js::started() && super::settled(&rendered) && pictures_in(&rendered) == 2;
+                once(0.0, "the new formula to render", again, move || {
+                    check(
+                        "a new formula after the renderer's web view ended starts it again as the first did and shows",
+                        js::started() && !js::had_its_page_at_once() && pictures_in(&editor) == 2,
+                        &format!("{} pictures", pictures_in(&editor)),
+                    );
+                    then();
+                });
+            });
         },
     );
 }
@@ -356,7 +405,7 @@ fn with_web_views_started(mtm: MainThreadMarker) {
         super::super::render_queue::Owner::unique(),
         keys.iter().map(|(_, k)| k.clone()).collect(),
     );
-    let field = mathfield::field(mtm);
+    let _ = mathfield::field(mtm);
     let local = std::env::temp_dir().join(format!("splat-probe-{}.bmp", std::process::id()));
     let _ = std::fs::write(&local, two_pixel_bmp());
     // SAFETY: NSDocument's initializer, called once on the newly allocated object.
@@ -390,7 +439,6 @@ fn with_web_views_started(mtm: MainThreadMarker) {
         local,
         changed,
         changed_url,
-        field,
     });
     wait_until_done(probe, std::time::Instant::now());
 }
@@ -531,7 +579,7 @@ impl Probe {
         self.reloaded_text().as_deref() == Some("# Nachher\n")
             && self.keys.iter().all(|(_, key)| js::outcome(key).is_some())
             && self.local_image_shown().is_some()
-            && self.field.loaded.get()
+            && mathfield::field(self.mtm).loaded.get()
             && super::super::remote::idle()
             && answered("/wackelig.svg")
             && answered("/ohne-netz.svg")
@@ -914,6 +962,22 @@ const LEAVE_THE_PAGE: &str = "const name = () => location.pathname.split('/').po
 const STOPPED: &str =
     "fetch blocked / image failed / inline handler blocked / violated connect-src,script-src-attr / stayed";
 
+/// Asks the page's scheme for a script of the resources, for the bundle's Info.plist beside them through escaped slashes,
+/// and for a file that is not there. A script element hears of a file served whatever it holds; the page's own
+/// configuration declares again what the page holds already, so it fails before it changes anything.
+const ONLY_RESOURCES: &str = "const tried = (src) => new Promise((done) => { \
+        const script = document.createElement('script'); \
+        script.onload = () => done('served'); \
+        script.onerror = () => done('refused'); \
+        script.src = src; \
+        document.head.appendChild(script); \
+    }); \
+    const answers = []; \
+    for (const src of ['js/render-config.js', 'js%2F..%2F..%2FInfo.plist', 'js/nosuch.js']) { \
+        answers.push(await tried(src)); \
+    } \
+    return answers.join(' / ');";
+
 /// What MathJax makes of text outside its fonts: letters that join or run from right to left must stay one piece,
 /// while text it has glyphs for stays in its own font.
 const FORMULA_TEXT: &str = "const svg = async (tex) => (await renderMath(tex, false, '#000')).svg; \
@@ -985,8 +1049,9 @@ fn ask(web: &WKWebView, name: &'static str, script: &str, answered: impl Fn(Stri
 }
 
 fn formula_editor(probe: &Probe) {
-    check("the formula editor's page loads", probe.field.loaded.get(), "");
-    let web = probe.field.web.clone();
+    let field = mathfield::field(probe.mtm);
+    check("the formula editor's page loads", field.loaded.get(), "");
+    let web = field.web.clone();
     let object: &objc2::runtime::NSObject = &web;
     let background = objc2_foundation::NSObjectNSKeyValueCoding::valueForKey(object, &ns(mathfield::DRAWS_BACKGROUND));
     check(
@@ -1302,7 +1367,24 @@ fn attack_the_renderer(mtm: MainThreadMarker) {
         &format!("{INJECTED} {LEAVE_THE_PAGE}"),
         move |text| {
             check(name, text == STOPPED, &text);
-            finish();
+            only_resources(mtm);
         },
     );
+}
+
+/// The offline rules let the app's own scheme through, so only the scheme keeps a page from reading beside the resources.
+fn only_resources(mtm: MainThreadMarker) {
+    let name = "the renderer's scheme serves its resources and nothing beside them";
+    ask(&js::renderer(mtm).web(), name, ONLY_RESOURCES, move |text| {
+        check(name, text == "served / refused / refused", &text);
+        what_ends_when_unused(mtm);
+    });
+}
+
+/// Last, as they wait for what ends a while after its use, which no other check may use meanwhile.
+fn what_ends_when_unused(mtm: MainThreadMarker) {
+    super::controller::the_formula_editor_lets_its_web_view_go(mtm, || {
+        super::saving::an_unused_service_ends();
+        finish();
+    });
 }

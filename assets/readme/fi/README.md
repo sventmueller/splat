@@ -130,7 +130,7 @@ Splat näyttää Markdown-lähdetekstin syntaksiväreineen vasemmalla ja elävä
 
 - macOS 14 Sonoma tai uudempi. Splatia kehitetään ja testataan macOS 27:llä, jossa se ottaa Liquid Glass -ulkoasun käyttöön automaattisesti.
 - Mac, jossa on Apple Silicon tai Intel-suoritin.
-- Noin 45 Mt levytilaa.
+- Noin 35 Mt levytilaa.
 
 ## Asennus
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Muita kaaviotyyppejä muokataan koodina. VoiceOver lukee kaavion otsikon tai vaihtoehtoisen tekstin.
 
-Ensimmäinen kaavio käynnistyksen jälkeen kestää noin sekunnin, koska renderöintimoottori käynnistyy taustalla. Yli 10 sekuntia kestävä kaavio näyttää virheen, ja renderöintimoottori käynnistyy seuraavaa varten uudelleen. PlantUML:n moottori (3 Mt) latautuu vasta ensimmäisen PlantUML-kaavion yhteydessä. PlantUML:n `!include` verkosta estetään.
+Ensimmäinen kaavio käynnistyksen jälkeen, samoin kuin ensimmäinen kahden minuutin kaaviottoman tauon jälkeen, kestää noin sekunnin, koska renderöintimoottori käynnistyy taustalla. Yli 10 sekuntia kestävä kaavio näyttää virheen, ja renderöintimoottori käynnistyy seuraavaa varten uudelleen. PlantUML:n moottori (3 Mt) latautuu vasta ensimmäisen PlantUML-kaavion yhteydessä. PlantUML:n `!include` verkosta estetään.
 
 ## Kuvat
 
@@ -441,7 +441,7 @@ Ensimmäinen kaavio käynnistyksen jälkeen kestää noin sekunnin, koska render
 - **Verkon kuvat** latautuvat heti, kun dokumentti näyttää ne, `https`-yhteydellä ja enintään 10 Mt kukin. Kuten sähköpostin kuvat, ne kertovat palvelimilleen, että ja milloin dokumentti avataan.
 - **Koko.** `<img width="200">` määrittää kuvan koon; muuten kuvat sovitetaan esikatselun leveyteen.
 - **Muutokset levyllä.** Korvaamasi tai vasta dokumentin mainitsemisen jälkeen ilmestyvä kuva näkyy avaamatta dokumenttia uudelleen. Verkon kuvia, jotka epäonnistuivat verkon vuoksi, yritetään uudelleen, kun dokumentti niitä näyttää.
-- **Muisti.** Kuvat näytetään enintään 2560 pikselin pisimmällä sivullaan, mikä täyttää myös A4-sivun. Ne puretaan pienempinä, kun ne täyttävät kahdeksasosan Macin muistista, ja kun macOS ilmoittaa muistipaineesta.
+- **Muisti.** Kuvat puretaan niin moneen pikseliin kuin ne peittävät näytöllä, enintään 2560 pisimmällä sivullaan, ja uudelleen, kun ne näytetään suurempina; paperilla niillä on enintään 2560 pikseliä, mikä täyttää A4-sivun. Ne puretaan pienempinä, kun ne täyttävät kahdeksasosan Macin muistista, ja kun macOS ilmoittaa muistipaineesta.
 - **Tumma tila.** Valkotaustaiset kuvat himmennetään hieman tummassa esikatselussa.
 - **Sijoittaminen ja pudottaminen.** Katso [Lähdetekstissä](#lähdetekstissä).
 
@@ -556,7 +556,7 @@ Markdown-tiedosto voi tulla keneltä tahansa, joten Splat kohtelee jokaista doku
 
 - **Ei telemetriaa.** Splat ei raportoi mitään siitä, miten käytät sitä. Se etsii päivityksiä vasta, kun suostut tai valitset **Etsi päivityksiä…**: silloin se lataa GitHubista pienen syötetiedoston, ja pyyntö kertoo vain apin ja sen version. Kaavat ja kaaviot renderöidään paikallisesti; ne renderöivät verkkonäkymät eivät pääse verkkoon. **Ohje › Ilmoita ongelmasta…** avaa selaimessa lomakkeen GitHubissa; sen osoite sisältää Splatin version, macOSin version ja Mac-tyypin, ei mitään dokumenteistasi.
 - **Verkon kuvat** latautuvat heti, kun dokumentti näyttää ne, mistä tahansa isännästä, vain `https`-yhteydellä, enintään 10 Mt kukin ja yksityisessä istunnossa ilman evästeitä. Niiden palvelimet saavat tietää, että ja milloin dokumentti avataan.
-- **Eristetty purku.** Kuvat sekä kaavojen ja kaavioiden grafiikka puretaan omassa palvelussaan, jonka macOS käynnistää omaan hiekkalaatikkoonsa: ei yhtään tiedostoistasi, ei verkkoa. Se palauttaa vain pikseleitä, joiden koko tarkistetaan, ja lopettaa itsensä, kun purku kestää yli 10 sekuntia tai vie liikaa muistia. Applen omat kuvanpurkajat näkevät vain HEIC-, TIFF-, AVIF- ja PDF-aineistoa, ja vain kun data todella on sitä muotoa. SVG:t, kaavat ja kaaviot kulkevat myös tämän palvelun kautta, joten ne ovat Splatissa kuvia, joilla on kiinteä erottelutarkkuus: neljä pikseliä pistettä kohti, enintään 2560 pidemmällä sivulla.
+- **Eristetty purku.** Kuvat sekä kaavojen ja kaavioiden grafiikka puretaan omassa palvelussaan, jonka macOS käynnistää omaan hiekkalaatikkoonsa: ei yhtään tiedostoistasi, ei verkkoa. Se palauttaa vain pikseleitä, joiden koko tarkistetaan, ja lopettaa itsensä, kun purku kestää yli 10 sekuntia tai vie liikaa muistia. Applen omat kuvanpurkajat näkevät vain HEIC-, TIFF-, AVIF- ja PDF-aineistoa, ja vain kun data todella on sitä muotoa. SVG:t, kaavat ja kaaviot kulkevat myös tämän palvelun kautta, joten ne ovat Splatissa kuvia: enintään neljä pikseliä pistettä kohti ja 2560 pidemmällä sivulla.
 - **Paikalliset tiedostot** tavoittavat dokumentin vain sen nimeämän polun kautta ja vain kansiosta, johon olet antanut käyttöoikeuden: Splat saa lukea avaamasi dokumentin, mutta sen ympärillä olevat kuvat, muistiinpanot, kirjallisuusluettelon ja tietovaraston vasta, kun annat niiden kansioon käyttöoikeuden valitsemalla **Anna kansion käyttöoikeus…** esikatselun yläpuolella olevassa palkissa. Käyttöoikeus koskee kaikkia alikansioita ja säilyy muistissa. Upotukset näyttävät Markdown-muistiinpanoja dokumentin kansiosta ja sen alta, ja puuttuvaa kuvaa etsitään vain sieltä. Muualla oleva kuvapolku, absoluuttinen tai `~`:lla alkava, latautuu esikatselussa kansiosta, johon on annettu käyttöoikeus; HTML- ja Word-viennit, tulostus ja PDF:t ottavat mukaan vain sen, mikä on dokumentin kansiossa tai sen Git-tietovarastossa, paitsi jos tämä tietovarasto sisältää myös kotikansiosi, joten toisen tekemä dokumentti ei voi vetää tiedostojasi vientiin, jonka annat eteenpäin.
 - **Muistiinpanokansiot** luetaan vain silloin, kun sivupalkki näyttää ne, ja muistiinpanon uudelleennimeäminen muuttaa muita tiedostoja vasta, kun olet vahvistanut, kuinka monta.
 - **Git-repositoriot** lukee Splat itse. Se ei koskaan suorita `git`-ohjelmaa, jonka asetukset toisen tekemässä repositoriossa voivat käynnistää muita ohjelmia, eikä se lue enempää kuin avoimen dokumentin version viimeisimmästä commitista. Se ei kirjoita sinne mitään eikä käytä verkkoa.
@@ -574,7 +574,7 @@ Splat pysyy vastaavana useiden megatavujen dokumenteillakin:
 - Lähdeteksti käyttää TextKit 2:ta, joka taittaa vain näkyvän osan.
 - Kun kirjoitat esikatselussa ja enintään 2 Mt:n dokumenttien lähdetekstissä, vain muuttuneet kappaleet jäsennetään, väritetään ja taitetaan uudelleen: noin 30 ms 10 Mt. 10 Mt:n dokumentissa jäsentäminen ja värittäminen kestävät noin 3 ms, piirtäminen noin 10 ms ja koko näppäinpainallus sen esikatselussa noin 30 ms näkymän oman työn kanssa.
 - Suuret esikatselut renderöivät ensin näkyvän osan ja loput appin ollessa joutilaana. Näkymään vieritetyt lohkot renderöidään ennen kuin ne piirretään.
-- Suurempien dokumenttien lähdetekstissä esikatselun jäsennys ajetaan taustalla kirjoittaessasi.
+- Suurempien dokumenttien lähdetekstissä sama tehdään taustalla kirjoittaessasi.
 - Dokumentti pysyy pelkkänä tekstinä, kun se veisi noin 4 Gt muistia, eli noin 50–120 Mt tavallista Markdownia mutta vain 10–20 Mt pelkkiä taulukoita tai otsikoita: lähdetekstissä ei ole värejä ja esikatselu kertoo, miksi se pysyy tyhjänä. Viennit toimivat edelleen.
 - Noin 200 kt:stä alkaen dokumentti avaa ikkunansa ennen kuin se jäsennetään; 5 Mt:n kohdalla värit ja esikatselu seuraavat noin neljännessekunnin kuluttua.
 - Kaikki kuvat yhteensä, kaavat ja kaaviot mukaan lukien, vievät enintään neljänneksen Macin muistista ja puolet siitä, kun muistia on vähän. Sen ylittävät kuvat näkyvät paikkamerkkeinä, kunnes tilaa taas on.

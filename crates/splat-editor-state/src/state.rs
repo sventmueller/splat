@@ -10,9 +10,9 @@ use crate::lanes::{contained, free_in_background};
 use crate::markdown::commands::Pending;
 use crate::markdown::doc::Doc;
 use crate::markdown::doc::Splice;
-use crate::markdown::highlight::Style;
+use crate::markdown::highlight::{Style, changed_region, changed_region_in};
 use crate::markdown::incremental::{Parsed, parse_and_color, parse_shared_and_color, reparse_part_and_color};
-use crate::markdown::text::{Byte, U16};
+use crate::markdown::text::{Byte, TextAt, U16, line_start, shifted, signed, utf16_len};
 use crate::preview::bridge::Bridge;
 use crate::preview::layout::ParaKind;
 use crate::preview::layout::{
@@ -88,7 +88,8 @@ pub enum PreviewMode {
 #[derive(Default)]
 pub struct State {
     version: u64,
-    doc: Doc,
+    /// Shared with the background thread while it copies the tree to parse the next text from.
+    doc: Arc<Doc>,
     layout: Layout,
     index: Index,
     blocks: Blocks,
@@ -108,6 +109,8 @@ pub struct State {
     mode: PreviewMode,
     /// Parsing this text panicked; unlike a failed layout, only another text can end that.
     parse_failed: bool,
+    /// What the last partial parse changed, with the versions of the tree before and after it.
+    spliced: Option<(u64, u64, Splice)>,
 }
 
 /// What the preview needs after an update.
@@ -198,6 +201,79 @@ pub struct Background {
     pub layout: Option<(Layout, Index)>,
     /// Parsing or laying out panicked.
     pub failed: bool,
+    /// The version of the tree that only a part of the text was parsed from; `None` after a full parse.
+    pub base: Option<u64>,
+}
+
+/// What the background thread parses the next text from: the tree, colours and layout of the text the state holds.
+pub struct ParseBase {
+    doc: Arc<Doc>,
+    spans: Spans,
+    /// The layout of that tree, if it is up to date, with the caret it was laid out for.
+    layout: Option<(Layout, Option<Byte>)>,
+}
+
+/// Parses `text` and lays it out if `resolver` is given, on the background thread: around the change from the text of
+/// `base` where that gives what a full parse gives, otherwise all of it. `None` once `current` says a newer text waits.
+pub fn parse_in_background(
+    base: ParseBase,
+    text: Arc<str>,
+    resolver: Option<&dyn Resolver>,
+    current: impl Fn() -> bool,
+) -> Option<Background> {
+    if !current() {
+        return None;
+    }
+    let ParseBase { doc, spans, layout } = base;
+    let version = doc.version();
+    // The tree is copied, not taken: the main thread goes on reading it until this result arrives.
+    let partial = contained(|| {
+        panic_if_a_test_asks();
+        match reparse_part_and_color(doc.copied(), &spans, &text) {
+            Ok(parsed) => Some(parsed),
+            Err(old) => {
+                free_in_background(old);
+                None
+            }
+        }
+    })
+    .flatten();
+    drop(doc);
+    let base = partial.as_ref().map(|_| version);
+    let (parsed, mut failed) = match partial {
+        Some(parsed) => (parsed, false),
+        None => match contained(|| parse_shared_and_color(text.clone())) {
+            Some(parsed) => (parsed, false),
+            None => (Parsed::failed(text), true),
+        },
+    };
+    // A newer text is waiting; the layout of this one would be thrown away.
+    if !current() {
+        free_in_background((parsed, layout));
+        return None;
+    }
+    let layout = resolver.map(|resolver| {
+        let laid = match (&parsed.splice, layout) {
+            (Some(splice), Some((old, old_caret))) if !parsed.doc.is_too_large() && old.doc_version == version => {
+                let reuse = reusable(splice, &parsed.doc, old_caret);
+                contained(|| relayout(&parsed.doc, resolver, None, old, &reuse))
+            }
+            (_, old) => {
+                free_in_background(old);
+                laid_out(&parsed.doc, resolver, None)
+            }
+        };
+        failed |= laid.is_none();
+        let laid = laid.unwrap_or_else(|| Layout::nothing_of(&parsed.doc));
+        let index = Index::new(&laid);
+        (laid, index)
+    });
+    Some(Background {
+        parsed,
+        layout,
+        failed,
+        base,
+    })
 }
 
 /// What the views need after the state advanced.
@@ -235,6 +311,36 @@ pub struct Recolor {
     pub text: Arc<str>,
     /// The colours of that text.
     pub spans: Spans,
+    /// Where the colours of `text` can differ from those the view has: all of it when the old ones are stale.
+    pub region: Range<Byte>,
+    /// The start of the line that holds the start of `region`, with its position in the source view.
+    pub anchor: (Byte, U16),
+}
+
+/// Where the colours of `text` can differ from those of `old_text`: from the window of a partial parse that kept the
+/// colours outside it, or by comparing them all.
+fn recolored(
+    old_text: &str,
+    old_spans: &[(Range<Byte>, Style)],
+    text: &str,
+    spans: &[(Range<Byte>, Style)],
+    kept: Option<(Range<Byte>, isize)>,
+) -> Range<Byte> {
+    if old_text.is_empty() && old_spans.is_empty() {
+        return Byte::new(0)..text.end();
+    }
+    kept.and_then(|(window, delta)| changed_region_in(old_text, old_spans, text, spans, &window, delta))
+        .unwrap_or_else(|| changed_region(old_text, old_spans, text, spans))
+}
+
+/// Whether `splice` can describe the change from `old_text` to `text`, as far as that shows without comparing them.
+fn splices(splice: &Splice, old_text: &str, text: &str) -> bool {
+    let window = &splice.window;
+    signed(text.len()) - signed(old_text.len()) == splice.delta
+        && window.start <= window.end
+        && window.end <= text.end()
+        && splice.behind <= text.end()
+        && shifted(window.end, -splice.delta) <= old_text.end()
 }
 
 /// The layout of a text, which has none when it stays plain; `None` if it panicked.
@@ -288,6 +394,22 @@ impl State {
     /// The parsed text.
     pub fn doc(&self) -> &Doc {
         &self.doc
+    }
+
+    /// What the background thread needs to parse a newer text from this one; the layout only while it fits the tree.
+    pub fn parse_base(&self) -> ParseBase {
+        let fits = !self.stale.layout && !self.preview_is_behind();
+        ParseBase {
+            doc: self.doc.clone(),
+            spans: self.spans.clone(),
+            layout: fits.then(|| {
+                let layout = Layout {
+                    blocks: self.layout.blocks.clone(),
+                    doc_version: self.layout.doc_version,
+                };
+                (layout, self.caret)
+            }),
+        }
     }
 
     /// The layout of the preview.
@@ -361,6 +483,16 @@ impl State {
     /// The state was computed from the text `snap` holds; equal versions save comparing the texts.
     pub fn is_current(&self, snap: &Snapshot) -> bool {
         self.version == snap.version || self.doc.text() == snap.text
+    }
+
+    /// The text `snap` holds, for what keeps it beyond the loan: the tree's without a copy while the state is current for
+    /// it, else a copy.
+    pub fn shared_text_of(&self, snap: &Snapshot) -> Arc<str> {
+        if self.is_current(snap) {
+            self.doc.shared_text()
+        } else {
+            Arc::from(snap.text.as_str())
+        }
     }
 
     /// The layout and what the view shows are of an older text, after an edit while the preview was hidden.
@@ -457,8 +589,12 @@ impl State {
         resolver: impl FnOnce(&str) -> R,
     ) -> Update {
         let (parsed, layout_done) = match background {
-            Some(background) => {
+            Some(mut background) => {
                 self.parse_failed = background.failed;
+                // What changed was measured against another tree than the one here, after an update in between.
+                if background.base != Some(self.doc.version()) {
+                    background.parsed.splice = None;
+                }
                 (Some(background.parsed), background.layout)
             }
             None if self.is_current(snap) => (None, None),
@@ -489,7 +625,7 @@ impl State {
     /// apart, and commands must not find it empty, so it is read anew then.
     fn parse_part(&mut self, new_text: &str) -> Option<Parsed> {
         let in_step = !self.preview_is_behind();
-        let doc = self.doc.split_off_blocks();
+        let doc = self.blocks_to_parse();
         let spans = &self.spans;
         let parsed = contained(|| {
             panic_if_a_test_asks();
@@ -498,13 +634,14 @@ impl State {
         match parsed {
             Some(Ok(parsed)) => Some(parsed),
             Some(Err(doc)) => {
-                self.doc = *doc;
+                self.doc = Arc::new(*doc);
                 None
             }
             None => {
                 let text = self.doc.shared_text();
-                self.doc =
-                    contained(|| parse_shared_and_color(text.clone()).doc).unwrap_or_else(|| Parsed::failed(text).doc);
+                self.doc = Arc::new(
+                    contained(|| parse_shared_and_color(text.clone()).doc).unwrap_or_else(|| Parsed::failed(text).doc),
+                );
                 if in_step {
                     self.layout.doc_version = self.doc.version();
                 }
@@ -513,9 +650,18 @@ impl State {
         }
     }
 
+    /// The blocks to parse the next text from, which leaves the text here. A copy while the background thread still
+    /// holds the tree.
+    fn blocks_to_parse(&mut self) -> Doc {
+        match Arc::get_mut(&mut self.doc) {
+            Some(doc) => doc.split_off_blocks(),
+            None => self.doc.copied(),
+        }
+    }
+
     /// Parses `new_text`, around the edit where that is possible.
     fn parse(&mut self, new_text: &str) -> Parsed {
-        let doc = self.doc.split_off_blocks();
+        let doc = self.blocks_to_parse();
         let spans = &self.spans;
         let parsed = contained(|| {
             panic_if_a_test_asks();
@@ -556,23 +702,56 @@ impl State {
         self.version = snap.version;
         let all = std::mem::take(&mut self.stale.colors);
         let old = parsed.map(|parsed| {
-            let old_doc = std::mem::replace(&mut self.doc, parsed.doc);
+            let Parsed {
+                doc,
+                spans,
+                splice,
+                kept_colors,
+            } = parsed;
+            let old_doc = std::mem::replace(&mut self.doc, Arc::new(doc));
             let old_text = old_doc.shared_text();
+            debug_assert!(
+                splice.as_ref().is_none_or(|s| splices(s, &old_text, self.doc.text())),
+                "a splice of another text"
+            );
+            let kept = splice
+                .as_ref()
+                .filter(|_| kept_colors)
+                .map(|s| (s.window.clone(), s.delta));
+            self.spliced = splice.map(|s| (old_doc.version(), self.doc.version(), s));
             // Freeing a large document tree takes long enough to be felt while typing.
             free_in_background(old_doc);
-            (old_text, std::mem::replace(&mut self.spans, Arc::new(parsed.spans)))
+            (old_text, std::mem::replace(&mut self.spans, Arc::new(spans)), kept)
         });
-        let (old_text, old_spans) = match old {
+        let (old_text, old_spans, kept) = match old {
             Some(old) if !all => old,
             None if !all => return None,
-            _ => (Arc::default(), Arc::default()),
+            _ => (Arc::default(), Arc::default(), None),
+        };
+        let text = self.doc.shared_text();
+        let region = recolored(&old_text, &old_spans, &text, &self.spans, kept);
+        let line = line_start(&text, region.start);
+        // The copy counts from where its last edit lies, which holds for its own text only.
+        let position = if snap.text.len() == text.len() {
+            snap.u16_at(line)
+        } else {
+            U16::new(utf16_len(text.upto(line)))
         };
         Some(Recolor {
             old_text,
             old_spans,
-            text: self.doc.shared_text(),
+            text,
             spans: self.spans.clone(),
+            region,
+            anchor: (line, position),
         })
+    }
+
+    /// The tree the current one was made from by a partial parse, by its version, and what that parse changed; `None`
+    /// when the current tree came from a full parse.
+    pub fn splice(&self) -> Option<(u64, &Splice)> {
+        let (from, to, splice) = self.spliced.as_ref()?;
+        (*to == self.doc.version()).then_some((*from, splice))
     }
 
     /// Lays out the text and finds the blocks that changed; `None` when the preview stays as it is.
@@ -1022,6 +1201,145 @@ mod tests {
         assert_eq!(&*recolor.old_text, "", "from nothing, so every color applies");
     }
 
+    const PIECES: [&str; 20] = [
+        "Wort",
+        " ",
+        "ä",
+        "😀",
+        "**",
+        "*",
+        "`",
+        "[a](b)",
+        "\n",
+        "\n\n",
+        "> ",
+        "- ",
+        "# ",
+        "```\n",
+        "<div>\n",
+        "| a | b |\n|---|---|\n",
+        "~~",
+        "<!-- c -->",
+        "$",
+        "- [x] שלום",
+    ];
+
+    /// A document of several paragraphs, so that most edits are parsed in part.
+    fn document(rng: &mut splat_testkit::Rng) -> String {
+        let paragraph =
+            |rng: &mut splat_testkit::Rng| -> String { (0..1 + rng.below(6)).map(|_| *rng.pick(&PIECES)).collect() };
+        (0..2 + rng.below(6))
+            .map(|_| paragraph(rng))
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    /// An edit of `snap` at UTF-16 positions, as the source view reports one.
+    fn typed(rng: &mut splat_testkit::Rng, snap: Snapshot, version: u64) -> Snapshot {
+        let units: Vec<u16> = snap.text.encode_utf16().collect();
+        let cuts: Vec<usize> = (0..=units.len())
+            .filter(|&i| i == units.len() || !(0xDC00..0xE000).contains(&units[i]))
+            .collect();
+        let start = cuts[rng.below(cuts.len())];
+        let end = cuts
+            .get(cuts.partition_point(|&c| c < start) + rng.below(3))
+            .copied()
+            .unwrap_or(start);
+        let inserted = if rng.below(4) == 0 { "" } else { *rng.pick(&PIECES) };
+        let new_len = inserted.encode_utf16().count();
+        let delta = signed(new_len) - signed(end - start);
+        snap.patched(U16::new(start)..U16::new(start + new_len), delta, inserted, version)
+            .expect("an edit between letters")
+    }
+
+    /// However the region to recolour and its anchor were found, they are what comparing all colours and counting from the
+    /// start give.
+    #[test]
+    fn recolouring_after_an_edit_finds_what_comparing_everything_finds() {
+        let mut rng = splat_testkit::Rng::new(0x5eed_5747_0001);
+        let (mut edits, mut in_part) = (0, 0);
+        for _ in 0..splat_testkit::rounds(300) {
+            let text = document(&mut rng);
+            let mut state = shown(&text);
+            let mut snap = snapshot(&text, 1);
+            for version in 2..7 {
+                snap = typed(&mut rng, snap, version);
+                if snap.text == state.text() {
+                    continue;
+                }
+                let (old_text, old_spans) = (state.text().to_string(), state.spans.clone());
+                let facts = views(&state, true);
+                let update = match state.advance_in_part(&snap, facts, |_| NoImages) {
+                    Some(update) => update,
+                    None => state.advance(&snap, facts, None, |_| NoImages),
+                };
+                let recolor = update.recolor.expect("new colours");
+                let what = format!("{old_text:?} -> {:?}", snap.text);
+                let region = changed_region(&old_text, &old_spans, &snap.text, &recolor.spans);
+                assert_eq!(recolor.region, region, "{what}");
+                let line = line_start(&snap.text, region.start);
+                let position = U16::new(utf16_len(&snap.text[..line.get()]));
+                assert_eq!(recolor.anchor, (line, position), "{what}");
+                edits += 1;
+                in_part += usize::from(state.splice().is_some());
+            }
+        }
+        assert!(
+            in_part > edits / 4,
+            "only {in_part} of {edits} edits were parsed in part"
+        );
+    }
+
+    #[test]
+    fn colours_of_a_text_the_copy_does_not_hold_count_from_its_start() {
+        let mut state = shown("Text\n");
+        let text = "Text\n\nä😀 und *mehr*\n";
+        let recolor = state
+            .apply_parse(&snapshot("Neu\n", 2), Some(parse_and_color(text)))
+            .expect("a change");
+        let line = line_start(text, recolor.region.start);
+        assert_eq!(recolor.anchor, (line, U16::new(utf16_len(&text[..line.get()]))));
+        assert!(recolor.region.start > Byte::new(0), "{:?}", recolor.region);
+    }
+
+    #[test]
+    fn the_text_is_shared_with_the_tree_while_that_is_current() {
+        let state = shown("Text\n");
+        let current = state.shared_text_of(&snapshot("Text\n", 1));
+        assert!(Arc::ptr_eq(&current, &state.doc().shared_text()));
+        let ahead = state.shared_text_of(&snapshot("Texte\n", 2));
+        assert_eq!(&*ahead, "Texte\n", "the source is ahead of the parse");
+        let same = state.shared_text_of(&snapshot("Text\n", 3));
+        assert!(Arc::ptr_eq(&same, &state.doc().shared_text()), "the same text again");
+    }
+
+    #[test]
+    fn a_splice_fits_the_texts_it_was_made_between() {
+        let old = "Eins\n\nZwei\n\nDrei\n\nVier\n\nFünf\n\nSechs\n\nSieben\n";
+        let new = old.replace("Vier", "Viertel");
+        let mut doc = crate::markdown::reader::parse(old);
+        let splice = crate::markdown::incremental::reparse(&mut doc, &new).expect("a part");
+        assert!(splices(&splice, old, &new));
+        assert!(!splices(&splice, &new, old), "the other way round");
+        let beyond = Splice {
+            window: splice.window.start..Byte::new(new.len() + 1),
+            ..splice.clone()
+        };
+        assert!(!splices(&beyond, old, &new));
+    }
+
+    #[test]
+    fn the_splice_of_the_tree_is_known_until_a_full_parse() {
+        let old = "Eins\n\nZwei\n\nDrei\n\nVier\n\nFünf\n\nSechs\n\nSieben\n";
+        let mut state = shown(old);
+        let before = state.doc().version();
+        let _ = update(&mut state, &old.replace("Vier", "Viertel"), 2);
+        let (from, splice) = state.splice().expect("a part");
+        assert_eq!((from, splice.delta), (before, 3));
+        let _ = update(&mut state, "---\nt: 1\n---\n\nNeu\n", 3);
+        assert!(state.splice().is_none(), "front matter that comes takes a full parse");
+    }
+
     #[test]
     fn a_text_that_stays_plain_has_no_layout() {
         let doc = Parsed::plain("|\n".repeat(8 << 20).into()).doc;
@@ -1114,6 +1432,101 @@ mod tests {
         assert_eq!(state.footnote_paragraph("c"), None);
     }
 
+    /// The background result for `new`, parsed from what `state` holds.
+    fn in_background(state: &State, new: &str, resolver: Option<&dyn Resolver>) -> Background {
+        parse_in_background(state.parse_base(), new.into(), resolver, || true).expect("a result")
+    }
+
+    #[test]
+    fn the_background_parses_a_part_and_gives_what_a_full_parse_gives() {
+        let old = "# Eins\n\nZwei *und*\n\n- Drei\n- Vier\n\nFünf $x$\n\nSechs\n";
+        let mut state = shown(old);
+        let new = old.replace("Vier", "Viertel");
+        let background = in_background(&state, &new, Some(&NoImages));
+        assert_eq!(background.base, Some(state.doc().version()), "parsed in part");
+        assert!(!background.failed);
+        let full = parse_and_color(&new);
+        assert_eq!(background.parsed.doc.blocks(), full.doc.blocks());
+        assert_eq!(background.parsed.spans, full.spans);
+        let (laid, index) = background.layout.as_ref().expect("laid out");
+        assert_eq!(laid.blocks, layout(&full.doc, &NoImages, None).blocks);
+        assert_eq!(index.block_starts.len(), laid.blocks.len());
+        let facts = views(&state, true);
+        let change = state
+            .advance(&snapshot(&new, 2), facts, Some(background), |_| NoImages)
+            .preview
+            .expect("a new preview");
+        assert_eq!(change.blocks.len(), 1, "only the list changed");
+        assert_eq!(state.text(), new);
+        belongs_together(&state);
+    }
+
+    #[test]
+    fn a_background_result_measured_against_an_older_tree_is_taken_as_a_whole() {
+        let old = "Eins\n\nZwei\n\nDrei\n";
+        let mut state = shown(old);
+        let base = state.parse_base();
+        let _ = update(&mut state, "Eins\n\nZwei!\n\nDrei\n", 2);
+        let new = "Eins\n\nZwei!\n\nDrei?\n";
+        let background = parse_in_background(base, new.into(), Some(&NoImages), || true).expect("a result");
+        assert!(background.parsed.splice.is_some());
+        let facts = views(&state, true);
+        let done = state.advance(&snapshot(new, 3), facts, Some(background), |_| NoImages);
+        let recolor = done.recolor.expect("new colours");
+        assert_eq!(
+            &*recolor.old_text, "Eins\n\nZwei!\n\nDrei\n",
+            "against the text the source showed"
+        );
+        assert_eq!(state.text(), new);
+        assert_eq!(state.doc().blocks(), parse_and_color(new).doc.blocks());
+        belongs_together(&state);
+    }
+
+    #[test]
+    fn the_background_parses_all_of_a_text_a_part_cannot_tell() {
+        let state = shown("Text\n\nmehr\n");
+        let background = in_background(&state, "---\ntitle: Neu\n---\n\nText\n\nmehr\n", None);
+        assert_eq!(background.base, None);
+        assert!(background.layout.is_none(), "the preview is hidden");
+        let failed_part = with_panicking_parser(|| in_background(&state, "Text\n\nmehr!\n", None));
+        assert_eq!(failed_part.base, None, "a panic in the part falls back to all of it");
+        assert!(!failed_part.failed);
+        assert!(parse_in_background(state.parse_base(), "Neu\n".into(), None, || false).is_none());
+    }
+
+    #[test]
+    fn a_background_layout_that_panics_says_so() {
+        let state = shown("Text\n");
+        let background = in_background(&state, "Text $x$\n", Some(&PanicsAtFormulas));
+        assert!(background.failed);
+        assert!(background.layout.expect("a layout of nothing").0.blocks.is_empty());
+    }
+
+    #[test]
+    fn a_stale_layout_is_not_handed_to_the_background() {
+        let mut state = shown("Text $x$\n\nmehr\n");
+        assert!(state.parse_base().layout.is_some());
+        state.invalidate(Invalidate::Arrivals);
+        assert!(state.parse_base().layout.is_none(), "formulas arrived since");
+        let background = in_background(&state, "Text $x$\n\nmehr!\n", Some(&NoImages));
+        assert_eq!(background.base, Some(state.doc().version()));
+        let full = parse_and_color("Text $x$\n\nmehr!\n");
+        assert_eq!(
+            background.layout.expect("laid out").0.blocks,
+            layout(&full.doc, &NoImages, None).blocks
+        );
+    }
+
+    #[test]
+    fn a_tree_the_background_still_copies_is_copied_for_a_parse_here() {
+        let mut state = shown("Eins\n\nZwei\n");
+        let base = state.parse_base();
+        let _ = update(&mut state, "Eins\n\nZwei!\n", 2);
+        assert_eq!(state.doc().blocks(), parse_and_color("Eins\n\nZwei!\n").doc.blocks());
+        belongs_together(&state);
+        drop(base);
+    }
+
     #[test]
     fn a_background_result_takes_the_failure_with_it() {
         let mut state = shown("Text\n");
@@ -1125,6 +1538,7 @@ mod tests {
             parsed,
             layout: Some((layout, index)),
             failed: true,
+            base: None,
         };
         let done = state.advance(&snapshot("Neu\n", 2), facts, Some(background), |_| NoImages);
         assert_eq!(done.preview.expect("the preview says so").mode, PreviewMode::Failed);
