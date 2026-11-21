@@ -1,7 +1,8 @@
 //! The visual formula editor: MathLive in a web view that every formula popover borrows in turn.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::time::Duration;
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{NSObject, ProtocolObject};
@@ -14,7 +15,7 @@ use objc2_web_kit::{
 
 use super::EditorController;
 use super::webkit::{self, ScriptValue};
-use crate::util::{contained, guarded, ns};
+use crate::util::{contained, guarded, main_after, ns};
 
 define_class!(
     #[unsafe(super(NSObject))]
@@ -41,7 +42,7 @@ define_class!(
                     && let Some(s) = value.downcast_ref::<NSString>()
                 {
                     let latex = s.to_string();
-                    if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+                    if let Some(field) = current() {
                         field.shown.replace(latex.clone());
                     }
                     editor.visual_formula_changed(&latex);
@@ -56,7 +57,7 @@ define_class!(
         #[unsafe(method(webView:didFinishNavigation:))]
         fn finished(&self, _web: &WKWebView, _navigation: Option<&WKNavigation>) {
             guarded((), || {
-                if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+                if let Some(field) = current() {
                     field.loaded.set(true);
                     if let Some(latex) = field.pending.borrow_mut().take() {
                         field.run("setLatex(latex)", &latex);
@@ -77,7 +78,7 @@ define_class!(
 
         #[unsafe(method(webViewWebContentProcessDidTerminate:))]
         fn terminated(&self, web: &WKWebView) {
-            guarded((), || if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+            guarded((), || if let Some(field) = current() {
                 field.loaded.set(false);
                 // The new page starts empty, and the next input would replace the formula with what it then holds.
                 let shown = field.shown.borrow().clone();
@@ -100,8 +101,14 @@ pub struct MathField {
 }
 
 thread_local! {
-    static FIELD: OnceCell<Rc<MathField>> = const { OnceCell::new() };
+    static FIELD: RefCell<Option<Rc<MathField>>> = const { RefCell::new(None) };
+    /// Counts the times the field was given to an editor or taken from it, so that a release planned when it was taken
+    /// knows whether that was the last.
+    static TURNS: Cell<u64> = const { Cell::new(0) };
 }
+
+/// How long the field keeps its web view and page after its popover closed, for the next formula.
+const KEPT_AFTER_CLOSE: Duration = Duration::from_secs(60);
 
 pub(super) const DRAWS_BACKGROUND: &str = "drawsBackground";
 
@@ -121,20 +128,47 @@ fn switch_off(object: &NSObject, key: &str) -> bool {
     .is_some()
 }
 
-/// The shared visual editor; its page loads once, the first time a formula popover shows it.
+/// The shared visual editor, built with its page the first time a formula popover shows it, and again after it was
+/// released `KEPT_AFTER_CLOSE` after the last popover closed.
 pub fn field(mtm: MainThreadMarker) -> Rc<MathField> {
-    FIELD.with(|f| f.get_or_init(|| Rc::new(MathField::new(mtm))).clone())
+    if let Some(field) = current() {
+        return field;
+    }
+    let field = Rc::new(MathField::new(mtm));
+    FIELD.with(|f| *f.borrow_mut() = Some(field.clone()));
+    field
+}
+
+/// The field, while it is built.
+fn current() -> Option<Rc<MathField>> {
+    FIELD.with(|f| f.borrow().clone())
 }
 
 pub fn detach_if_started(editor: &EditorController) {
-    if let Some(field) = FIELD.with(|f| f.get().cloned()) {
+    if let Some(field) = current() {
         field.detach(editor);
     }
 }
 
 #[cfg(feature = "selftest")]
 pub(super) fn started() -> bool {
-    FIELD.with(|f| f.get().is_some())
+    current().is_some()
+}
+
+fn next_turn() -> u64 {
+    let turn = TURNS.get() + 1;
+    TURNS.set(turn);
+    turn
+}
+
+/// Releases the field `KEPT_AFTER_CLOSE` from now, unless an editor took it meanwhile.
+fn release_later() {
+    let turn = next_turn();
+    main_after(crate::test_hooks::formula_field_kept(KEPT_AFTER_CLOSE), move || {
+        if TURNS.get() == turn {
+            drop(FIELD.with(|f| f.borrow_mut().take()));
+        }
+    });
 }
 
 impl MathField {
@@ -162,6 +196,7 @@ impl MathField {
 
     /// Shows `latex` and reports edits to `editor` until `detach`.
     pub fn attach(&self, editor: &EditorController, latex: &str) {
+        next_turn();
         *self.bridge.ivars().borrow_mut() = Some(Weak::from(editor));
         self.shown.replace(latex.to_string());
         if self.loaded.get() {
@@ -177,6 +212,7 @@ impl MathField {
         if owner.is_some_and(|owner| std::ptr::eq(&*owner, editor)) {
             *self.bridge.ivars().borrow_mut() = None;
             self.web.removeFromSuperview();
+            release_later();
         }
     }
 

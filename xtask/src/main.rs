@@ -6,6 +6,7 @@ mod assets;
 mod bundle;
 mod coverage;
 mod licenses;
+mod packing;
 mod release;
 mod selftest;
 
@@ -18,6 +19,7 @@ pub(crate) use assets::*;
 pub(crate) use bundle::*;
 pub(crate) use coverage::*;
 pub(crate) use licenses::*;
+pub(crate) use packing::*;
 pub(crate) use release::*;
 pub(crate) use selftest::*;
 
@@ -182,6 +184,10 @@ pub(crate) mod files {
 
     pub(crate) fn write(path: impl AsRef<Path>, content: impl AsRef<[u8]>) -> Result<(), String> {
         at(path.as_ref(), fs::write(path.as_ref(), content))
+    }
+
+    pub(crate) fn read(path: impl AsRef<Path>) -> Result<Vec<u8>, String> {
+        at(path.as_ref(), fs::read(path.as_ref()))
     }
 
     pub(crate) fn read_to_string(path: impl AsRef<Path>) -> Result<String, String> {

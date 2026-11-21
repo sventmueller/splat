@@ -130,7 +130,7 @@ Splat viser din Markdown-kildetekst med syntaksfarver til venstre og et levende,
 
 - macOS 14 Sonoma eller nyere. Splat udvikles og testes på macOS 27, hvor det automatisk overtager designet Liquid Glass.
 - En Mac med Apple Silicon eller en Intel-processor.
-- Cirka 45 MB ledig diskplads.
+- Cirka 35 MB ledig diskplads.
 
 ## Installation
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Andre diagramtyper redigeres som kode. VoiceOver læser et diagrams titel eller alternative tekst.
 
-Det første diagram efter opstart tager cirka et sekund, fordi gengivelsesmotoren starter i baggrunden. Et diagram, der tager længere end 10 sekunder, viser en fejl, og gengivelsesmotoren starter forfra til det næste. PlantUML's motor (3 MB) indlæses først med det første PlantUML-diagram. En PlantUML-`!include` fra nettet er blokeret.
+Det første diagram efter opstart, og det første efter to minutter uden diagrammer, tager cirka et sekund, fordi gengivelsesmotoren starter i baggrunden. Et diagram, der tager længere end 10 sekunder, viser en fejl, og gengivelsesmotoren starter forfra til det næste. PlantUML's motor (3 MB) indlæses først med det første PlantUML-diagram. En PlantUML-`!include` fra nettet er blokeret.
 
 ## Billeder
 
@@ -441,7 +441,7 @@ Det første diagram efter opstart tager cirka et sekund, fordi gengivelsesmotore
 - **Billeder fra nettet** indlæses, så snart et dokument viser dem, over `https` og op til 10 MB pr. billede. Ligesom billeder i en e-mail fortæller de deres servere, at og hvornår dokumentet åbnes.
 - **Størrelse.** `<img width="200">` angiver et billedes størrelse; ellers tilpasses billeder til eksemplets bredde.
 - **Ændringer på disken.** Et billede, du erstatter, eller et, der dukker op, efter dokumentet har nævnt det, vises uden at dokumentet åbnes igen. Billeder fra nettet, der slog fejl på grund af netværket, prøves igen, mens et dokument viser dem.
-- **Hukommelse.** Billeder vises med op til 2560 pixel på den længste led, hvilket også fylder en A4-side. De afkodes mindre, når de fylder en ottendedel af Macens hukommelse, og mens macOS melder hukommelsespres.
+- **Hukommelse.** Billeder afkodes til de pixels, de dækker på skærmen, højst 2560 på den længste led, og igen, når de vises større; på papir har de op til 2560, hvilket fylder en A4-side. De afkodes mindre, når de fylder en ottendedel af Macens hukommelse, og mens macOS melder hukommelsespres.
 - **Mørk tilstand.** Billeder med hvid baggrund dæmpes en smule i det mørke eksempel.
 - **Indsættelse og slip.** Se [I kildeteksten](#i-kildeteksten).
 
@@ -556,7 +556,7 @@ En Markdown-fil kan komme fra hvem som helst, så Splat behandler hvert dokument
 
 - **Ingen telemetri.** Splat rapporterer intet om, hvordan du bruger det. Det søger kun efter opdateringer, når du har sagt ja, eller du vælger **Søg efter opdateringer…**: Så indlæser det en lille feedfil fra GitHub, og forespørgslen nævner kun appen og dens version. Formler og diagrammer gengives lokalt; de webvisninger, der gør det, kan ikke nå netværket. **Hjælp › Rapportér et problem…** åbner en formular på GitHub i din browser; dens adresse indeholder Splats version, macOS-versionen og typen af Mac, intet fra dine dokumenter.
 - **Billeder fra nettet** indlæses, så snart et dokument viser dem, fra enhver vært, kun over `https`, højst 10 MB pr. billede og i en privat session uden cookies. Deres servere får at vide, at og hvornår dokumentet åbnes.
-- **Isoleret afkodning.** Billeder og grafikken fra formler og diagrammer afkodes i en tjeneste for sig, som macOS starter i sin egen sandbox: ingen af dine filer, intet netværk. Den afleverer kun pixels, hvis størrelse kontrolleres, og afslutter sig selv, når en afkodning tager mere end 10 sekunder eller for meget hukommelse. Apples egne billeddekodere ser kun HEIC, TIFF, AVIF og PDF, og kun når dataene virkelig har det format. SVG-filer, formler og diagrammer passerer også den tjeneste, så de er billeder med fast opløsning i Splat: fire pixels pr. punkt, op til 2560 på den længste led.
+- **Isoleret afkodning.** Billeder og grafikken fra formler og diagrammer afkodes i en tjeneste for sig, som macOS starter i sin egen sandbox: ingen af dine filer, intet netværk. Den afleverer kun pixels, hvis størrelse kontrolleres, og afslutter sig selv, når en afkodning tager mere end 10 sekunder eller for meget hukommelse. Apples egne billeddekodere ser kun HEIC, TIFF, AVIF og PDF, og kun når dataene virkelig har det format. SVG-filer, formler og diagrammer passerer også den tjeneste, så de er billeder i Splat: højst fire pixels pr. punkt og 2560 på den længste led.
 - **Lokale filer** når kun et dokument gennem den sti, det angiver, og kun fra en mappe, du har givet adgang til: Splat må læse et dokument, du åbner, men billederne, noterne, litteraturlisten og repositoryet omkring det først, når du giver adgang til deres mappe med **Giv adgang til mappe…** i bjælken over eksemplet. En adgang gælder alle undermapper og huskes. Indlejringer viser Markdown-noter fra dokumentets mappe og derunder, og et manglende billede søges kun dér. En billedsti andre steder, absolut eller begyndende med `~`, indlæses i forhåndsvisningen fra en mappe, du har givet adgang til; HTML- og Word-eksporter, udskrivning og PDF'er tager kun det med, der ligger i dokumentets mappe eller dets Git-repository, medmindre det repository også rummer din hjemmemappe, så et dokument fra en anden ikke kan trække dine filer ind i en eksport, du giver videre.
 - **Mapper med noter** læses kun, mens indholdsoversigten viser dem, og omdøbning af en note ændrer først andre filer, når du har bekræftet, hvor mange.
 - **Git-repositories** læses af Splat selv. Det kører aldrig programmet `git`, hvis konfiguration i et repository fra en anden kan starte andre programmer, og det læser ikke mere end det åbne dokuments version i seneste commit. Det skriver intet dér og går ikke på netværket.
@@ -574,7 +574,7 @@ Splat forbliver responsivt med dokumenter på flere megabyte:
 - Kildeteksten bruger TextKit 2, som kun lægger den synlige del ud.
 - Mens du taster i eksemplet, og i kildeteksten i dokumenter på op til 2 MB, parses, farvelægges og lægges kun de berørte afsnit ud igen. I et dokument på 10 MB tager parsning og farvelægning cirka 3 ms, gengivelse cirka 10 ms og et helt tastetryk i dets eksempel cirka 30 ms med visningens eget arbejde.
 - Store eksempler gengiver den synlige del først og resten, mens appen er ledig. Blokke, der ruller ind i billedet, gengives, før de tegnes.
-- I kildeteksten i større dokumenter kører parsingen til eksemplet i baggrunden, mens du taster.
+- I kildeteksten i større dokumenter kører det samme i baggrunden, mens du taster.
 - Et dokument forbliver ren tekst, når det ville bruge omkring 4 GB hukommelse, hvilket svarer til cirka 50 til 120 MB almindelig Markdown, men kun 10 til 20 MB, hvis det udelukkende består af tabeller eller overskrifter: Kildeteksten har ingen farver, og eksemplet siger, hvorfor det forbliver tomt. Eksporter virker stadig.
 - Fra cirka 200 KB åbner et dokument sit vindue, før det er parset; ved 5 MB følger farverne og eksemplet cirka et kvart sekund senere.
 - Alle billeder tilsammen, inklusive formler og diagrammer, fylder højst en fjerdedel af Mac'ens hukommelse og det halve, mens hukommelsen er knap. Derudover vises yderligere billeder som pladsholdere, indtil der igen er plads.

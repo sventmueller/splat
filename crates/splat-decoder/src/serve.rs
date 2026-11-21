@@ -13,7 +13,8 @@ use objc2_foundation::{NSData, NSDictionary, NSPoint, NSRect, NSSize};
 use usvg::fontdb;
 
 use super::protocol::{
-    Decoded, EXPORT_SIDE, MAX_SIDE, NATURAL_SIDE, Request, TIMEOUT, memory_of, most_memory, read_request, write_answer,
+    Decoded, FIT_BYTES, Fit, MAX_SIDE, NATURAL_SIDE, Request, TIMEOUT, memory_of, most_memory, read_request,
+    write_answer,
 };
 use super::safe_image;
 
@@ -41,18 +42,18 @@ pub fn answer(input: impl Read, output: impl Write, native: bool) {
 }
 
 fn decode(kind: Request, payload: &[u8], native: bool) -> Option<Decoded> {
-    let side = |payload: &[u8]| {
+    let fit = |payload: &[u8]| {
         payload
-            .split_first_chunk::<4>()
-            .map(|(side, rest)| (u32::from_le_bytes(*side).clamp(1, EXPORT_SIDE), rest.to_vec()))
+            .split_first_chunk::<FIT_BYTES>()
+            .map(|(fit, rest)| (Fit::from_bytes(*fit), rest.to_vec()))
     };
     match (native, kind) {
-        (false, Request::Image) => side(payload).and_then(|(side, image)| safe_image::decode(&image, fonts(), side)),
+        (false, Request::Image) => fit(payload).and_then(|(fit, image)| safe_image::decode(&image, fonts(), fit)),
         (false, Request::FormulaSvg) => std::str::from_utf8(payload)
             .ok()
             .and_then(|svg| safe_image::formula_to_pdf(svg, fonts()))
             .map(Decoded::Pdf),
-        (true, Request::NativeImage) => side(payload).and_then(|(side, image)| native_pixels(&image, side)),
+        (true, Request::NativeImage) => fit(payload).and_then(|(fit, image)| native_pixels(&image, fit)),
         (true, Request::PastedTiff) => png_of_tiff(payload).map(Decoded::Png),
         _ => None,
     }
@@ -121,9 +122,9 @@ pub fn watch(end: fn(i32)) {
     });
 }
 
-/// How many pixels a picture becomes: as many as it has, or for a vector picture what looks sharp, and no more than
-/// `side` on its longer side. `None` for a size no decoder should be asked to allocate.
-fn raster_size(pixels: (isize, isize), points: (f64, f64), side: u32) -> Option<(u32, u32)> {
+/// How many pixels a picture becomes: of as many as it has, or for a vector picture of what looks sharp, those `fit` asks
+/// for. `None` for a size no decoder should be asked to allocate.
+fn raster_size(pixels: (isize, isize), points: (f64, f64), fit: Fit) -> Option<(u32, u32)> {
     let (w, h) = if pixels.0 > 0 && pixels.1 > 0 {
         (pixels.0 as f64, pixels.1 as f64)
     } else {
@@ -132,14 +133,7 @@ fn raster_size(pixels: (isize, isize), points: (f64, f64), side: u32) -> Option<
     if !(w.is_finite() && h.is_finite()) || w <= 0.0 || h <= 0.0 || w.max(h) > f64::from(MAX_SIDE) {
         return None;
     }
-    let scale = (f64::from(side) / w.max(h)).min(1.0);
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "between 1 and `side`"
-    )]
-    let fit = |v: f64| ((v * scale).round() as u32).clamp(1, side);
-    Some((fit(w), fit(h)))
+    Some(fit.pixels(w, h))
 }
 
 /// A TIFF as a PNG at its full size and with its color profile, which pixels drawn for the preview would lose.
@@ -153,7 +147,7 @@ fn png_of_tiff(bytes: &[u8]) -> Option<Vec<u8>> {
 }
 
 /// What the system's decoders make of `bytes`, drawn into pixels with straight alpha.
-fn native_pixels(bytes: &[u8], side: u32) -> Option<Decoded> {
+fn native_pixels(bytes: &[u8], fit: Fit) -> Option<Decoded> {
     autoreleasepool(|_| {
         let image = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))?;
         let size = image.size();
@@ -161,7 +155,7 @@ fn native_pixels(bytes: &[u8], side: u32) -> Option<Decoded> {
         let (width, height) = raster_size(
             (representation.pixelsWide(), representation.pixelsHigh()),
             (size.width, size.height),
-            side,
+            fit,
         )?;
         let (w, h) = (isize::try_from(width).ok()?, isize::try_from(height).ok()?);
         // SAFETY: without plane pointers the image rep allocates its own buffer of the given size.
@@ -244,22 +238,41 @@ mod tests {
 
     #[test]
     fn a_picture_keeps_its_pixels_and_a_vector_one_gets_four_per_point_within_the_limit() {
-        assert_eq!(raster_size((40, 20), (40.0, 20.0), 2560), Some((40, 20)));
-        assert_eq!(raster_size((4000, 2000), (4000.0, 2000.0), 2000), Some((2000, 1000)));
-        assert_eq!(raster_size((0, 0), (200.0, 40.0), 2560), Some((800, 160)));
-        assert_eq!(raster_size((0, 0), (2000.0, 400.0), 2560), Some((2560, 512)));
+        let within = Fit::within;
+        assert_eq!(raster_size((40, 20), (40.0, 20.0), within(2560)), Some((40, 20)));
         assert_eq!(
-            raster_size((3000, 1), (3000.0, 1.0), 300),
+            raster_size((4000, 2000), (4000.0, 2000.0), within(2000)),
+            Some((2000, 1000))
+        );
+        assert_eq!(raster_size((0, 0), (200.0, 40.0), within(2560)), Some((800, 160)));
+        assert_eq!(raster_size((0, 0), (2000.0, 400.0), within(2560)), Some((2560, 512)));
+        assert_eq!(
+            raster_size((3000, 1), (3000.0, 1.0), within(300)),
             Some((300, 1)),
             "never less than a pixel"
         );
         assert_eq!(
-            raster_size((1 << 20, 10), (1.0, 1.0), 2560),
+            raster_size((1 << 20, 10), (1.0, 1.0), within(2560)),
             None,
             "too large to ask for"
         );
-        assert_eq!(raster_size((0, 0), (0.0, 0.0), 2560), None);
-        assert_eq!(raster_size((0, 0), (f64::NAN, 1.0), 2560), None);
+        assert_eq!(raster_size((0, 0), (0.0, 0.0), within(2560)), None);
+        assert_eq!(raster_size((0, 0), (f64::NAN, 1.0), within(2560)), None);
+    }
+
+    #[test]
+    fn a_picture_the_system_reads_decodes_to_the_width_asked_for() {
+        let column = Fit {
+            width: 512,
+            height: 0,
+            side: 2560,
+        };
+        assert_eq!(raster_size((4000, 3000), (2000.0, 1500.0), column), Some((512, 384)));
+        assert_eq!(
+            raster_size((0, 0), (200.0, 40.0), column),
+            Some((512, 102)),
+            "a vector picture as well"
+        );
     }
 
     #[test]

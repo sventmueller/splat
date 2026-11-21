@@ -304,21 +304,26 @@ fn a_read_that_fails_for_a_moment_is_tried_again(mtm: MainThreadMarker, dir: &Pa
     document.close();
 }
 
+/// A picture of two pixels, which every helper decodes.
+const BMP: [u8; 62] = {
+    let mut b = [0u8; 62];
+    (b[0], b[1], b[2]) = (b'B', b'M', 62);
+    b[10] = 54;
+    b[14] = 40;
+    b[18] = 2;
+    b[22] = 1;
+    b[26] = 1;
+    b[28] = 24;
+    (b[56], b[57]) = (255, 255);
+    b
+};
+
+fn decoded() -> bool {
+    decoder::decode(&BMP, 16).is_some()
+}
+
 /// A helper can die or stop answering because of what it decoded before, which the next picture must not notice.
 fn a_helper_that_fails_is_replaced() {
-    const BMP: [u8; 62] = {
-        let mut b = [0u8; 62];
-        (b[0], b[1], b[2]) = (b'B', b'M', 62);
-        b[10] = 54;
-        b[14] = 40;
-        b[18] = 2;
-        b[22] = 1;
-        b[26] = 1;
-        b[28] = 24;
-        (b[56], b[57]) = (255, 255);
-        b
-    };
-    let decoded = || decoder::decode(&BMP, 16).is_some();
     check("a helper decodes a picture", decoded(), "");
     decoder::end_helpers();
     check("a helper that died is replaced for the next picture", decoded(), "");
@@ -334,6 +339,21 @@ fn a_helper_that_fails_is_replaced() {
         "the picture after a helper that stopped answering decodes",
         decoded(),
         "",
+    );
+    decoder::release_idle();
+}
+
+/// The service ends after a while without a request, and the next picture starts it again.
+pub(super) fn an_unused_service_ends() {
+    decoder::end_unused_after(Some(Duration::from_millis(300)));
+    let first = decoded();
+    let ended = until(|| !decoder::service_runs());
+    decoder::end_unused_after(None);
+    let again = decoded();
+    check(
+        "the decoding service ends after a while without a request, and the next picture starts it again",
+        first && ended && again,
+        &format!("decoded {first}, ended {ended}, decoded again {again}"),
     );
     decoder::release_idle();
 }

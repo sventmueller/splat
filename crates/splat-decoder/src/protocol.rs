@@ -11,8 +11,8 @@ pub const MAX_BYTES: usize = 10 << 20;
 pub const MAX_FILE_BYTES: usize = 64 << 20;
 /// Larger images are not decoded at all.
 pub const MAX_SIDE: u32 = 16_384;
-/// Longest side of a decoded image in the preview and on paper, where 2480 pixels fill an A4 page at 300 dpi; larger
-/// ones are scaled down.
+/// Longest side of a decoded image on paper, where 2480 pixels fill an A4 page at 300 dpi, and the most the preview
+/// decodes for the pixels a picture covers on screen; larger ones are scaled down.
 pub const SHOWN_SIDE: u32 = 2560;
 /// Longest side of an image converted for an export, which outlives the screen it is first seen on.
 pub const EXPORT_SIDE: u32 = 4096;
@@ -133,7 +133,7 @@ impl TryFrom<u8> for Answer {
 }
 
 impl Request {
-    /// The most bytes a request of this kind may carry, without the side it names.
+    /// The most bytes a request of this kind may carry, without the `Fit` it names.
     pub fn most_bytes(self) -> usize {
         match self {
             Request::PastedTiff => MAX_PASTED_BYTES,
@@ -185,8 +185,62 @@ pub fn memory_of(pid: i32) -> Option<u64> {
 /// A screenshot of a large display can come as an uncompressed TIFF far beyond any image file a document holds.
 pub const MAX_PASTED_BYTES: usize = 1 << 30;
 
-/// The longest side a request for pixels names, in front of its file.
-pub const SIDE_BYTES: usize = 4;
+/// How many pixels a picture is decoded to: as few as cover `width` × `height`, never more than its file holds, and no
+/// side longer than `side`. A request for pixels names it in front of its file.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Fit {
+    pub width: u32,
+    pub height: u32,
+    pub side: u32,
+}
+
+/// The length of a `Fit` in a request.
+pub const FIT_BYTES: usize = 12;
+
+impl Fit {
+    /// As many pixels as the file holds, with no side longer than `side`.
+    pub const fn within(side: u32) -> Fit {
+        Fit {
+            width: side,
+            height: side,
+            side,
+        }
+    }
+
+    /// The pixels a picture of `width` × `height`, both above zero, is decoded to; at least one each way.
+    pub fn pixels(self, width: f64, height: f64) -> (u32, u32) {
+        let enough = (f64::from(self.width) / width).max(f64::from(self.height) / height);
+        let scale = enough.min(f64::from(self.side) / width.max(height)).min(1.0);
+        let most = self.side.max(1);
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "between 1 and `side`"
+        )]
+        let fit = |v: f64| ((v * scale).round() as u32).clamp(1, most);
+        (fit(width), fit(height))
+    }
+
+    /// As a request carries it: the side first, then width and height.
+    pub fn to_bytes(self) -> [u8; FIT_BYTES] {
+        let mut bytes = [0; FIT_BYTES];
+        for (at, value) in [self.side, self.width, self.height].into_iter().enumerate() {
+            bytes[at * 4..at * 4 + 4].copy_from_slice(&value.to_le_bytes());
+        }
+        bytes
+    }
+
+    /// As the service takes it from a request: the side within the export size, width and height within the side.
+    pub fn from_bytes(bytes: [u8; FIT_BYTES]) -> Fit {
+        let at = |n: usize| u32::from_le_bytes([bytes[n], bytes[n + 1], bytes[n + 2], bytes[n + 3]]);
+        let side = at(0).clamp(1, EXPORT_SIDE);
+        Fit {
+            width: at(4).min(side),
+            height: at(8).min(side),
+            side,
+        }
+    }
+}
 
 /// A request as the helper reads it. A request it does not know ends it, as the app sends none.
 pub fn read_request(input: &mut impl Read) -> std::io::Result<(Request, Vec<u8>)> {
@@ -196,7 +250,7 @@ pub fn read_request(input: &mut impl Read) -> std::io::Result<(Request, Vec<u8>)
     let len = usize::try_from(u64::from_le_bytes(head[1..].try_into().expect("8 bytes"))).unwrap_or(usize::MAX);
     let most = match kind {
         Request::PastedTiff => MAX_PASTED_BYTES,
-        Request::Image | Request::FormulaSvg | Request::SelfCheck | Request::NativeImage => MAX_FILE_BYTES + SIDE_BYTES,
+        Request::Image | Request::FormulaSvg | Request::SelfCheck | Request::NativeImage => MAX_FILE_BYTES + FIT_BYTES,
     };
     if len > most {
         return Err(std::io::ErrorKind::InvalidData.into());
@@ -454,7 +508,7 @@ mod tests {
         let error = read_request(&mut wire.as_slice()).expect_err("no request");
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
         let mut tiff = vec![u8::from(Request::PastedTiff)];
-        tiff.extend_from_slice(&((MAX_FILE_BYTES + SIDE_BYTES + 1) as u64).to_le_bytes());
+        tiff.extend_from_slice(&((MAX_FILE_BYTES + FIT_BYTES + 1) as u64).to_le_bytes());
         assert!(
             read_request(&mut tiff.as_slice()).is_err_and(|e| e.kind() == std::io::ErrorKind::UnexpectedEof),
             "a pasted picture may be larger than a file"
@@ -469,6 +523,74 @@ mod tests {
         let pid = i32::try_from(child.id()).unwrap();
         child.wait().unwrap();
         assert_eq!(memory_of(pid), None);
+    }
+
+    #[test]
+    fn a_picture_decodes_to_the_width_asked_for_and_its_height_follows() {
+        let column = Fit {
+            width: 1536,
+            height: 0,
+            side: SHOWN_SIDE,
+        };
+        assert_eq!(column.pixels(4000.0, 3000.0), (1536, 1152), "landscape");
+        assert_eq!(column.pixels(3000.0, 4000.0), (1536, 2048), "portrait");
+        assert_eq!(
+            column.pixels(800.0, 600.0),
+            (800, 600),
+            "never more than the file holds"
+        );
+        assert_eq!(
+            column.pixels(3000.0, 12_000.0),
+            (640, 2560),
+            "never a side longer than the limit"
+        );
+        let tall = Fit {
+            width: 0,
+            height: 512,
+            side: SHOWN_SIDE,
+        };
+        assert_eq!(tall.pixels(4000.0, 2000.0), (1024, 512), "by its height");
+        let stretched = Fit {
+            width: 256,
+            height: 1024,
+            side: SHOWN_SIDE,
+        };
+        assert_eq!(
+            stretched.pixels(4000.0, 3000.0),
+            (1365, 1024),
+            "both covered where a size stretches it"
+        );
+    }
+
+    #[test]
+    fn as_many_pixels_as_fit_within_a_side_is_the_longest_side_of_before() {
+        assert_eq!(Fit::within(2000).pixels(4000.0, 2000.0), (2000, 1000));
+        assert_eq!(Fit::within(2000).pixels(2000.0, 4000.0), (1000, 2000));
+        assert_eq!(
+            Fit::within(300).pixels(3000.0, 1.0),
+            (300, 1),
+            "never less than a pixel"
+        );
+        assert_eq!(Fit::within(0).pixels(10.0, 10.0), (1, 1));
+    }
+
+    #[test]
+    fn a_fit_crosses_the_pipe_with_its_side_first_and_within_the_limits() {
+        let fit = Fit {
+            width: 1536,
+            height: 2,
+            side: SHOWN_SIDE,
+        };
+        let bytes = fit.to_bytes();
+        assert_eq!(bytes[..4], SHOWN_SIDE.to_le_bytes());
+        assert_eq!(Fit::from_bytes(bytes), fit);
+        let beyond = Fit {
+            width: u32::MAX,
+            height: u32::MAX,
+            side: u32::MAX,
+        };
+        assert_eq!(Fit::from_bytes(beyond.to_bytes()), Fit::within(EXPORT_SIDE));
+        assert_eq!(Fit::from_bytes([0; FIT_BYTES]).side, 1);
     }
 
     #[test]

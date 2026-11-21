@@ -75,8 +75,8 @@ pub(crate) fn sha256(path: &Path) -> Result<String, String> {
         .ok_or_else(|| format!("no checksum for {}", path.display()))
 }
 
-/// Turns an ES module into a classic script that sets its exports as one global: the render page loads its scripts
-/// from files, and WebKit refuses module imports from file URLs. The module keeps its own scope and strict mode.
+/// Turns an ES module into a classic script that sets its exports as one global, the way the render page's `load` takes
+/// its libraries. The module keeps its own scope and strict mode.
 pub(crate) fn classic_script(path: &Path) -> Result<(), String> {
     if path.extension().is_none_or(|e| e != "js") {
         return Ok(());

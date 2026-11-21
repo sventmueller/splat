@@ -553,6 +553,17 @@ impl Doc {
         self.version
     }
 
+    /// The same tree of the same parse, for a partial parse that must leave this one in use.
+    pub fn copied(&self) -> Doc {
+        Doc {
+            blocks: self.blocks.clone(),
+            text: self.text.clone(),
+            version: self.version,
+            too_large: self.too_large,
+            facts: self.facts.clone(),
+        }
+    }
+
     /// The blocks in a document of their own; this one keeps the text, which a panic on the way must not take along.
     pub fn split_off_blocks(&mut self) -> Doc {
         Doc {
@@ -802,6 +813,20 @@ mod tests {
 
     fn slice<'a>(t: &'a str, r: &Range<Byte>) -> &'a str {
         t.at(r.clone())
+    }
+
+    #[test]
+    fn a_copy_is_the_same_parse_with_a_tree_of_its_own() {
+        let d = parse("# Titel\n\nText *mit* Betonung.\n");
+        let facts = d.facts().clone();
+        let mut copy = d.copied();
+        assert_eq!(
+            (copy.blocks(), copy.version(), copy.text()),
+            (d.blocks(), d.version(), d.text())
+        );
+        assert_eq!(copy.facts(), &facts);
+        copy.blocks.clear();
+        assert_eq!(d.blocks().len(), 2, "the original keeps its tree");
     }
 
     #[test]

@@ -130,7 +130,7 @@ Splat solda sözdizimi renkli Markdown kaynağınızı, sağda canlı ve tümüy
 
 - macOS 14 Sonoma veya üstü. Splat macOS 27’de geliştirilir ve test edilir; orada Liquid Glass tasarımını kendiliğinden benimser.
 - Apple Silicon veya Intel işlemcili bir Mac.
-- Yaklaşık 45 MB disk alanı.
+- Yaklaşık 35 MB disk alanı.
 
 ## Kurulum
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Diğer diyagram türleri kod olarak düzenlenir. VoiceOver bir diyagramın başlığını ya da alternatif metnini okur.
 
-Açılıştan sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görüntüleme motoru arka planda başlar. 10 saniyeden uzun süren bir diyagram hata gösterir ve görüntüleme motoru bir sonrakine yeniden başlar. PlantUML’in motoru (3 MB) yalnızca ilk PlantUML diyagramıyla yüklenir. Web’den bir PlantUML `!include` engellenir.
+Açılıştan sonraki ilk diyagram ve iki dakika diyagramsız geçtikten sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görüntüleme motoru arka planda başlar. 10 saniyeden uzun süren bir diyagram hata gösterir ve görüntüleme motoru bir sonrakine yeniden başlar. PlantUML’in motoru (3 MB) yalnızca ilk PlantUML diyagramıyla yüklenir. Web’den bir PlantUML `!include` engellenir.
 
 ## Görüntüler
 
@@ -441,7 +441,7 @@ Açılıştan sonraki ilk diyagram yaklaşık bir saniye sürer, çünkü görü
 - **Web’deki görüntüler**, bir belge onları gösterir göstermez `https` üzerinden ve her biri en fazla 10 MB olarak yüklenir. Bir e-postadaki görüntüler gibi, sunucularına belgenin açıldığını ve ne zaman açıldığını bildirirler.
 - **Boyut.** `<img width="200">` bir görüntünün boyutunu belirler; aksi halde görüntüler önizlemenin genişliğine sığar.
 - **Diskteki değişiklikler.** Değiştirdiğiniz bir görüntü ya da belge adını verdikten sonra ortaya çıkan bir görüntü, belge yeniden açılmadan görünür. Ağ yüzünden başarısız olan web görüntüleri, bir belge onları gösterdiği sürece yeniden denenir.
-- **Bellek.** Görüntüler en uzun kenarında 2560 piksele kadar gösterilir; bu bir A4 sayfayı da doldurur. Mac’in belleğinin sekizde birini doldurduklarında ve macOS bellek baskısı bildirdiği sürece daha küçük çözülürler.
+- **Bellek.** Görüntüler ekranda kapladıkları piksel sayısında, en uzun kenarında en fazla 2560 piksel olarak çözülür ve daha büyük gösterildiklerinde yeniden çözülür; kâğıtta 2560 piksele kadar çıkarlar, bu da bir A4 sayfayı doldurur. Mac’in belleğinin sekizde birini doldurduklarında ve macOS bellek baskısı bildirdiği sürece daha küçük çözülürler.
 - **Koyu mod.** Beyaz arka planlı görüntüler koyu önizlemede hafifçe karartılır.
 - **Yapıştırma ve bırakma.** [Kaynakta](#kaynakta) bölümüne bakın.
 
@@ -556,7 +556,7 @@ Bir Markdown dosyası herkesten gelebilir; bu yüzden Splat her belgeyi güvenil
 
 - **Telemetri yok.** Splat, onu nasıl kullandığınız hakkında hiçbir şey bildirmez. Güncellemeleri yalnızca siz onay verdikten sonra ya da **Güncellemeleri Denetle…**’yi seçtiğinizde arar: o zaman GitHub’dan küçük bir akış dosyası yükler ve istek uygulamanın adı ile sürümünden başka bir şey içermez. Formüller ve diyagramlar yerelde görüntülenir; bunu yapan web görünümleri ağa erişemez. **Yardım › Sorun Bildir…**, tarayıcınızda GitHub’daki bir formu açar; adresi Splat sürümünü, macOS sürümünü ve Mac türünü içerir, belgelerinizden hiçbir şey içermez.
 - **Web’deki görüntüler**, bir belge onları gösterir göstermez, herhangi bir sunucudan, yalnızca `https` üzerinden, her biri en fazla 10 MB ve çerezsiz özel bir oturumda yüklenir. Sunucuları belgenin açıldığını ve ne zaman açıldığını öğrenir.
-- **Yalıtılmış çözme.** Görüntüler ile formüllerin ve diyagramların grafikleri ayrı bir hizmette çözülür; macOS bu hizmeti kendine ait bir sanal alanda (sandbox) başlatır: dosyalarınızın hiçbiri yok, ağ yok. Hizmet yalnızca boyutu denetlenen pikselleri geri verir ve bir çözme işlemi 10 saniyeden uzun sürdüğünde ya da çok fazla bellek kullandığında kendini sonlandırır. Apple’ın kendi görüntü çözücüleri yalnızca HEIC, TIFF, AVIF ve PDF’yi görür, o da yalnızca veri gerçekten o biçimdeyse. SVG’ler, formüller ve diyagramlar da bu hizmetten geçer; bu yüzden Splat’ta sabit çözünürlüklü resimlerdir: nokta başına dört piksel, uzun kenarda en fazla 2560.
+- **Yalıtılmış çözme.** Görüntüler ile formüllerin ve diyagramların grafikleri ayrı bir hizmette çözülür; macOS bu hizmeti kendine ait bir sanal alanda (sandbox) başlatır: dosyalarınızın hiçbiri yok, ağ yok. Hizmet yalnızca boyutu denetlenen pikselleri geri verir ve bir çözme işlemi 10 saniyeden uzun sürdüğünde ya da çok fazla bellek kullandığında kendini sonlandırır. Apple’ın kendi görüntü çözücüleri yalnızca HEIC, TIFF, AVIF ve PDF’yi görür, o da yalnızca veri gerçekten o biçimdeyse. SVG’ler, formüller ve diyagramlar da bu hizmetten geçer; bu yüzden Splat’ta resimlerdir: nokta başına en fazla dört piksel ve uzun kenarda en fazla 2560.
 - **Yerel dosyalar** bir belgeye yalnızca onun adlandırdığı yolla ve yalnızca erişim izni verdiğiniz bir klasörden ulaşır: Splat açtığınız bir belgeyi okuyabilir, ancak çevresindeki resimleri, notları, kaynakçayı ve depoyu ancak önizlemenin üstündeki çubukta **Klasöre Erişim İzni Ver…** ile klasörlerine erişim izni verdiğinizde okur. Verilen izin tüm alt klasörleri kapsar ve hatırlanır. Gömmeler Markdown notlarını belgenin klasöründen ve altından gösterir, eksik bir resim de yalnızca orada aranır. Başka yerdeki, mutlak ya da `~` ile başlayan bir görüntü yolu, erişim izni verilmiş bir klasördeyse önizlemede yüklenir; HTML ve Word dışa aktarmaları, yazdırma ve PDF’ler yalnızca belgenin klasöründe ya da Git deposunda (bu depo Ana klasörünüzü de içermediği sürece) olanı yanına alır, böylece başkasından gelen bir belge dosyalarınızı ilettiğiniz bir dışa aktarmaya çekemez.
 - **Not klasörleri** yalnızca kenar çubuğu onları gösterirken okunur; bir notun adını değiştirmek, diğer dosyaları ancak kaç tane olduğunu onayladıktan sonra değiştirir.
 - **Git depolarını** Splat’ın kendisi okur. Başkasından gelen bir depodaki yapılandırması başka programları başlatabilen `git` programını asla çalıştırmaz ve açık belgenin son commit’teki sürümünden fazlasını okumaz. Oraya hiçbir şey yazmaz ve ağa çıkmaz.
@@ -574,7 +574,7 @@ Splat, birkaç megabaytlık belgelerde de duyarlı kalır:
 - Kaynak, yalnızca görünen kısmı yerleştiren TextKit 2’yi kullanır.
 - Önizlemede yazarken ve 2 MB’a kadar belgelerin kaynağında, yalnızca etkilenen paragraflar yeniden ayrıştırılır, renklendirilir ve yerleştirilir. 10 MB’lık bir belgede ayrıştırma ve renklendirme yaklaşık 3 ms, işleme yaklaşık 10 ms, önizlemesinde görünümün kendi işiyle birlikte tam bir tuş vuruşu yaklaşık 30 ms sürer.
 - Büyük önizlemeler önce görünen kısmı, kalanını uygulama boştayken görüntüler. Görünüme kaydırılan bloklar çizilmeden önce görüntülenir.
-- Daha büyük belgelerin kaynağında, siz yazarken önizleme için ayrıştırma arka planda çalışır.
+- Daha büyük belgelerin kaynağında, siz yazarken aynı işlem arka planda çalışır.
 - Belge yaklaşık 4 GB bellek gerektirecek olduğunda düz metin olarak kalır; bu, sıradan Markdown için yaklaşık 50 ila 120 MB, yalnızca tablo veya başlıklardan oluşan belgeler için ise yalnızca 10 ila 20 MB demektir: kaynakta renk yoktur ve önizleme neden boş kaldığını söyler. Dışa aktarmalar yine çalışır.
 - Yaklaşık 200 KB’tan itibaren bir belge, ayrıştırılmadan önce penceresini açar; 5 MB’ta renkler ve önizleme yaklaşık çeyrek saniye sonra gelir.
 - Formüller ve diyagramlar dahil tüm görüntüler birlikte, Mac’in belleğinin en fazla dörtte birini, bellek azken de bunun yarısını kaplar. Bunun ötesinde, diğer görüntüler yeniden yer açılana kadar yer tutucu olarak gösterilir.

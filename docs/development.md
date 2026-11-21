@@ -75,6 +75,17 @@ gets Splat's MIT terms with the authors from its manifest. A dependency whose li
 stops the build with its name, and the test `every_component_of_the_program_comes_with_its_license_text` finds it in
 `make check` before that. A new script in `resources/js` needs its `LICENSE-<name>` next to it.
 
+The libraries in `resources/js` take about 14 MB, so `bundle` packs every file there above 64 KiB with Apple's
+Compression framework into `<name>.lzfse`: the length of the file as eight bytes little-endian, then its LZFSE stream,
+about 4 MB together. It unpacks each again and stops the build when that does not give back the same bytes. The
+repository keeps the files as published, which `cargo xtask vendor check` compares. The pages load from the scheme
+`splat://localhost/` of `crates/splat-render/src/scheme.rs` instead of from files: it reads the resources on a thread of
+its own, unpacks a `.lzfse` where one lies beside the name asked for and serves the plain file otherwise, so an app that
+shares the render path without packing its scripts keeps working. It serves nothing outside the resources, also through
+a link, and answers no request WebKit has stopped. The content security policy of both pages and the offline rules in
+`webkit.rs` admit that scheme and no `file:` address, and the probe asks the scheme for the bundle's `Info.plist`
+beside the resources.
+
 The version lives in [VERSION](../VERSION) as `major.minor.build` and is the one the next build gets. Every release
 build that succeeds (`make build`, `cargo xtask bundle --release`, `make release`) raises the build number by one;
 debug and self-test builds leave it alone. Major and minor are raised by hand: set VERSION to, say, `1.1.0`, and the
@@ -84,14 +95,14 @@ next build gets exactly that. Since the version ends in the build number, the Ab
 
 `cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) first builds the package
 for the [Mac App Store](#mac-app-store) with the same version, then a release, signs it with your Developer ID,
-notarizes the app with Apple and staples the ticket, packs it into a compressed, read-only disk image with a link to
-Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
+notarizes the app with Apple and staples the ticket, packs it into a read-only disk image compressed with LZMA (`ULMO`, a
+quarter smaller than zlib) with a link to Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
 ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
 rounds with the notary service take a few minutes each. Only an image that passed every step becomes
 `dist/Splat-<version>.dmg`, the copy that is committed, and the build number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
 feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/` and VERSION as they
 were.
-Each release adds the full image, about 16 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
+Each release adds the full image, about 12 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
 - a "Developer ID Application" certificate in the keychain
 - a saved login for Apple's notary service with an app-specific password, created once with
@@ -125,6 +136,11 @@ The disk image is a universal binary for Apple Silicon and Intel; other builds a
 Homebrew's Rust ships the standard library for the host processor only, so `dmg` builds through rustup, which installs
 the toolchain and targets of [rust-toolchain.toml](../rust-toolchain.toml) on first use, and stops if the program or
 Sparkle lacks the code for either processor. `make universal` builds only the program.
+The programs that ship, for the disk image and the Mac App Store, are built with the cargo profile `dist`: whole-program
+optimisation in one unit makes them a third smaller than `release`, which tests and self-tests keep since every test binary
+would take minutes longer to link. The bundle's copies lose their symbols; the programs as built stay in
+`dist/symbols/<version>/`, which git ignores, so that `atos -o dist/symbols/<version>/splat -arch arm64 -l <load address>
+<address>` names the functions of a crash report of that version.
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
 permissions for the two.
 
@@ -172,7 +188,7 @@ as App Review refuses methods that are not public; only the self-test may.
 | `cargo clippy --release --all-targets [--features selftest]` | lints, including the justification of every `unsafe` block, the length of functions and, in the library, number conversions |
 | `cargo xtask check-library` | the library builds for Linux, so nothing in it needs macOS |
 | `cargo xtask vendor check` | the JavaScript libraries match `vendor.lock` byte for byte |
-| `cargo xtask selftest probe` | without a window, each with its expected result: formulas, diagrams, web images against a server inside the process, the text every command writes, each image format through both exports, a page that stops answering, and the defences of the web views against a page without them. Takes about half a minute. What needs the app in front is skipped on a locked screen |
+| `cargo xtask selftest probe` | without a window, each with its expected result: formulas, diagrams, web images against a server inside the process, the text every command writes, each image format through both exports, a page that stops answering, the web views and the decoding service ending when unused, and the defences of the web views against a page without them. Takes about half a minute. What needs the app in front is skipped on a locked screen |
 | `cargo xtask selftest gui [--stop-after "<check>"] [--scenarios] [--only "<group>"] [--in-back]` | the running app, click by click. Opens a window and types into it; the Mac is busy for about four minutes. `--scenarios` runs only the second part, in about a minute and a half. `--only` runs one group of that part, in its own document. On a locked screen it all runs as well, and what needs an unlocked one reports as skipped. `--in-back` leaves out what needs the app in front while another app is there; without it such a check fails |
 | `cargo xtask selftest resize` | widens the window after moving the divider: the source re-wraps while the window is resized. Then shows and hides the sidebar: source and preview keep their share, and a new window opens the sidebar as the last one left it. Takes about ten seconds |
 | `cargo xtask selftest typing [--by-hand]` | types through saves, with keys through the app's event queue or, with `--by-hand`, from a person: what is typed stays and shows as unsaved. Takes about a minute. On a locked screen the keys go straight to the window, and what needs the app in front reports as skipped |
@@ -255,8 +271,9 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `crates/splat-editor-state/`: what the editor window knows and decides without a window. Everything the controller
   knows about the document and every way that changes in `state.rs`, whose fields are private; `model.rs`, which lends
   the state and the text copy to closures that cannot reach a view; the text copy and the block bookkeeping in
-  `sync.rs`, with randomised tests; the rules of what WebKit renders when in `render_queue.rs`, and when an update runs,
-  which blocks of a large preview render when and when the parts of a large source get their colours in `progress.rs`.
+  `sync.rs`, with randomised tests; the rules of what WebKit renders when, and which of its pictures stay, in
+  `render_queue.rs`, and when an update runs, which blocks of a large preview render when and when the parts of a large
+  source get their colours in `progress.rs`.
   Also what a link click means and where opening a link leads (`navigation.rs`, `links.rs`), the BibTeX file
   (`bibtex.rs`) and the code host of the repository (`repository.rs`), the sidebar's rows, searches and renames
   (`notes.rs`), the outline (`outline.rs`), the marks for what changed since the last commit (`changes.rs`), what an
@@ -267,12 +284,19 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `crates/splat-testkit/`: the generator of the randomised tests and the checks of the fuzz targets.
 - `crates/splat-render/`: the preview's render path, which other apps share: the layout as native text (`render.rs`,
   text attributes in `attributes.rs`), WebKit for MathJax, Mermaid, Graphviz and PlantUML in a hidden window (`js.rs`,
-  calls into WebKit in `webkit.rs`), local images (`images.rs`) and pictures from the web (`remote.rs`), all within one
-  memory budget (`picture.rs`); worker threads (`lanes.rs`) and volumes that may stop answering (`volumes.rs`). A
-  document asks as a `Viewer` and hears through it what arrives for it. macOS only, outside `check-library`.
+  calls into WebKit in `webkit.rs`, the scheme its pages load the resources from in `scheme.rs`), local images
+  (`images.rs`) and pictures from the web (`remote.rs`), all within one memory budget (`picture.rs`); worker threads
+  (`lanes.rs`) and volumes that may stop answering (`volumes.rs`). A picture decodes to the pixels it covers in the
+  preview, its width in points there times the screen's pixels per point, in steps of 256 and up to `SHOWN_SIDE`; one
+  that comes to show larger decodes again, and paper takes up to `SHOWN_SIDE` of every picture. A document asks as a
+  `Viewer` and hears through it what arrives for it. macOS only, outside `check-library`. The hidden window and its web
+  view, whose processes take about 150 MB, start with the first formula or diagram to render and end after two minutes
+  without one; the pictures they made stay for the open documents, and of those no document wants, at most 32 MB.
 - `crates/splat-decoder/`: the decoding service, which decodes images and graphics in a sandbox of its own, and the
   app's side of it: what both sides say in `protocol.rs`, the service's side in `serve.rs` and `safe_image.rs`, the
-  sockets it gets through libxpc in `xpc.rs`. It needs no WebKit, so the service's program does not load it.
+  sockets it gets through libxpc in `xpc.rs`. It needs no WebKit, so the service's program does not load it. The service
+  ends after a minute without a request; while it ends, it holds every helper's slot, so a request that starts then
+  waits and starts a new one.
 - `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views and forwards to
   components, small structs over the controller and the state they own, whose fields the other modules cannot reach:
 
@@ -297,7 +321,7 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `metadata.rs`, `export_options.rs` | the metadata form; what exports add to the text |
 | `shadow.rs` | copies of unsaved text for the recovery after a crash |
 | `export.rs`, `outline.rs` | `Sharing`: HTML and Word export, the share file, printing; the outline sidebar |
-| `mathfield.rs` | the visual formula editor in WebKit; formulas and diagrams render through `splat-render` |
+| `mathfield.rs` | the visual formula editor in WebKit, whose web view goes a minute after its popover closed; formulas and diagrams render through `splat-render` |
 | `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
 - `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
@@ -309,7 +333,8 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 - `src/util/`: AppKit helpers, files and processes, and what moved to `splat-render` under its old names. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
 - `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
   returns after big edits.
-- `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](../vendor.lock).
+- `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](../vendor.lock). The bundle carries
+  the large ones packed, see [Building](#building).
 - `xtask/`: bundling, signing, the disk image, the icon, vendoring, the self-test runner and the coverage floors.
 
 ## Data flow
@@ -330,8 +355,10 @@ The source text in the left text view is the single source of truth.
 4. HTML blocks that open `<details>` or `<div align>` and close it later affect the Markdown blocks in between; a
    reused block must have the same surroundings.
 5. While you type in the source of a document up to 2 MB, the partial update runs immediately; when it does not apply,
-   or in a larger document, parsing and layout run in the background. While you type in the preview, they run
-   immediately, because the preview's cursor depends on the result.
+   or in a larger document, parsing and layout run in the background. There, too, only the affected paragraphs are
+   parsed and laid out again, from a copy of the tree (`state::parse_in_background`), since the main thread reads its
+   own until the result arrives: at 10 MB copying takes about 25 ms, parsing all of it about 280 ms. While you type in
+   the preview, they run immediately, because the preview's cursor depends on the result.
 6. Input in the preview is translated by `Bridge` into an edit of the source and takes the same path from there.
    Markdown has too many ways of turning text into syntax for rules alone, so `preview/verify.rs` parses the changed part
    again and compares what it shows with what was typed; an edit that does not hold is escaped further or refused.
@@ -355,7 +382,8 @@ The source text in the left text view is the single source of truth.
 6. A new command needs a row in `actions.rs`, which gives it its method in `controller.rs` as well, and a branch in
    `Editing::perform`, which the compiler asks for.
 7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
-   the decoding service only, through `decoder::decode_native`; a test scans the sources for other calls.
+   the decoding service only, through `decoder::decode_native` or `decode_native_to`; a test scans the sources for other
+   calls.
 8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
    looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user
    waits for, like an export or saving, may touch the disk directly.

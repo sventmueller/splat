@@ -17,7 +17,7 @@ use objc2_foundation::{
 use objc2_uniform_type_identifiers::UTType;
 
 use super::attributes::{Attribute, Attributes, attributed};
-use super::decoder::{Decoded, EXPORT_SIDE, MAX_FILE_BYTES};
+use super::decoder::{Decoded, EXPORT_SIDE, Fit, MAX_FILE_BYTES, SHOWN_SIDE};
 use super::export_options::{ExportOptions, TitleFacts};
 use super::images::{native_only, resolve_path};
 use super::layers::{ForSharing, Message};
@@ -137,6 +137,7 @@ impl Sharing<'_> {
             doc_dir: doc_dir.as_deref(),
             images: self.host.pictures().store(),
             max_image_width: width - 20.0,
+            scale: None,
             dark: false,
             requester: None,
             leaves_the_mac: Some(super::env::may_carry_along),
@@ -457,7 +458,7 @@ impl ExportSource {
         let image = |url: &str| {
             let picture = if remote::is_remote(url) {
                 on_main(|| {
-                    let rendered = remote::get(url, None).flatten()?;
+                    let rendered = remote::get_for(url, None, Fit::within(SHOWN_SIDE)).flatten()?;
                     picture_of(&rendered.image, rendered.image.size())
                 })
                 .flatten()?

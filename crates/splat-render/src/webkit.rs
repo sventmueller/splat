@@ -8,7 +8,7 @@ use block2::{DynBlock, RcBlock};
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{MainThreadMarker, MainThreadOnly, Message};
-use objc2_foundation::{NSData, NSDictionary, NSError, NSNumber, NSRect, NSString, NSURL};
+use objc2_foundation::{NSData, NSDictionary, NSError, NSNumber, NSRect, NSString, NSURL, NSURLRequest};
 use objc2_web_kit::{
     WKContentRuleList, WKContentRuleListStore, WKContentWorld, WKNavigationAction, WKNavigationActionPolicy,
     WKPDFConfiguration, WKScriptMessage, WKScriptMessageHandler, WKWebView, WKWebViewConfiguration, WKWebsiteDataStore,
@@ -16,6 +16,7 @@ use objc2_web_kit::{
 
 use crate::appkit::{ns, obj};
 use crate::lanes::guarded;
+use crate::scheme;
 
 /// A script argument, of a type WebKit hands to the script as a plain value.
 pub enum ScriptValue<'a> {
@@ -37,12 +38,14 @@ fn script_arguments(args: &[(&str, ScriptValue)]) -> Retained<NSDictionary<NSStr
     NSDictionary::from_slices(&key_refs, &value_refs)
 }
 
-/// A configuration whose pages keep no cookies or storage between documents.
+/// A configuration whose pages keep no cookies or storage between documents and read the resources through
+/// `scheme::SCHEME`.
 pub fn configuration(mtm: MainThreadMarker) -> Retained<WKWebViewConfiguration> {
     // SAFETY: A plain configuration object, created on the main thread.
     let config = unsafe { WKWebViewConfiguration::new(mtm) };
     // SAFETY: A fresh non-persistent store, set before the configuration is used.
     unsafe { config.setWebsiteDataStore(&WKWebsiteDataStore::nonPersistentDataStore(mtm)) };
+    scheme::serve(&config);
     config
 }
 
@@ -73,10 +76,9 @@ pub fn detach_delegate(web: &WKWebView) {
 pub fn load_bundled_page(web: &WKWebView, name: &str) {
     let (page_web, name) = (web.retain(), name.to_string());
     when_offline(web, move || {
-        let resources = NSURL::fileURLWithPath_isDirectory(&ns(&crate::host().resources.to_string_lossy()), true);
-        if let Some(page) = resources.URLByAppendingPathComponent(&ns(&name)) {
-            // SAFETY: Both URLs are file URLs of the resources, the page within the readable folder.
-            unsafe { page_web.loadFileURL_allowingReadAccessToURL(&page, &resources) };
+        if let Some(page) = NSURL::URLWithString(&ns(&scheme::address(&name))) {
+            // SAFETY: A request for a page of the scheme that every configuration of `configuration` serves.
+            unsafe { page_web.loadRequest(&NSURLRequest::requestWithURL(&page)) };
         }
     });
 }
@@ -94,11 +96,11 @@ pub fn when_offline(web: &WKWebView, then: impl FnOnce() + 'static) {
 }
 
 /// What the pages may load besides their content security policy, which a script slipping through a vendored library
-/// could evade: the app's own files and what a script makes in memory, never the network. WebKit's filters know no
-/// alternatives, hence a rule for each scheme.
+/// could evade: the app's resources through `scheme::SCHEME` and what a script makes in memory, never the network or
+/// another file. WebKit's filters know no alternatives, hence a rule for each scheme.
 const OFFLINE_RULES: &str = r#"[
     {"trigger": {"url-filter": ".*"}, "action": {"type": "block"}},
-    {"trigger": {"url-filter": "^file:"}, "action": {"type": "ignore-previous-rules"}},
+    {"trigger": {"url-filter": "^splat:"}, "action": {"type": "ignore-previous-rules"}},
     {"trigger": {"url-filter": "^data:"}, "action": {"type": "ignore-previous-rules"}},
     {"trigger": {"url-filter": "^blob:"}, "action": {"type": "ignore-previous-rules"}},
     {"trigger": {"url-filter": "^about:"}, "action": {"type": "ignore-previous-rules"}}
@@ -171,9 +173,7 @@ fn compile_offline_rules(mtm: MainThreadMarker) {
 pub fn navigation_policy(action: &WKNavigationAction, page: &str) -> WKNavigationActionPolicy {
     // SAFETY: The navigation action carries its request while WebKit asks about it.
     let target = unsafe { action.request() }.URL();
-    let expected = Some(crate::host().resources.join(page).to_string_lossy().into_owned());
-    let allowed = target.is_some_and(|u| u.isFileURL() && u.path().map(|p| p.to_string()) == expected);
-    if allowed {
+    if target.is_some_and(|url| scheme::is_page(&url, page)) {
         WKNavigationActionPolicy::Allow
     } else {
         WKNavigationActionPolicy::Cancel
@@ -284,6 +284,43 @@ mod tests {
         assert_eq!(thrown_message(&thrown).as_deref(), Some("Error: bad formula"));
         let other = NSError::new(1, &ns("WKErrorDomain"));
         assert_eq!(thrown_message(&other), None);
+    }
+
+    #[test]
+    fn the_pages_and_the_rules_let_in_the_scheme_and_no_network() {
+        let allowed = |name: &str| {
+            OFFLINE_RULES.contains(&format!(
+                r#"{{"trigger": {{"url-filter": "^{name}:"}}, "action": {{"type": "ignore-previous-rules"}}}}"#
+            ))
+        };
+        assert!(allowed(scheme::SCHEME) && allowed("data") && allowed("blob") && allowed("about"));
+        let block = OFFLINE_RULES.find(r#"{"trigger": {"url-filter": ".*"}, "action": {"type": "block"}}"#);
+        assert!(
+            block.is_some() && block < OFFLINE_RULES.find("ignore-previous-rules"),
+            "the rest is blocked first"
+        );
+        assert_eq!(OFFLINE_RULES.matches("ignore-previous-rules").count(), 4);
+        let pages = [
+            include_str!("../../../resources/render.html"),
+            include_str!("../../../resources/mathfield.html"),
+        ];
+        for page in pages {
+            let policy = page
+                .split(r#"http-equiv="Content-Security-Policy" content=""#)
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .expect("a policy");
+            let own = scheme::SCHEME;
+            assert!(
+                policy.starts_with(&format!("default-src 'none'; script-src {own}:")),
+                "{policy}"
+            );
+            assert!(
+                policy.contains(&format!("font-src data: {own}:")) && policy.contains("connect-src 'none'"),
+                "{policy}"
+            );
+            assert!(!policy.contains("file:") && !policy.contains("http"), "{policy}");
+        }
     }
 
     #[test]

@@ -130,7 +130,7 @@ El Splat mostra el teu codi font Markdown amb colors de sintaxi a l’esquerra i
 
 - macOS 14 Sonoma o posterior. El Splat es desenvolupa i es prova amb macOS 27, on adopta automàticament el disseny Liquid Glass.
 - Un Mac amb Apple Silicon o amb processador Intel.
-- Uns 45 MB d’espai al disc.
+- Uns 35 MB d’espai al disc.
 
 ## Instal·lació
 
@@ -432,7 +432,7 @@ flowchart LR
 
 Els altres tipus de diagrama s’editen com a codi. VoiceOver llegeix el títol o el text alternatiu d’un diagrama.
 
-El primer diagrama després d’obrir l’app triga aproximadament un segon, perquè el motor de renderització arrenca en segon pla. Un diagrama que triga més de 10 segons mostra un error, i el motor de renderització arrenca de nou per al següent. El motor de PlantUML (3 MB) només es carrega amb el primer diagrama de PlantUML. Un `!include` de PlantUML des del web es bloqueja.
+El primer diagrama després d’obrir l’app, i el primer després de dos minuts sense cap, triga aproximadament un segon, perquè el motor de renderització arrenca en segon pla. Un diagrama que triga més de 10 segons mostra un error, i el motor de renderització arrenca de nou per al següent. El motor de PlantUML (3 MB) només es carrega amb el primer diagrama de PlantUML. Un `!include` de PlantUML des del web es bloqueja.
 
 ## Imatges
 
@@ -440,7 +440,7 @@ El primer diagrama després d’obrir l’app triga aproximadament un segon, per
 - **Les imatges d’internet** es carreguen tan bon punt un document les mostra, per `https` i de fins a 10 MB cadascuna. Com les imatges d’un correu electrònic, fan saber als seus servidors que s’obre el document i quan.
 - **Mida.** `<img width="200">` dona mida a una imatge; si no, les imatges s’ajusten a l’amplada de la previsualització.
 - **Canvis al disc.** Una imatge que substitueixes, o una que apareix després que el document la nomeni, es mostra sense tornar a obrir el document. Les imatges d’internet que han fallat per culpa de la xarxa es tornen a provar mentre un document les mostra.
-- **Memòria.** Les imatges es mostren amb fins a 2560 píxels al costat més llarg, cosa que també omple una pàgina A4. Es descodifiquen més petites quan ocupen una vuitena part de la memòria del Mac, i mentre macOS informa de pressió de memòria.
+- **Memòria.** Les imatges es descodifiquen als píxels que ocupen a la pantalla, com a màxim 2560 al costat més llarg, i de nou quan es mostren més grans; en paper tenen fins a 2560 píxels, cosa que omple una pàgina A4. Es descodifiquen més petites quan ocupen una vuitena part de la memòria del Mac, i mentre macOS informa de pressió de memòria.
 - **Mode fosc.** Les imatges amb fons blanc s’atenuen una mica a la previsualització fosca.
 - **Enganxar i deixar anar.** Mira [Al codi font](#al-codi-font).
 
@@ -555,7 +555,7 @@ Un fitxer Markdown pot venir de qualsevol, així que el Splat tracta cada docume
 
 - **Sense telemetria.** El Splat no informa de res sobre com el fas servir. Només cerca actualitzacions quan hi estàs d’acord o tries **Cerca actualitzacions…**: llavors carrega un petit fitxer de canal de GitHub, i la sol·licitud no esmenta res més que l’app i la seva versió. Les fórmules i els diagrames es renderitzen en local; les vistes web que ho fan no poden accedir a la xarxa. **Ajuda › Informa d’un problema…** obre un formulari de GitHub al navegador; la seva adreça porta la versió del Splat, la de macOS i el tipus de Mac, però res dels teus documents.
 - **Les imatges d’internet** es carreguen tan bon punt un document les mostra, des de qualsevol servidor, només per `https`, com a màxim de 10 MB cadascuna i en una sessió privada sense galetes. Els seus servidors saben que s’obre el document i quan.
-- **Descodificació aïllada.** Les imatges i els gràfics de fórmules i diagrames es descodifiquen en un servei propi, que macOS inicia en una caixa de proves pròpia: cap dels teus fitxers, sense xarxa. Només retorna píxels, la mida dels quals es comprova, i s’atura tot sol quan una descodificació triga més de 10 segons o necessita massa memòria. Els descodificadors d’imatge d’Apple només veuen HEIC, TIFF, AVIF i PDF, i només quan les dades són realment d’aquest format. Els SVG, les fórmules i els diagrames també passen per aquest servei, de manera que al Splat són imatges amb una resolució fixa: quatre píxels per punt, fins a 2560 al costat més llarg.
+- **Descodificació aïllada.** Les imatges i els gràfics de fórmules i diagrames es descodifiquen en un servei propi, que macOS inicia en una caixa de proves pròpia: cap dels teus fitxers, sense xarxa. Només retorna píxels, la mida dels quals es comprova, i s’atura tot sol quan una descodificació triga més de 10 segons o necessita massa memòria. Els descodificadors d’imatge d’Apple només veuen HEIC, TIFF, AVIF i PDF, i només quan les dades són realment d’aquest format. Els SVG, les fórmules i els diagrames també passen per aquest servei, de manera que al Splat són imatges: com a màxim quatre píxels per punt i 2560 al costat més llarg.
 - **Els fitxers locals** només arriben a un document per la ruta que aquest anomena, i només des d’una carpeta a la qual has donat accés: el Splat pot llegir un document que obres, però les imatges, les notes, la bibliografia i el repositori que l’envolten només quan dones accés a la seva carpeta amb **Dona accés a la carpeta…** a la barra sobre la previsualització. Un accés val per a totes les subcarpetes i es recorda. Les incrustacions mostren notes Markdown de la carpeta del document i de sota, i una imatge que falta només es busca allà. Una ruta d’imatge a un altre lloc, absoluta o que comença per `~`, es carrega a la previsualització des d’una carpeta amb accés donat; les exportacions HTML i Word, la impressió i els PDF només s’emporten el que hi ha a la carpeta del document o al seu repositori Git, tret que aquest repositori també contingui la teva carpeta d’inici, de manera que un document d’una altra persona no pot arrossegar els teus fitxers a una exportació que passis a algú.
 - **Les carpetes de notes** només es llegeixen mentre la barra lateral les mostra, i canviar el nom d’una nota només canvia altres fitxers després que hagis confirmat quants.
 - **Els repositoris Git** els llegeix el mateix Splat. Mai no executa el programa `git`, la configuració del qual en un repositori d’algú altre pot iniciar altres programes, i no llegeix més que la versió del document obert de l’últim commit. No hi escriu res i no fa servir cap xarxa.
@@ -573,7 +573,7 @@ El Splat continua responent amb documents de diversos megabytes:
 - El codi font fa servir TextKit 2, que només disposa la part visible.
 - Mentre escrius a la previsualització, i al codi font de documents de fins a 2 MB, només s’analitzen, es coloregen i es tornen a disposar els paràgrafs afectats. En un document de 10 MB, analitzar i colorejar triga uns 3 ms, renderitzar uns 10 ms, i una pulsació de tecla sencera a la seva previsualització uns 30 ms amb la feina pròpia de la vista.
 - Les previsualitzacions grans renderitzen primer la part visible i la resta mentre l’app està inactiva. Els blocs que es desplacen a la vista es renderitzen abans de dibuixar-se.
-- Al codi font dels documents més grans, l’anàlisi per a la previsualització s’executa en segon pla mentre escrius.
+- Al codi font dels documents més grans, el mateix s’executa en segon pla mentre escrius.
 - Un document es manté com a text pla quan necessitaria uns 4 GB de memòria, és a dir, uns 50 a 120 MB de Markdown habitual, però només de 10 a 20 MB si tot són taules o encapçalaments: el codi font no té colors i la previsualització diu per què es manté buida. Les exportacions continuen funcionant.
 - A partir d’uns 200 KB, un document obre la finestra abans d’analitzar-se; a 5 MB, els colors i la previsualització arriben aproximadament un quart de segon més tard.
 - Totes les imatges juntes, incloses les fórmules i els diagrames, ocupen com a màxim una quarta part de la memòria del Mac, i la meitat d’això mentre hi ha poca memòria. Més enllà d’això, les altres imatges es mostren com a marcadors de posició fins que torna a haver-hi espai.

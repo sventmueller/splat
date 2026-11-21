@@ -200,12 +200,7 @@ impl<'a> Object<'a> {
         field.attach(self.0, latex);
     }
 
-    /// Takes `field` from this editor, if it has it.
-    pub(in crate::editor) fn detach_formula_field(self, field: &MathField) {
-        field.detach(self.0);
-    }
-
-    /// Takes the formula field from this editor, if one was ever made.
+    /// Takes the formula field from this editor, if there is one.
     pub(in crate::editor) fn detach_formula_field_if_started(self) {
         crate::editor::mathfield::detach_if_started(self.0);
     }
@@ -299,6 +294,10 @@ impl<'a> ForPanes<'a> {
 
     pub(in crate::editor) fn source_text(&self) -> String {
         self.0.source_text()
+    }
+
+    pub(in crate::editor) fn shared_source_text(&self) -> Arc<str> {
+        self.0.shared_source_text()
     }
 
     /// Marks what is outdated and asks for an update, whoever is the one to notice.

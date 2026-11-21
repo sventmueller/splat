@@ -130,7 +130,7 @@ Splat meletakkan sumber Markdown anda dengan warna sintaks di sebelah kiri dan p
 
 - macOS 14 Sonoma atau lebih baharu. Splat dibangunkan dan diuji pada macOS 27, tempat ia menggunakan reka bentuk Liquid Glass secara automatik.
 - Mac dengan Apple Silicon atau pemproses Intel.
-- Kira-kira 45 MB ruang cakera.
+- Kira-kira 35 MB ruang cakera.
 
 ## Pemasangan
 
@@ -432,7 +432,7 @@ flowchart LR
 
 Jenis rajah lain diedit sebagai kod. VoiceOver membaca tajuk atau teks alternatif rajah.
 
-Rajah pertama selepas pelancaran mengambil masa kira-kira satu saat, kerana enjin pemaparan bermula di latar belakang. Rajah yang mengambil masa lebih daripada 10 saat menunjukkan ralat, dan enjin pemaparan bermula semula untuk rajah seterusnya. Enjin PlantUML (3 MB) dimuatkan hanya dengan rajah PlantUML yang pertama. `!include` PlantUML dari web disekat.
+Rajah pertama selepas pelancaran, dan rajah pertama selepas dua minit tanpa rajah, mengambil masa kira-kira satu saat, kerana enjin pemaparan bermula di latar belakang. Rajah yang mengambil masa lebih daripada 10 saat menunjukkan ralat, dan enjin pemaparan bermula semula untuk rajah seterusnya. Enjin PlantUML (3 MB) dimuatkan hanya dengan rajah PlantUML yang pertama. `!include` PlantUML dari web disekat.
 
 ## Imej
 
@@ -440,7 +440,7 @@ Rajah pertama selepas pelancaran mengambil masa kira-kira satu saat, kerana enji
 - **Imej dari web** dimuatkan sebaik sahaja dokumen menunjukkannya, melalui `https` dan sehingga 10 MB setiap satu. Seperti imej dalam e-mel, imej ini memberitahu pelayannya bahawa dan bila dokumen dibuka.
 - **Saiz.** `<img width="200">` menetapkan saiz imej; jika tidak, imej muat dengan lebar pratonton.
 - **Perubahan pada cakera.** Imej yang anda gantikan, atau yang muncul selepas dokumen menamakannya, ditunjukkan tanpa membuka dokumen sekali lagi. Imej dari web yang gagal kerana rangkaian dicuba semula selagi dokumen menunjukkannya.
-- **Memori.** Imej ditunjukkan sehingga 2560 piksel pada sisi terpanjangnya, yang juga memenuhi halaman A4. Ia dinyahkod lebih kecil apabila ia memenuhi satu perlapan memori Mac, dan semasa macOS melaporkan tekanan memori.
+- **Memori.** Imej dinyahkod kepada piksel yang diliputinya pada skrin, paling banyak 2560 pada sisi terpanjangnya, dan dinyahkod semula apabila ia ditunjukkan lebih besar; pada kertas ia mempunyai sehingga 2560 piksel, yang memenuhi halaman A4. Ia dinyahkod lebih kecil apabila ia memenuhi satu perlapan memori Mac, dan semasa macOS melaporkan tekanan memori.
 - **Mod gelap.** Imej dengan latar putih dilaraskan sedikit lebih malap dalam pratonton gelap.
 - **Menampal dan melepas.** Lihat [In the source](#dalam-sumber).
 
@@ -555,7 +555,7 @@ Fail Markdown boleh datang daripada sesiapa sahaja, jadi Splat menganggap setiap
 
 - **Tiada telemetri.** Splat tidak melaporkan apa-apa tentang cara anda menggunakannya. Ia mencari kemas kini hanya apabila anda bersetuju atau memilih **Semak Kemas Kini…**: ia kemudian memuatkan fail suapan kecil daripada GitHub, dan permintaan itu tidak menamakan apa-apa selain app dan versinya. Formula dan rajah dipaparkan secara setempat; paparan web yang melakukannya tidak dapat mencapai rangkaian. **Bantuan › Laporkan Masalah…** membuka borang di GitHub dalam pelayar anda; alamatnya mengandungi versi Splat, versi macOS dan jenis Mac, tiada apa-apa daripada dokumen anda.
 - **Imej dari web** dimuatkan sebaik sahaja dokumen menunjukkannya, daripada mana-mana hos, hanya melalui `https`, paling banyak 10 MB setiap satu, dan dalam sesi persendirian tanpa kuki. Pelayannya mengetahui bahawa dan bila dokumen dibuka.
-- **Penyahkodan terasing.** Imej dan grafik formula serta rajah dinyahkod dalam perkhidmatan tersendiri, yang dimulakan oleh macOS dalam kotak pasirnya sendiri: tiada satu pun fail anda, tiada rangkaian. Ia hanya menyerahkan semula piksel, yang saiznya disemak, dan menamatkan dirinya sendiri apabila sesuatu penyahkodan mengambil masa lebih daripada 10 saat atau terlalu banyak memori. Penyahkod imej Apple sendiri hanya melihat HEIC, TIFF, AVIF dan PDF, dan hanya apabila data itu benar-benar format tersebut. SVG, formula dan rajah turut melalui perkhidmatan itu, jadi ia ialah gambar dengan resolusi tetap dalam Splat: empat piksel setiap titik, sehingga 2560 pada sisi yang lebih panjang.
+- **Penyahkodan terasing.** Imej dan grafik formula serta rajah dinyahkod dalam perkhidmatan tersendiri, yang dimulakan oleh macOS dalam kotak pasirnya sendiri: tiada satu pun fail anda, tiada rangkaian. Ia hanya menyerahkan semula piksel, yang saiznya disemak, dan menamatkan dirinya sendiri apabila sesuatu penyahkodan mengambil masa lebih daripada 10 saat atau terlalu banyak memori. Penyahkod imej Apple sendiri hanya melihat HEIC, TIFF, AVIF dan PDF, dan hanya apabila data itu benar-benar format tersebut. SVG, formula dan rajah turut melalui perkhidmatan itu, jadi ia ialah gambar dalam Splat: paling banyak empat piksel setiap titik dan 2560 pada sisi yang lebih panjang.
 - **Fail setempat** sampai kepada dokumen hanya melalui laluan yang dinamakannya, dan hanya daripada folder yang telah anda beri akses: Splat boleh membaca dokumen yang anda buka, tetapi gambar, nota, bibliografi dan repositori di sekelilingnya hanya selepas anda memberikan akses kepada foldernya dengan **Beri Akses kepada Folder…** dalam bar di atas pratonton. Akses meliputi semua subfolder dan diingati. Benam menunjukkan nota Markdown daripada folder dokumen dan ke bawah, dan gambar yang tiada dicari di situ sahaja. Laluan imej di tempat lain, mutlak atau bermula dengan `~`, dimuatkan dalam pratonton daripada folder yang telah diberi akses; eksport HTML dan Word, pencetakan dan PDF hanya membawa apa yang ada dalam folder dokumen atau repositori Gitnya, melainkan repositori itu juga menyimpan folder Utama anda, supaya dokumen daripada orang lain tidak dapat menarik fail anda ke dalam eksport yang anda hantar.
 - **Folder nota** dibaca hanya semasa bar sisi menunjukkannya, dan menamakan semula nota mengubah fail lain hanya selepas anda mengesahkan berapa banyak.
 - **Repositori Git** dibaca oleh Splat sendiri. Ia tidak pernah menjalankan program `git`, yang konfigurasinya dalam repositori daripada orang lain boleh memulakan program lain, dan ia tidak membaca lebih daripada versi dokumen yang dibuka dalam commit terakhir. Ia tidak menulis apa-apa di situ dan tidak menggunakan rangkaian.
@@ -573,7 +573,7 @@ Splat kekal responsif dengan dokumen beberapa megabait:
 - Sumber menggunakan TextKit 2, yang hanya menyusun atur bahagian yang kelihatan.
 - Semasa anda menaip dalam pratonton, dan dalam sumber dokumen sehingga 2 MB, hanya perenggan yang terjejas dihuraikan, diwarnakan dan disusun atur semula. Dalam dokumen 10 MB, penghuraian dan pewarnaan mengambil kira-kira 3 ms, perenderan kira-kira 10 ms, dan satu ketukan kekunci penuh dalam pratontonnya kira-kira 30 ms termasuk kerja paparan itu sendiri.
 - Pratonton besar memaparkan bahagian yang kelihatan dahulu dan selebihnya semasa app terbiar. Blok yang digulung ke paparan dipaparkan sebelum dilukis.
-- Dalam sumber dokumen yang lebih besar, penghuraian untuk pratonton berjalan di latar belakang semasa anda menaip.
+- Dalam sumber dokumen yang lebih besar, perkara yang sama berjalan di latar belakang semasa anda menaip.
 - Dokumen kekal sebagai teks biasa apabila ia akan memerlukan kira-kira 4 GB memori, iaitu kira-kira 50 hingga 120 MB Markdown biasa, tetapi hanya 10 hingga 20 MB jika isinya hanya jadual atau tajuk: sumber tiada warna dan pratonton menyatakan sebab ia kekal kosong. Eksport masih berfungsi.
 - Mulai kira-kira 200 KB, dokumen membuka tetingkapnya sebelum dihuraikan; pada 5 MB, warna dan pratonton menyusul kira-kira suku saat kemudian.
 - Semua imej bersama-sama, termasuk formula dan rajah, mengambil paling banyak satu perempat memori Mac, dan separuh daripadanya semasa memori kurang. Selebihnya, imej seterusnya dipaparkan sebagai pemegang tempat sehingga ada ruang semula.

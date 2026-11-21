@@ -151,7 +151,7 @@ har ingen telemetri.
 
 - macOS 14 Sonoma eller senare. Splat utvecklas och testas på macOS 27, där appen automatiskt får designen Liquid Glass.
 - En Mac med Apple Silicon eller en Intel-processor.
-- Cirka 45 MB diskutrymme.
+- Cirka 35 MB diskutrymme.
 
 ## Installation
 
@@ -542,8 +542,9 @@ eller ett Gantt-schema. Byggblock hjälper till med de tre vanligaste Mermaid-ty
 
 Andra diagramtyper redigeras som kod. VoiceOver läser upp ett diagrams titel eller alternativtext.
 
-Det första diagrammet efter start tar cirka en sekund, eftersom renderingsmotorn startar i bakgrunden. Ett diagram
-som tar längre tid än 10 sekunder visar ett fel, och renderingsmotorn startar om för nästa.
+Det första diagrammet efter start, och det första efter två minuter utan något, tar cirka en sekund, eftersom
+renderingsmotorn startar i bakgrunden. Ett diagram som tar längre tid än 10 sekunder visar ett fel, och renderingsmotorn
+startar om för nästa.
 PlantUML:s motor (3 MB) läses in först med det första PlantUML-diagrammet. En PlantUML-`!include` från webben blockeras.
 
 ## Bilder
@@ -556,8 +557,9 @@ PlantUML:s motor (3 MB) läses in först med det första PlantUML-diagrammet. En
 - **Ändringar på disk.** En bild som du byter ut, eller en som dyker upp sedan dokumentet nämnt den, visas utan att dokumentet
   öppnas igen. Bilder från webben som misslyckades på grund av nätverket provas på nytt medan ett dokument visar
   dem.
-- **Minne.** Bilder visas med upp till 2560 pixlar på den längsta sidan, vilket också fyller en A4-sida. De avkodas i mindre storlek
-  när de fyller en åttondel av Macens minne, och så länge macOS rapporterar minnesbrist.
+- **Minne.** Bilder avkodas till de pixlar de täcker på skärmen, högst 2560 på den längsta sidan, och på nytt när de
+  visas större; på papper har de upp till 2560, vilket fyller en A4-sida. De avkodas i mindre storlek när de fyller en
+  åttondel av Macens minne, och så länge macOS rapporterar minnesbrist.
 - **Mörkt läge.** Bilder med vit bakgrund dämpas något i den mörka förhandsvisningen.
 - **Klistra in och släppa.** Se [In the source](#i-källtexten).
 
@@ -719,8 +721,7 @@ En Markdown-fil kan komma från vem som helst, så Splat behandlar varje dokumen
   egen sandlåda: inga av dina filer, inget nätverk. Den lämnar bara tillbaka pixlar, vars storlek kontrolleras, och
   avslutar sig själv när en avkodning tar mer än 10 sekunder eller för mycket minne. Apples egna bildavkodare får bara
   se HEIC, TIFF, AVIF och PDF, och bara när datan verkligen har det formatet. SVG-filer, formler och diagram passerar
-  också den tjänsten, så de är bilder med fast upplösning i Splat: fyra pixlar per punkt, upp till 2560 på den längre
-  sidan.
+  också den tjänsten, så de är bilder i Splat: högst fyra pixlar per punkt och 2560 på den längre sidan.
 - **Lokala filer** når ett dokument bara via den sökväg det anger, och bara från en mapp som du har gett åtkomst till:
   Splat får läsa ett dokument som du öppnar, men bilderna, anteckningarna, litteraturlistan och arkivet runt det först
   när du ger åtkomst till deras mapp med **Ge åtkomst till mapp…** i fältet ovanför förhandsvisningen. En åtkomst gäller
@@ -759,7 +760,7 @@ Splat förblir responsivt med dokument på flera megabyte:
   och en hel tangenttryckning i dess förhandsvisning cirka 30 ms med vyns eget arbete.
 - Stora förhandsvisningar renderar den synliga delen först och resten medan appen är overksam. Block som rullas in i bild renderas
   innan de ritas.
-- I källtexten i större dokument sker tolkningen för förhandsvisningen i bakgrunden medan du skriver.
+- I källtexten i större dokument sker samma sak i bakgrunden medan du skriver.
 - Ett dokument förblir ren text när det skulle kräva ungefär 4 GB minne, vilket motsvarar cirka 50 till 120 MB vanlig
   Markdown men bara 10 till 20 MB om det enbart består av tabeller eller rubriker: källtexten har inga färger och
   förhandsvisningen förklarar varför den förblir tom. Exporter fungerar fortfarande.

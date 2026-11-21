@@ -130,7 +130,7 @@ Splat prikazuje vaš izvorni Markdown kod s bojanjem sintakse lijevo, a desno ž
 
 - macOS 14 Sonoma ili noviji. Splat se razvija i testira na macOSu 27, gdje automatski preuzima dizajn Liquid Glass.
 - Mac s Apple Silicon ili Intelovim procesorom.
-- Oko 45 MB prostora na disku.
+- Oko 35 MB prostora na disku.
 
 ## Instalacija
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Druge vrste dijagrama uređuju se kao kod. VoiceOver čita naslov dijagrama ili alternativni tekst.
 
-Prvi dijagram nakon pokretanja traje otprilike sekundu jer se mehanizam za prikaz pokreće u pozadini. Dijagram koji traje dulje od 10 sekundi prikazuje pogrešku, a mehanizam za prikaz za sljedeći se dijagram pokreće iznova. PlantUML-ov mehanizam (3 MB) učitava se tek s prvim PlantUML dijagramom. PlantUML `!include` s weba je blokiran.
+Prvi dijagram nakon pokretanja, kao i prvi nakon dvije minute bez dijagrama, traje otprilike sekundu jer se mehanizam za prikaz pokreće u pozadini. Dijagram koji traje dulje od 10 sekundi prikazuje pogrešku, a mehanizam za prikaz za sljedeći se dijagram pokreće iznova. PlantUML-ov mehanizam (3 MB) učitava se tek s prvim PlantUML dijagramom. PlantUML `!include` s weba je blokiran.
 
 ## Slike
 
@@ -441,7 +441,7 @@ Prvi dijagram nakon pokretanja traje otprilike sekundu jer se mehanizam za prika
 - **Slike s weba** učitavaju se čim ih dokument prikaže, preko `https` i do 10 MB po slici. Kao slike u e-poruci, njihovim poslužiteljima otkrivaju da i kada se dokument otvara.
 - **Veličina.** `<img width="200">` postavlja veličinu slike; inače se slike prilagođavaju širini pregleda.
 - **Promjene na disku.** Slika koju zamijenite ili koja se pojavi nakon što ju je dokument naveo prikazuje se bez ponovnog otvaranja dokumenta. Slike s weba koje nisu uspjele zbog mreže pokušavaju se ponovno dok ih dokument prikazuje.
-- **Memorija.** Slike se prikazuju do 2560 piksela po dužoj stranici, što ispunjava i stranicu formata A4. Dekodiraju se manje čim ispune osminu memorije Maca i dok macOS javlja pritisak na memoriju.
+- **Memorija.** Slike se dekodiraju na onoliko piksela koliko zauzimaju na zaslonu, najviše 2560 po dužoj stranici, i ponovno kad se prikažu veće; na papiru imaju do 2560 piksela, što ispunjava stranicu formata A4. Dekodiraju se manje čim ispune osminu memorije Maca i dok macOS javlja pritisak na memoriju.
 - **Tamni način rada.** Slike s bijelom pozadinom u tamnom pregledu blago su zatamnjene.
 - **Lijepljenje i ispuštanje.** Vidi [U izvornom kodu](#u-izvornom-kodu).
 
@@ -556,7 +556,7 @@ Markdown datoteka može doći od bilo koga, pa Splat svaki dokument smatra nepou
 
 - **Bez telemetrije.** Splat ne javlja ništa o tome kako ga koristite. Ažuriranja traži tek kad pristanete ili odaberete **Potraži ažuriranja…**: tada s GitHuba učitava malu datoteku feeda, a zahtjev navodi samo aplikaciju i njezinu verziju. Formule i dijagrami prikazuju se lokalno; web prikazi koji to rade ne mogu doseći mrežu. **Pomoć › Prijavi problem…** otvara obrazac na GitHubu u vašem pregledniku; njegova adresa sadrži verziju Splata, verziju macOS-a i vrstu Maca, a ništa iz vaših dokumenata.
 - **Slike s weba** učitavaju se čim ih dokument prikaže, s bilo kojeg hosta, samo preko `https`, najviše 10 MB po slici i u privatnoj sesiji bez kolačića. Njihovi poslužitelji saznaju da i kada se dokument otvara.
-- **Izolirano dekodiranje.** Slike te grafika formula i dijagrama dekodiraju se u vlastitoj usluzi koju macOS pokreće u vlastitom sandboxu: nijedna vaša datoteka, bez mreže. Vraća samo piksele, čija se veličina provjerava, i sama se zaustavlja kad dekodiranje traje dulje od 10 sekundi ili troši previše memorije. Appleovi vlastiti dekoderi slika vide samo HEIC, TIFF, AVIF i PDF, i to samo kad podaci doista jesu taj format. I SVG-ovi, formule i dijagrami prolaze kroz tu uslugu, pa su u Splatu slike fiksne razlučivosti: četiri piksela po točki, do 2560 po duljoj stranici.
+- **Izolirano dekodiranje.** Slike te grafika formula i dijagrama dekodiraju se u vlastitoj usluzi koju macOS pokreće u vlastitom sandboxu: nijedna vaša datoteka, bez mreže. Vraća samo piksele, čija se veličina provjerava, i sama se zaustavlja kad dekodiranje traje dulje od 10 sekundi ili troši previše memorije. Appleovi vlastiti dekoderi slika vide samo HEIC, TIFF, AVIF i PDF, i to samo kad podaci doista jesu taj format. I SVG-ovi, formule i dijagrami prolaze kroz tu uslugu, pa su u Splatu slike: najviše četiri piksela po točki i 2560 po duljoj stranici.
 - **Lokalne datoteke** dolaze do dokumenta samo putanjom koju on navodi, i to samo iz mape kojoj ste dodijelili pristup: Splat smije čitati dokument koji otvorite, ali slike, bilješke, bibliografiju i repozitorij oko njega tek kad njihovoj mapi dodijelite pristup pomoću **Dodijeli pristup mapi…** na traci iznad pregleda. Pristup vrijedi za sve podmape i pamti se. Ugradnje prikazuju Markdown bilješke iz mape dokumenta i ispod nje, a slika koje nema traži se samo ondje. Putanja slike drugdje, apsolutna ili koja počinje s `~`, učitava se u pregledu iz mape kojoj je dodijeljen pristup; HTML i Word izvozi, ispis i PDF-ovi uzimaju samo ono što je u mapi dokumenta ili u njegovu Git repozitoriju, osim ako taj repozitorij sadrži i vašu početnu mapu, pa tuđi dokument ne može uvući vaše datoteke u izvoz koji prosljeđujete.
 - **Mape bilješki** čitaju se samo dok ih bočna traka prikazuje, a preimenovanje bilješke mijenja druge datoteke tek nakon što potvrdite koliko ih je.
 - **Git repozitorije** čita sam Splat. Nikad ne pokreće program `git`, čija konfiguracija u tuđem repozitoriju može pokrenuti druge programe, i ne čita više od verzije otvorenog dokumenta u zadnjem commitu. Onamo ništa ne zapisuje i ne izlazi na mrežu.
@@ -574,7 +574,7 @@ Splat ostaje responzivan s dokumentima od nekoliko megabajta:
 - Izvorni kod koristi TextKit 2, koji slaže samo vidljivi dio.
 - Dok tipkate u pregledu, i u izvornom kodu dokumenata do 2 MB, ponovno se parsiraju, boje i slažu samo zahvaćeni odlomci. U dokumentu od 10 MB parsiranje i bojenje traju oko 3 ms, iscrtavanje oko 10 ms, a cijeli pritisak tipke u njegovu pregledu oko 30 ms, uključujući vlastiti rad prikaza.
 - Veliki pregledi najprije prikazuju vidljivi dio, a ostatak dok je aplikacija u mirovanju. Blokovi koji se pomaknu u vidno polje prikazuju se prije crtanja.
-- U izvornom kodu većih dokumenata parsiranje za pregled radi u pozadini dok tipkate.
+- U izvornom kodu većih dokumenata isto se odvija u pozadini dok tipkate.
 - Dokument ostaje običan tekst čim bi trebao oko 4 GB memorije, što je oko 50 do 120 MB uobičajenog Markdowna, ali samo 10 do 20 MB ako su u njemu samo tablice ili naslovi: izvorni kod nema boja, a pregled kaže zašto ostaje prazan. Izvozi i dalje rade.
 - Od otprilike 200 KB dokument otvara prozor prije nego što je parsiran; kod 5 MB boje i pregled slijede otprilike četvrt sekunde kasnije.
 - Sve slike zajedno, uključujući formule i dijagrame, zauzimaju najviše četvrtinu memorije Maca, a polovicu toga dok memorije nedostaje. Iznad toga se daljnje slike prikazuju kao rezervirana mjesta dok opet ne bude mjesta.

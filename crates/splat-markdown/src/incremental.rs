@@ -26,6 +26,9 @@ pub struct Parsed {
     pub spans: Vec<(Range<Byte>, Style)>,
     /// Which top-level blocks changed, when only those were parsed again.
     pub splice: Option<Splice>,
+    /// The colours outside the splice's window are those of the text before, moved along with the change; not when
+    /// one reached across the window and all were computed anew.
+    pub kept_colors: bool,
 }
 
 const MOST_STAND_INS: usize = 1000;
@@ -37,6 +40,7 @@ impl Parsed {
             doc: Doc::too_large(text),
             spans: Vec::new(),
             splice: None,
+            kept_colors: false,
         }
     }
 
@@ -46,6 +50,7 @@ impl Parsed {
             doc: Doc::new(text, Vec::new()),
             spans: Vec::new(),
             splice: None,
+            kept_colors: false,
         }
     }
 }
@@ -68,6 +73,7 @@ pub fn parse_shared_and_color(text: Arc<str>) -> Parsed {
         doc,
         spans,
         splice: None,
+        kept_colors: false,
     }
 }
 
@@ -84,11 +90,15 @@ pub fn reparse_part_and_color(
     new_text: &str,
 ) -> Result<Parsed, Box<Doc>> {
     match reparse(&mut doc, new_text) {
-        Some(splice) => Ok(Parsed {
-            spans: with_definitions_in_window(rehighlight(spans, &doc, &splice), &doc, &splice),
-            doc,
-            splice: Some(splice),
-        }),
+        Some(splice) => {
+            let (spans, kept_colors) = rehighlight(spans, &doc, &splice);
+            Ok(Parsed {
+                spans: with_definitions_in_window(spans, &doc, &splice),
+                doc,
+                splice: Some(splice),
+                kept_colors,
+            })
+        }
         None => Err(Box::new(doc)),
     }
 }

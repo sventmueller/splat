@@ -8,8 +8,8 @@ use splat_editor_state::zoom;
 pub use splat_render::style::{appearance_of, token_color};
 
 use super::attributes::{Attribute, Attributes, add_attribute, set_attributes};
-use crate::markdown::highlight::{Style, changed_region, right_to_left_behind_markers};
-use crate::markdown::text::{Byte, TextAt, Utf16Cursor, line_start};
+use crate::markdown::highlight::{Style, right_to_left_behind_markers};
+use crate::markdown::text::{Byte, TextAt, U16, Utf16Cursor, line_start};
 use crate::util::{constant, ns};
 
 pub const SOURCE_SIZE: f64 = 13.0;
@@ -70,29 +70,19 @@ pub fn base_source_attributes(fonts: &SourceFonts) -> Attributes {
     ])
 }
 
-/// Re-applies syntax colors only where they can have changed: around the edit and wherever the new spans differ
-/// from the previous ones. Setting attributes on the whole text would make TextKit lay out the whole document again.
-pub fn apply_highlight_changes(
-    storage: &NSTextStorage,
-    old_text: &str,
-    old: &[(std::ops::Range<Byte>, Style)],
-    text: &str,
-    spans: &[(std::ops::Range<Byte>, Style)],
-    fonts: &SourceFonts,
-) {
-    apply_highlight_in(storage, text, spans, changed_region(old_text, old, text, spans), fonts);
-}
-
-/// Gives `region` of the source the colours `spans` say, whatever it had before.
+/// Gives `region` of the source the colours `spans` say, whatever it had before, counting positions from `anchor`, a char
+/// boundary no later than the start of the line that holds the start of `region`, with its position in the view. Setting
+/// attributes on the whole text would make TextKit lay out the whole document again.
 pub fn apply_highlight_in(
     storage: &NSTextStorage,
     text: &str,
     spans: &[(std::ops::Range<Byte>, Style)],
     region: std::ops::Range<Byte>,
+    anchor: (Byte, U16),
     fonts: &SourceFonts,
 ) {
     let (start, end) = (region.start, region.end);
-    let (region, styled) = styled_ranges(text, spans, start..end);
+    let (region, styled) = styled_ranges(text, spans, start..end, anchor);
     crate::util::editing(storage, || {
         let base = base_source_attributes(fonts);
         set_attributes(storage, &base, region);
@@ -108,25 +98,24 @@ pub fn apply_highlight_in(
                 add_attribute(storage, &strike, r);
             }
         }
-        set_line_directions(storage, text, start..end.max(start));
+        set_line_directions(storage, text, start..end.max(start), anchor);
     });
 }
 
-/// What is restyled in UTF-16 units: all of `region`, and the part of each span within it.
+/// What is restyled in UTF-16 units: all of `region`, and the part of each span within it, which lie sorted and apart.
 fn styled_ranges<'a>(
     text: &str,
     spans: &'a [(std::ops::Range<Byte>, Style)],
     region: std::ops::Range<Byte>,
+    anchor: (Byte, U16),
 ) -> (NSRange, Vec<(NSRange, &'a Style)>) {
     let (start, end) = (region.start, region.end);
-    let mut cursor = Utf16Cursor::new(text);
+    let mut cursor = Utf16Cursor::from_anchor(text, anchor);
     let u_start = cursor.at(start);
-    let u_end = cursor.at(end.max(start));
-    let whole = NSRange::new(u_start.get(), u_end - u_start);
-    let mut cursor = Utf16Cursor::new(text);
-    let styled = spans
+    let first = spans.partition_point(|(r, _)| r.end <= start);
+    let last = spans.partition_point(|(r, _)| r.start < end).max(first);
+    let styled = spans[first..last]
         .iter()
-        .filter(|(r, _)| r.end > start && r.start < end)
         .filter_map(|(range, style)| {
             let a = cursor.at(range.start.max(start));
             let b = cursor.at(range.end.min(end));
@@ -134,6 +123,8 @@ fn styled_ranges<'a>(
             (r.length > 0).then_some((r, style))
         })
         .collect();
+    let u_end = cursor.at(end.max(start));
+    let whole = NSRange::new(u_start.get(), u_end - u_start);
     (whole, styled)
 }
 
@@ -145,10 +136,10 @@ enum LineDirection {
     Cleared,
 }
 
-/// The lines around `region` whose direction has to be set, in UTF-16 units.
-fn line_directions(text: &str, region: std::ops::Range<Byte>) -> Vec<(NSRange, LineDirection)> {
+/// The lines around `region` whose direction has to be set, in UTF-16 units counted from `anchor`.
+fn line_directions(text: &str, region: std::ops::Range<Byte>, anchor: (Byte, U16)) -> Vec<(NSRange, LineDirection)> {
     let mut lines = Vec::new();
-    let mut cursor = Utf16Cursor::new(text);
+    let mut cursor = Utf16Cursor::from_anchor(text, anchor);
     let mut at = line_start(text, region.start);
     while at < text.end() && at <= region.end {
         let stop = text.from(at).find('\n').map_or(text.end(), |i| at + i);
@@ -165,11 +156,11 @@ fn line_directions(text: &str, region: std::ops::Range<Byte>) -> Vec<(NSRange, L
 }
 
 /// TextKit takes a source line's direction from its first letter, for a done task the x of `[x]`.
-fn set_line_directions(storage: &NSTextStorage, text: &str, region: std::ops::Range<Byte>) {
+fn set_line_directions(storage: &NSTextStorage, text: &str, region: std::ops::Range<Byte>, anchor: (Byte, U16)) {
     let rtl = NSMutableParagraphStyle::new();
     rtl.setBaseWritingDirection(NSWritingDirection::RightToLeft);
     let rtl = Attribute::paragraph(&rtl);
-    for (line, direction) in line_directions(text, region) {
+    for (line, direction) in line_directions(text, region, anchor) {
         match direction {
             LineDirection::RightToLeft => add_attribute(storage, &rtl, line),
             LineDirection::Cleared => storage.removeAttribute_range(constant!(NSParagraphStyleAttributeName), line),
@@ -208,12 +199,14 @@ mod tests {
         strike: false,
     };
 
+    const START: (Byte, U16) = (Byte::new(0), U16::new(0));
+
     #[test]
     fn a_restyled_region_cuts_the_spans_to_itself_and_counts_in_utf16() {
         let text = "ä𝄞 fett und mehr";
         let span = |range| (bytes(range), BOLD);
         let spans = [span(0..6), span(7..11), span(16..20)];
-        let (whole, styled) = styled_ranges(text, &spans, bytes(2..13));
+        let (whole, styled) = styled_ranges(text, &spans, bytes(2..13), START);
         assert_eq!(
             whole,
             NSRange::new(1, 9),
@@ -221,15 +214,44 @@ mod tests {
         );
         let ranges: Vec<NSRange> = styled.iter().map(|(r, _)| *r).collect();
         assert_eq!(ranges, [NSRange::new(1, 2), NSRange::new(4, 4)]);
-        let (whole, styled) = styled_ranges(text, &spans, bytes(6..7));
+        let (whole, styled) = styled_ranges(text, &spans, bytes(6..7), START);
         assert_eq!(whole, NSRange::new(3, 1));
         assert!(styled.is_empty(), "the space between the spans");
+        let (whole, styled) = styled_ranges(text, &spans, bytes(20..20), START);
+        assert_eq!((whole, styled.len()), (NSRange::new(17, 0), 0), "at the end");
+    }
+
+    #[test]
+    fn counting_from_an_anchor_restyles_what_counting_from_the_start_does() {
+        let text = "ä𝄞 eins\n- [x] שלום **fett**\nund 😀 *mehr*\n".repeat(30);
+        let mut spans: Vec<_> = text
+            .match_indices("**fett**")
+            .chain(text.match_indices("*mehr*"))
+            .map(|(at, s)| (bytes(at..at + s.len()), BOLD))
+            .collect();
+        spans.sort_by_key(|(r, _)| r.start);
+        for at in [0, 9, text.len() / 2, text.len() - 9, text.len()] {
+            let start = Byte::new(text.floor_char_boundary(at));
+            let region = start..Byte::new(text.floor_char_boundary(at + 60));
+            let line = line_start(&text, start);
+            let anchor = (line, U16::new(text[..line.get()].encode_utf16().count()));
+            assert_eq!(
+                styled_ranges(&text, &spans, region.clone(), anchor),
+                styled_ranges(&text, &spans, region.clone(), START),
+                "{region:?}"
+            );
+            assert_eq!(
+                line_directions(&text, region.clone(), anchor),
+                line_directions(&text, region.clone(), START),
+                "{region:?}"
+            );
+        }
     }
 
     #[test]
     fn only_lines_that_read_from_the_right_get_a_direction() {
         let text = "Links\n- [x] שלום\nauch links\n- [x] مرحبا\n";
-        let lines = |region| line_directions(text, region);
+        let lines = |region| line_directions(text, region, START);
         assert_eq!(
             lines(bytes(0..3)),
             [],
@@ -253,7 +275,7 @@ mod tests {
             "a line begun before the region may have changed"
         );
         assert_eq!(
-            line_directions("שלום\n", bytes(0..4)),
+            line_directions("שלום\n", bytes(0..4), START),
             [],
             "without a marker in front, its first letter says it"
         );
@@ -272,7 +294,7 @@ mod tests {
         let storage = NSTextStorage::new();
         storage.replaceCharactersInRange_withString(NSRange::new(0, 0), &ns(text));
         let spans = [(bytes(0..8), BOLD)];
-        apply_highlight_changes(&storage, "", &[], text, &spans, &manager_free_fonts);
+        apply_highlight_in(&storage, text, &spans, bytes(0..text.len()), START, &manager_free_fonts);
         let font_key = constant!(objc2_app_kit::NSFontAttributeName);
         let font_at = |i| {
             // SAFETY: `i` lies inside the text, and the range pointer may be null.

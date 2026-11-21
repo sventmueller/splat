@@ -93,6 +93,7 @@ impl Progressive<'_> {
         let dark = self.host.is_dark();
         let doc_dir = self.host.doc_dir();
         let max_width = self.host.panes().preview_image_width();
+        let scale = self.host.panes().backing_scale();
         let shown_len = self.host.panes().preview().length();
         let wanted = window.clone();
         let Some((zoom, waiting)) = self.host.model().read(move |st| waiting_blocks(st, wanted, from)) else {
@@ -108,6 +109,7 @@ impl Progressive<'_> {
             doc_dir: doc_dir.as_deref(),
             images: self.host.pictures().store(),
             max_image_width: max_width,
+            scale: Some(scale),
             dark,
             requester: Some(&viewer),
             leaves_the_mac: None,

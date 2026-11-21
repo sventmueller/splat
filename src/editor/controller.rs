@@ -167,6 +167,11 @@ super::actions::commands!(class_with_commands, [
         fn window_did_resize(&self, _notification: &NSNotification) {
             guarded((), || self.panes().remember_frame());
         }
+
+        #[unsafe(method(windowDidChangeBackingProperties:))]
+        fn window_did_change_backing_properties(&self, _notification: &NSNotification) {
+            guarded((), || self.updater().render_pictures_again());
+        }
     }
 
     unsafe impl NSTextStorageDelegate for EditorController {
@@ -694,6 +699,11 @@ impl EditorController {
 
     pub fn source_text(&self) -> String {
         self.on_source_text(str::to_string)
+    }
+
+    /// The current source text for what keeps it, copied only while the source is ahead of the parse.
+    pub fn shared_source_text(&self) -> std::sync::Arc<str> {
+        self.with_text(|snap, st| st.shared_text_of(snap))
     }
 
     /// The text exactly as the source view holds it, for saving.

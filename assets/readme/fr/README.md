@@ -130,7 +130,7 @@ Splat affiche à gauche votre source Markdown avec coloration syntaxique et, à 
 
 - macOS 14 Sonoma ou ultérieur. Splat est développé et testé sous macOS 27, où il adopte automatiquement le design Liquid Glass.
 - Un Mac avec Apple Silicon ou un processeur Intel.
-- Environ 45 Mo d’espace disque.
+- Environ 35 Mo d’espace disque.
 
 ## Installation
 
@@ -433,7 +433,7 @@ flowchart LR
 
 Les autres types de diagrammes se modifient sous forme de code. VoiceOver lit le titre ou le texte alternatif d’un diagramme.
 
-Le premier diagramme après le lancement prend environ une seconde, car le moteur de rendu démarre en arrière-plan. Un diagramme qui prend plus de 10 secondes affiche une erreur, et le moteur de rendu redémarre à neuf pour le suivant. Le moteur de PlantUML (3 Mo) ne se charge qu’avec le premier diagramme PlantUML. Un `!include` PlantUML provenant du web est bloqué.
+Le premier diagramme après le lancement, ainsi que le premier après deux minutes sans diagramme, prend environ une seconde, car le moteur de rendu démarre en arrière-plan. Un diagramme qui prend plus de 10 secondes affiche une erreur, et le moteur de rendu redémarre à neuf pour le suivant. Le moteur de PlantUML (3 Mo) ne se charge qu’avec le premier diagramme PlantUML. Un `!include` PlantUML provenant du web est bloqué.
 
 ## Images
 
@@ -441,7 +441,7 @@ Le premier diagramme après le lancement prend environ une seconde, car le moteu
 - **Les images du web** se chargent dès qu’un document les affiche, via `https` et jusqu’à 10 Mo chacune. Comme les images d’un e-mail, elles indiquent à leurs serveurs que le document est ouvert, et à quel moment.
 - **Taille.** `<img width="200">` fixe la taille d’une image ; sinon, les images s’adaptent à la largeur de l’aperçu.
 - **Modifications sur le disque.** Une image que vous remplacez, ou une image qui apparaît après que le document l’a nommée, s’affiche sans qu’il soit nécessaire de rouvrir le document. Les images du web qui ont échoué à cause du réseau sont rechargées tant qu’un document les affiche.
-- **Mémoire.** Les images s’affichent jusqu’à 2560 pixels sur leur plus grand côté, ce qui remplit aussi une page A4. Elles sont décodées en plus petit dès qu’elles occupent un huitième de la mémoire du Mac, et tant que macOS signale une pression sur la mémoire.
+- **Mémoire.** Les images sont décodées selon les pixels qu’elles couvrent à l’écran, 2560 au plus sur leur plus grand côté, et de nouveau lorsqu’elles s’affichent en plus grand ; sur papier, elles en ont jusqu’à 2560, ce qui remplit une page A4. Elles sont décodées en plus petit dès qu’elles occupent un huitième de la mémoire du Mac, et tant que macOS signale une pression sur la mémoire.
 - **Mode sombre.** Les images à fond blanc sont légèrement atténuées dans l’aperçu sombre.
 - **Coller et déposer.** Voir [In the source](#dans-la-source).
 
@@ -556,7 +556,7 @@ Un fichier Markdown peut venir de n’importe qui, c’est pourquoi Splat traite
 
 - **Aucune télémétrie.** Splat ne transmet rien sur la façon dont vous l’utilisez. Il ne recherche des mises à jour qu’une fois que vous l’avez accepté ou que vous choisissez **Rechercher les mises à jour…** : il charge alors un petit fichier de flux depuis GitHub, et la requête ne nomme rien d’autre que l’app et sa version. Les formules et les diagrammes sont rendus localement ; les vues web qui s’en chargent ne peuvent pas accéder au réseau. **Aide › Signaler un problème…** ouvre un formulaire sur GitHub dans votre navigateur ; son adresse contient la version de Splat, celle de macOS et le type de Mac, rien de vos documents.
 - **Les images du web** se chargent dès qu’un document les affiche, depuis n’importe quel hôte, uniquement via `https`, au plus 10 Mo chacune, et dans une session privée sans cookies. Leurs serveurs apprennent que le document est ouvert, et à quel moment.
-- **Décodage isolé.** Les images et les graphiques des formules et des diagrammes sont décodés dans un service distinct, que macOS lance dans son propre bac à sable : aucun de vos fichiers, pas de réseau. Il ne renvoie que des pixels, dont la taille est vérifiée, et s’arrête de lui-même lorsqu’un décodage dure plus de 10 secondes ou demande trop de mémoire. Les décodeurs d’images d’Apple ne voient que le HEIC, le TIFF, l’AVIF et le PDF, et seulement lorsque les données sont vraiment de ce format. Les SVG, les formules et les diagrammes passent aussi par ce service, ce sont donc dans Splat des images à résolution fixe : quatre pixels par point, jusqu’à 2560 sur le plus grand côté.
+- **Décodage isolé.** Les images et les graphiques des formules et des diagrammes sont décodés dans un service distinct, que macOS lance dans son propre bac à sable : aucun de vos fichiers, pas de réseau. Il ne renvoie que des pixels, dont la taille est vérifiée, et s’arrête de lui-même lorsqu’un décodage dure plus de 10 secondes ou demande trop de mémoire. Les décodeurs d’images d’Apple ne voient que le HEIC, le TIFF, l’AVIF et le PDF, et seulement lorsque les données sont vraiment de ce format. Les SVG, les formules et les diagrammes passent aussi par ce service, ce sont donc dans Splat des images : au plus quatre pixels par point et 2560 sur le plus grand côté.
 - **Les fichiers locaux** n’atteignent un document que par le chemin qu’il nomme, et seulement depuis un dossier auquel vous avez autorisé l’accès : Splat peut lire un document que vous ouvrez, mais les images, les notes, la bibliographie et le dépôt qui l’entourent seulement une fois que vous avez autorisé l’accès à leur dossier avec **Autoriser l’accès au dossier…** dans la barre au-dessus de l’aperçu. Une autorisation couvre tous les sous-dossiers et reste mémorisée. Les intégrations affichent des notes Markdown du dossier du document et de ses sous-dossiers, et une image manquante n’est recherchée que là. Un chemin d’image situé ailleurs, absolu ou commençant par `~`, se charge dans l’aperçu depuis un dossier autorisé ; les exportations HTML et Word, l’impression et les PDF n’emportent que ce qui se trouve dans le dossier du document ou dans son dépôt Git, sauf si ce dépôt contient aussi votre dossier Départ, pour qu’un document venu d’ailleurs ne puisse pas entraîner vos fichiers dans une exportation que vous transmettez.
 - **Les dossiers de notes** ne sont lus que tant que la barre latérale les affiche, et renommer une note ne modifie d’autres fichiers qu’après que vous avez confirmé combien.
 - **Les dépôts Git** sont lus par Splat lui-même. Il n’exécute jamais le programme `git`, dont la configuration dans un dépôt venu d’ailleurs peut lancer d’autres programmes, et il ne lit rien de plus que la version du document ouvert dans le dernier commit. Il n’y écrit rien et n’utilise aucun réseau.
@@ -574,7 +574,7 @@ Splat reste réactif avec des documents de plusieurs mégaoctets :
 - La source utilise TextKit 2, qui ne met en page que la partie visible.
 - Pendant la saisie dans l’aperçu, et dans la source des documents jusqu’à 2 Mo, seuls les paragraphes concernés sont de nouveau analysés, colorés et mis en page. Dans un document de 10 Mo, l’analyse et la coloration prennent environ 3 ms, le rendu environ 10 ms, et une frappe complète dans son aperçu environ 30 ms avec le travail propre à la vue.
 - Les aperçus volumineux rendent d’abord la partie visible, puis le reste lorsque l’app est inactive. Les blocs qui défilent dans la zone visible sont rendus avant d’être dessinés.
-- Dans la source des documents plus volumineux, l’analyse pour l’aperçu s’exécute en arrière-plan pendant la saisie.
+- Dans la source des documents plus volumineux, le même travail s’exécute en arrière-plan pendant la saisie.
 - Un document reste en texte brut dès qu’il demanderait environ 4 Go de mémoire, soit environ 50 à 120 Mo de Markdown ordinaire, mais seulement 10 à 20 Mo s’il ne contient que des tableaux ou des titres : la source n’a pas de couleurs et l’aperçu dit pourquoi il reste vide. Les exports fonctionnent toujours.
 - À partir d’environ 200 Ko, un document ouvre sa fenêtre avant d’être analysé ; à 5 Mo, les couleurs et l’aperçu suivent environ un quart de seconde plus tard.
 - Toutes les images ensemble, formules et diagrammes compris, occupent au plus un quart de la mémoire du Mac, et la moitié de cela quand la mémoire manque. Au-delà, les images suivantes s’affichent comme des espaces réservés jusqu’à ce qu’il y ait de nouveau de la place.

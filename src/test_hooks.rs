@@ -23,6 +23,25 @@ pub(crate) const FIRST_RETRY: Duration = if SELFTEST {
     Duration::from_secs(30)
 };
 
+/// What a check set in place of the time the formula editor keeps its web view after its popover closed.
+static FORMULA_FIELD_KEPT: Mutex<Option<Duration>> = Mutex::new(None);
+
+/// How long the formula editor keeps its web view after its popover closed: `shipped`, or what a check set.
+pub(crate) fn formula_field_kept(shipped: Duration) -> Duration {
+    if !SELFTEST {
+        return shipped;
+    }
+    FORMULA_FIELD_KEPT.lock().ok().and_then(|kept| *kept).unwrap_or(shipped)
+}
+
+/// Lets the formula editor keep its web view for `time` after its popover closed, or for the app's time with `None`.
+#[cfg(feature = "selftest")]
+pub(crate) fn keep_formula_field_for(time: Option<Duration>) {
+    if let Ok(mut kept) = FORMULA_FIELD_KEPT.lock() {
+        *kept = time;
+    }
+}
+
 /// Rounds of looks at the files whose answers have been taken in, for a check that something did not happen to wait for.
 pub(crate) static LOOKS_TAKEN: AtomicUsize = AtomicUsize::new(0);
 

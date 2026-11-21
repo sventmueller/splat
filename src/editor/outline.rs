@@ -2,7 +2,6 @@
 //! stand for the rows of this and the other lists of the sidebar.
 
 use std::cell::{Cell, OnceCell, RefCell};
-use std::ops::Range;
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, NSObject, ProtocolObject};
@@ -12,10 +11,9 @@ use objc2_app_kit::{
     NSScrollView, NSTableColumn, NSTableViewStyle, NSTextField, NSView,
 };
 use objc2_foundation::{NSNotification, NSObjectProtocol, NSPoint, NSRect, NSSize};
-use splat_editor_state::outline::{Node, tree};
+use splat_editor_state::outline::{Followed, Heading, Headings, Node, tree};
 
 use super::EditorController;
-use crate::markdown::text::Byte;
 use crate::util::{guarded, ns};
 
 define_class!(
@@ -83,6 +81,8 @@ pub struct SourceIvars {
     items: RowItems,
     /// The tree as last shown, to tell a new heading from text moving the existing ones.
     shown: RefCell<Vec<(u8, String)>>,
+    /// The headings the nodes were made of.
+    headings: RefCell<Headings>,
     controller: RefCell<Option<Weak<EditorController>>>,
     /// Set while the tree is replaced, which clears the selection without the user choosing anything.
     reloading: Cell<bool>,
@@ -212,12 +212,38 @@ impl Outline {
         (Outline { view, source }, scroll)
     }
 
-    /// Shows the headings; the tree is only rebuilt when headings were added, removed or renamed, so typing does
-    /// not collapse what the user opened.
-    pub fn update(&self, headings: &[(u8, String, Range<Byte>)]) {
+    /// The headings it shows, for the next ones to follow; until `update` gives it others, it knows none.
+    pub fn take_headings(&self) -> Headings {
+        self.source.ivars().headings.take()
+    }
+
+    /// Shows the headings, which became `followed` of those `take_headings` gave; the tree is only rebuilt when headings
+    /// were added, removed or renamed, so typing does not collapse what the user opened.
+    pub fn update(&self, headings: Headings, followed: Followed) {
+        let ivars = self.source.ivars();
+        match followed {
+            Followed::Same => {}
+            Followed::Moved => {
+                for (node, heading) in ivars.nodes.borrow_mut().iter_mut().zip(headings.list()) {
+                    node.start = heading.range.start;
+                }
+            }
+            Followed::Changed => self.rebuild(headings.list()),
+        }
+        *ivars.headings.borrow_mut() = headings;
+    }
+
+    /// The title and the start in the source of every heading it holds.
+    #[cfg(feature = "selftest")]
+    pub fn nodes(&self) -> Vec<(String, crate::markdown::text::Byte)> {
+        let nodes = self.source.ivars().nodes.borrow();
+        nodes.iter().map(|n| (n.title.clone(), n.start)).collect()
+    }
+
+    fn rebuild(&self, headings: &[Heading]) {
         let ivars = self.source.ivars();
         let (nodes, roots) = tree(headings);
-        let shape: Vec<(u8, String)> = headings.iter().map(|(l, t, _)| (*l, t.clone())).collect();
+        let shape: Vec<(u8, String)> = headings.iter().map(|h| (h.level, h.title.clone())).collect();
         let changed = *ivars.shown.borrow() != shape;
         let count = nodes.len();
         *ivars.nodes.borrow_mut() = nodes;

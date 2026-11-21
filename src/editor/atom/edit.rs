@@ -9,7 +9,7 @@ use objc2_app_kit::NSTextView;
 use objc2_foundation::NSRect;
 
 use super::{AtomEditor, AtomKind};
-use crate::editor::{State, mathfield};
+use crate::editor::State;
 use crate::i18n::t;
 use crate::markdown::commands::{self, Edit};
 use crate::markdown::doc::{BlockKind, Doc, block_path, figure_at};
@@ -225,9 +225,7 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            self.host
-                .object()
-                .detach_formula_field(&mathfield::field(self.host.mtm()));
+            self.host.object().detach_formula_field_if_started();
         }
         edit.popover.close();
     }
@@ -247,9 +245,7 @@ impl AtomEditor<'_> {
             return;
         };
         if edit.visual.get() {
-            self.host
-                .object()
-                .detach_formula_field(&mathfield::field(self.host.mtm()));
+            self.host.object().detach_formula_field_if_started();
         }
         self.state.closed.set(Some(edit.range_start));
         let current = edit.start..edit.start + edit.len.get();

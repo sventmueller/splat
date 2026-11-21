@@ -5,6 +5,7 @@ use splat_file_state::{Encoding, FileFormat};
 use splat_markdown::commands::{self, Edit, InlineStyle, ListStyle};
 use splat_markdown::doc::Align;
 use splat_markdown::docx::{WordExport, stored_entries, to_docx};
+use splat_markdown::highlight::{changed_region, changed_region_in};
 use splat_markdown::html::{Export, to_html};
 use splat_markdown::incremental::{parse_and_color, reparse_and_color};
 use splat_markdown::reader::parse;
@@ -93,6 +94,14 @@ pub fn reparse(data: &[u8]) {
         let what = || format!("{text:?} -> {new:?}");
         assert!(next.doc.blocks() == full.doc.blocks(), "blocks: {}", what());
         assert!(next.spans == full.spans, "colors: {}", what());
+        if let Some(splice) = next.splice.as_ref().filter(|_| next.kept_colors) {
+            let region = changed_region_in(&text, &spans, &new, &next.spans, &splice.window, splice.delta);
+            assert!(
+                region == Some(changed_region(&text, &spans, &new, &next.spans)),
+                "region to recolor: {}",
+                what()
+            );
+        }
         assert!(next.doc.facts() == full.doc.facts(), "facts: {}", what());
         assert!(
             layout(&next.doc, &NoImages, None).blocks == layout(&full.doc, &NoImages, None).blocks,

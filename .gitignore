@@ -1,4 +1,5 @@
 /target/
+/dist/symbols/
 .DS_Store
 /.playwright-mcp/
 

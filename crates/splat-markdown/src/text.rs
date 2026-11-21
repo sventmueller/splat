@@ -650,20 +650,65 @@ fn advance_u16(text: &str, from: Byte, units: usize) -> (Byte, usize) {
     (text.end(), count)
 }
 
+/// The place `units` UTF-16 code units before `from`, at a char boundary: a surrogate pair the count would end inside
+/// stays whole, so the place lies at or after the position, as with `byte_at_u16`.
+pub fn byte_before_u16(text: &str, from: Byte, units: usize) -> Byte {
+    retreat_u16(text, from, units).0
+}
+
+/// Like `byte_before_u16`, but `None` when `units` ends inside a surrogate pair or before the start of the text.
+pub fn byte_before_u16_exact(text: &str, from: Byte, units: usize) -> Option<Byte> {
+    let (byte, reached) = retreat_u16(text, from, units);
+    (reached == units).then_some(byte)
+}
+
+fn retreat_u16(text: &str, from: Byte, units: usize) -> (Byte, usize) {
+    const CHUNK: usize = 4096;
+    let mut at = from.0;
+    let mut count = 0;
+    while at > CHUNK {
+        let start = text.ceil_char_boundary(at - CHUNK);
+        let n = utf16_len(&text[start..at]);
+        if count + n > units {
+            break;
+        }
+        count += n;
+        at = start;
+    }
+    for c in text[..at].chars().rev() {
+        let n = c.len_utf16();
+        if count + n > units {
+            break;
+        }
+        count += n;
+        at -= c.len_utf8();
+    }
+    (Byte(at), count)
+}
+
 /// Converts increasing positions of a text to UTF-16 positions in one forward pass, without a table.
 pub struct Utf16Cursor<'a> {
     text: &'a str,
     byte: Byte,
     u16: U16,
+    /// Where counting starts again for a position before the last one, unless the position lies before it as well.
+    anchor: (Byte, U16),
 }
 
 impl<'a> Utf16Cursor<'a> {
     /// A cursor at the start of `text`.
     pub fn new(text: &'a str) -> Self {
+        Utf16Cursor::from_anchor(text, (Byte(0), U16(0)))
+    }
+
+    /// A cursor at a char boundary of `text` whose UTF-16 position is known, which saves counting up to it.
+    pub fn from_anchor(text: &'a str, anchor: (Byte, U16)) -> Self {
+        debug_assert!(text.boundary(anchor.0), "an anchor inside a character");
         Utf16Cursor {
             text,
-            byte: Byte(0),
-            u16: U16(0),
+            byte: anchor.0,
+            u16: anchor.1,
+            anchor,
         }
     }
 
@@ -671,8 +716,11 @@ impl<'a> Utf16Cursor<'a> {
     pub fn at(&mut self, byte: Byte) -> U16 {
         let byte = self.text.fit_at(byte);
         if byte < self.byte {
-            self.byte = Byte(0);
-            self.u16 = U16(0);
+            (self.byte, self.u16) = if byte >= self.anchor.0 {
+                self.anchor
+            } else {
+                (Byte(0), U16(0))
+            };
         }
         self.u16 += utf16_len(self.text.at(self.byte..byte));
         self.byte = byte;
@@ -968,6 +1016,64 @@ mod tests {
         };
         for units in [0, 1, 3, 2000, 4096, 5000, 11_999, 12_000, 20_000] {
             assert_eq!(advance_u16(&text, Byte::new(0), units), walked(units), "{units}");
+        }
+    }
+
+    #[test]
+    fn counting_back_lands_where_counting_forward_from_the_start_does() {
+        for text in ["aä😀b€😀".to_string(), "aé😀".repeat(3000), "x😀".repeat(2500)] {
+            let total = utf16_len(&text);
+            for from in [text.len(), text.len() / 2, 4097, 0].map(|b| text.floor_char_boundary(b)) {
+                let at = utf16_len(&text[..from]);
+                for back in [0, 1, 2, 3, 5, 4096, 4097, at.saturating_sub(1), at, at + 1] {
+                    let forward = byte_at_u16(&text, Byte::new(0), at.saturating_sub(back));
+                    let what = format!("{back} back from {from} of {} bytes", text.len());
+                    if back <= at {
+                        assert_eq!(byte_before_u16(&text, Byte::new(from), back), forward, "{what}");
+                    }
+                    let exact = (back <= at)
+                        .then(|| byte_at_u16_exact(&text, Byte::new(0), at - back))
+                        .flatten();
+                    assert_eq!(byte_before_u16_exact(&text, Byte::new(from), back), exact, "{what}");
+                }
+            }
+            assert_eq!(
+                byte_before_u16(&text, text.end(), total + 7),
+                Byte::new(0),
+                "the start at most"
+            );
+        }
+    }
+
+    #[test]
+    fn counting_back_keeps_a_surrogate_pair_whole() {
+        let text = "a😀b";
+        assert_eq!(byte_before_u16(text, Byte::new(5), 1), Byte::new(5), "half of the pair");
+        assert_eq!(byte_before_u16_exact(text, Byte::new(5), 1), None);
+        assert_eq!(byte_before_u16_exact(text, Byte::new(5), 2), Some(Byte::new(1)));
+        assert_eq!(byte_before_u16_exact(text, Byte::new(6), 4), Some(Byte::new(0)));
+        assert_eq!(byte_before_u16_exact(text, Byte::new(6), 5), None, "before the start");
+        assert_eq!(byte_before_u16_exact("äö", Byte::new(4), 1), Some(Byte::new(2)));
+    }
+
+    #[test]
+    fn a_cursor_from_an_anchor_counts_as_one_from_the_start() {
+        let text = "aä😀b\n€😀 x".repeat(50);
+        let anchor = Byte::new(text.floor_char_boundary(text.len() / 2));
+        let mut from_anchor = Utf16Cursor::from_anchor(&text, (anchor, U16::new(utf16_len(text.upto(anchor)))));
+        let mut from_start = Utf16Cursor::new(&text);
+        for at in [
+            anchor.0,
+            anchor.0 + 9,
+            text.len(),
+            anchor.0 + 1,
+            anchor.0 - 3,
+            0,
+            5,
+            text.len() + 4,
+        ] {
+            let at = Byte::new(at);
+            assert_eq!(from_anchor.at(at), from_start.at(at), "{at:?}");
         }
     }
 

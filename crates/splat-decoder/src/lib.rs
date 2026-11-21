@@ -9,8 +9,9 @@
 use std::io::Read;
 use std::io::{BufReader, BufWriter, Write};
 use std::os::unix::net::UnixStream;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError, TryLockError};
+use std::time::{Duration, Instant};
 
 use objc2::AnyThread;
 use objc2::rc::Retained;
@@ -22,7 +23,7 @@ mod safe_image;
 pub mod serve;
 pub mod xpc;
 
-pub use protocol::{Decoded, EXPORT_SIDE, MAX_BYTES, MAX_FILE_BYTES, SHOWN_SIDE};
+pub use protocol::{Decoded, EXPORT_SIDE, Fit, MAX_BYTES, MAX_FILE_BYTES, SHOWN_SIDE};
 use protocol::{Request, TIMEOUT, memory_of, most_memory, read_answer};
 
 use xpc::{Connection, Order};
@@ -72,17 +73,162 @@ fn answer_socket(stream: std::os::fd::OwnedFd, native: bool) {
 /// The connection to the service, made on first use; the service itself starts with the first socket it gets.
 static SERVICE: Mutex<Option<Connection>> = Mutex::new(None);
 
+/// After this long without a request the service ends, and with it the memory its fonts and decoders hold.
+const SERVICE_IDLE: Duration = Duration::from_secs(60);
+
+/// When a request last began or ended, noted while its helper's slot is held.
+static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::new(None);
+/// Wakes the watch of the service before its time, as a check that shortens the time does.
+static WAKE: Condvar = Condvar::new();
+/// The number of the connection made last; the watch of an earlier one leaves it to its own.
+static CONNECTIONS: AtomicU64 = AtomicU64::new(0);
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// The app's identifier with `.decoder`, so that the self-test and debug builds each reach their own service.
 fn service_name() -> Option<String> {
     Some(format!("{}.decoder", NSBundle::mainBundle().bundleIdentifier()?))
 }
 
 fn with_service<T>(f: impl FnOnce(&Connection) -> Option<T>) -> Option<T> {
-    let mut service = SERVICE.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut service = lock(&SERVICE);
     if service.is_none() {
         *service = Connection::to_service(&service_name()?);
+        if service.is_some() {
+            used();
+            watch_idle(CONNECTIONS.fetch_add(1, Ordering::SeqCst) + 1);
+        }
     }
     f(service.as_ref()?)
+}
+
+fn used() {
+    *lock(&LAST_REQUEST) = Some(Instant::now());
+}
+
+fn quiet_for(last: Option<Instant>) -> Duration {
+    last.map_or(Duration::ZERO, |at| at.elapsed())
+}
+
+#[cfg(feature = "selftest")]
+static IDLE_FOR_CHECKS: Mutex<Option<Duration>> = Mutex::new(None);
+
+fn idle_time() -> Duration {
+    #[cfg(feature = "selftest")]
+    if let Some(time) = *lock(&IDLE_FOR_CHECKS) {
+        return time;
+    }
+    SERVICE_IDLE
+}
+
+/// Ends the service after `time` without a request instead of `SERVICE_IDLE`, or after that again with `None`.
+#[cfg(feature = "selftest")]
+pub fn end_unused_after(time: Option<Duration>) {
+    // Held, so that a watch about to wait does so for the new time.
+    let _last = lock(&LAST_REQUEST);
+    *lock(&IDLE_FOR_CHECKS) = time;
+    WAKE.notify_all();
+}
+
+/// Whether the app holds a connection to the service, which it lets go when the service ends.
+#[cfg(feature = "selftest")]
+pub fn service_runs() -> bool {
+    lock(&SERVICE).is_some()
+}
+
+/// What a look of the watch of the service found.
+enum Look {
+    /// The service ended, or a newer connection has a watch of its own.
+    Done,
+    /// A request runs; it notes its end, from which the time counts anew.
+    Busy,
+    /// A request ran since the time was read.
+    Early,
+}
+
+/// Ends the service of connection `number` after `idle_time()` without a request, on a thread that ends with it.
+fn watch_idle(number: u64) {
+    let watch = move || {
+        loop {
+            {
+                let last = lock(&LAST_REQUEST);
+                let left = idle_time().saturating_sub(quiet_for(*last));
+                if !left.is_zero() {
+                    drop(WAKE.wait_timeout(last, left));
+                    continue;
+                }
+            }
+            match end_if_unused(number) {
+                Look::Done => return,
+                Look::Busy => drop(WAKE.wait_timeout(lock(&LAST_REQUEST), idle_time())),
+                Look::Early => {}
+            }
+        }
+    };
+    let _ = std::thread::Builder::new()
+        .name("decoder service watch".into())
+        .spawn(watch);
+}
+
+/// The slot, unless a request holds it.
+fn hold_if_free(slot: &'static Mutex<Option<Helper>>) -> Option<MutexGuard<'static, Option<Helper>>> {
+    match slot.try_lock() {
+        Ok(free) => Some(free),
+        Err(TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+        Err(TryLockError::WouldBlock) => None,
+    }
+}
+
+/// Ends the service of connection `number` unless a request runs or ran within `idle_time()`. Every helper's slot stays
+/// held until the service has gone, so a request that starts meanwhile waits and then starts a new one.
+fn end_if_unused(number: u64) -> Look {
+    let Some(mut slots) = HELPERS
+        .iter()
+        .chain(&NATIVE_HELPERS)
+        .map(hold_if_free)
+        .collect::<Option<Vec<_>>>()
+    else {
+        return Look::Busy;
+    };
+    if quiet_for(*lock(&LAST_REQUEST)) < idle_time() {
+        return Look::Early;
+    }
+    let connection = {
+        let mut service = match SERVICE.try_lock() {
+            Ok(service) => service,
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(TryLockError::WouldBlock) => return Look::Busy,
+        };
+        if CONNECTIONS.load(Ordering::SeqCst) != number {
+            return Look::Done;
+        }
+        let Some(connection) = service.take() else {
+            return Look::Done;
+        };
+        connection
+    };
+    let mut pids: Vec<i32> = slots
+        .iter_mut()
+        .filter_map(|slot| slot.take().map(|helper| helper.pid))
+        .collect();
+    pids.sort_unstable();
+    pids.dedup();
+    connection.tell(Order::End);
+    for pid in pids {
+        wait_for_end(pid);
+    }
+    drop(connection);
+    Look::Done
+}
+
+/// Waits a moment for process `pid` to go, so that the request after it reaches a new service, not the one ending.
+fn wait_for_end(pid: i32) {
+    let asked = Instant::now();
+    while memory_of(pid).is_some() && asked.elapsed() < Duration::from_secs(1) {
+        std::thread::sleep(Duration::from_millis(5));
+    }
 }
 
 fn tell_service(order: Order) {
@@ -113,8 +259,8 @@ impl Helper {
         })
     }
 
-    fn exchange(&mut self, kind: Request, side: Option<u32>, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
-        let prefix = side.map(u32::to_le_bytes);
+    fn exchange(&mut self, kind: Request, fit: Option<Fit>, payload: &[u8]) -> std::io::Result<Option<Decoded>> {
+        let prefix = fit.map(Fit::to_bytes);
         let prefix = prefix.as_ref().map_or(&[][..], |p| &p[..]);
         self.input.write_all(&[u8::from(kind)])?;
         self.input
@@ -122,7 +268,7 @@ impl Helper {
         self.input.write_all(prefix)?;
         self.input.write_all(payload)?;
         self.input.flush()?;
-        read_answer(&mut self.output, kind, side)
+        read_answer(&mut self.output, kind, fit.map(|fit| fit.side))
     }
 }
 
@@ -133,25 +279,28 @@ static NATIVE_HELPERS: [Mutex<Option<Helper>>; HELPER_COUNT] = [const { Mutex::n
 static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// A free helper if there is one, so that an image that takes long holds up nothing but itself.
-fn free_helper(pool: &'static [Mutex<Option<Helper>>]) -> std::sync::MutexGuard<'static, Option<Helper>> {
-    let first = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+fn free_helper(pool: &'static [Mutex<Option<Helper>>]) -> MutexGuard<'static, Option<Helper>> {
+    let first = NEXT.fetch_add(1, Ordering::Relaxed);
     for n in 0..pool.len() {
         if let Ok(free) = pool[(first + n) % pool.len()].try_lock() {
             return free;
         }
     }
-    pool[first % pool.len()]
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+    lock(&pool[first % pool.len()])
 }
 
-/// Ends the helpers that are not decoding, and the service when none is; the next request starts them again.
+/// Ends the helpers that are not decoding, and the service when none is; the next request starts them again. The slots
+/// stay held until the service has been told, so a request that starts meanwhile finds neither gone under it.
 pub fn release_idle() {
+    let mut held = Vec::new();
     let mut all_idle = true;
     for slot in HELPERS.iter().chain(&NATIVE_HELPERS) {
-        match slot.try_lock() {
-            Ok(mut idle) => *idle = None,
-            Err(_) => all_idle = false,
+        match hold_if_free(slot) {
+            Some(mut idle) => {
+                *idle = None;
+                held.push(idle);
+            }
+            None => all_idle = false,
         }
     }
     // Its fonts and decoders stay in memory for as long as it runs.
@@ -161,6 +310,7 @@ pub fn release_idle() {
     {
         service.tell(Order::End);
     }
+    drop(held);
 }
 
 /// Why a helper was stopped during a request.
@@ -204,19 +354,32 @@ enum HelperFailure {
     Ended,
 }
 
-fn asked(kind: Request, side: Option<u32>, payload: &[u8]) -> Result<Option<Decoded>, HelperFailure> {
+fn asked(kind: Request, fit: Option<Fit>, payload: &[u8]) -> Result<Option<Decoded>, HelperFailure> {
     if payload.len() > kind.most_bytes() {
         return Err(HelperFailure::TooLarge);
     }
     let pool: &'static [Mutex<Option<Helper>>] = if kind.is_native() { &NATIVE_HELPERS } else { &HELPERS };
     let mut guard = free_helper(pool);
+    used();
+    let answer = answer_in(&mut guard, kind, fit, payload);
+    used();
+    answer
+}
+
+/// What the helper in `slot` answers, started if there is none.
+fn answer_in(
+    slot: &mut Option<Helper>,
+    kind: Request,
+    fit: Option<Fit>,
+    payload: &[u8],
+) -> Result<Option<Decoded>, HelperFailure> {
     // A helper can die of what the image before did to it, so a failure gets one more try with a new one; a file that
     // ends every helper or takes too long then fails on its own.
     for _ in 0..2 {
-        if guard.is_none() {
-            *guard = Helper::start(kind.is_native());
+        if slot.is_none() {
+            *slot = Helper::start(kind.is_native());
         }
-        let helper = guard.as_mut().ok_or(HelperFailure::NotStarted)?;
+        let helper = slot.as_mut().ok_or(HelperFailure::NotStarted)?;
         let pid = helper.pid;
         let (done, finished) = std::sync::mpsc::channel::<()>();
         let watch = std::thread::spawn(move || {
@@ -226,13 +389,13 @@ fn asked(kind: Request, side: Option<u32>, payload: &[u8]) -> Result<Option<Deco
             }
             overrun
         });
-        let answer = helper.exchange(kind, side, payload);
+        let answer = helper.exchange(kind, fit, payload);
         let _ = done.send(());
         let overrun = watch.join().ok().flatten();
         match answer {
             Ok(decoded) => return Ok(decoded),
             Err(_) => {
-                *guard = None;
+                *slot = None;
                 if let Some(overrun) = overrun {
                     return Err(HelperFailure::Stopped(overrun));
                 }
@@ -243,18 +406,23 @@ fn asked(kind: Request, side: Option<u32>, payload: &[u8]) -> Result<Option<Deco
 }
 
 /// What a helper answers; why there is none goes to the log, as a picture that does not show says nothing about that.
-fn request(kind: Request, side: Option<u32>, payload: &[u8]) -> Option<Decoded> {
-    asked(kind, side, payload).unwrap_or_else(|failure| {
+fn request(kind: Request, fit: Option<Fit>, payload: &[u8]) -> Option<Decoded> {
+    asked(kind, fit, payload).unwrap_or_else(|failure| {
         report("a decoder helper gave no answer", format!("{failure:?}"));
         None
     })
 }
 
-/// An image file or download as pixels no wider or higher than `side`: PNG, JPEG, GIF, WebP and BMP from one helper, an
-/// SVG as a PDF from there and as pixels from the other, so that this process reads no PDF.
+/// An image file or download as pixels no wider or higher than `side`.
 pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
-    match request(Request::Image, Some(side), bytes)? {
-        Decoded::Pdf(pdf) => decode_native(&pdf, side),
+    decode_to(bytes, Fit::within(side))
+}
+
+/// An image file or download as the pixels `fit` asks for: PNG, JPEG, GIF, WebP and BMP from one helper, an SVG as a PDF
+/// from there and as pixels from the other, so that this process reads no PDF.
+pub fn decode_to(bytes: &[u8], fit: Fit) -> Option<Decoded> {
+    match request(Request::Image, Some(fit), bytes)? {
+        Decoded::Pdf(pdf) => decode_native_to(&pdf, fit),
         Decoded::Png(_) => None,
         pixels => Some(pixels),
     }
@@ -262,7 +430,12 @@ pub fn decode(bytes: &[u8], side: u32) -> Option<Decoded> {
 
 /// What only the system's decoders read, as pixels no wider or higher than `side`.
 pub fn decode_native(bytes: &[u8], side: u32) -> Option<Decoded> {
-    request(Request::NativeImage, Some(side), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
+    decode_native_to(bytes, Fit::within(side))
+}
+
+/// What only the system's decoders read, as the pixels `fit` asks for.
+pub fn decode_native_to(bytes: &[u8], fit: Fit) -> Option<Decoded> {
+    request(Request::NativeImage, Some(fit), bytes).filter(|answer| matches!(answer, Decoded::Rgba { .. }))
 }
 
 /// A TIFF from the pasteboard as a PNG file.
@@ -391,7 +564,7 @@ mod tests {
     fn a_request_over_its_limit_reaches_no_helper() {
         let too_large = vec![0; MAX_FILE_BYTES + 1];
         assert_eq!(
-            asked(Request::Image, Some(1), &too_large).err(),
+            asked(Request::Image, Some(Fit::within(1)), &too_large).err(),
             Some(HelperFailure::TooLarge)
         );
     }

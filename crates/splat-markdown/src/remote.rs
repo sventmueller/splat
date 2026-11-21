@@ -1,6 +1,6 @@
 //! What in a document comes from the files around it.
 
-use super::doc::{BlockKind, Doc, InlineKind, walk_blocks, walk_inlines};
+use super::doc::{Block, BlockKind, Doc, Inline, InlineKind};
 use super::{markup, url};
 
 /// Whether the document names files around it: a picture by its path, a wiki link or an embed. A sandboxed app reads them
@@ -17,20 +17,22 @@ pub fn has_local_files(doc: &Doc) -> bool {
             markup::Node::Text { .. } => false,
         })
     }
-    let mut found = false;
-    walk_blocks(&doc.blocks, &mut |b| {
-        if let BlockKind::HtmlBlock { literal } = &b.kind {
-            found |= literal.contains("<img") && in_html(&markup::parse(literal));
-        }
-        walk_inlines(b.inlines(), &mut |i| {
-            found |= match &i.kind {
-                InlineKind::Image { url, .. } | InlineKind::HtmlImage { url, .. } => local(url),
-                InlineKind::WikiLink { .. } => true,
-                _ => false,
-            };
-        });
-    });
-    found
+    fn names_one(i: &Inline) -> bool {
+        let here = match &i.kind {
+            InlineKind::Image { url, .. } | InlineKind::HtmlImage { url, .. } => local(url),
+            InlineKind::WikiLink { .. } => true,
+            _ => false,
+        };
+        here || i.children.iter().any(names_one)
+    }
+    fn holds_one(b: &Block) -> bool {
+        let html = match &b.kind {
+            BlockKind::HtmlBlock { literal } => literal.contains("<img") && in_html(&markup::parse(literal)),
+            _ => false,
+        };
+        html || b.inlines().iter().any(names_one) || b.children().iter().any(holds_one)
+    }
+    doc.blocks.iter().any(holds_one)
 }
 
 #[cfg(test)]
@@ -45,6 +47,11 @@ mod tests {
         assert!(local("![Logo](file:///Users/a/logo.png)\n"));
         assert!(local("Siehe [[Notiz]].\n"));
         assert!(local("![[Bild.png]]\n"));
+        assert!(
+            local("# T\n\n> - a\n>\n>   ![Logo](bilder/logo.png)\n"),
+            "deep inside blocks"
+        );
+        assert!(local("*a **[[Notiz]]** b*\n"), "deep inside inlines");
         assert!(local("<p>\n<img src=\"logo.png\">\n</p>\n"));
         assert!(local("Text <img src=\"logo.png\" width=\"20\"> Text\n"));
         assert!(

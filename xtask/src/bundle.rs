@@ -411,6 +411,11 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     let service = app.join(DECODER_BUNDLE).join("Contents");
     files::create_dir_all(service.join("MacOS"))?;
     files::copy(&decoder, service.join("MacOS").join(DECODER))?;
+    if matches!(build, Build::Distribution | Build::AppStore) {
+        keep_symbols(&[(&program, PROGRAM), (&decoder, DECODER)], version)?;
+        run(Command::new("strip").arg(macos.join(APP)))?;
+        run(Command::new("strip").arg(service.join("MacOS").join(DECODER)))?;
+    }
     let measured = std::env::var("LLVM_PROFILE_FILE").ok().filter(|_| build.selftest());
     files::write(
         service.join("Info.plist"),
@@ -430,6 +435,7 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
     files::write(&plist, info_plist(version, &languages, variant, updates))?;
     run(Command::new("plutil").arg("-lint").arg("-s").arg(&plist))?;
     copy_dir(&root.join("resources"), &resources)?;
+    pack_scripts(&resources.join("js"))?;
     let icns = root.join("assets").join("AppIcon.icns");
     if icns.exists() {
         files::copy(&icns, resources.join("AppIcon.icns"))?;
@@ -472,7 +478,7 @@ pub(crate) fn assemble(build: Build, version: &str) -> Result<PathBuf, String> {
 /// processor alone.
 pub(crate) fn universal_programs() -> Result<(PathBuf, PathBuf), String> {
     let mut build = rustup_cargo()?;
-    build.args(["build", "--package", PACKAGE, "--release"]);
+    build.args(["build", "--package", PACKAGE, "--profile", DIST_PROFILE]);
     for (target, _) in UNIVERSAL {
         build.args(["--target", target]);
     }
@@ -481,13 +487,27 @@ pub(crate) fn universal_programs() -> Result<(PathBuf, PathBuf), String> {
         let mut join = Command::new("lipo");
         join.arg("-create");
         for (target, _) in UNIVERSAL {
-            join.arg(target_dir().join(target).join("release").join(name));
+            join.arg(target_dir().join(target).join(DIST_PROFILE).join(name));
         }
         let program = target_dir().join(format!("{name}-universal"));
         run(join.arg("-output").arg(&program))?;
         Ok(program)
     };
     Ok((join(PROGRAM)?, join(DECODER)?))
+}
+
+/// The cargo profile of the programs that ship, defined in the workspace's Cargo.toml.
+const DIST_PROFILE: &str = "dist";
+
+/// The programs of a shipped version as built, before the bundle's copies lose their symbols: macOS crash reports of
+/// that version name only addresses, which `atos` turns into functions with these files.
+fn keep_symbols(programs: &[(&Path, &str)], version: &str) -> Result<(), String> {
+    let dir = root().join("dist").join("symbols").join(version);
+    files::create_dir_all(&dir)?;
+    for (program, name) in programs {
+        files::copy(program, dir.join(name))?;
+    }
+    Ok(())
 }
 
 /// That the library builds for a system without AppKit, through rustup for the same reason.

@@ -1,9 +1,10 @@
 //! Renders formulas (MathJax) and diagrams (Mermaid) in a hidden WebKit view.
 
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::{AnyObject, NSObject};
@@ -40,17 +41,32 @@ pub enum Key {
 }
 
 pub struct Renderer {
-    window: Retained<NSPanel>,
-    web: RefCell<Retained<WKWebView>>,
-    _delegate: Retained<NavDelegate>,
+    mtm: MainThreadMarker,
+    /// The web view and its window, from the first render that needs them until `RENDERER_IDLE` without one.
+    page: RefCell<Option<Page>>,
     queue: RefCell<RenderQueue<Key, Rendered>>,
     listeners: RefCell<Vec<(Owner, Held)>>,
+    /// When the page started or was last given something to render.
+    last_use: Cell<Instant>,
+    /// The number of the timer that may end the page; one that finds another number has been replaced.
+    watch: Cell<u64>,
 }
 
-/// Beyond this many rendered formulas and diagrams, or this many bytes of their pictures, those no open document asked for
-/// lately go. What is in use stays, and `room_for_more` holds that within the memory all pictures may take.
-const CACHE_LIMIT: usize = 1500;
-const CACHE_BYTES: usize = 256 << 20;
+/// The hidden window, its web view and the delegate that hears from it, which end together.
+struct Page {
+    window: Retained<NSPanel>,
+    web: Retained<WKWebView>,
+    delegate: Retained<NavDelegate>,
+}
+
+/// Of the formulas and diagrams no open document wants, such as each half-typed formula, at most this many, holding at
+/// most this many bytes of pictures, stay for a document that asks again; the least recently asked for go first. What
+/// a document wants stays, and `room_for_more` holds that within the memory all pictures may take.
+const CACHE_LIMIT: usize = 200;
+const CACHE_BYTES: usize = 32 << 20;
+
+/// After this long without a render, the web view, its window and its web process end; what they rendered stays.
+const RENDERER_IDLE: Duration = Duration::from_secs(120);
 
 thread_local! {
     static RENDERER: OnceCell<Rc<Renderer>> = const { OnceCell::new() };
@@ -108,7 +124,7 @@ fn web_view(window: &NSPanel, delegate: &NavDelegate) -> Retained<WKWebView> {
         NSRect::new(NSPoint::new(0.0, 0.0), window.frame().size),
         &webkit::configuration(mtm),
     );
-    // SAFETY: WebKit holds the delegate weakly; the renderer keeps it alive next to the web view.
+    // SAFETY: WebKit holds the delegate weakly; the page keeps it alive next to the web view.
     unsafe { web.setNavigationDelegate(Some(objc2::runtime::ProtocolObject::from_ref(delegate))) };
     web
 }
@@ -118,39 +134,29 @@ fn load_page(window: &NSPanel, web: &WKWebView) {
     webkit::load_bundled_page(web, PAGE);
 }
 
-/// Between creating the first web view and loading its page, so that a key pressed meanwhile gets through; a block
-/// dispatched without a delay would run ahead of it.
-const TURN_FOR_KEYS: std::time::Duration = std::time::Duration::from_millis(16);
+/// Between creating a web view and loading its page, so that a key pressed meanwhile gets through; a block dispatched
+/// without a delay would run ahead of it.
+const TURN_FOR_KEYS: Duration = Duration::from_millis(16);
 
 /// A render that has not answered by then counts as failed, and a new web view takes over.
-pub const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const RENDER_TIMEOUT: Duration = Duration::from_secs(10);
 
 fn renderer_if_started() -> Option<Rc<Renderer>> {
     RENDERER.with(|r| r.get().cloned())
 }
 
-/// The shared renderer; created on first use and kept for the lifetime of the app.
+/// The shared renderer, created on first use and kept with what it rendered for the lifetime of the app. Its web view,
+/// whose processes take about 150 MB, starts with the first render that needs it and ends after `RENDERER_IDLE` without
+/// one.
 pub fn renderer(mtm: MainThreadMarker) -> Rc<Renderer> {
-    RENDERER.with(|cell| {
-        cell.get_or_init(|| {
-            let renderer = Rc::new(Renderer::new(mtm));
-            #[cfg(feature = "selftest")]
-            HAD_ITS_PAGE_AT_ONCE.set(renderer.web.borrow().window().is_some());
-            renderer.watch_load();
-            main_after(TURN_FOR_KEYS, || {
-                if let Some(r) = renderer_if_started() {
-                    load_page(&r.window, &r.web.borrow());
-                }
-            });
-            renderer
-        })
-        .clone()
-    })
+    RENDERER.with(|cell| cell.get_or_init(|| Rc::new(Renderer::new(mtm))).clone())
 }
 
 #[cfg(feature = "selftest")]
 thread_local! {
-    static HAD_ITS_PAGE_AT_ONCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static HAD_ITS_PAGE_AT_ONCE: Cell<bool> = const { Cell::new(false) };
+    /// What a check set in place of `RENDERER_IDLE`.
+    static IDLE_FOR_CHECKS: Cell<Option<Duration>> = const { Cell::new(None) };
 }
 
 #[cfg(feature = "selftest")]
@@ -158,9 +164,10 @@ pub fn had_its_page_at_once() -> bool {
     HAD_ITS_PAGE_AT_ONCE.get()
 }
 
+/// Whether the web view runs.
 #[cfg(feature = "selftest")]
 pub fn started() -> bool {
-    renderer_if_started().is_some()
+    renderer_if_started().is_some_and(|r| r.page.borrow().is_some())
 }
 
 #[cfg(feature = "selftest")]
@@ -168,11 +175,30 @@ pub fn idle() -> bool {
     renderer_if_started().is_none_or(|r| r.idle())
 }
 
+/// Ends the web view after `time` without a render instead of `RENDERER_IDLE`, or after that again with `None`.
+#[cfg(feature = "selftest")]
+pub fn end_unused_after(time: Option<Duration>) {
+    IDLE_FOR_CHECKS.set(time);
+    if let Some(r) = renderer_if_started() {
+        r.watch_idle(Duration::ZERO);
+    }
+}
+
+fn idle_time() -> Duration {
+    #[cfg(feature = "selftest")]
+    if let Some(time) = IDLE_FOR_CHECKS.get() {
+        return time;
+    }
+    RENDERER_IDLE
+}
+
 #[cfg(feature = "selftest")]
 impl Renderer {
-    /// The page itself, for what the selftest tries against it.
+    /// The page itself, for what the selftest tries against it, started if it does not run; a try counts as a render.
     pub fn web(&self) -> Retained<WKWebView> {
-        self.web.borrow().clone()
+        self.used();
+        let running = self.running().map(|(_, web)| web);
+        running.unwrap_or_else(|| self.start_page())
     }
 }
 
@@ -305,8 +331,8 @@ impl splat_preview::layout::Resolver for Ready {
     }
 }
 
-impl Renderer {
-    fn new(mtm: MainThreadMarker) -> Renderer {
+impl Page {
+    fn new(mtm: MainThreadMarker) -> Page {
         // WebKit only lays out and measures text inside a real window, so the view lives in an
         // invisible window far off screen instead of being created detached. A panel, because AppKit counts every
         // other visible window as open and then answers a click on the Dock icon without opening a document.
@@ -328,13 +354,90 @@ impl Renderer {
         let delegate: Retained<NavDelegate> = unsafe { msg_send![super(NavDelegate::alloc(mtm).set_ivars(())), init] };
         let web = web_view(&window, &delegate);
         window.orderBack(None);
+        Page { window, web, delegate }
+    }
+}
+
+impl Renderer {
+    fn new(mtm: MainThreadMarker) -> Renderer {
         Renderer {
-            window,
-            web: RefCell::new(web),
-            _delegate: delegate,
+            mtm,
+            page: RefCell::new(None),
             queue: RefCell::default(),
             listeners: RefCell::new(Vec::new()),
+            last_use: Cell::new(Instant::now()),
+            watch: Cell::new(0),
         }
+    }
+
+    /// The window and the web view, while the page runs.
+    fn running(&self) -> Option<(Retained<NSPanel>, Retained<WKWebView>)> {
+        self.page
+            .borrow()
+            .as_ref()
+            .map(|page| (page.window.clone(), page.web.clone()))
+    }
+
+    /// Starts the page as the first render needs it: the web view now, its page in a later turn of the main loop.
+    fn start_page(&self) -> Retained<WKWebView> {
+        let page = Page::new(self.mtm);
+        let web = page.web.clone();
+        #[cfg(feature = "selftest")]
+        HAD_ITS_PAGE_AT_ONCE.set(web.window().is_some());
+        *self.page.borrow_mut() = Some(page);
+        self.used();
+        self.watch_idle(idle_time());
+        self.watch_load();
+        main_after(TURN_FOR_KEYS, || {
+            if let Some((window, web)) = renderer_if_started().and_then(|r| r.running()) {
+                load_page(&window, &web);
+            }
+        });
+        web
+    }
+
+    fn used(&self) {
+        self.last_use.set(Instant::now());
+    }
+
+    /// Looks after `wait` whether the page can end; a look planned before is dropped.
+    fn watch_idle(&self, wait: Duration) {
+        let watch = self.watch.get() + 1;
+        self.watch.set(watch);
+        main_after(wait, move || {
+            if let Some(r) = renderer_if_started()
+                && r.watch.get() == watch
+            {
+                r.end_if_unused();
+            }
+        });
+    }
+
+    /// Ends the page once it has had nothing to do for `idle_time()`, and otherwise looks again when that may be so.
+    fn end_if_unused(&self) {
+        if self.page.borrow().is_none() {
+            return;
+        }
+        let (idle, quiet) = (idle_time(), self.last_use.get().elapsed());
+        if !self.idle() {
+            self.watch_idle(idle);
+        } else if quiet >= idle {
+            self.end_page();
+        } else {
+            self.watch_idle(idle.saturating_sub(quiet));
+        }
+    }
+
+    /// Ends the web view, its window and its web process. What they rendered stays, a late answer of theirs no longer
+    /// counts, and the next render starts a new page.
+    fn end_page(&self) {
+        let Some(page) = self.page.borrow_mut().take() else {
+            return;
+        };
+        self.queue.borrow_mut().lost_page();
+        webkit::detach_delegate(&page.web);
+        page.window.setContentView(None);
+        page.window.close();
     }
 
     /// `viewer` hears when renders arrive; what it asks for goes by the owner this returns.
@@ -378,9 +481,16 @@ impl Renderer {
     }
 
     fn pump(&self) {
+        if self.page.borrow().is_none() {
+            if self.queue.borrow().waits() {
+                self.start_page();
+            }
+            return;
+        }
         let Some((key, job)) = self.queue.borrow_mut().next() else {
             return;
         };
+        self.used();
         main_after(RENDER_TIMEOUT, move || {
             if let Some(r) = renderer_if_started() {
                 r.give_up(job);
@@ -398,6 +508,7 @@ impl Renderer {
     }
 
     fn finish(&self, key: Key, result: Option<Rendered>) {
+        self.used();
         let current = self.queue.borrow_mut().release(&key);
         self.store(key, result);
         self.notify_if_idle();
@@ -419,11 +530,20 @@ impl Renderer {
 
     /// A new web view takes over from one that does not answer.
     fn replace_view(&self) {
-        let stuck = self.web.borrow().clone();
+        let Some((window, stuck, delegate)) = self
+            .page
+            .borrow()
+            .as_ref()
+            .map(|page| (page.window.clone(), page.web.clone(), page.delegate.clone()))
+        else {
+            return;
+        };
         webkit::detach_delegate(&stuck);
-        let web = web_view(&self.window, &self._delegate);
-        load_page(&self.window, &web);
-        *self.web.borrow_mut() = web;
+        let web = web_view(&window, &delegate);
+        load_page(&window, &web);
+        if let Some(page) = self.page.borrow_mut().as_mut() {
+            page.web = web;
+        }
     }
 
     /// WebKit reports a page that never finishes loading to nobody, and queued formulas would wait forever.
@@ -440,13 +560,18 @@ impl Renderer {
     }
 
     fn is_current(&self, web: &WKWebView) -> bool {
-        std::ptr::eq(web, &**self.web.borrow())
+        self.page
+            .borrow()
+            .as_ref()
+            .is_some_and(|page| std::ptr::eq(web, &*page.web))
     }
 
     /// The web process ended: the page loads again in a new one.
     fn restart(&self) {
         self.lost_page();
-        webkit::load_bundled_page(&self.web.borrow(), PAGE);
+        if let Some((_, web)) = self.running() {
+            webkit::load_bundled_page(&web, PAGE);
+        }
         self.watch_load();
     }
 
@@ -508,9 +633,13 @@ impl Renderer {
         args: &[(&str, ScriptValue)],
         done: impl Fn(Answer<T>) + 'static,
     ) {
+        // `pump` hands out keys only while the page runs.
+        let Some((_, web)) = self.running() else {
+            return;
+        };
         let names: Vec<&str> = args.iter().map(|(name, _)| *name).collect();
         let body = format!("return await {function}({});", names.join(", "));
-        webkit::call_script(&self.web.borrow(), &body, args, move |result| {
+        webkit::call_script(&web, &body, args, move |result| {
             done(Answer::read(result));
         });
     }
@@ -597,7 +726,7 @@ impl Renderer {
             ("dark", ScriptValue::Flag(dark)),
         ];
         // Weak: WebKit keeps this handler until the script answers, and a view held by it could never close.
-        let web = Weak::from_retained(&self.web.borrow());
+        let web = self.running().map(|(_, web)| Weak::from_retained(&web));
         let label = source.lines().next().unwrap_or(splat_i18n::t("Diagramm")).to_string();
         self.call("renderDiagram", &args, move |answer: Answer<PlacedPicture>| {
             let Some(r) = renderer_if_started().filter(|r| r.queue.borrow().answer_counts(job)) else {
@@ -606,7 +735,8 @@ impl Renderer {
             if let Some(message) = answer.error {
                 r.queue.borrow_mut().note_error(key.clone(), message);
             }
-            let (Some(PlacedPicture { x, y, w, h }), Some(web)) = (answer.value, web.load()) else {
+            let (Some(PlacedPicture { x, y, w, h }), Some(web)) = (answer.value, web.as_ref().and_then(Weak::load))
+            else {
                 r.finish(key.clone(), None);
                 return;
             };

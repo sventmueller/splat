@@ -8,7 +8,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::markdown::text::{Byte, TextAt, U16, byte_at_u16, byte_at_u16_exact, offsets, units, utf16_len};
+use crate::markdown::text::{
+    Byte, TextAt, U16, byte_at_u16, byte_at_u16_exact, byte_before_u16, byte_before_u16_exact, offsets, units,
+    utf16_len,
+};
 use crate::preview::map::Shown;
 
 /// A length as a text storage counts a change of it; no text comes near the difference.
@@ -45,12 +48,14 @@ impl Snapshot {
     pub fn patched(mut self, range: Range<U16>, delta: isize, inserted: &str, version: u64) -> Option<Snapshot> {
         let new_len = units(&range);
         let old_len = usize::try_from(signed(new_len) - delta).ok()?;
-        let (mark_u16, mark_byte) = if self.mark.0 <= range.start {
-            self.mark
+        let (mark_u16, mark_byte) = self.mark;
+        let start = if mark_u16 <= range.start {
+            byte_at_u16_exact(&self.text, mark_byte, range.start - mark_u16)
+        } else if self.back_from_mark(range.start) {
+            byte_before_u16_exact(&self.text, mark_byte, mark_u16 - range.start)
         } else {
-            (U16::new(0), Byte::default())
-        };
-        let start = byte_at_u16_exact(&self.text, mark_byte, range.start - mark_u16)?;
+            byte_at_u16_exact(&self.text, Byte::default(), range.start.get())
+        }?;
         let end = byte_at_u16_exact(&self.text, start, old_len)?;
         self.text.replace_range(offsets(&(start..end)), inserted);
         self.version = version;
@@ -60,11 +65,20 @@ impl Snapshot {
         Some(self)
     }
 
-    /// The position of `byte`; counting starts at the last edit when `byte` lies behind it.
+    /// Whether a position before the mark is counted from the mark back rather than from the start: the text before the
+    /// last edit did not change, so the mark holds there as well.
+    fn back_from_mark(&self, position: U16) -> bool {
+        self.mark.0 - position < position.get()
+    }
+
+    /// The position of `byte`; counting starts at the last edit, or at the start of the text when that lies nearer.
     pub fn u16_at(&self, byte: Byte) -> U16 {
         let byte = Byte::new(self.text.floor_char_boundary(byte.get().min(self.text.len())));
-        if byte >= self.mark.1 {
-            self.mark.0 + utf16_len(self.text.at(self.mark.1..byte))
+        let (mark_u16, mark_byte) = self.mark;
+        if byte >= mark_byte {
+            mark_u16 + utf16_len(self.text.at(mark_byte..byte))
+        } else if mark_byte - byte < byte.get() {
+            mark_u16 - utf16_len(self.text.at(byte..mark_byte))
         } else {
             U16::new(utf16_len(self.text.upto(byte)))
         }
@@ -72,8 +86,11 @@ impl Snapshot {
 
     /// The char boundary at or after a position.
     pub fn byte_at(&self, position: U16) -> Byte {
-        if position >= self.mark.0 {
-            byte_at_u16(&self.text, self.mark.1, position - self.mark.0)
+        let (mark_u16, mark_byte) = self.mark;
+        if position >= mark_u16 {
+            byte_at_u16(&self.text, mark_byte, position - mark_u16)
+        } else if self.back_from_mark(position) {
+            byte_before_u16(&self.text, mark_byte, mark_u16 - position)
         } else {
             byte_at_u16(&self.text, Byte::default(), position.get())
         }
@@ -304,7 +321,7 @@ pub fn utf16_diff(old: &[u16], new: &[u16], caret: usize) -> (Range<usize>, Rang
 
 #[cfg(test)]
 mod tests {
-    use splat_markdown::text::bytes;
+    use splat_markdown::text::{Utf16Map, bytes};
     use splat_testkit::{Rng, rounds};
 
     use super::*;
@@ -321,16 +338,77 @@ mod tests {
             .collect()
     }
 
+    /// Which way a position before the mark is counted: back from it, or forward from the start.
+    #[derive(Default)]
+    struct Directions {
+        back: usize,
+        forward: usize,
+    }
+
+    impl Directions {
+        fn note(&mut self, snap: &Snapshot, position: usize) {
+            if position < snap.mark.0.get() {
+                if snap.back_from_mark(U16::new(position)) {
+                    self.back += 1;
+                } else {
+                    self.forward += 1;
+                }
+            }
+        }
+    }
+
+    /// Every position of the copy, as a table of the whole text gives it.
+    fn positions_hold(snap: &Snapshot, directions: &mut Directions) {
+        let text = &snap.text;
+        let units: Vec<u16> = text.encode_utf16().collect();
+        let map = Utf16Map::new(text);
+        for u in 0..=units.len() + 1 {
+            directions.note(snap, u);
+            let expected = map.to_byte(U16::new(u));
+            assert_eq!(
+                snap.byte_at(U16::new(u)),
+                expected,
+                "{text:?} at {u}, mark {:?}",
+                snap.mark
+            );
+        }
+        for byte in 0..=text.len() + 1 {
+            let expected = map.to_u16(Byte::new(byte));
+            assert_eq!(
+                snap.u16_at(Byte::new(byte)),
+                expected,
+                "{text:?} at byte {byte}, mark {:?}",
+                snap.mark
+            );
+        }
+        for &u in &boundaries(&units) {
+            let byte = snap.byte_at(U16::new(u));
+            assert_eq!(snap.u16_at(byte), U16::new(u), "{text:?} at {u}");
+        }
+    }
+
     #[test]
     fn patched_copies_match_the_edited_text() {
         let mut rng = Rng::new(0x5eed_0001);
-        for _ in 0..rounds(2000) {
-            let mut reference: Vec<u16> = random_text(&mut rng, 30).encode_utf16().collect();
+        let mut directions = Directions::default();
+        for round in 0..rounds(2000) {
+            let longest = if round % 2 == 0 { 30 } else { 120 };
+            let mut reference: Vec<u16> = random_text(&mut rng, longest).encode_utf16().collect();
             let mut snap = Snapshot::new(String::from_utf16(&reference).unwrap(), reference.len(), 0);
             for version in 1..6 {
                 let cuts = boundaries(&reference);
                 let (a, b) = (cuts[rng.below(cuts.len())], cuts[rng.below(cuts.len())]);
                 let (a, b) = (a.min(b), a.max(b));
+                // A Backspace or an undo right before the last edit starts there.
+                let (a, b) = if rng.below(3) == 0 {
+                    let near = cuts
+                        .partition_point(|&c| c < snap.mark.0.get())
+                        .saturating_sub(1 + rng.below(3));
+                    (cuts[near], cuts[near].max(b.min(snap.mark.0.get())))
+                } else {
+                    (a, b)
+                };
+                directions.note(&snap, a);
                 let inserted = random_text(&mut rng, 4);
                 let new: Vec<u16> = inserted.encode_utf16().collect();
                 reference.splice(a..b, new.iter().copied());
@@ -340,12 +418,55 @@ mod tests {
                     .expect("edit fits");
                 assert_eq!(snap.text, String::from_utf16(&reference).unwrap());
                 assert_eq!(snap.len_u16, reference.len());
-                for &u in &boundaries(&reference) {
-                    let byte = snap.byte_at(U16::new(u));
-                    assert_eq!(snap.u16_at(byte), U16::new(u), "{:?} at {u}", snap.text);
-                }
+                positions_hold(&snap, &mut directions);
             }
         }
+        assert!(
+            directions.back > rounds(2000) && directions.forward > rounds(2000),
+            "{} counted back from the mark, {} forward from the start",
+            directions.back,
+            directions.forward
+        );
+    }
+
+    #[test]
+    fn backspaces_in_a_long_text_count_back_from_the_last_edit() {
+        let mut reference: Vec<u16> = "ä😀x".repeat(4000).encode_utf16().collect();
+        let mut snap = Snapshot::new(String::from_utf16(&reference).unwrap(), reference.len(), 0);
+        let typed_at = reference.len() - 12;
+        snap = snap
+            .patched(U16::new(typed_at)..U16::new(typed_at + 1), 1, "y", 1)
+            .unwrap();
+        reference.insert(typed_at, u16::from(b'y'));
+        for (version, start) in [(2, typed_at - 4), (3, typed_at - 8), (4, typed_at - 6000)] {
+            assert!(snap.back_from_mark(U16::new(start)), "{start}");
+            snap = snap.patched(U16::new(start)..U16::new(start), -4, "", version).unwrap();
+            reference.drain(start..start + 4);
+            assert_eq!(snap.text, String::from_utf16(&reference).unwrap());
+            let map = Utf16Map::new(&snap.text);
+            for u in [
+                0,
+                1,
+                2,
+                3,
+                start / 2 + 1,
+                start - 4103,
+                start - 2,
+                start - 1,
+                start,
+                start + 1,
+                start + 5,
+            ] {
+                let byte = snap.byte_at(U16::new(u));
+                assert_eq!(byte, map.to_byte(U16::new(u)), "{u} after {start}");
+                assert_eq!(snap.u16_at(byte), map.to_u16(byte), "{u} after {start}");
+                assert_eq!(snap.u16_at(byte + 1), map.to_u16(byte + 1), "inside a letter at {u}");
+            }
+        }
+        assert!(
+            snap.patched(U16::new(2)..U16::new(2), -1, "", 5).is_none(),
+            "half of a surrogate pair"
+        );
     }
 
     #[test]
