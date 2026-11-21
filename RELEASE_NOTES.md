@@ -1,5 +1,3 @@
-- **Line numbers.** **View › Line Numbers** shows the number of each line beside the Markdown source, in every window; a wrapped paragraph keeps one number. Splat remembers the choice.
-- **The text size stays.** **Zoom In**, **Zoom Out** and **Actual Size** (⌘+, ⌘−, ⌘0) now set one size for every window, and Splat keeps it for new windows and the next start.
-- **Pictures show sooner.** A document with many photos shows them about three times as fast, and pictures on iCloud Drive, an external disk or a network share load three at a time instead of one after the other.
-- Code blocks in **TOML** are highlighted.
-- With **View › Changes Since Last Commit** switched off, a document in a Git repository no longer asks for access to its folder unless it shows pictures or notes from it.
+- **Smaller.** Splat takes about 35 MB on disk instead of 55 MB, and the download is about a quarter smaller.
+- **Less memory.** The engine that draws formulas and diagrams ends after two minutes without a new one, the visual formula editor a minute after it closed, and the image decoder after a minute without a picture; what they drew stays. Pictures take the pixels they cover on screen and decode again when they show larger.
+- **Faster typing in large documents.** Above 2 MB, the preview catches up after a keystroke many times sooner, as only the changed paragraphs are parsed and laid out again.
