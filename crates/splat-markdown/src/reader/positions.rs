@@ -437,36 +437,75 @@ mod tests {
         out
     }
 
+    /// A text with every kind of inline that a paragraph holds.
+    const BODIES: &[&str] = &[
+        "foo *e* _i_ **s** __b__ baz",
+        "a ~~x~~ ~y~ ==h== ^u^ ||sp|| z",
+        "a `c` ``d`e`` z",
+        "a <b>t</b> <u>v</u> <kbd>k</kbd> z",
+        "a <img src=\"p.png\" alt=\"q\" width=\"3\"> <span>s</span> z",
+        "a $m$ $$n$$ $`k`$ \\(l\\) \\[o\\] z",
+        "a :smile: :rocket: z",
+        "a [[Seite]] [[Seite|Titel]] ![[bild.png]] z",
+        "a %%z%% <!-- y --> z",
+        "a [l](u) [m](u \"t\") [n][x] [x] ![i](p) ![j](p \"t\") z",
+        "a <https://a.de> https://b.de www.c.de z",
+        "a[^1] b^[n] c^[n [m] o] z",
+        "a\nb  \nc\\\nd<br>e",
+        "a \\* b &amp; c &eacute; d",
+        "***a*** **_b_** *`c`* [**d**](e) z",
+    ];
+
     /// comrak is right about these without the definition in front, so that is what they must be with it too.
     #[test]
     fn every_kind_of_inline_finds_its_place_behind_a_definition() {
-        for body in [
-            "foo *e* _i_ **s** __b__ baz",
-            "a ~~x~~ ~y~ ==h== ^u^ ||sp|| z",
-            "a `c` ``d`e`` z",
-            "a <b>t</b> <u>v</u> <kbd>k</kbd> z",
-            "a <img src=\"p.png\" alt=\"q\" width=\"3\"> <span>s</span> z",
-            "a $m$ $$n$$ $`k`$ \\(l\\) \\[o\\] z",
-            "a :smile: :rocket: z",
-            "a [[Seite]] [[Seite|Titel]] ![[bild.png]] z",
-            "a %%z%% <!-- y --> z",
-            "a [l](u) [m](u \"t\") [n][x] [x] ![i](p) ![j](p \"t\") z",
-            "a <https://a.de> https://b.de www.c.de z",
-            "a[^1] b^[n] c^[n [m] o] z",
-            "a\nb  \nc\\\nd<br>e",
-            "a \\* b &amp; c &eacute; d",
-            "***a*** **_b_** *`c`* [**d**](e) z",
-            "\n".trim_start(),
-        ] {
-            if body.is_empty() {
-                continue;
-            }
+        for body in BODIES {
             let definition = "[x]: y\n";
             let alone = parse(&format!("{body}\n\n{definition}\n[^1]: note\n"));
             let behind = parse(&format!("{definition}{body}\n\n[^1]: note\n"));
             let expected = ranges(alone.blocks[0].inlines(), definition.len());
             assert_eq!(ranges(behind.blocks[0].inlines(), 0), expected, "in {body:?}");
         }
+    }
+
+    /// The same inlines with every range at the start of the text, which no inline but an empty text fits.
+    fn misplaced(inlines: &[Inline]) -> Vec<Inline> {
+        inlines
+            .iter()
+            .map(|i| Inline {
+                kind: i.kind.clone(),
+                range: bytes(0..0),
+                children: misplaced(&i.children).into(),
+            })
+            .collect()
+    }
+
+    /// comrak 1.1 gives these the right places itself, so only positions it got wrong reach the reading from the source.
+    #[test]
+    fn every_kind_of_inline_is_read_again_where_comrak_misplaced_it() {
+        for body in BODIES {
+            let source = format!("{body}\n\n[x]: y\n\n[^1]: note\n");
+            let doc = parse(&source);
+            let block = &doc.blocks[0];
+            let read = super::checked(&source, &block.range, misplaced(block.inlines()));
+            let read = read.unwrap_or_else(|| panic!("given up in {body:?}"));
+            assert_eq!(ranges(&read, 0), ranges(block.inlines(), 0), "in {body:?}");
+        }
+    }
+
+    #[test]
+    fn a_leaf_that_takes_too_long_to_read_again_is_given_up() {
+        let source = "a **b** c\n";
+        let doc = parse(source);
+        let block = &doc.blocks[0];
+        let mut walker = super::Walker {
+            text: source,
+            at: block.range.start,
+            end: block.range.end,
+            steps: 2,
+        };
+        let mut inlines = misplaced(block.inlines());
+        assert!(inlines.iter_mut().try_for_each(|i| walker.place(i)).is_none());
     }
 
     #[test]
