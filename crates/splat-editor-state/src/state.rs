@@ -870,7 +870,11 @@ pub fn images_of(block: &TopBlock) -> impl Iterator<Item = &str> {
 
 /// The links of `block`, once for each run they cover.
 pub fn links_of(block: &TopBlock) -> impl Iterator<Item = &crate::preview::layout::Link> {
-    block.paras.iter().flat_map(|p| &p.runs).filter_map(|r| r.style.link.as_ref())
+    block
+        .paras
+        .iter()
+        .flat_map(|p| &p.runs)
+        .filter_map(|r| r.style.link.as_ref())
 }
 
 #[cfg(test)]

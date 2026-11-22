@@ -15,7 +15,8 @@ use super::panes::Side;
 use super::panes::Views;
 use super::render::{Live, RenderCtx};
 use super::state::{
-    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, links_of, parse_in_background,
+    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, links_of,
+    parse_in_background,
 };
 use super::style::{self, SourceFonts};
 use super::{js, string_of};

@@ -271,7 +271,11 @@ pub(super) fn dead_link_steps() -> Vec<Step> {
                     } else {
                         format!("a link to {target}, which is there, is not marked")
                     };
-                    check(&name, marked(c, target) == Some(dead), &format!("{:?}", link_tip(c, target)));
+                    check(
+                        &name,
+                        marked(c, target) == Some(dead),
+                        &format!("{:?}", link_tip(c, target)),
+                    );
                 }
                 check(
                     "a link to another app is not marked",

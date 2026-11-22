@@ -371,7 +371,10 @@ mod tests {
         assert_eq!(of(Link::Address("https://a.de".into())), None);
         assert_eq!(of(Link::Address("zoommtg://x".into())), None);
         assert_eq!(of(Link::Address("#".into())), None);
-        assert_eq!(of(Link::Address("#Teil".into())), Some(Destination::Anchor("Teil".into())));
+        assert_eq!(
+            of(Link::Address("#Teil".into())),
+            Some(Destination::Anchor("Teil".into()))
+        );
         assert_eq!(
             of(Link::Address("b/c.md#Teil".into())),
             Some(Destination::Path("/Users/a/docs/b/c.md".into()))
@@ -386,7 +389,11 @@ mod tests {
         assert_eq!(of(Link::WikiPage("#Kapitel".into())), None);
         assert_eq!(of(Link::WikiPage("^block".into())), None);
         assert_eq!(of(Link::Tag("#a".into())), None);
-        assert_eq!(destination(&Link::Address("c.md".into()), None), None, "an unsaved document");
+        assert_eq!(
+            destination(&Link::Address("c.md".into()), None),
+            None,
+            "an unsaved document"
+        );
         assert_eq!(destination(&Link::WikiPage("Notiz".into()), None), None);
         assert_eq!(
             destination(&Link::Address("/tmp/x.md".into()), None),
@@ -417,7 +424,11 @@ mod tests {
             dir: root.join("gibt es nicht"),
             name: "Notiz".into(),
         };
-        assert_eq!(missing_on_disk(&gone), None, "a folder that cannot be listed says nothing");
+        assert_eq!(
+            missing_on_disk(&gone),
+            None,
+            "a folder that cannot be listed says nothing"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 

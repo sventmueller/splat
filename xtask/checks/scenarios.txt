@@ -48,7 +48,19 @@ a large picture goes to paper with the most pixels it may have
 a large picture shown smaller again keeps its pixels
 a link in a closed file follows the rename, and nothing else in it changes
 a link in an open document follows the rename
+a link loses its mark once its file appears
+a link that leads nowhere is red
+a link to #da, which is there, is not marked
+a link to #html-ziel, which is there, is not marked
+a link to #weg, which is not there, is marked
+a link to andere.md, which is there, is not marked
 a link to another app asks first
+a link to another app is not marked
+a link to fehlt.md, which is not there, is marked
+a link to https://example.com/x, which is there, is not marked
+a link to kommt.md, which is not there, is marked
+a link to splat-wiki:Nirgends, which is not there, is marked
+a link to splat-wiki:andere, which is there, is not marked
 a missing image counts as failed
 a missing template says so
 a name that is taken is refused
@@ -93,6 +105,7 @@ aligning the table is undone in one step
 aligning the table writes exactly its text
 an alert box is undone in one step
 an alert box writes exactly its text
+an edit that names an existing heading takes the mark away
 an empty pasteboard changes nothing
 an export to a place without write access fails
 an image replaced on disk shows without reopening
@@ -217,6 +230,7 @@ the next start says once where the copies are
 the next start takes over the copies of a crashed run
 the numbers count up line by line, downwards
 the options can be taken over
+the other links keep their marks
 the outline check leaves the text
 the outline closes
 the outline comes back as a tab

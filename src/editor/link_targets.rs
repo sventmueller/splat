@@ -140,8 +140,7 @@ impl LinkTargets<'_> {
         let search = self.state.looks.get().is_multiple_of(LOOKS_PER_SEARCH);
         let wanted: HashSet<Destination> = {
             let on_disk = self.state.on_disk.borrow();
-            self
-                .state
+            self.state
                 .shown
                 .borrow()
                 .values()
@@ -229,12 +228,10 @@ impl LinkTargets<'_> {
 
 /// Whether HTML in `text` gives an element the `id` or `name` `anchor`, which a link may point to as well as to a heading.
 fn names_an_element(text: &str, anchor: &str) -> bool {
-    ["id=\"", "id='", "name=\"", "name='"]
-        .iter()
-        .any(|attribute| {
-            let quote = &attribute[attribute.len() - 1..];
-            text.contains(&format!("{attribute}{anchor}{quote}"))
-        })
+    ["id=\"", "id='", "name=\"", "name='"].iter().any(|attribute| {
+        let quote = &attribute[attribute.len() - 1..];
+        text.contains(&format!("{attribute}{anchor}{quote}"))
+    })
 }
 
 #[cfg(test)]

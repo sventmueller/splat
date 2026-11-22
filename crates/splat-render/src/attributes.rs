@@ -147,7 +147,10 @@ mod tests {
         );
         check::<NSColor>(Attribute::foreground(&color), constant!(NSForegroundColorAttributeName));
         check::<NSColor>(Attribute::background(&color), constant!(NSBackgroundColorAttributeName));
-        check::<NSColor>(Attribute::underline_color(&color), constant!(NSUnderlineColorAttributeName));
+        check::<NSColor>(
+            Attribute::underline_color(&color),
+            constant!(NSUnderlineColorAttributeName),
+        );
         check::<NSParagraphStyle>(
             Attribute::paragraph(&NSParagraphStyle::defaultParagraphStyle()),
             constant!(NSParagraphStyleAttributeName),
