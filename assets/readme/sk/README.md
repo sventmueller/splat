@@ -5,7 +5,7 @@
 **Editor Markdownu pre macOS, v ktorom píšete v zdrojovom texte alebo priamo v náhľade.**
 
 Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a živý, plne upraviteľný náhľad vpravo. Písať môžete v ktoromkoľvek z nich: všetko, čo napíšete v náhľade, sa prenesie do zdrojového textu ako minimálna zmena, takže riadky, ktorých ste sa nedotkli, zostanú bajt po bajte rovnaké a vaše diffy v Gite zostanú čisté. Splat rozumie Markdownu, ktorý už používate: CommonMark a GitHub Flavored Markdown, upozornenia GitHubu, wiki odkazy, vloženia a informačné rámčeky z Obsidianu, rozšírenia Pandocu a Typory, vložené HTML, vzorce LaTeX a diagramy Mermaid, Graphviz a PlantUML, to všetko vykreslené offline. Prechádzajte a prehľadávajte celý priečinok poznámok, pozrite si, čo sa zmenilo od posledného commitu v Gite, vkladajte z Wordu alebo webovej stránky ako Markdown a exportujte do PDF, HTML alebo Wordu jedným kliknutím. Je napísaný v Ruste na skutočných ovládacích prvkoch AppKit, hovorí 35 jazykmi a nemá telemetriu.
- 
+ 
 
 
 [![Stiahnuť Splat pre macOS](https://img.shields.io/badge/Download-Splat_for_macOS-0A84FF?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)
@@ -13,61 +13,12 @@ Splat zobrazuje váš zdrojový text Markdown so zvýraznením syntaxe vľavo a 
 **[Stiahnuť Splat.dmg](https://github.com/sventmueller/splat/releases/latest/download/Splat.dmg)**: podpísaný a overený spoločnosťou Apple (notarizovaný), pre macOS 14 alebo novší na Apple Silicon aj Intel.
 
 **Našli ste chybu?** Splat zachováva riadky, ktorých ste sa nedotkli, bajt po bajte rovnaké. Ak sa niektorý predsa zmení alebo sa súbor zobrazí nesprávne, [založte issue](https://github.com/sventmueller/splat/issues/new/choose) a priložte súbor. Ak je pre vás Splat užitočný, [hviezdička na GitHube](https://github.com/sventmueller/splat) pomôže ostatným nájsť ho.
- 
- 
+ 
+ 
 
-[![Rust edícia 2024](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![macOS 14 alebo novší](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
-![Univerzálny: Apple Silicon a Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white)
-[![AppKit cez objc2](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2)
-[![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
-[![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
-[![CommonMark a GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
-[![Graphviz cez Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
-![35 jazykov rozhrania](https://img.shields.io/badge/languages-35-4C9A2A)
-![Bez telemetrie](https://img.shields.io/badge/telemetry-none-4C9A2A)
-![Podpísaný s Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
-[![Licencia: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licencia)
+[![Rust edícia 2024](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org) [![macOS 14 alebo novší](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/) ![Univerzálny: Apple Silicon a Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white) [![AppKit cez objc2](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2) [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org) [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak) [![CommonMark a GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/) [![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org) [![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/) [![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org) [![Graphviz cez Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org) [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com) ![35 jazykov rozhrania](https://img.shields.io/badge/languages-35-4C9A2A) ![Bez telemetrie](https://img.shields.io/badge/telemetry-none-4C9A2A) ![Podpísaný s Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A) [![Licencia: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#licencia)
 
-[Bahasa Indonesia](../id/README.md) ·
-[Bahasa Melayu](../ms/README.md) ·
-[Català](../ca/README.md) ·
-[Čeština](../cs/README.md) ·
-[Dansk](../da/README.md) ·
-[Deutsch](../de/README.md) ·
-[English](../../../README.md) ·
-[Español](../es/README.md) ·
-[Français](../fr/README.md) ·
-[Hrvatski](../hr/README.md) ·
-[Italiano](../it/README.md) ·
-[Magyar](../hu/README.md) ·
-[Nederlands](../nl/README.md) ·
-[Norsk](../no/README.md) ·
-[Polski](../pl/README.md) ·
-[Português (Brasil)](../pt_BR/README.md) ·
-[Português (Portugal)](../pt_PT/README.md) ·
-[Română](../ro/README.md) ·
-**Slovenčina** ·
-[Slovenščina](../sl/README.md) ·
-[Suomi](../fi/README.md) ·
-[Svenska](../sv/README.md) ·
-[Tiếng Việt](../vi/README.md) ·
-[Türkçe](../tr/README.md) ·
-[Ελληνικά](../el/README.md) ·
-[Русский](../ru/README.md) ·
-[Українська](../uk/README.md) ·
-[עברית](../he/README.md)‎ ·
-[العربية](../ar/README.md)‎ ·
-[हिन्दी](../hi/README.md) ·
-[ไทย](../th/README.md) ·
-[한국어](../ko/README.md) ·
-[日本語](../ja/README.md) ·
-[简体中文](../zh-Hans/README.md) ·
-[繁體中文](../zh-Hant/README.md)
+[Bahasa Indonesia](../id/README.md) · [Bahasa Melayu](../ms/README.md) · [Català](../ca/README.md) · [Čeština](../cs/README.md) · [Dansk](../da/README.md) · [Deutsch](../de/README.md) · [English](../../../README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Hrvatski](../hr/README.md) · [Italiano](../it/README.md) · [Magyar](../hu/README.md) · [Nederlands](../nl/README.md) · [Norsk](../no/README.md) · [Polski](../pl/README.md) · [Português (Brasil)](../pt_BR/README.md) · [Português (Portugal)](../pt_PT/README.md) · [Română](../ro/README.md) · **Slovenčina** · [Slovenščina](../sl/README.md) · [Suomi](../fi/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Türkçe](../tr/README.md) · [Ελληνικά](../el/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [עברית](../he/README.md)‎ · [العربية](../ar/README.md)‎ · [हिन्दी](../hi/README.md) · [ไทย](../th/README.md) · [한국어](../ko/README.md) · [日本語](../ja/README.md) · [简体中文](../zh-Hans/README.md) · [繁體中文](../zh-Hant/README.md)
 
 ## Obsah
 

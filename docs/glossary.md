@@ -1,7 +1,6 @@
 # Glossary
 
-The words the code uses for its own things, with the usual term where one exists. Names in `code` are types or
-functions; the crate is in brackets where it is not obvious.
+The words the code uses for its own things, with the usual term where one exists. Names in `code` are types or functions; the crate is in brackets where it is not obvious.
 
 ## Positions and text
 

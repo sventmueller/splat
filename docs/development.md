@@ -2,21 +2,15 @@
 
 The words the code uses for its own things are explained in [glossary.md](glossary.md).
 
-Splat is a Rust application that talks to AppKit and WebKit directly through
-[objc2](https://github.com/madsmtm/objc2). There is no Swift, no Objective-C, no Xcode project and no Interface
-Builder file.
+Splat is a Rust application that talks to AppKit and WebKit directly through [objc2](https://github.com/madsmtm/objc2). There is no Swift, no Objective-C, no Xcode project and no Interface Builder file.
 
 ## Building
 
 Prerequisites:
 
-- macOS with the Command Line Tools (`xcode-select --install`). Xcode is not needed; Splat builds without `actool`,
-  `ibtool` and `metal`.
-- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../rust-toolchain.toml) names the exact version that CI uses;
-  rustup installs it on its own, Homebrew's Rust ignores the file. Raising it there is how new compiler and clippy
-  warnings reach the project.
-- rustup, for `make lint`, `make check` and `make universal`: `cargo xtask check-library` builds the library for Linux
-  to show that it needs no macOS, and Homebrew's Rust has no other targets.
+- macOS with the Command Line Tools (`xcode-select --install`). Xcode is not needed; Splat builds without `actool`, `ibtool` and `metal`.
+- Rust 1.99 (`brew install rust`). [rust-toolchain.toml](../rust-toolchain.toml) names the exact version that CI uses; rustup installs it on its own, Homebrew's Rust ignores the file. Raising it there is how new compiler and clippy warnings reach the project.
+- rustup, for `make lint`, `make check` and `make universal`: `cargo xtask check-library` builds the library for Linux to show that it needs no macOS, and Homebrew's Rust has no other targets.
 
 The [Makefile](../Makefile) holds short entry points; `make help` lists them all:
 
@@ -51,131 +45,50 @@ cargo xtask vendor check       # verify the bundled JavaScript against vendor.lo
 cargo xtask vendor fetch       # download it again after changing a version in vendor.lock
 ```
 
-`bundle` writes the `Info.plist`, copies the resources and localizations, and signs the app with the certificate
-"Splat Local Signing". The first build creates that certificate in your login keychain, valid for 20 years. As long
-as it stays, Splat keeps its recent documents and folder permissions across rebuilds; with an ad hoc signature, every
-build would be a new app to macOS. Debug and self-test builds carry bundle IDs of their own (`local.splat.debug`,
-`local.splat.selftest`) and do not register for Markdown files, so the Finder never opens a document in an outdated
-build and they leave the settings of the normal app alone.
+`bundle` writes the `Info.plist`, copies the resources and localizations, and signs the app with the certificate "Splat Local Signing". The first build creates that certificate in your login keychain, valid for 20 years. As long as it stays, Splat keeps its recent documents and folder permissions across rebuilds; with an ad hoc signature, every build would be a new app to macOS. Debug and self-test builds carry bundle IDs of their own (`local.splat.debug`, `local.splat.selftest`) and do not register for Markdown files, so the Finder never opens a document in an outdated build and they leave the settings of the normal app alone.
 
-Every build runs in the App Sandbox, as an app of the Mac App Store would, without exceptions for files. `bundle` signs
-the app with the entitlements for files the user opens or saves, bookmarks of folders the user granted, the network for
-pictures from the web and for updates, and printing; builds with Sparkle may reach its installer service by name as
-well. The decoding service gets the sandbox alone. The self-test build may in addition read and write under `target/`,
-where the runner puts the documents of a run, and it starts no program of the system: what it needs of `git`,
-`pdftotext` or a crashed web process it asks the runner for in `SELFTEST RUN` and `SELFTEST END-PROCESS` lines of its
-output, and the runner makes the full disk of the probe.
+Every build runs in the App Sandbox, as an app of the Mac App Store would, without exceptions for files. `bundle` signs the app with the entitlements for files the user opens or saves, bookmarks of folders the user granted, the network for pictures from the web and for updates, and printing; builds with Sparkle may reach its installer service by name as well. The decoding service gets the sandbox alone. The self-test build may in addition read and write under `target/`, where the runner puts the documents of a run, and it starts no program of the system: what it needs of `git`, `pdftotext` or a crashed web process it asks the runner for in `SELFTEST RUN` and `SELFTEST END-PROCESS` lines of its output, and the runner makes the full disk of the probe.
 
-`bundle` also writes `Acknowledgements.txt` into the resources, since the licenses of what Splat contains ask for their
-texts to go along with the app; the About window links only Splat's own. The file holds Splat's license and the
-license text of every crate that `cargo tree` finds in the program for either processor, of every
-`resources/js/LICENSE-<name>` and of Sparkle where the bundle carries it, each text once under the components it
-covers. Of alternatives a crate offers, MIT is taken where it can be; a crate that names MIT without shipping its text
-gets Splat's MIT terms with the authors from its manifest. A dependency whose license text xtask does not recognize
-stops the build with its name, and the test `every_component_of_the_program_comes_with_its_license_text` finds it in
-`make check` before that. A new script in `resources/js` needs its `LICENSE-<name>` next to it.
+`bundle` also writes `Acknowledgements.txt` into the resources, since the licenses of what Splat contains ask for their texts to go along with the app; the About window links only Splat's own. The file holds Splat's license and the license text of every crate that `cargo tree` finds in the program for either processor, of every `resources/js/LICENSE-<name>` and of Sparkle where the bundle carries it, each text once under the components it covers. Of alternatives a crate offers, MIT is taken where it can be; a crate that names MIT without shipping its text gets Splat's MIT terms with the authors from its manifest. A dependency whose license text xtask does not recognize stops the build with its name, and the test `every_component_of_the_program_comes_with_its_license_text` finds it in `make check` before that. A new script in `resources/js` needs its `LICENSE-<name>` next to it.
 
-The libraries in `resources/js` take about 14 MB, so `bundle` packs every file there above 64 KiB with Apple's
-Compression framework into `<name>.lzfse`: the length of the file as eight bytes little-endian, then its LZFSE stream,
-about 4 MB together. It unpacks each again and stops the build when that does not give back the same bytes. The
-repository keeps the files as published, which `cargo xtask vendor check` compares. The pages load from the scheme
-`splat://localhost/` of `crates/splat-render/src/scheme.rs` instead of from files: it reads the resources on a thread of
-its own, unpacks a `.lzfse` where one lies beside the name asked for and serves the plain file otherwise, so an app that
-shares the render path without packing its scripts keeps working. It serves nothing outside the resources, also through
-a link, and answers no request WebKit has stopped. The content security policy of both pages and the offline rules in
-`webkit.rs` admit that scheme and no `file:` address, and the probe asks the scheme for the bundle's `Info.plist`
-beside the resources.
+The libraries in `resources/js` take about 14 MB, so `bundle` packs every file there above 64 KiB with Apple's Compression framework into `<name>.lzfse`: the length of the file as eight bytes little-endian, then its LZFSE stream, about 4 MB together. It unpacks each again and stops the build when that does not give back the same bytes. The repository keeps the files as published, which `cargo xtask vendor check` compares. The pages load from the scheme `splat://localhost/` of `crates/splat-render/src/scheme.rs` instead of from files: it reads the resources on a thread of its own, unpacks a `.lzfse` where one lies beside the name asked for and serves the plain file otherwise, so an app that shares the render path without packing its scripts keeps working. It serves nothing outside the resources, also through a link, and answers no request WebKit has stopped. The content security policy of both pages and the offline rules in `webkit.rs` admit that scheme and no `file:` address, and the probe asks the scheme for the bundle's `Info.plist` beside the resources.
 
-The version lives in [VERSION](../VERSION) as `major.minor.build` and is the one the next build gets. Every release
-build that succeeds (`make build`, `cargo xtask bundle --release`, `make release`) raises the build number by one;
-debug and self-test builds leave it alone. Major and minor are raised by hand: set VERSION to, say, `1.1.0`, and the
-next build gets exactly that. Since the version ends in the build number, the About window shows no second one.
+The version lives in [VERSION](../VERSION) as `major.minor.build` and is the one the next build gets. Every release build that succeeds (`make build`, `cargo xtask bundle --release`, `make release`) raises the build number by one; debug and self-test builds leave it alone. Major and minor are raised by hand: set VERSION to, say, `1.1.0`, and the next build gets exactly that. Since the version ends in the build number, the About window shows no second one.
 
 ## Distribution
 
-`cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) first builds the package
-for the [Mac App Store](#mac-app-store) with the same version, then a release, signs it with your Developer ID,
-notarizes the app with Apple and staples the ticket, packs it into a read-only disk image compressed with LZMA (`ULMO`, a
-quarter smaller than zlib) with a link to Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own
-ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two
-rounds with the notary service take a few minutes each. Only an image that passed every step becomes
-`dist/Splat-<version>.dmg`, the copy that is committed, and the build number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update
-feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/` and VERSION as they
-were.
-Each release adds the full image, about 12 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
+`cargo xtask dmg` (or `make release`, which runs `make test` and `make coverage-library` first) first builds the package for the [Mac App Store](#mac-app-store) with the same version, then a release, signs it with your Developer ID, notarizes the app with Apple and staples the ticket, packs it into a read-only disk image compressed with LZMA (`ULMO`, a quarter smaller than zlib) with a link to Applications, notarizes and staples the image as well and checks the result with Gatekeeper. The app carries its own ticket so that a copy installed without the Finder, as Homebrew does, opens offline on first launch too; the two rounds with the notary service take a few minutes each. Only an image that passed every step becomes `dist/Splat-<version>.dmg`, the copy that is committed, and the build number goes up. The previous image stays for one more release, since GitHub's raw server may hand out the old update feed for a few minutes after a push; older ones are moved to the trash. A failed run leaves `dist/` and VERSION as they were. Each release adds the full image, about 12 MB, to the repository history. It runs only when called, never as part of a normal build, and needs:
 
 - a "Developer ID Application" certificate in the keychain
-- a saved login for Apple's notary service with an app-specific password, created once with
-  `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
-- the private key that signs updates, in the login keychain. Sparkle's `generate_keys` created it; its public half is
-  `UPDATE_KEY` in [xtask/src/main.rs](../xtask/src/main.rs) and inside every installed copy, which accepts only updates
-  signed with it. Keep a backup in a password manager: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exports
-  it, `-f <file>` imports it on another Mac. Without it, installed copies can never be updated again.
+- a saved login for Apple's notary service with an app-specific password, created once with `xcrun notarytool store-credentials notary --apple-id <Apple ID> --team-id <team ID>`
+- the private key that signs updates, in the login keychain. Sparkle's `generate_keys` created it; its public half is `UPDATE_KEY` in [xtask/src/main.rs](../xtask/src/main.rs) and inside every installed copy, which accepts only updates signed with it. Keep a backup in a password manager: `target/sparkle-2.10.1/bin/generate_keys -x <file>` exports it, `-f <file>` imports it on another Mac. Without it, installed copies can never be updated again.
 - rustup (`brew install rustup`, which leaves Homebrew's Rust in place)
-- `RELEASE_NOTES.md`, with what this release brings. The update dialog shows it above a line on how to report a problem,
-  so `dmg` stops if the file is empty or still holds the previous release's notes
+- `RELEASE_NOTES.md`, with what this release brings. The update dialog shows it above a line on how to report a problem, so `dmg` stops if the file is empty or still holds the previous release's notes
 - the certificates and the profile of the [Mac App Store](#mac-app-store) package
 
-If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the
-Finder, which lays out the disk image window. `dmg` then reads the icon positions Finder stored in the image and stops
-if they are not the intended ones, as when Finder shows hidden files (⇧⌘. hides them) or lacks the permission.
+If any of them is missing, `dmg` stops before building. On the first run, macOS asks whether Terminal may control the Finder, which lays out the disk image window. `dmg` then reads the icon positions Finder stored in the image and stops if they are not the intended ones, as when Finder shows hidden files (⇧⌘. hides them) or lacks the permission.
 
-Only the disk image carries the updater, [Sparkle](https://sparkle-project.org), which the build downloads once into
-`target/` from its GitHub release and checks against the checksum in xtask. The hardened runtime loads the framework
-only when it carries the app's Team ID, which the Developer ID signature has and the local certificate lacks; and an
-update must not replace a build of your own. The self-test build carries Sparkle as well, to check the update menu
-against it: with a feed that does not exist, without Sparkle's question on the second launch, and with an entitlement
-that lets the locally signed app load the framework. `dmg` signs the new image with the update key and writes
-`dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image and the feed
-together: from then on, installed copies offer the update. The download links in this README and its translations point
-at `Splat.dmg` in the latest GitHub Release, so each release carries a copy under that name:
-`cp dist/Splat-<version>.dmg target/Splat.dmg`, then
-`gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
+Only the disk image carries the updater, [Sparkle](https://sparkle-project.org), which the build downloads once into `target/` from its GitHub release and checks against the checksum in xtask. The hardened runtime loads the framework only when it carries the app's Team ID, which the Developer ID signature has and the local certificate lacks; and an update must not replace a build of your own. The self-test build carries Sparkle as well, to check the update menu against it: with a feed that does not exist, without Sparkle's question on the second launch, and with an entitlement that lets the locally signed app load the framework. `dmg` signs the new image with the update key and writes `dist/appcast.xml`, the feed installed copies read from GitHub. Commit and push the image and the feed together: from then on, installed copies offer the update. The download links in this README and its translations point at `Splat.dmg` in the latest GitHub Release, so each release carries a copy under that name: `cp dist/Splat-<version>.dmg target/Splat.dmg`, then `gh release create v<version> dist/Splat-<version>.dmg target/Splat.dmg`.
 
-The disk image is a universal binary for Apple Silicon and Intel; other builds are for the host processor alone.
-Homebrew's Rust ships the standard library for the host processor only, so `dmg` builds through rustup, which installs
-the toolchain and targets of [rust-toolchain.toml](../rust-toolchain.toml) on first use, and stops if the program or
-Sparkle lacks the code for either processor. `make universal` builds only the program.
-The programs that ship, for the disk image and the Mac App Store, are built with the cargo profile `dist`: whole-program
-optimisation in one unit makes them a third smaller than `release`, which tests and self-tests keep since every test binary
-would take minutes longer to link. The bundle's copies lose their symbols; the programs as built stay in
-`dist/symbols/<version>/`, which git ignores, so that `atos -o dist/symbols/<version>/splat -arch arm64 -l <load address>
+The disk image is a universal binary for Apple Silicon and Intel; other builds are for the host processor alone. Homebrew's Rust ships the standard library for the host processor only, so `dmg` builds through rustup, which installs the toolchain and targets of [rust-toolchain.toml](../rust-toolchain.toml) on first use, and stops if the program or Sparkle lacks the code for either processor. `make universal` builds only the program. The programs that ship, for the disk image and the Mac App Store, are built with the cargo profile `dist`: whole-program optimisation in one unit makes them a third smaller than `release`, which tests and self-tests keep since every test binary would take minutes longer to link. The bundle's copies lose their symbols; the programs as built stay in `dist/symbols/<version>/`, which git ignores, so that `atos -o dist/symbols/<version>/splat -arch arm64 -l <load address>
 <address>` names the functions of a crash report of that version.
 The app in it carries a different signature from a local build, so macOS keeps separate recent documents and folder
 permissions for the two.
 
 ### Updates at a used path
 
-launchd learns which XPC services an app's frameworks hold only the first time an app runs from a path, and keeps that
-answer for the path. Replacing the bundle, registering it again with Launch Services, a new framework version or another
-folder name for the framework do not change it; whether restarting the Mac does is not known. Builds up to 1.0.11
-carried Sparkle without its services, so wherever one of them ran, such as `/Applications/Splat.app` on every Mac that
-updated from 1.0.11, launchd never offered 1.0.12 and 1.0.13 Sparkle's installer service, and their updates failed with
-"An error occurred while connecting to the installer".
+launchd learns which XPC services an app's frameworks hold only the first time an app runs from a path, and keeps that answer for the path. Replacing the bundle, registering it again with Launch Services, a new framework version or another folder name for the framework do not change it; whether restarting the Mac does is not known. Builds up to 1.0.11 carried Sparkle without its services, so wherever one of them ran, such as `/Applications/Splat.app` on every Mac that updated from 1.0.11, launchd never offered 1.0.12 and 1.0.13 Sparkle's installer service, and their updates failed with "An error occurred while connecting to the installer".
 
-`Contents/XPCServices` launchd reads at every launch. The bundle therefore carries `SparkleInstaller.xpc` there, a link
-to the installer service in the framework: the service resolves the link and finds Sparkle's tools beside it, and Sparkle
-refuses a service named `Installer.xpc` in that folder. The probe in `make test` fails when launchd does not offer the
-service to the self-test app, whose path under `target/` saw such builds as well.
+`Contents/XPCServices` launchd reads at every launch. The bundle therefore carries `SparkleInstaller.xpc` there, a link to the installer service in the framework: the service resolves the link and finds Sparkle's tools beside it, and Sparkle refuses a service named `Installer.xpc` in that folder. The probe in `make test` fails when launchd does not offer the service to the self-test app, whose path under `target/` saw such builds as well.
 
 ### Mac App Store
 
-`cargo xtask appstore` (or `make appstore`, after `make test` and `make coverage-library`) builds the same universal app
-without Sparkle, since the store allows no updater but its own, embeds the provisioning profile, signs it with Apple
-Distribution and packs it into `target/Splat-<version>.pkg`, signed with the installer certificate, with a copy in
-`~/Downloads`. `make release` builds it as well, before the disk image. Transporter uploads that package to App Store
-Connect; Apple checks it there instead of notarizing it. The build number stays, so a second
-upload of the same version needs a higher one in VERSION. It needs, in the login keychain and the developer account of
-team `TEAM_ID`:
+`cargo xtask appstore` (or `make appstore`, after `make test` and `make coverage-library`) builds the same universal app without Sparkle, since the store allows no updater but its own, embeds the provisioning profile, signs it with Apple Distribution and packs it into `target/Splat-<version>.pkg`, signed with the installer certificate, with a copy in `~/Downloads`. `make release` builds it as well, before the disk image. Transporter uploads that package to App Store Connect; Apple checks it there instead of notarizing it. The build number stays, so a second upload of the same version needs a higher one in VERSION. It needs, in the login keychain and the developer account of team `TEAM_ID`:
 
-- an "Apple Distribution" certificate and a "Mac Installer Distribution" certificate, whose identity is named
-  "3rd Party Mac Developer Installer"
-- the App ID `local.splat` and a "Mac App Store Connect" provisioning profile for it, in
-  `~/Library/Developer/Xcode/UserData/Provisioning Profiles`, or named with `PROFILE=<file>`
+- an "Apple Distribution" certificate and a "Mac Installer Distribution" certificate, whose identity is named "3rd Party Mac Developer Installer"
+- the App ID `local.splat` and a "Mac App Store Connect" provisioning profile for it, in `~/Library/Developer/Xcode/UserData/Provisioning Profiles`, or named with `PROFILE=<file>`
 
-The entitlements are those of the disk image without Sparkle's exceptions, plus the application and team identifiers the
-profile grants. A test in `tests/structure.rs` fails when the app sends a message whose name starts with an underscore,
-as App Review refuses methods that are not public; only the self-test may.
+The entitlements are those of the disk image without Sparkle's exceptions, plus the application and team identifiers the profile grants. A test in `tests/structure.rs` fails when the app sends a message whose name starts with an underscore, as App Review refuses methods that are not public; only the self-test may.
 
 ## Testing
 
@@ -204,101 +117,33 @@ as App Review refuses methods that are not public; only the self-test may.
 | `make coverage` | line coverage of `cargo test` and all self-tests, through [cargo-llvm-cov](https://github.com/taiki-e/cargo-llvm-cov) (`brew install cargo-llvm-cov llvm`); fails below the floors. Occupies the Mac for about five minutes, also on a locked screen |
 | `make coverage-library` | the crates `splat-markdown`, `splat-preview`, `splat-file-state`, `splat-git`, `splat-import`, `splat-ooxml`, `splat-notes`, `splat-editor-state` and `splat-i18n` against their higher floors, measured by `cargo test` alone |
 
-Unit tests sit next to the code they test. `crates/splat-testkit/tests/` holds what reaches the model and the preview
-from outside: the randomised tests in `robustness.rs`, which share the generator of `splat-testkit` with those of
-`sync.rs` in `splat-editor-state`, the documents built to hurt in `hostile.rs`, and the seeds of the fuzz targets in
-`fuzz_seeds.rs`. `tests/` holds what looks at all of the program: its sources, its translations and the decoder test,
-which starts the built program. What the window decides without needing one lives in `crates/splat-editor-state/`, whose
-tests `make coverage-library` holds to the higher floors; in `src/editor/` and `crates/splat-render/` the rest are free
-functions with tests of their own: paragraph styles, fonts and colours as values in `render.rs`, what toolbar
-identifiers stand for in `toolbar.rs`.
+Unit tests sit next to the code they test. `crates/splat-testkit/tests/` holds what reaches the model and the preview from outside: the randomised tests in `robustness.rs`, which share the generator of `splat-testkit` with those of `sync.rs` in `splat-editor-state`, the documents built to hurt in `hostile.rs`, and the seeds of the fuzz targets in `fuzz_seeds.rs`. `tests/` holds what looks at all of the program: its sources, its translations and the decoder test, which starts the built program. What the window decides without needing one lives in `crates/splat-editor-state/`, whose tests `make coverage-library` holds to the higher floors; in `src/editor/` and `crates/splat-render/` the rest are free functions with tests of their own: paragraph styles, fonts and colours as values in `render.rs`, what toolbar identifiers stand for in `toolbar.rs`.
 
-A step of the window self-test waits for a named condition, not for a time; only what gives no signal, like the absence of something, keeps a pause with its reason. The self-test build runs panes and popovers without their animations, which never end without a display, and no check looks at an animation. Waiting in vain is a failed check that names what never came, a step that panics is a failed check as well, and the run goes on either way. A check that cannot say anything in this run reports `SELFTEST SKIP`: xtask lists it, and it neither passes nor fails. xtask holds each mode, and `--scenarios` of its own, to about nine tenths of its checks. The window
-self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios/`: every formatting and
-table command, the dialogs, link clicks, pasting, dropping, exports, a file another program changed, a large change, images
-changing on disk, memory pressure, a huge document, the word count, the marks for what changed, the notes in the sidebar, the
-metadata form, the export options, importing Word and the recovery after a crash. Each group of it opens a document of its
-own, so that a failure in one does not reach the next, and each can run alone with `--only`. The groups of the
-click-through do the same: each opens a document holding the text and carets the groups before it leave, kept in
-`xtask/checks/click-through/` and written anew by `--record`, which runs them one after the other on one document. What the
-self-test build does differently from the app that ships stands in `src/test_hooks.rs`, and `make coverage` names every
-check that was skipped. The probe also breaks saving on
-purpose: a folder that takes nothing, a read-only file, a folder that has gone, a full disk, and a panic in every callback of
-a save, none of which may cost text.
+A step of the window self-test waits for a named condition, not for a time; only what gives no signal, like the absence of something, keeps a pause with its reason. The self-test build runs panes and popovers without their animations, which never end without a display, and no check looks at an animation. Waiting in vain is a failed check that names what never came, a step that panics is a failed check as well, and the run goes on either way. A check that cannot say anything in this run reports `SELFTEST SKIP`: xtask lists it, and it neither passes nor fails. xtask holds each mode, and `--scenarios` of its own, to about nine tenths of its checks. The window self-test runs a second part after its main click-through, in `src/editor/selftest/scenarios/`: every formatting and table command, the dialogs, link clicks, pasting, dropping, exports, a file another program changed, a large change, images changing on disk, memory pressure, a huge document, the word count, the marks for what changed, the notes in the sidebar, the metadata form, the export options, importing Word and the recovery after a crash. Each group of it opens a document of its own, so that a failure in one does not reach the next, and each can run alone with `--only`. The groups of the click-through do the same: each opens a document holding the text and carets the groups before it leave, kept in `xtask/checks/click-through/` and written anew by `--record`, which runs them one after the other on one document. What the self-test build does differently from the app that ships stands in `src/test_hooks.rs`, and `make coverage` names every check that was skipped. The probe also breaks saving on purpose: a folder that takes nothing, a read-only file, a folder that has gone, a full disk, and a panic in every callback of a save, none of which may cost text.
 
-Coverage has two floors: every module at least 84 % of its lines, all modules together at least 96 %. `make coverage`
-measures `cargo test` together with the self-tests and fails below either; `make coverage-library` holds what needs no window to 90 % and 97 %. The floors and the few exceptions, such
-as the panic hook in `main.rs` that runs only in a crash, are in [xtask](../xtask/src/coverage.rs) next to their reasons.
-Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. launchd
-starts the decoding service without the app's environment, so a measured self-test build names the measurement file in
-the service's property list, and the service writes what ran after each socket.
+Coverage has two floors: every module at least 84 % of its lines, all modules together at least 96 %. `make coverage` measures `cargo test` together with the self-tests and fails below either; `make coverage-library` holds what needs no window to 90 % and 97 %. The floors and the few exceptions, such as the panic hook in `main.rs` that runs only in a crash, are in [xtask](../xtask/src/coverage.rs) next to their reasons. Measured builds go to `target/coverage/`, so measuring code never reaches `target/release/` or a disk image. launchd starts the decoding service without the app's environment, so a measured self-test build names the measurement file in the service's property list, and the service writes what ran after each socket.
 
-CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) runs `make check`, `make coverage-library` and the universal
-build on Apple Silicon and `cargo test` on Intel for every push to `main` and every pull request. Every night,
-[.github/workflows/nightly.yml](../.github/workflows/nightly.yml) runs `make test-long` with new random inputs. The self-tests and the disk image stay on the developer's Mac: they need a screen and the
-signing certificates in the keychain.
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) runs `make check`, `make coverage-library` and the universal build on Apple Silicon and `cargo test` on Intel for every push to `main` and every pull request. Every night, [.github/workflows/nightly.yml](../.github/workflows/nightly.yml) runs `make test-long` with new random inputs. The self-tests and the disk image stay on the developer's Mac: they need a screen and the signing certificates in the keychain.
 
-Self-test output goes to `target/selftest/`. The self-test builds a separate app (`target/release/Splat Selftest.app`,
-bundle ID `local.splat.selftest`) and leaves the settings, recent documents and file associations of the normal app
-untouched.
+Self-test output goes to `target/selftest/`. The self-test builds a separate app (`target/release/Splat Selftest.app`, bundle ID `local.splat.selftest`) and leaves the settings, recent documents and file associations of the normal app untouched.
 
 ## Project layout
 
-Everything that needs no window is a crate of its own under `crates/`, which builds without macOS, so the compiler holds the
-way they depend on each other. The app in `src/` (package `splat-app`, program `splat`) builds on them.
+Everything that needs no window is a crate of its own under `crates/`, which builds without macOS, so the compiler holds the way they depend on each other. The app in `src/` (package `splat-app`, program `splat`) builds on them.
 
-- `crates/splat-markdown/`: the tree every consumer reads, `Doc` in `doc/`, which owns its text, and the only binding to the
-  parser in `reader/`: comrak is named nowhere else, and `reader/assumptions.rs` holds what the code assumes about it.
-  Syntax colours, and all commands as pure text edits (`Edit`) in `commands/`. Also re-parsing after an edit
-  (`incremental.rs`), the reader for embedded HTML (`markup.rs`), typography, tags, references and citations in running
-  text (`typography.rs`), how text looks and which Markdown and HTML make it so (`style.rs`), what an address may be
-  (`url.rs`), the word count (`counts.rs`), reading and editing front matter line by line (`front_matter.rs`), and the HTML and
-  Word export (`html.rs`, `docx.rs` with `docx/html.rs` and `docx/xml.rs`). A position has
-  its type: `Byte` in the source text, `U16` in the source view, `Shown` in the preview view (`text.rs`).
-- `crates/splat-preview/`: the preview layout in `layout/`, with embedded HTML in `layout/html.rs`, and the mapping between
-  preview and source (`Bridge`, `Index`). A `Bridge` refuses a layout of another version of the `Doc`.
+- `crates/splat-markdown/`: the tree every consumer reads, `Doc` in `doc/`, which owns its text, and the only binding to the parser in `reader/`: comrak is named nowhere else, and `reader/assumptions.rs` holds what the code assumes about it. Syntax colours, and all commands as pure text edits (`Edit`) in `commands/`. Also re-parsing after an edit (`incremental.rs`), the reader for embedded HTML (`markup.rs`), typography, tags, references and citations in running text (`typography.rs`), how text looks and which Markdown and HTML make it so (`style.rs`), what an address may be (`url.rs`), the word count (`counts.rs`), reading and editing front matter line by line (`front_matter.rs`), and the HTML and Word export (`html.rs`, `docx.rs` with `docx/html.rs` and `docx/xml.rs`). A position has its type: `Byte` in the source text, `U16` in the source view, `Shown` in the preview view (`text.rs`).
+- `crates/splat-preview/`: the preview layout in `layout/`, with embedded HTML in `layout/html.rs`, and the mapping between preview and source (`Bridge`, `Index`). A `Bridge` refuses a layout of another version of the `Doc`.
 - `crates/splat-file-state/`: which text a file holds, in which format, and what a look at it means.
-- `crates/splat-import/`: foreign formats as Markdown through one model in `rich.rs`: HTML, RTF in the code pages its
-  fonts name (`rtf/code_page.rs`) and separated text from the clipboard, Word files with their formulas in `docx/`, the
-  Word package that import and templates share in `package.rs`, one budget for all the XML of an import or a merge in
-  `xml.rs`, and the look of a Word template in `template/`.
-- `crates/splat-ooxml/`: what reading and writing Word files share: ZIP archives in `zip.rs`, read from anywhere within
-  limits and written as the export stores them, their CRC-32 checksum, and XML escaping in `xml.rs`.
-- `crates/splat-git/`: what a file holds in the last commit, read from the repository's files without the `git` program, and
-  where a text differs from it (`diff.rs`); also how a Mac volume compares file names (`folded_name`).
-- `crates/splat-notes/`: the folder around a document, the search through it, what its links resolve to and what a rename
-  changes in them.
-- `crates/splat-editor-state/`: what the editor window knows and decides without a window. Everything the controller
-  knows about the document and every way that changes in `state.rs`, whose fields are private; `model.rs`, which lends
-  the state and the text copy to closures that cannot reach a view; the text copy and the block bookkeeping in
-  `sync.rs`, with randomised tests; the rules of what WebKit renders when, and which of its pictures stay, in
-  `render_queue.rs`, and when an update runs, which blocks of a large preview render when and when the parts of a large
-  source get their colours in `progress.rs`.
-  Also what a link click means and where opening a link leads (`navigation.rs`, `links.rs`), the BibTeX file
-  (`bibtex.rs`) and the code host of the repository (`repository.rs`), the sidebar's rows, searches and renames
-  (`notes.rs`), the outline (`outline.rs`), the marks for what changed since the last commit (`changes.rs`), what an
-  edit in the preview changed and what a drop inserts (`editing.rs`), new files beside a document (`files.rs`), the
-  metadata form (`metadata.rs`), the word count (`word_count.rs`), and the worker threads and `contained` (`lanes.rs`).
-- `crates/splat-i18n/` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table
-  of the interface language at its start.
+- `crates/splat-import/`: foreign formats as Markdown through one model in `rich.rs`: HTML, RTF in the code pages its fonts name (`rtf/code_page.rs`) and separated text from the clipboard, Word files with their formulas in `docx/`, the Word package that import and templates share in `package.rs`, one budget for all the XML of an import or a merge in `xml.rs`, and the look of a Word template in `template/`.
+- `crates/splat-ooxml/`: what reading and writing Word files share: ZIP archives in `zip.rs`, read from anywhere within limits and written as the export stores them, their CRC-32 checksum, and XML escaping in `xml.rs`.
+- `crates/splat-git/`: what a file holds in the last commit, read from the repository's files without the `git` program, and where a text differs from it (`diff.rs`); also how a Mac volume compares file names (`folded_name`).
+- `crates/splat-notes/`: the folder around a document, the search through it, what its links resolve to and what a rename changes in them.
+- `crates/splat-editor-state/`: what the editor window knows and decides without a window. Everything the controller knows about the document and every way that changes in `state.rs`, whose fields are private; `model.rs`, which lends the state and the text copy to closures that cannot reach a view; the text copy and the block bookkeeping in `sync.rs`, with randomised tests; the rules of what WebKit renders when, and which of its pictures stay, in `render_queue.rs`, and when an update runs, which blocks of a large preview render when and when the parts of a large source get their colours in `progress.rs`. Also what a link click means and where opening a link leads (`navigation.rs`, `links.rs`), the BibTeX file (`bibtex.rs`) and the code host of the repository (`repository.rs`), the sidebar's rows, searches and renames (`notes.rs`), the outline (`outline.rs`), the marks for what changed since the last commit (`changes.rs`), what an edit in the preview changed and what a drop inserts (`editing.rs`), new files beside a document (`files.rs`), the metadata form (`metadata.rs`), the word count (`word_count.rs`), and the worker threads and `contained` (`lanes.rs`).
+- `crates/splat-i18n/` with `resources/*.lproj`: 35 languages; the keys are the German texts, and the app installs the table of the interface language at its start.
 - `crates/splat-testkit/`: the generator of the randomised tests and the checks of the fuzz targets.
-- `crates/splat-render/`: the preview's render path, which other apps share: the layout as native text (`render.rs`,
-  text attributes in `attributes.rs`), WebKit for MathJax, Mermaid, Graphviz and PlantUML in a hidden window (`js.rs`,
-  calls into WebKit in `webkit.rs`, the scheme its pages load the resources from in `scheme.rs`), local images
-  (`images.rs`) and pictures from the web (`remote.rs`), all within one memory budget (`picture.rs`); worker threads
-  (`lanes.rs`) and volumes that may stop answering (`volumes.rs`). A picture decodes to the pixels it covers in the
-  preview, its width in points there times the screen's pixels per point, in steps of 256 and up to `SHOWN_SIDE`; one
-  that comes to show larger decodes again, and paper takes up to `SHOWN_SIDE` of every picture. A document asks as a
-  `Viewer` and hears through it what arrives for it. macOS only, outside `check-library`. The hidden window and its web
-  view, whose processes take about 150 MB, start with the first formula or diagram to render and end after two minutes
-  without one; the pictures they made stay for the open documents, and of those no document wants, at most 32 MB.
-- `crates/splat-decoder/`: the decoding service, which decodes images and graphics in a sandbox of its own, and the
-  app's side of it: what both sides say in `protocol.rs`, the service's side in `serve.rs` and `safe_image.rs`, the
-  sockets it gets through libxpc in `xpc.rs`. It needs no WebKit, so the service's program does not load it. The service
-  ends after a minute without a request; while it ends, it holds every helper's slot, so a request that starts then
-  waits and starts a new one.
-- `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views and forwards to
-  components, small structs over the controller and the state they own, whose fields the other modules cannot reach:
+- `crates/splat-render/`: the preview's render path, which other apps share: the layout as native text (`render.rs`, text attributes in `attributes.rs`), WebKit for MathJax, Mermaid, Graphviz and PlantUML in a hidden window (`js.rs`, calls into WebKit in `webkit.rs`, the scheme its pages load the resources from in `scheme.rs`), local images (`images.rs`) and pictures from the web (`remote.rs`), all within one memory budget (`picture.rs`); worker threads (`lanes.rs`) and volumes that may stop answering (`volumes.rs`). A picture decodes to the pixels it covers in the preview, its width in points there times the screen's pixels per point, in steps of 256 and up to `SHOWN_SIDE`; one that comes to show larger decodes again, and paper takes up to `SHOWN_SIDE` of every picture. A document asks as a `Viewer` and hears through it what arrives for it. macOS only, outside `check-library`. The hidden window and its web view, whose processes take about 150 MB, start with the first formula or diagram to render and end after two minutes without one; the pictures they made stay for the open documents, and of those no document wants, at most 32 MB.
+- `crates/splat-decoder/`: the decoding service, which decodes images and graphics in a sandbox of its own, and the app's side of it: what both sides say in `protocol.rs`, the service's side in `serve.rs` and `safe_image.rs`, the sockets it gets through libxpc in `xpc.rs`. It needs no WebKit, so the service's program does not load it. The service ends after a minute without a request; while it ends, it holds every helper's slot, so a request that starts then waits and starts a new one.
+- `src/editor/`: the window. One `EditorController` object serves AppKit as delegate of both views and forwards to components, small structs over the controller and the state they own, whose fields the other modules cannot reach:
 
 | Module | Responsibility |
 |---|---|
@@ -324,17 +169,11 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 | `mathfield.rs` | the visual formula editor in WebKit, whose web view goes a minute after its popover closed; formulas and diagrams render through `splat-render` |
 | `controller/window.rs`, `toolbar.rs`, `views.rs`, `dialogs.rs`, `style.rs` | building the window, toolbar, text views, dialogs, colours |
 
-- `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument`
-  subclass). `src/word_import.rs`: asking for a Word document and writing its Markdown and images. `src/grants.rs`:
-  the folders the user granted, kept as security-scoped bookmarks; the bar above the preview offers the folder around a
-  document while the App Sandbox keeps it closed.
-- `src/decoder_main.rs`: the program of the decoding service, `SplatDecoder.xpc` in the app bundle, which macOS starts
-  in a sandbox without the user's files and without the network; `splat-decoder` hands it a socket per helper.
+- `src/menu.rs`, `src/app.rs`, `src/document.rs`: menu bar, app delegate, document (`MDDocument`, an `NSDocument` subclass). `src/word_import.rs`: asking for a Word document and writing its Markdown and images. `src/grants.rs`: the folders the user granted, kept as security-scoped bookmarks; the bar above the preview offers the folder around a document while the App Sandbox keeps it closed.
+- `src/decoder_main.rs`: the program of the decoding service, `SplatDecoder.xpc` in the app bundle, which macOS starts in a sandbox without the user's files and without the network; `splat-decoder` hands it a socket per helper.
 - `src/util/`: AppKit helpers, files and processes, and what moved to `splat-render` under its old names. `src/diag.rs`: what goes wrong out of the user's sight goes to the system log, without any text of a document.
-- `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory
-  returns after big edits.
-- `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](../vendor.lock). The bundle carries
-  the large ones packed, see [Building](#building).
+- `src/large_alloc.rs`: large allocations come straight from the kernel and go back to it when freed, so memory returns after big edits.
+- `resources/js/`: web pages and libraries; versions and checksums in [vendor.lock](../vendor.lock). The bundle carries the large ones packed, see [Building](#building).
 - `xtask/`: bundling, signing, the disk image, the icon, vendoring, the self-test runner and the coverage floors.
 
 ## Data flow
@@ -342,84 +181,44 @@ way they depend on each other. The app in `src/` (package `splat-app`, program `
 The source text in the left text view is the single source of truth.
 
 1. Every character change there updates the text copy (`Snapshot`) in place, without reading the text again.
-2. An update parses the copy, recolours the source only where colours changed, lays out the preview and replaces only
-   the blocks whose content changed.
-3. After an edit, only the affected paragraphs are parsed, coloured and laid out again, as long as their neighbours
-   stay the same; [docs/partial-parse.md](partial-parse.md) says why that gives what a full parse gives, and what to
-   look at when comrak changes. Documents with `%%` comment blocks, changes to the
-   front matter and, in a document with link reference definitions, changes to a part holding a bracket are processed
-   in full. comrak recognizes a footnote
-   reference only with its definition in the same parse and moves definitions behind the text, so the part is parsed
-   with a stand-in definition per label and takes its numbers from the old tree; a change to the references or
-   definitions in the part, or next to an inline footnote, is processed in full.
-4. HTML blocks that open `<details>` or `<div align>` and close it later affect the Markdown blocks in between; a
-   reused block must have the same surroundings.
-5. While you type in the source of a document up to 2 MB, the partial update runs immediately; when it does not apply,
-   or in a larger document, parsing and layout run in the background. There, too, only the affected paragraphs are
-   parsed and laid out again, from a copy of the tree (`state::parse_in_background`), since the main thread reads its
-   own until the result arrives: at 10 MB copying takes about 25 ms, parsing all of it about 280 ms. While you type in
-   the preview, they run immediately, because the preview's cursor depends on the result.
-6. Input in the preview is translated by `Bridge` into an edit of the source and takes the same path from there.
-   Markdown has too many ways of turning text into syntax for rules alone, so `preview/verify.rs` parses the changed part
-   again and compares what it shows with what was typed; an edit that does not hold is escaped further or refused.
-7. comrak's inline positions go wrong in a few places, for example behind a link reference definition. `reader/positions.rs`
-   checks them against the source when reading a block and reads them again from the source where they do not fit.
+2. An update parses the copy, recolours the source only where colours changed, lays out the preview and replaces only the blocks whose content changed.
+3. After an edit, only the affected paragraphs are parsed, coloured and laid out again, as long as their neighbours stay the same; [docs/partial-parse.md](partial-parse.md) says why that gives what a full parse gives, and what to look at when comrak changes. Documents with `%%` comment blocks, changes to the front matter and, in a document with link reference definitions, changes to a part holding a bracket are processed in full. comrak recognizes a footnote reference only with its definition in the same parse and moves definitions behind the text, so the part is parsed with a stand-in definition per label and takes its numbers from the old tree; a change to the references or definitions in the part, or next to an inline footnote, is processed in full.
+4. HTML blocks that open `<details>` or `<div align>` and close it later affect the Markdown blocks in between; a reused block must have the same surroundings.
+5. While you type in the source of a document up to 2 MB, the partial update runs immediately; when it does not apply, or in a larger document, parsing and layout run in the background. There, too, only the affected paragraphs are parsed and laid out again, from a copy of the tree (`state::parse_in_background`), since the main thread reads its own until the result arrives: at 10 MB copying takes about 25 ms, parsing all of it about 280 ms. While you type in the preview, they run immediately, because the preview's cursor depends on the result.
+6. Input in the preview is translated by `Bridge` into an edit of the source and takes the same path from there. Markdown has too many ways of turning text into syntax for rules alone, so `preview/verify.rs` parses the changed part again and compares what it shows with what was typed; an edit that does not hold is escaped further or refused.
+7. comrak's inline positions go wrong in a few places, for example behind a link reference definition. `reader/positions.rs` checks them against the source when reading a block and reads them again from the source where they do not fit.
 
 ## Rules in the controller
 
-1. The controller's own changes to the views run inside `Panes::silently`; the delegate callbacks ignore them. Everywhere
-   else the views can only be read, so the compiler checks this. What the callbacks are meant to hear, or what hands a
-   view to AppKit, says so by going through `Panes::for_appkit`.
-2. The state is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view: `Model`
-   lends it to `Send` closures, and no view is `Send`, so the compiler checks this. It changes through its own methods
-   only, whose tests need no window.
-3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `renders_arrived` and `image_arrived`, never in the
-   middle of an update. What another thread, a sheet or a panel answers reaches the controller as a `Message` through a
-   `Messenger`, on the main thread and only while the window is open.
+1. The controller's own changes to the views run inside `Panes::silently`; the delegate callbacks ignore them. Everywhere else the views can only be read, so the compiler checks this. What the callbacks are meant to hear, or what hands a view to AppKit, says so by going through `Panes::for_appkit`.
+2. The state is borrowed only to read and compute, never across a call that changes, lays out or scrolls a view: `Model` lends it to `Send` closures, and no view is `Send`, so the compiler checks this. It changes through its own methods only, whose tests need no window.
+3. Messages from outside (an image loaded, a formula rendered) arrive delayed through `renders_arrived` and `image_arrived`, never in the middle of an update. What another thread, a sheet or a panel answers reaches the controller as a `Message` through a `Messenger`, on the main thread and only while the window is open.
 4. Redrawing without a text change goes through `invalidate(reason)` only.
-5. The text copy is not held across a change of the source, or that change copies the whole text: `with_text` lends it
-   for the length of a `Send` closure only.
-6. A new command needs a row in `actions.rs`, which gives it its method in `controller.rs` as well, and a branch in
-   `Editing::perform`, which the compiler asks for.
-7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in
-   the decoding service only, through `decoder::decode_native` or `decode_native_to`; a test scans the sources for other
-   calls.
-8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are
-   looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user
-   waits for, like an export or saving, may touch the disk directly.
-9. What has to end also ends after a panic, as the main thread survives one: a raised flag goes through `with_raised`, an
-   editing of the text storage through `editing`, and what undo is not to know of through `without_undo`. A test finds these
-   written by hand.
+5. The text copy is not held across a change of the source, or that change copies the whole text: `with_text` lends it for the length of a `Send` closure only.
+6. A new command needs a row in `actions.rs`, which gives it its method in `controller.rs` as well, and a branch in `Editing::perform`, which the compiler asks for.
+7. Every `unsafe` block carries its justification as a `// SAFETY:` comment. Bytes reach the system's image decoders in the decoding service only, through `decoder::decode_native` or `decode_native_to`; a test scans the sources for other calls.
+8. Nothing on the main thread waits for the user's folders, since a network volume can stop answering: files are looked at on the thread `DISK`, and the preview reads the answers through `Env::known`. Only an action the user waits for, like an export or saving, may touch the disk directly.
+9. What has to end also ends after a panic, as the main thread survives one: a raised flag goes through `with_raised`, an editing of the text storage through `editing`, and what undo is not to know of through `without_undo`. A test finds these written by hand.
 10. An address in a document has one reading, in `splat_markdown::url`; a test finds schemes compared by hand.
 
 ## Adding a command
 
-The menu bar, the toolbar and the context menu all build their items from the registry in
-[src/editor/actions.rs](../src/editor/actions.rs), and menu validation reads there when a command applies and whether it
-shows a checkmark. A new command needs:
+The menu bar, the toolbar and the context menu all build their items from the registry in [src/editor/actions.rs](../src/editor/actions.rs), and menu validation reads there when a command applies and whether it shows a checkmark. A new command needs:
 
-1. a row of `commands!`: the variant of `Action`, its selector, when it applies and what of its `Spec` it has: title,
-   toolbar label, tooltip (starting with a verb, at most 75 characters), shortcut and SF Symbol. The same row gives
-   `src/editor/controller.rs` the method AppKit finds the command's target by
-2. a branch in `Editing::perform`, which the compiler asks for; a command with variants in a submenu reads the one
-   chosen as a `Choice` of `Action::choices`
+1. a row of `commands!`: the variant of `Action`, its selector, when it applies and what of its `Spec` it has: title, toolbar label, tooltip (starting with a verb, at most 75 characters), shortcut and SF Symbol. The same row gives `src/editor/controller.rs` the method AppKit finds the command's target by
+2. a branch in `Editing::perform`, which the compiler asks for; a command with variants in a submenu reads the one chosen as a `Choice` of `Action::choices`
 3. its texts in every `Localizable.strings`
 
-The test `every_command_has_a_method_and_every_method_a_command` checks that registry and methods match. Apple's
-standard shortcuts such as ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F and ⌘, stay untouched.
+The test `every_command_has_a_method_and_every_method_a_command` checks that registry and methods match. Apple's standard shortcuts such as ⌘E, ⌘J, ⌘T, ⌘;, ⇧⌘C, ⌥⌘C, ⌥⌘V, ⇧⌘P, ⌥⌘T, ⌃⌘F and ⌘, stay untouched.
 
 ## Translations
 
-Code uses the German text as key: `t("Fett")` looks it up at run time, `n("Fett")` marks a constant for later
-lookup. Each `resources/<language>.lproj/` holds:
+Code uses the German text as key: `t("Fett")` looks it up at run time, `n("Fett")` marks a constant for later lookup. Each `resources/<language>.lproj/` holds:
 
 - `Localizable.strings`: every interface text, menu terms after Apple's own glossaries
 - `InfoPlist.strings`: the name macOS shows for the document type
 - `QuickReference.md`: the Markdown quick reference
 
-`cargo xtask bundle` lists every `.lproj` folder as a localization, and `CFBundleDevelopmentRegion` is English, so
-the system menus and the save dialog follow the same language. The i18n test checks that every language has every
-text and that every quick reference has the outline of the German one.
+`cargo xtask bundle` lists every `.lproj` folder as a localization, and `CFBundleDevelopmentRegion` is English, so the system menus and the save dialog follow the same language. The i18n test checks that every language has every text and that every quick reference has the outline of the German one.
 
-`assets/readme/<language>/` holds this README in that language, its screenshot and the demo document the screenshot
-shows. A change to this README belongs in those copies as well.
+`assets/readme/<language>/` holds this README in that language, its screenshot and the demo document the screenshot shows. A change to this README belongs in those copies as well.

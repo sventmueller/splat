@@ -16,58 +16,9 @@
  
  
 
-[![إصدار Rust 2024](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![macOS 14 أو أحدث](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
-![شامل: Apple Silicon وIntel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white)
-[![AppKit عبر objc2](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2)
-[![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org)
-[![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak)
-[![CommonMark وGFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/)
-[![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org)
-[![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/)
-[![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org)
-[![Graphviz عبر Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org)
-[![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com)
-![35 لغة للواجهة](https://img.shields.io/badge/languages-35-4C9A2A)
-![بلا قياس عن بُعد](https://img.shields.io/badge/telemetry-none-4C9A2A)
-![موقّع مع Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A)
-[![الترخيص: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#الترخيص)
+[![إصدار Rust 2024](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org) [![macOS 14 أو أحدث](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/) ![شامل: Apple Silicon وIntel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white) [![AppKit عبر objc2](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2) [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org) [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak) [![CommonMark وGFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/) [![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org) [![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/) [![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org) [![Graphviz عبر Viz.js 3.24](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org) [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com) ![35 لغة للواجهة](https://img.shields.io/badge/languages-35-4C9A2A) ![بلا قياس عن بُعد](https://img.shields.io/badge/telemetry-none-4C9A2A) ![موقّع مع Hardened Runtime](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A) [![الترخيص: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#الترخيص)
 
-[Bahasa Indonesia](../id/README.md) ·
-[Bahasa Melayu](../ms/README.md) ·
-[Català](../ca/README.md) ·
-[Čeština](../cs/README.md) ·
-[Dansk](../da/README.md) ·
-[Deutsch](../de/README.md) ·
-[English](../../../README.md) ·
-[Español](../es/README.md) ·
-[Français](../fr/README.md) ·
-[Hrvatski](../hr/README.md) ·
-[Italiano](../it/README.md) ·
-[Magyar](../hu/README.md) ·
-[Nederlands](../nl/README.md) ·
-[Norsk](../no/README.md) ·
-[Polski](../pl/README.md) ·
-[Português (Brasil)](../pt_BR/README.md) ·
-[Português (Portugal)](../pt_PT/README.md) ·
-[Română](../ro/README.md) ·
-[Slovenčina](../sk/README.md) ·
-[Slovenščina](../sl/README.md) ·
-[Suomi](../fi/README.md) ·
-[Svenska](../sv/README.md) ·
-[Tiếng Việt](../vi/README.md) ·
-[Türkçe](../tr/README.md) ·
-[Ελληνικά](../el/README.md) ·
-[Русский](../ru/README.md) ·
-[Українська](../uk/README.md) ·
-[עברית](../he/README.md)‎ ·
-**العربية**‎ ·
-[हिन्दी](../hi/README.md) ·
-[ไทย](../th/README.md) ·
-[한국어](../ko/README.md) ·
-[日本語](../ja/README.md) ·
-[简体中文](../zh-Hans/README.md) ·
-[繁體中文](../zh-Hant/README.md)
+[Bahasa Indonesia](../id/README.md) · [Bahasa Melayu](../ms/README.md) · [Català](../ca/README.md) · [Čeština](../cs/README.md) · [Dansk](../da/README.md) · [Deutsch](../de/README.md) · [English](../../../README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Hrvatski](../hr/README.md) · [Italiano](../it/README.md) · [Magyar](../hu/README.md) · [Nederlands](../nl/README.md) · [Norsk](../no/README.md) · [Polski](../pl/README.md) · [Português (Brasil)](../pt_BR/README.md) · [Português (Portugal)](../pt_PT/README.md) · [Română](../ro/README.md) · [Slovenčina](../sk/README.md) · [Slovenščina](../sl/README.md) · [Suomi](../fi/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Türkçe](../tr/README.md) · [Ελληνικά](../el/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [עברית](../he/README.md)‎ · **العربية**‎ · [हिन्दी](../hi/README.md) · [ไทย](../th/README.md) · [한국어](../ko/README.md) · [日本語](../ja/README.md) · [简体中文](../zh-Hans/README.md) · [繁體中文](../zh-Hant/README.md)
 
 ## المحتويات
 
