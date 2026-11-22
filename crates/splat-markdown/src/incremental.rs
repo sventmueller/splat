@@ -19,6 +19,9 @@ use super::text::{
     Byte, TextAt, TextPart, changed, growth, label_key, line_start, next_line_start, previous_line_start, shifted,
 };
 
+mod known_edit;
+pub use known_edit::reparse_edit_and_color;
+
 /// The parsed document and its source colors.
 pub struct Parsed {
     /// The tree of the text.
@@ -91,16 +94,19 @@ pub fn reparse_part_and_color(
     new_text: &str,
 ) -> Result<Parsed, Box<Doc>> {
     match reparse(&mut doc, new_text) {
-        Some(splice) => {
-            let (spans, kept_colors) = rehighlight(spans, &doc, &splice);
-            Ok(Parsed {
-                spans: with_definitions_in_window(spans, &doc, &splice),
-                doc,
-                splice: Some(splice),
-                kept_colors,
-            })
-        }
+        Some(splice) => Ok(colored(doc, spans, splice)),
         None => Err(Box::new(doc)),
+    }
+}
+
+/// `doc` after a partial parse with its colours, from `spans` of the text before.
+fn colored(doc: Doc, spans: &[(Range<Byte>, Style)], splice: Splice) -> Parsed {
+    let (spans, kept_colors) = rehighlight(spans, &doc, &splice);
+    Parsed {
+        spans: with_definitions_in_window(spans, &doc, &splice),
+        doc,
+        splice: Some(splice),
+        kept_colors,
     }
 }
 
@@ -676,10 +682,20 @@ pub fn reparse(doc: &mut Doc, new_text: &str) -> Option<Splice> {
 
 /// `reparse`, with the reason if all of `new_text` has to be parsed.
 pub(crate) fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice, WholeParse> {
+    let (old_change, new_change) = changed(doc.text(), new_text);
+    reparse_changed(doc, new_text, old_change, new_change)
+}
+
+/// `reparse_or_why_not` with the changed part of both texts as [`changed`] gives it.
+fn reparse_changed(
+    doc: &mut Doc,
+    new_text: &str,
+    old_change: Range<Byte>,
+    new_change: Range<Byte>,
+) -> Result<Splice, WholeParse> {
     let shared = doc.shared_text();
     let old_text: &str = &shared;
     let facts = doc.facts().clone();
-    let (old_change, new_change) = changed(old_text, new_text);
     let counts = facts.counts.after_change(old_text, new_text, &old_change, &new_change);
     if counts.memory >= MOST_MEMORY {
         return Err(WholeParse::TooMuch);

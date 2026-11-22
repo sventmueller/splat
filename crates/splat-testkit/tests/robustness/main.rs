@@ -4,6 +4,7 @@ mod code_tokens;
 mod commands;
 mod common;
 mod keystroke_cost;
+mod known_edit;
 mod pending;
 mod preview;
 mod reparse;
