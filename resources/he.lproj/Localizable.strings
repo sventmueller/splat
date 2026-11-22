@@ -284,6 +284,7 @@
 "Überschrift" = "כותרת";
 "Überschrift {}" = "כותרת {}";
 "⌘-Klick öffnet den Link" = "לחיצה עם ⌘ פותחת את הקישור";
+"Das Ziel dieses Links fehlt" = "היעד של הקישור הזה חסר";
 "Link in einer anderen App öffnen?" = "לפתוח את הקישור ביישום אחר?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "הקישור ״{}״ ייפתח ביישום ״{}״. יש לפתוח את הקישור רק אם ניתן לסמוך על המקור.";
 "Öffnen" = "פתיחה";

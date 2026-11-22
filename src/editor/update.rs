@@ -15,7 +15,7 @@ use super::panes::Side;
 use super::panes::Views;
 use super::render::{Live, RenderCtx};
 use super::state::{
-    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, parse_in_background,
+    Background, Invalidate, PreviewChange, PreviewMode, Recolor, Update, ViewFacts, images_of, links_of, parse_in_background,
 };
 use super::style::{self, SourceFonts};
 use super::{js, string_of};
@@ -310,6 +310,15 @@ impl Updater<'_> {
         }
     }
 
+    /// Renders the blocks whose links gained or lost the mark of leading nowhere.
+    pub(super) fn link_targets_changed(&self, changed: std::collections::HashSet<String>) {
+        let shows_changed = move |block: &TopBlock| links_of(block).any(|link| changed.contains(&link.attribute()));
+        if self.host.model().change(move |st| st.mark_arrived(shows_changed)) {
+            self.host.progressive().render_visible_blocks();
+            self.host.progressive().schedule_pending_blocks();
+        }
+    }
+
     /// The window moved to a screen with other pixels per point: the pictures render again, as if they had arrived,
     /// and those that now cover more pixels decode again.
     pub(super) fn render_pictures_again(&self) {
@@ -521,6 +530,7 @@ impl Updater<'_> {
         if !shown {
             return;
         }
+        self.host.link_targets().preview_changed();
         if preview_focused {
             self.host.selection().place_preview_selection();
         }
@@ -688,6 +698,7 @@ impl Updater<'_> {
         let live = Live {
             requester: Some(&viewer),
         };
+        let nowhere = self.host.link_targets().nowhere();
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
             zoom,
@@ -698,6 +709,7 @@ impl Updater<'_> {
             dark: self.host.is_dark(),
             requester: Some(&viewer),
             leaves_the_mac: None,
+            leads_nowhere: Some(&nowhere),
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,
         };

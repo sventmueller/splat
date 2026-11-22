@@ -141,6 +141,7 @@ impl Sharing<'_> {
             dark: false,
             requester: None,
             leaves_the_mac: Some(super::env::may_carry_along),
+            leads_nowhere: None,
             macros,
             drawn: &live,
         };

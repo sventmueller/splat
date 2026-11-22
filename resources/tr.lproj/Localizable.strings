@@ -284,6 +284,7 @@
 "Überschrift" = "Başlık";
 "Überschrift {}" = "Başlık {}";
 "⌘-Klick öffnet den Link" = "⌘-tıklama bağlantıyı açar";
+"Das Ziel dieses Links fehlt" = "Bu bağlantının hedefi yok";
 "Link in einer anderen App öffnen?" = "Bağlantı başka bir uygulamada açılsın mı?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}”, {} ile açılacak. Bağlantıyı yalnızca kaynağına güveniyorsanız açın.";
 "Öffnen" = "Aç";

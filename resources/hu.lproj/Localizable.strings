@@ -284,6 +284,7 @@
 "Überschrift" = "Címsor";
 "Überschrift {}" = "Címsor {}";
 "⌘-Klick öffnet den Link" = "A ⌘-kattintás megnyitja a linket";
+"Das Ziel dieses Links fehlt" = "A hivatkozás célja hiányzik";
 "Link in einer anderen App öffnen?" = "Megnyitja a linket egy másik appban?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "A(z) „{}” a(z) {} appban nyílik meg. Csak akkor nyissa meg a linket, ha megbízik a forrásában.";
 "Öffnen" = "Megnyitás";

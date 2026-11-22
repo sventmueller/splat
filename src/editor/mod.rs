@@ -15,6 +15,7 @@ mod export_options;
 mod geometry;
 mod images;
 mod line_numbers;
+mod link_targets;
 mod mathfield;
 mod metadata;
 mod navigation;
@@ -53,6 +54,7 @@ use splat_render::{js, picture, remote, render, webkit};
 pub use crate::util::panic_is_contained;
 pub use controller::EditorController;
 pub use images::{look_at_images, watch_memory};
+pub use link_targets::look_at_link_targets;
 pub use shadow::{discard_copies, discard_share_files, keep_copies};
 
 use state::{Invalidate, State};

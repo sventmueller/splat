@@ -284,6 +284,7 @@
 "Überschrift" = "Заголовок";
 "Überschrift {}" = "Заголовок {}";
 "⌘-Klick öffnet den Link" = "⌘-клацання відкриває посилання";
+"Das Ziel dieses Links fehlt" = "Ціль цього посилання відсутня";
 "Link in einer anderen App öffnen?" = "Відкрити посилання в іншій програмі?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "«{}» буде відкрито в програмі {}. Відкривайте посилання, лише якщо довіряєте його джерелу.";
 "Öffnen" = "Відкрити";

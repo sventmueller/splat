@@ -284,6 +284,7 @@
 "Überschrift" = "Overskrift";
 "Überschrift {}" = "Overskrift {}";
 "⌘-Klick öffnet den Link" = "⌘-klik åbner linket";
+"Das Ziel dieses Links fehlt" = "Linkets mål mangler";
 "Link in einer anderen App öffnen?" = "Åbn linket i en anden app?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” åbnes med {}. Åbn kun linket, hvis du stoler på kilden.";
 "Öffnen" = "Åbn";

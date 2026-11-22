@@ -284,6 +284,7 @@
 "Überschrift" = "Encabezamiento";
 "Überschrift {}" = "Encabezamiento {}";
 "⌘-Klick öffnet den Link" = "⌘-clic abre el enlace";
+"Das Ziel dieses Links fehlt" = "Falta el destino de este enlace";
 "Link in einer anderen App öffnen?" = "¿Abrir el enlace en otra app?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "«{}» se abrirá en {}. Abre el enlace solo si confías en su origen.";
 "Öffnen" = "Abrir";

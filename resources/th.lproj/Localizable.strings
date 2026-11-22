@@ -284,6 +284,7 @@
 "Überschrift" = "หัวข้อ";
 "Überschrift {}" = "หัวข้อ {}";
 "⌘-Klick öffnet den Link" = "⌘-คลิกเพื่อเปิดลิงก์";
+"Das Ziel dieses Links fehlt" = "ไม่พบปลายทางของลิงก์นี้";
 "Link in einer anderen App öffnen?" = "เปิดลิงก์ในแอปอื่นหรือไม่";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” จะเปิดใน {} เปิดลิงก์นี้เฉพาะเมื่อคุณเชื่อถือแหล่งที่มาเท่านั้น";
 "Öffnen" = "เปิด";

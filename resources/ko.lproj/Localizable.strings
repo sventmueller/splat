@@ -284,6 +284,7 @@
 "Überschrift" = "머리말";
 "Überschrift {}" = "머리말 {}";
 "⌘-Klick öffnet den Link" = "⌘-클릭하여 링크 열기";
+"Das Ziel dieses Links fehlt" = "이 링크의 대상이 없습니다";
 "Link in einer anderen App öffnen?" = "다른 앱에서 링크를 열겠습니까?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” 링크가 {}에서 열립니다. 출처를 신뢰하는 경우에만 링크를 여십시오.";
 "Öffnen" = "열기";

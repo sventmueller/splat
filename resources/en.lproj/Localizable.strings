@@ -284,6 +284,7 @@
 "Überschrift" = "Heading";
 "Überschrift {}" = "Heading {}";
 "⌘-Klick öffnet den Link" = "⌘-click opens the link";
+"Das Ziel dieses Links fehlt" = "This link's target is missing";
 "Link in einer anderen App öffnen?" = "Open the link in another app?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” will open in {}. Only open the link if you trust its source.";
 "Öffnen" = "Open";

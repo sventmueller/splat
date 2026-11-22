@@ -284,6 +284,7 @@
 "Überschrift" = "Επικεφαλίδα";
 "Überschrift {}" = "Επικεφαλίδα {}";
 "⌘-Klick öffnet den Link" = "Το ⌘-κλικ ανοίγει τον σύνδεσμο";
+"Das Ziel dieses Links fehlt" = "Ο προορισμός αυτού του συνδέσμου λείπει";
 "Link in einer anderen App öffnen?" = "Άνοιγμα του συνδέσμου σε άλλη εφαρμογή;";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "Ο σύνδεσμος «{}» θα ανοίξει στην εφαρμογή {}. Ανοίξτε τον μόνο αν εμπιστεύεστε την πηγή του.";
 "Öffnen" = "Άνοιγμα";

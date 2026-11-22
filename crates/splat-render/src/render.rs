@@ -51,6 +51,8 @@ pub struct RenderCtx<'a> {
     pub requester: Option<&'a Rc<dyn Viewer>>,
     /// What leaves the Mac as a file shows only the local images this allows; what stays shows them all.
     pub leaves_the_mac: Option<CarriesAlong>,
+    /// The links that lead nowhere, as `Link::attribute` writes them, which the preview marks and an export does not.
+    pub leads_nowhere: Option<&'a std::collections::HashSet<String>>,
     /// What the formulas of the document define for each other.
     pub macros: std::sync::Arc<str>,
     /// Pictures from the web and what WebKit drew, which the preview shows but does not make.
@@ -566,9 +568,17 @@ impl RenderCtx<'_> {
 
     fn run(&self, run: &Run, para: &Para, paragraph: &NSMutableParagraphStyle) -> Retained<NSAttributedString> {
         let font = self.font_for(run, para);
+        let nowhere = run.style.link.as_ref().filter(|link| {
+            matches!(link, Link::Address(_) | Link::WikiPage(_))
+                && self.leads_nowhere.is_some_and(|n| n.contains(&link.attribute()))
+        });
+        let color = match nowhere {
+            Some(_) => NSColor::systemRedColor(),
+            None => TextColor::of(run, para).color(),
+        };
         let mut attributes = vec![
             Attribute::font(&font),
-            Attribute::foreground(&TextColor::of(run, para).color()),
+            Attribute::foreground(&color),
             Attribute::paragraph(paragraph),
         ];
         if run.style.text.strike {
@@ -604,12 +614,19 @@ impl RenderCtx<'_> {
             let attribute = link.attribute();
             let url = NSURL::URLWithString(&ns(&attribute)).filter(|_| !attribute.starts_with("splat-"));
             attributes.push(url.map_or_else(|| Attribute::link_text(&attribute), |url| Attribute::link(&url)));
-            if let Link::Address(address) = link {
+            if let Link::Address(_) = link {
                 attributes.push(Attribute::underline());
-                attributes.push(Attribute::tool_tip(&format!(
-                    "{address}\n{}",
-                    splat_i18n::t("⌘-Klick öffnet den Link")
-                )));
+            }
+            let hint = match nowhere {
+                Some(_) => Some(splat_i18n::t("Das Ziel dieses Links fehlt")),
+                None if matches!(link, Link::Address(_)) => Some(splat_i18n::t("⌘-Klick öffnet den Link")),
+                None => None,
+            };
+            if let (Some(hint), Link::Address(name) | Link::WikiPage(name)) = (hint, link) {
+                attributes.push(Attribute::tool_tip(&format!("{name}\n{hint}")));
+            }
+            if nowhere.is_some() {
+                attributes.push(Attribute::underline_color(&color));
             }
         }
         if let RunMap::Atom { atom: Atom::Marker, .. } = &run.map

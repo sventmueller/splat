@@ -214,3 +214,119 @@ pub(super) fn link_steps() -> Vec<Step> {
         ),
     ]
 }
+
+/// The tool tip of the preview link to `target`, which says when the link leads nowhere.
+fn link_tip(c: &Ctx, target: &str) -> Option<String> {
+    let at = preview_link(&c.e, target)?;
+    let text = storage(c.e.preview());
+    // SAFETY: An index inside the text, and no range asked for.
+    let value = unsafe {
+        text.attribute_atIndex_effectiveRange(objc2_app_kit::NSToolTipAttributeName, at, std::ptr::null_mut())
+    };
+    Some(
+        value
+            .and_then(|v| v.downcast::<objc2_foundation::NSString>().ok())
+            .map(|s| s.to_string())
+            .unwrap_or_default(),
+    )
+}
+
+fn marked(c: &Ctx, target: &str) -> Option<bool> {
+    link_tip(c, target).map(|tip| tip.contains(crate::i18n::t("Das Ziel dieses Links fehlt")))
+}
+
+fn arrives_later(c: &Ctx) -> std::path::PathBuf {
+    c.e.doc_dir().unwrap_or_else(|| c.out.clone()).join("kommt.md")
+}
+
+const DEAD_LINKS: &str = "# Ziele\n\n## Da\n\n[Andere](andere.md) [Fehlt](fehlt.md) [Kommt](kommt.md) \
+    [[andere]] [[Nirgends]] [Da](#da) [Weg](#weg) <a id=\"html-ziel\"></a>[Html](#html-ziel) \
+    [Netz](https://example.com/x) [Einstellungen](x-apple.systempreferences:com.apple.Settings)\n";
+
+pub(super) fn dead_link_steps() -> Vec<Step> {
+    let wanted: [(&str, bool); 9] = [
+        ("andere.md", false),
+        ("fehlt.md", true),
+        ("kommt.md", true),
+        ("splat-wiki:andere", false),
+        ("splat-wiki:Nirgends", true),
+        ("#da", false),
+        ("#weg", true),
+        ("#html-ziel", false),
+        ("https://example.com/x", false),
+    ];
+    vec![
+        applied(|c| {
+            let _ = std::fs::remove_file(arrives_later(c));
+            c.e.replace_all_text(DEAD_LINKS);
+            c.e.updater().update_now();
+        }),
+        when(
+            "the links that lead nowhere to be marked",
+            move |c| wanted.iter().all(|(target, dead)| marked(c, target) == Some(*dead)),
+            move |c| {
+                for (target, dead) in wanted {
+                    let name = if dead {
+                        format!("a link to {target}, which is not there, is marked")
+                    } else {
+                        format!("a link to {target}, which is there, is not marked")
+                    };
+                    check(&name, marked(c, target) == Some(dead), &format!("{:?}", link_tip(c, target)));
+                }
+                check(
+                    "a link to another app is not marked",
+                    marked(c, "x-apple.systempreferences:com.apple.Settings") == Some(false),
+                    "",
+                );
+                let at = preview_link(&c.e, "fehlt.md").unwrap_or_default();
+                let text = storage(c.e.preview());
+                // SAFETY: An index inside the text, and no range asked for.
+                let color = unsafe {
+                    text.attribute_atIndex_effectiveRange(
+                        objc2_app_kit::NSForegroundColorAttributeName,
+                        at,
+                        std::ptr::null_mut(),
+                    )
+                };
+                check(
+                    "a link that leads nowhere is red",
+                    color
+                        .and_then(|v| v.downcast::<objc2_app_kit::NSColor>().ok())
+                        .is_some_and(|v| v == objc2_app_kit::NSColor::systemRedColor()),
+                    "",
+                );
+                std::fs::write(arrives_later(c), "# Kommt\n").expect("a test file");
+            },
+        ),
+        when(
+            "a file that appeared to lose the mark of the link to it",
+            |c| marked(c, "kommt.md") == Some(false),
+            |c| {
+                check(
+                    "a link loses its mark once its file appears",
+                    marked(c, "kommt.md") == Some(false),
+                    "",
+                );
+                check(
+                    "the other links keep their marks",
+                    marked(c, "fehlt.md") == Some(true) && marked(c, "andere.md") == Some(false),
+                    "",
+                );
+                let _ = std::fs::remove_file(arrives_later(c));
+                c.e.replace_all_text(&DEAD_LINKS.replace("](#weg)", "](#da)"));
+                c.e.updater().update_now();
+            },
+        ),
+        when(
+            "a link whose heading the text now has to lose its mark",
+            |c| marked(c, "#weg").is_none() && marked(c, "#da") == Some(false),
+            |c| {
+                check(
+                    "an edit that names an existing heading takes the mark away",
+                    marked(c, "#weg").is_none() && marked(c, "#da") == Some(false),
+                    "",
+                );
+            },
+        ),
+    ]
+}

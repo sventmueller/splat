@@ -284,6 +284,7 @@
 "Überschrift" = "Đề mục";
 "Überschrift {}" = "Đề mục {}";
 "⌘-Klick öffnet den Link" = "⌘-bấm để mở liên kết";
+"Das Ziel dieses Links fehlt" = "Đích của liên kết này không tồn tại";
 "Link in einer anderen App öffnen?" = "Mở liên kết trong ứng dụng khác?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” sẽ được mở bằng {}. Chỉ mở liên kết nếu bạn tin tưởng nguồn của nó.";
 "Öffnen" = "Mở";

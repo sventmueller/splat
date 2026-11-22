@@ -284,6 +284,7 @@
 "Überschrift" = "Otsikko";
 "Überschrift {}" = "Otsikko {}";
 "⌘-Klick öffnet den Link" = "⌘-klikkaus avaa linkin";
+"Das Ziel dieses Links fehlt" = "Tämän linkin kohde puuttuu";
 "Link in einer anderen App öffnen?" = "Avataanko linkki toisessa apissa?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "”{}” avataan apissa {}. Avaa linkki vain, jos luotat sen lähteeseen.";
 "Öffnen" = "Avaa";

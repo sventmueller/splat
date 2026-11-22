@@ -27,6 +27,7 @@ use super::editing::{self, Editing};
 use super::export::{self, Sharing};
 use super::images::{self, Pictures};
 use super::line_numbers::{self, LineNumbers};
+use super::link_targets::{self, LinkTargets};
 use super::model::Model;
 use super::navigation::Links;
 use super::notes::{self, Inherited, NoteAnswer, Notes};
@@ -42,8 +43,8 @@ use super::{string_of, style, toolbar};
 use crate::document::MdDocument;
 use crate::util::guarded;
 use layers::{
-    ForAtoms, ForChanges, ForCounter, ForEditing, ForLineNumbers, ForLinks, ForNotes, ForPanes, ForPictures,
-    ForProgressive, ForScroll, ForSelection, ForSharing, ForUpdater, Message,
+    ForAtoms, ForChanges, ForCounter, ForEditing, ForLineNumbers, ForLinkTargets, ForLinks, ForNotes, ForPanes,
+    ForPictures, ForProgressive, ForScroll, ForSelection, ForSharing, ForUpdater, Message,
 };
 use splat_editor_state::progress;
 use splat_render::Viewer;
@@ -57,6 +58,7 @@ pub struct Ivars {
     marks: selection::SelectionMarks,
     atoms: atom::Atoms,
     pictures: images::PictureState,
+    link_targets: link_targets::LinkTargetState,
     scroll: scroll::ScrollState,
     edits: editing::EditState,
     sharing: export::ShareState,
@@ -381,6 +383,11 @@ super::actions::commands!(class_with_commands, [
             });
         }
 
+        #[unsafe(method(lookAtLinkTargets))]
+        fn look_at_link_targets(&self) {
+            guarded((), || self.link_targets().look_now());
+        }
+
         #[unsafe(method(countWords))]
         fn count_words(&self) {
             guarded((), || self.word_counter().count_now());
@@ -439,6 +446,7 @@ within_the_controller! {
     fn line_numbers(self) -> LineNumbers<'_> { LineNumbers::new(ForLineNumbers::of(self), &self.ivars().line_numbers) }
     fn selection(self) -> Selection<'_> { Selection::new(ForSelection::of(self), &self.ivars().marks) }
     fn pictures(self) -> Pictures<'_> { Pictures::new(ForPictures::of(self), &self.ivars().pictures) }
+    fn link_targets(self) -> LinkTargets<'_> { LinkTargets::new(ForLinkTargets::of(self), &self.ivars().link_targets) }
     fn progressive(self) -> Progressive<'_> { Progressive::new(ForProgressive::of(self)) }
     fn scroll_sync(self) -> ScrollSync<'_> { ScrollSync::new(ForScroll::of(self), &self.ivars().scroll) }
     fn updater(self) -> Updater<'_> { Updater::new(ForUpdater::of(self), &self.ivars().updates) }
@@ -477,6 +485,7 @@ impl EditorController {
             Message::NotesFolder(folder) => self.use_notes_folder(folder),
             Message::FolderGranted => {
                 self.updater().folder_granted();
+                self.link_targets().forget();
                 self.editing().folder_granted();
                 self.notes().rescan();
                 self.change_marks().look();
@@ -487,6 +496,7 @@ impl EditorController {
             Message::Changes(answer) => self.change_marks().answer(answer),
             Message::ImageLoaded(path, file) => self.pictures().image_loaded(path, file),
             Message::ImagesChanged(changed) => self.pictures().read_images_again(changed),
+            Message::LinkTargets(answer) => self.link_targets().disk_answered(answer),
             Message::Parsed {
                 generation,
                 text,
@@ -501,6 +511,13 @@ impl EditorController {
 
     pub(in crate::editor) fn reveal_source(&self, start: crate::markdown::text::Byte) {
         self.links().reveal_source(start);
+    }
+
+    /// Looks again where the links of a preview that shows point.
+    pub(in crate::editor) fn look_at_link_targets_again(&self) {
+        if self.panes().preview_visible() {
+            self.link_targets().look_again();
+        }
     }
 
     /// What the images of a preview that shows hold, for a look at their files.

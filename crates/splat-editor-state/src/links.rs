@@ -4,6 +4,7 @@
 use std::path::{Component, Path, PathBuf};
 
 use crate::markdown::url::percent_decode;
+use crate::preview::layout::Link;
 
 /// Where a link leads, by what may happen when it opens.
 #[derive(Debug, PartialEq, Eq)]
@@ -69,6 +70,67 @@ pub fn classify_wiki(name: &str, doc_dir: Option<&Path>) -> LinkTarget {
     doc_dir
         .and_then(|dir| find_note(dir, name.trim()))
         .map_or(LinkTarget::Nothing, local)
+}
+
+/// What has to be there for a link of the preview to lead somewhere.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Destination {
+    /// A place in the document itself, by the anchor as the link writes it.
+    Anchor(String),
+    /// A file or folder.
+    Path(PathBuf),
+    /// The note a wiki link names, searched for below the document's folder.
+    Note {
+        /// The document's folder.
+        dir: PathBuf,
+        /// The name as the link writes it, with `#heading` or `|title` if it has them.
+        name: String,
+    },
+}
+
+/// What `link` of a document in `doc_dir` needs to lead somewhere, or `None` for a link to the web or another app, or one
+/// an unsaved document cannot place.
+pub fn destination(link: &Link, doc_dir: Option<&Path>) -> Option<Destination> {
+    match link {
+        Link::WikiPage(name) => {
+            let name = name.trim();
+            // `[[#Heading]]` and `[[^block]]` name a place in the document itself, which ⌘-click does not look for.
+            if name.is_empty() || name.starts_with(['#', '^']) {
+                return None;
+            }
+            Some(Destination::Note {
+                dir: doc_dir?.to_path_buf(),
+                name: name.to_string(),
+            })
+        }
+        Link::Address(address) => match classify(address, doc_dir) {
+            LinkTarget::Anchor(anchor) if !anchor.is_empty() => Some(Destination::Anchor(anchor)),
+            LinkTarget::Document(path) | LinkTarget::File(path) => Some(Destination::Path(path)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether nothing lies where `destination` points, or `None` where the disk does not say, as in a folder the App Sandbox
+/// keeps closed, and for anchors, which are not on disk. It reads the disk, so it belongs on the thread of the volume.
+pub fn missing_on_disk(destination: &Destination) -> Option<bool> {
+    match destination {
+        Destination::Anchor(_) => None,
+        Destination::Path(path) => match std::fs::metadata(path) {
+            Ok(_) => Some(false),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Some(true),
+            Err(_) => None,
+        },
+        Destination::Note { dir, name } => {
+            if find_note(dir, name).is_some() {
+                Some(false)
+            } else {
+                // The sandbox lets Splat look at a path but not list a folder without a grant.
+                std::fs::read_dir(dir).is_ok().then_some(true)
+            }
+        }
+    }
 }
 
 /// Folders and entries searched below the document's folder for a note named in a wiki link.
@@ -299,6 +361,63 @@ mod tests {
             docs.join("../x/bild.png")
         );
         assert_eq!(locate(&deep.join("bild.png"), None), deep.join("bild.png"));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_link_needs_a_destination_only_where_the_mac_can_look_for_it() {
+        let dir = Path::new("/Users/a/docs");
+        let of = |link: Link| destination(&link, Some(dir));
+        assert_eq!(of(Link::Address("https://a.de".into())), None);
+        assert_eq!(of(Link::Address("zoommtg://x".into())), None);
+        assert_eq!(of(Link::Address("#".into())), None);
+        assert_eq!(of(Link::Address("#Teil".into())), Some(Destination::Anchor("Teil".into())));
+        assert_eq!(
+            of(Link::Address("b/c.md#Teil".into())),
+            Some(Destination::Path("/Users/a/docs/b/c.md".into()))
+        );
+        assert_eq!(
+            of(Link::WikiPage(" Notiz ".into())),
+            Some(Destination::Note {
+                dir: dir.into(),
+                name: "Notiz".into()
+            })
+        );
+        assert_eq!(of(Link::WikiPage("#Kapitel".into())), None);
+        assert_eq!(of(Link::WikiPage("^block".into())), None);
+        assert_eq!(of(Link::Tag("#a".into())), None);
+        assert_eq!(destination(&Link::Address("c.md".into()), None), None, "an unsaved document");
+        assert_eq!(destination(&Link::WikiPage("Notiz".into()), None), None);
+        assert_eq!(
+            destination(&Link::Address("/tmp/x.md".into()), None),
+            Some(Destination::Path("/tmp/x.md".into()))
+        );
+    }
+
+    #[test]
+    fn the_disk_says_which_destinations_are_missing() {
+        let root = std::env::temp_dir().join(format!("splat-missing-{}", std::process::id()));
+        let deep = root.join("a/b");
+        std::fs::create_dir_all(&deep).unwrap();
+        std::fs::write(deep.join("Notiz.md"), "# Notiz").unwrap();
+        std::fs::write(root.join("bild.png"), b"png").unwrap();
+        let note = |name: &str| Destination::Note {
+            dir: root.clone(),
+            name: name.into(),
+        };
+        assert_eq!(missing_on_disk(&Destination::Path(root.join("bild.png"))), Some(false));
+        assert_eq!(missing_on_disk(&Destination::Path(root.join("a"))), Some(false));
+        assert_eq!(missing_on_disk(&Destination::Path(root.join("fehlt.md"))), Some(true));
+        assert_eq!(missing_on_disk(&note("Notiz")), Some(false));
+        assert_eq!(missing_on_disk(&note("Notiz#Kapitel")), Some(false));
+        assert_eq!(missing_on_disk(&note("Fehlt")), Some(true));
+        assert_eq!(missing_on_disk(&note("../Notiz")), Some(true));
+        assert_eq!(missing_on_disk(&Destination::Anchor("x".into())), None);
+        let gone = Destination::Note {
+            dir: root.join("gibt es nicht"),
+            name: "Notiz".into(),
+        };
+        assert_eq!(missing_on_disk(&gone), None, "a folder that cannot be listed says nothing");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

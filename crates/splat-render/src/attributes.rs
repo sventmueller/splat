@@ -8,7 +8,7 @@ use objc2_app_kit::{
     NSAttachmentAttributeName, NSBackgroundColorAttributeName, NSBaselineOffsetAttributeName, NSColor, NSFont,
     NSFontAttributeName, NSForegroundColorAttributeName, NSLayoutManager, NSLinkAttributeName, NSParagraphStyle,
     NSParagraphStyleAttributeName, NSStrikethroughStyleAttributeName, NSTextAttachment, NSTextView,
-    NSToolTipAttributeName, NSUnderlineStyleAttributeName,
+    NSToolTipAttributeName, NSUnderlineColorAttributeName, NSUnderlineStyleAttributeName,
 };
 use objc2_foundation::{
     NSAttributedString, NSAttributedStringKey, NSDictionary, NSMutableAttributedString, NSNumber, NSRange, NSURL,
@@ -51,6 +51,10 @@ impl Attribute {
 
     pub fn underline() -> Attribute {
         Attribute::new(constant!(NSUnderlineStyleAttributeName), &*NSNumber::new_isize(1))
+    }
+
+    pub fn underline_color(color: &NSColor) -> Attribute {
+        Attribute::new(constant!(NSUnderlineColorAttributeName), color)
     }
 
     pub fn baseline_offset(offset: f64) -> Attribute {
@@ -143,6 +147,7 @@ mod tests {
         );
         check::<NSColor>(Attribute::foreground(&color), constant!(NSForegroundColorAttributeName));
         check::<NSColor>(Attribute::background(&color), constant!(NSBackgroundColorAttributeName));
+        check::<NSColor>(Attribute::underline_color(&color), constant!(NSUnderlineColorAttributeName));
         check::<NSParagraphStyle>(
             Attribute::paragraph(&NSParagraphStyle::defaultParagraphStyle()),
             constant!(NSParagraphStyleAttributeName),

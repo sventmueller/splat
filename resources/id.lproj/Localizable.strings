@@ -284,6 +284,7 @@
 "Überschrift" = "Heading";
 "Überschrift {}" = "Heading {}";
 "⌘-Klick öffnet den Link" = "⌘-klik membuka tautan";
+"Das Ziel dieses Links fehlt" = "Tujuan tautan ini tidak ada";
 "Link in einer anderen App öffnen?" = "Buka tautan di app lain?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” akan dibuka dengan {}. Buka tautan hanya jika Anda memercayai sumbernya.";
 "Öffnen" = "Buka";

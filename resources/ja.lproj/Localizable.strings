@@ -284,6 +284,7 @@
 "Überschrift" = "見出し";
 "Überschrift {}" = "見出し{}";
 "⌘-Klick öffnet den Link" = "⌘+クリックでリンクを開きます";
+"Das Ziel dieses Links fehlt" = "このリンクの移動先がありません";
 "Link in einer anderen App öffnen?" = "リンクをほかのAppで開きますか？";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "「{}」は{}で開かれます。リンク元が信頼できる場合にのみ開いてください。";
 "Öffnen" = "開く";

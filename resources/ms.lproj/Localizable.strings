@@ -284,6 +284,7 @@
 "Überschrift" = "Tajuk";
 "Überschrift {}" = "Tajuk {}";
 "⌘-Klick öffnet den Link" = "⌘-klik membuka pautan";
+"Das Ziel dieses Links fehlt" = "Sasaran pautan ini tiada";
 "Link in einer anderen App öffnen?" = "Buka pautan dalam app lain?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” akan dibuka dengan {}. Buka pautan hanya jika anda mempercayai sumbernya.";
 "Öffnen" = "Buka";

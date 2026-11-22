@@ -74,7 +74,7 @@ fn link_text(link: &AnyObject) -> Option<String> {
 }
 
 /// An anchor as the heading has it, or as it stands where it is no valid percent encoding.
-fn decoded_anchor(anchor: &str) -> String {
+pub(super) fn decoded_anchor(anchor: &str) -> String {
     ns(anchor)
         .stringByRemovingPercentEncoding()
         .map_or_else(|| anchor.to_string(), |s| s.to_string())

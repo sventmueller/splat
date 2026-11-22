@@ -117,6 +117,7 @@ fn rendering_takes_what_it_is_given(mtm: MainThreadMarker) {
             dark: false,
             requester: None,
             leaves_the_mac: None,
+            leads_nowhere: None,
             macros: std::sync::Arc::from(""),
             drawn: &given,
         };

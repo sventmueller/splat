@@ -1,7 +1,7 @@
 //! Who may reach whom, lowest first. A component gets a handle that offers what lies below it, and `Object`, the controller
 //! as AppKit knows it, which offers none of the controller's own methods. What a component needs from one above it, and
 //! what arrives for it later, it sends the controller as a `Message`, and the controller hands that on. Beyond that, upward
-//! go only `invalidate`, `under_way`, `image_arrived`, `toggle_preview`, `toggle_files`, `toggle_sidebar` and
+//! go only `invalidate`, `under_way`, `image_arrived`, `link_targets_changed`, `toggle_preview`, `toggle_files`, `toggle_sidebar` and
 //! `search_notes`. The compiler holds this, as only this module sees what the handles hold; what a component does to every
 //! open window, its own among them, goes through what the controller offers the rest of the program.
 
@@ -31,6 +31,7 @@ use crate::editor::export::{ExportFailure, ExportKind, Sharing};
 use crate::editor::images::{ImageFile, Pictures};
 use crate::editor::js::Renderer;
 use crate::editor::line_numbers::LineNumbers;
+use crate::editor::link_targets::{DiskAnswer, LinkTargets};
 use crate::editor::mathfield::MathField;
 use crate::editor::model::Model;
 use crate::editor::notes::{NoteAnswer, Notes, RenameRequest};
@@ -79,6 +80,8 @@ pub(in crate::editor) enum Message {
     ImageLoaded(PathBuf, ImageFile),
     /// These image files changed on disk since they were read.
     ImagesChanged(Vec<(PathBuf, Stamp)>),
+    /// The disk said what lies where links of the preview point.
+    LinkTargets(DiskAnswer),
     /// The parse in the background ended, with nothing if a newer text made it pointless.
     Parsed {
         generation: u64,
@@ -367,7 +370,8 @@ macro_rules! layer {
 layer!(ForLineNumbers above ForPanes, reaches panes -> Panes);
 layer!(ForSelection above ForLineNumbers, reaches line_numbers -> LineNumbers);
 layer!(ForPictures above ForSelection, reaches selection -> Selection);
-layer!(ForProgressive above ForPictures, reaches pictures -> Pictures);
+layer!(ForLinkTargets above ForPictures, reaches pictures -> Pictures);
+layer!(ForProgressive above ForLinkTargets, reaches link_targets -> LinkTargets);
 layer!(ForCounter above ForProgressive, reaches progressive -> Progressive);
 layer!(ForChanges above ForCounter, reaches word_counter -> WordCounter);
 layer!(ForScroll above ForChanges, reaches change_marks -> ChangeMarks);
@@ -377,6 +381,13 @@ layer!(ForAtoms above ForSharing, reaches sharing -> Sharing);
 layer!(ForEditing above ForAtoms, reaches atom_editor -> AtomEditor);
 layer!(ForNotes above ForEditing, reaches editing -> Editing);
 layer!(ForLinks above ForNotes, reaches notes -> Notes);
+
+impl ForLinkTargets<'_> {
+    /// The links of these keys gained or lost their mark, which the blocks that show them render again for.
+    pub(in crate::editor) fn link_targets_changed(&self, changed: std::collections::HashSet<String>) {
+        self.controller().updater().link_targets_changed(changed);
+    }
+}
 
 impl ForPictures<'_> {
     /// A picture that arrived reports to whoever waits for it, up to the update that shows it.

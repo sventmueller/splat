@@ -284,6 +284,7 @@
 "Überschrift" = "Título";
 "Überschrift {}" = "Título {}";
 "⌘-Klick öffnet den Link" = "⌘-clique abre a hiperligação";
+"Das Ziel dieses Links fehlt" = "O destino desta ligação não existe";
 "Link in einer anderen App öffnen?" = "Abrir a hiperligação noutra aplicação?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” será aberta com {}. Abra a hiperligação apenas se confiar na origem.";
 "Öffnen" = "Abrir";

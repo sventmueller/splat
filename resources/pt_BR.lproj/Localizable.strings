@@ -284,6 +284,7 @@
 "Überschrift" = "Título";
 "Überschrift {}" = "Título {}";
 "⌘-Klick öffnet den Link" = "⌘-clique abre o link";
+"Das Ziel dieses Links fehlt" = "O destino deste link não existe";
 "Link in einer anderen App öffnen?" = "Abrir o link em outro app?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” será aberto no app {}. Abra o link somente se você confiar na fonte.";
 "Öffnen" = "Abrir";

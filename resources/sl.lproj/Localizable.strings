@@ -284,6 +284,7 @@
 "Überschrift" = "Naslov";
 "Überschrift {}" = "Naslov {}";
 "⌘-Klick öffnet den Link" = "⌘-klik odpre povezavo";
+"Das Ziel dieses Links fehlt" = "Cilj te povezave manjka";
 "Link in einer anderen App öffnen?" = "Želite odpreti povezavo v drugi aplikaciji?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "»{}« se bo odprla v aplikaciji {}. Povezavo odprite le, če zaupate njenemu viru.";
 "Öffnen" = "Odpri";

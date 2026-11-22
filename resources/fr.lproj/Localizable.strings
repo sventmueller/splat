@@ -284,6 +284,7 @@
 "Überschrift" = "Titre";
 "Überschrift {}" = "Titre {}";
 "⌘-Klick öffnet den Link" = "⌘-clic ouvre le lien";
+"Das Ziel dieses Links fehlt" = "La cible de ce lien est introuvable";
 "Link in einer anderen App öffnen?" = "Ouvrir le lien dans une autre app ?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "« {} » s’ouvrira dans {}. N’ouvrez le lien que si vous faites confiance à sa source.";
 "Öffnen" = "Ouvrir";

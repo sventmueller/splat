@@ -284,6 +284,7 @@
 "Überschrift" = "हेडिंग";
 "Überschrift {}" = "हेडिंग {}";
 "⌘-Klick öffnet den Link" = "⌘-क्लिक से लिंक खुलता है";
+"Das Ziel dieses Links fehlt" = "इस लिंक का लक्ष्य मौजूद नहीं है";
 "Link in einer anderen App öffnen?" = "लिंक को अन्य ऐप में खोलें?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "“{}” {} में खुलेगा। लिंक तभी खोलें, जब आपको उसके स्रोत पर भरोसा हो।";
 "Öffnen" = "खोलें";

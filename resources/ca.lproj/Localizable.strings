@@ -284,6 +284,7 @@
 "Überschrift" = "Capçalera";
 "Überschrift {}" = "Capçalera {}";
 "⌘-Klick öffnet den Link" = "⌘-clic obre l’enllaç";
+"Das Ziel dieses Links fehlt" = "Falta la destinació d'aquest enllaç";
 "Link in einer anderen App öffnen?" = "Vols obrir l’enllaç en una altra app?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "«{}» s’obrirà amb {}. Obre l’enllaç només si confies en l’origen.";
 "Öffnen" = "Obre";

@@ -284,6 +284,7 @@
 "Überschrift" = "Titlu";
 "Überschrift {}" = "Titlu {}";
 "⌘-Klick öffnet den Link" = "⌘-clic deschide linkul";
+"Das Ziel dieses Links fehlt" = "Ținta acestui link lipsește";
 "Link in einer anderen App öffnen?" = "Deschideți linkul în altă aplicație?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "„{}” se va deschide cu {}. Deschideți linkul doar dacă aveți încredere în sursă.";
 "Öffnen" = "Deschideți";

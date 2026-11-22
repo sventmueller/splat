@@ -103,6 +103,7 @@ impl Progressive<'_> {
         let live = Live {
             requester: Some(&viewer),
         };
+        let nowhere = self.host.link_targets().nowhere();
         let ctx = RenderCtx {
             mtm: self.host.mtm(),
             zoom,
@@ -113,6 +114,7 @@ impl Progressive<'_> {
             dark,
             requester: Some(&viewer),
             leaves_the_mac: None,
+            leads_nowhere: Some(&nowhere),
             macros: self.host.model().read(|st| st.macros()),
             drawn: &live,
         };

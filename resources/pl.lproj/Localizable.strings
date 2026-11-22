@@ -284,6 +284,7 @@
 "Überschrift" = "Nagłówek";
 "Überschrift {}" = "Nagłówek {}";
 "⌘-Klick öffnet den Link" = "⌘-kliknięcie otwiera łącze";
+"Das Ziel dieses Links fehlt" = "Brak celu tego linku";
 "Link in einer anderen App öffnen?" = "Otworzyć łącze w innej aplikacji?";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "„{}” zostanie otwarte w aplikacji {}. Otwieraj łącze tylko wtedy, gdy ufasz jego źródłu.";
 "Öffnen" = "Otwórz";

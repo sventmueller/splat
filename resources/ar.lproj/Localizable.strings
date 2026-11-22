@@ -284,6 +284,7 @@
 "Überschrift" = "عنوان";
 "Überschrift {}" = "عنوان {}";
 "⌘-Klick öffnet den Link" = "انقر مع ⌘ لفتح الرابط";
+"Das Ziel dieses Links fehlt" = "هدف هذا الرابط غير موجود";
 "Link in einer anderen App öffnen?" = "هل ترغب في فتح الرابط في تطبيق آخر؟";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "سيتم فتح \"{}\" باستخدام {}. لا تفتح الرابط إلا إذا كنت تثق في مصدره.";
 "Öffnen" = "فتح";

@@ -91,6 +91,7 @@ impl EditorController {
             atoms: Default::default(),
             edits: Default::default(),
             pictures: Default::default(),
+            link_targets: Default::default(),
             sharing: Default::default(),
             counter: Default::default(),
             changes: Default::default(),

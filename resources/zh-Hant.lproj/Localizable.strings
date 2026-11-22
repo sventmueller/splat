@@ -284,6 +284,7 @@
 "Überschrift" = "標題";
 "Überschrift {}" = "標題 {}";
 "⌘-Klick öffnet den Link" = "按住 ⌘ 鍵按一下以打開連結";
+"Das Ziel dieses Links fehlt" = "此連結的目標不存在";
 "Link in einer anderen App öffnen?" = "要在另一個 App 中打開連結嗎？";
 "„{}“ wird mit {} geöffnet. Öffne den Link nur, wenn du der Quelle vertraust." = "「{}」將以 {} 打開。請只在信任其來源時打開此連結。";
 "Öffnen" = "打開";

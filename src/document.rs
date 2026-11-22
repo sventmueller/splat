@@ -446,6 +446,7 @@ pub fn watch_files(mtm: MainThreadMarker) {
         guarded((), || {
             look_at_files(mtm);
             crate::editor::look_at_images(mtm);
+            crate::editor::look_at_link_targets();
             crate::editor::look_at_repositories();
         });
     });

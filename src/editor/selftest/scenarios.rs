@@ -29,7 +29,7 @@ use dialogs::dialog_steps;
 use exports::export_steps;
 use files::{image_file_steps, memory_steps, old_encoding_steps};
 use large::{huge_document_steps, large_change_steps};
-use links::link_steps;
+use links::{dead_link_steps, link_steps};
 use paste::paste_steps;
 use saving::{
     another_version_on_disk_steps, reload_under_an_open_editor_steps, saving_and_unsaved_text_steps,
@@ -586,6 +586,7 @@ fn groups() -> Vec<(&'static str, Vec<Step>)> {
         ("line numbers", line_number_steps()),
         ("dialogs", dialog_steps()),
         ("links", link_steps()),
+        ("links that lead nowhere", dead_link_steps()),
         ("paste", paste_steps()),
         ("exports", export_steps()),
         ("toolbar", toolbar_steps()),
