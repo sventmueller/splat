@@ -1,3 +1,2 @@
-- **Smaller.** Splat takes about 35 MB on disk instead of 55 MB, and the download is about a quarter smaller.
-- **Less memory.** The engine that draws formulas and diagrams ends after two minutes without a new one, the visual formula editor a minute after it closed, and the image decoder after a minute without a picture; what they drew stays. Pictures take the pixels they cover on screen and decode again when they show larger.
-- **Faster typing in large documents.** Above 2 MB, the preview catches up after a keystroke many times sooner, as only the changed paragraphs are parsed and laid out again.
+- **Links that lead nowhere.** In the preview, a link to a file that is not there, a wiki link to a note no folder holds, or a link to a heading the document lacks shows in red, and its tool tip says so. The mark goes once the file or heading is there.
+- **PlantUML 1.2026.10.** Chen diagrams render now.
