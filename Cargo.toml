@@ -1,11 +1,7 @@
 [workspace]
 members = ["crates/*", "xtask"]
 default-members = [".", "crates/*", "xtask"]
-exclude = ["fuzz", "vendor/comrak"]
-
-# Until https://github.com/kivikakk/comrak/issues/904 is fixed in a release; see vendor/comrak/PATCH.md.
-[patch.crates-io]
-comrak = { path = "vendor/comrak" }
+exclude = ["fuzz"]
 
 [workspace.dependencies]
 splat-decoder = { path = "crates/splat-decoder" }
@@ -22,12 +18,12 @@ splat-render = { path = "crates/splat-render" }
 splat-testkit = { path = "crates/splat-testkit" }
 block2 = "0.6.2"
 caseless = "0.2"
-comrak = { version = "0.59", default-features = false }
+comrak = { version = "1.1", default-features = false }
 dispatch2 = "0.3"
 emojis = "0.9"
 encoding_rs = "0.8"
 entities = "1"
-fast_image_resize = { version = "6.1", default-features = false, features = ["image"] }
+fast_image_resize = { version = "6.2", default-features = false, features = ["image"] }
 image = { version = "0.25", default-features = false }
 krilla = "0.8"
 krilla-svg = "0.8"

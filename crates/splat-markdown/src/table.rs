@@ -81,17 +81,10 @@ pub(crate) fn table_at(doc: &Doc, offset: Byte) -> Option<(Table, Cell)> {
         {
             return None;
         }
-        // A cell missing in the source gets an empty one from comrak, whose range holds the row's closing pipe.
         let mut cells: Vec<String> = row
             .children()
             .iter()
-            .map(|c| {
-                if c.inlines().is_empty() {
-                    String::new()
-                } else {
-                    text.at(c.range.clone()).trim().to_string()
-                }
-            })
+            .map(|c| text.at(c.range.clone()).trim().to_string())
             .collect();
         cells.resize(cols, String::new());
         rows.push(cells);

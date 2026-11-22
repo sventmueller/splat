@@ -16,7 +16,7 @@ Splat 左邊是帶語法上色的 Markdown 原始碼，右邊是即時且完全�
  
  
 
-[![Rust 2024 版次](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org) [![macOS 14 或以上版本](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/) ![通用：Apple 晶片與 Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white) [![透過 objc2 使用 AppKit](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2) [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org) [![Comrak 0.59](https://img.shields.io/badge/comrak-0.59-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak) [![CommonMark 與 GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/) [![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org) [![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/) [![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org) [![透過 Viz.js 3.24 使用 Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org) [![PlantUML 1.2026.9](https://img.shields.io/badge/PlantUML-1.2026.9-A80036)](https://plantuml.com) ![35 種介面語言](https://img.shields.io/badge/languages-35-4C9A2A) ![無遙測](https://img.shields.io/badge/telemetry-none-4C9A2A) ![以 Hardened Runtime 簽署](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A) [![授權條款：MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#授權條款)
+[![Rust 2024 版次](https://img.shields.io/badge/Rust-2024_edition-000000?logo=rust&logoColor=white)](https://www.rust-lang.org) [![macOS 14 或以上版本](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/) ![通用：Apple 晶片與 Intel](https://img.shields.io/badge/Universal-Apple_Silicon_%7C_Intel-333333?logo=apple&logoColor=white) [![透過 objc2 使用 AppKit](https://img.shields.io/badge/AppKit-objc2_0.6-147EFB?logo=apple&logoColor=white)](https://github.com/madsmtm/objc2) [![WebKit](https://img.shields.io/badge/WebKit-offline-0A84FF?logo=safari&logoColor=white)](https://webkit.org) [![Comrak 1.1](https://img.shields.io/badge/comrak-1.1-DEA584?logo=markdown&logoColor=white)](https://github.com/kivikakk/comrak) [![CommonMark 與 GFM](https://img.shields.io/badge/CommonMark-GFM-24292F?logo=github&logoColor=white)](https://github.github.com/gfm/) [![MathJax 4.1.3](https://img.shields.io/badge/MathJax-4.1.3-1E6E9E?logo=latex&logoColor=white)](https://www.mathjax.org) [![MathLive 0.111.4](https://img.shields.io/badge/MathLive-0.111.4-5A3FC0)](https://cortexjs.io/mathlive/) [![Mermaid 12.3.0](https://img.shields.io/badge/Mermaid-12.3.0-FF3670?logo=mermaid&logoColor=white)](https://mermaid.js.org) [![透過 Viz.js 3.24 使用 Graphviz](https://img.shields.io/badge/Graphviz-Viz.js_3.24-2596BE)](https://graphviz.org) [![PlantUML 1.2026.10](https://img.shields.io/badge/PlantUML-1.2026.10-A80036)](https://plantuml.com) ![35 種介面語言](https://img.shields.io/badge/languages-35-4C9A2A) ![無遙測](https://img.shields.io/badge/telemetry-none-4C9A2A) ![以 Hardened Runtime 簽署](https://img.shields.io/badge/Hardened_Runtime-signed-4C9A2A) [![授權條款：MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT_OR_Apache--2.0-4C9A2A)](#授權條款)
 
 [Bahasa Indonesia](../id/README.md) · [Bahasa Melayu](../ms/README.md) · [Català](../ca/README.md) · [Čeština](../cs/README.md) · [Dansk](../da/README.md) · [Deutsch](../de/README.md) · [English](../../../README.md) · [Español](../es/README.md) · [Français](../fr/README.md) · [Hrvatski](../hr/README.md) · [Italiano](../it/README.md) · [Magyar](../hu/README.md) · [Nederlands](../nl/README.md) · [Norsk](../no/README.md) · [Polski](../pl/README.md) · [Português (Brasil)](../pt_BR/README.md) · [Português (Portugal)](../pt_PT/README.md) · [Română](../ro/README.md) · [Slovenčina](../sk/README.md) · [Slovenščina](../sl/README.md) · [Suomi](../fi/README.md) · [Svenska](../sv/README.md) · [Tiếng Việt](../vi/README.md) · [Türkçe](../tr/README.md) · [Ελληνικά](../el/README.md) · [Русский](../ru/README.md) · [Українська](../uk/README.md) · [עברית](../he/README.md)‎ · [العربية](../ar/README.md)‎ · [हिन्दी](../hi/README.md) · [ไทย](../th/README.md) · [한국어](../ko/README.md) · [日本語](../ja/README.md) · [简体中文](../zh-Hans/README.md) · **繁體中文**
 
@@ -530,7 +530,7 @@ Splat 在數 MB 的文件中仍能保持流暢：
 - 從約 200 KB 起，文件會在解析之前先打開視窗；在 5 MB 時，顏色和預覽會在約四分之一秒後跟上。
 - 所有影像加起來，包括公式和圖表，最多佔用 Mac 記憶體的四分之一，記憶體不足時再減半。超出部分的影像會顯示為預留位置，直到再次有空間。
 
-有些更動會完整處理，在 10 MB 時每個按鍵約 300 毫秒：更動註腳的定義或參照、更動行內註腳旁邊的內容、在文件最末端的註腳旁邊更動、更動 front matter 或連結參照定義，以及在含有 `%%` 註解區塊、註腳被定義兩次、註腳位於引言或列表內，或行內註腳或未閉合的公式標記超過 1000 個的文件中所做的每一項更動。記憶體會隨檔案增長，1 MB 的 Markdown 約為 115–160 MB，10 MB 則約為 340–510 MB。
+有些更動會完整處理，在 10 MB 時每個按鍵約 300 毫秒：更動註腳的定義或參照、更動行內註腳旁邊的內容、在文件最末端的註腳旁邊更動、更動 front matter 或連結參照定義，以及在含有 `%%` 註解區塊、註腳位於引言或列表內，或行內註腳、未閉合的公式標記或表格中跳脫的垂直線 `\|` 超過 1000 個的文件中所做的每一項更動。記憶體會隨檔案增長，1 MB 的 Markdown 約為 115–160 MB，10 MB 則約為 340–510 MB。
 
 ## 已知限制
 
@@ -577,7 +577,7 @@ Splat 在數 MB 的文件中仍能保持流暢：
 
 | 元件 | 版本 | 用途 | 授權條款 |
 |---|---|---|---|
-| [comrak](https://github.com/kivikakk/comrak) | 0.59（[更動一行](../../../vendor/comrak/PATCH.md)） | Markdown 解析器 | BSD-2-Clause |
+| [comrak](https://github.com/kivikakk/comrak) | 1.1 | Markdown 解析器 | BSD-2-Clause |
 | [objc2](https://github.com/madsmtm/objc2)、objc2-foundation、block2 | 0.6 / 0.3 | Objective-C 執行環境、Foundation、區塊 | MIT |
 | objc2-app-kit、objc2-web-kit、dispatch2 | 0.3 | AppKit、WebKit 和 Grand Central Dispatch 的綁定 | Zlib、Apache-2.0 或 MIT |
 | [krilla](https://github.com/LaurenzV/krilla), krilla-svg, [usvg](https://github.com/linebender/resvg) | 0.8 / 0.47 | 將公式和 SVG 影像轉為向量 PDF | MIT 或 Apache-2.0 |
@@ -593,7 +593,7 @@ Splat 在數 MB 的文件中仍能保持流暢：
 | [MathLive](https://cortexjs.io/mathlive/) | 0.111.4 | 視覺化公式編輯器，附 KaTeX 字體 | MIT |
 | [Mermaid](https://mermaid.js.org) | 12.3.0 | Mermaid 圖表 | MIT |
 | [Viz.js](https://github.com/mdaines/viz-js) | 3.24.0 | 編譯為 WebAssembly 的 Graphviz，內含 Graphviz（EPL-1.0）和 Expat（MIT） | MIT |
-| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.9 | PlantUML 圖表，編譯為 JavaScript | MIT |
+| [PlantUML](https://github.com/plantuml/plantuml)（`@plantuml/core`） | 1.2026.10 | PlantUML 圖表，編譯為 JavaScript | MIT |
 | [Sparkle](https://sparkle-project.org) | 2.10.1 | 磁碟映像檔版本的更新 | MIT，部分採用 BSD 和 zlib 授權 |
 
 JavaScript 函式庫會原封不動地存放在 `resources/js/` 中；[vendor.lock](../../../vendor.lock) 記錄了它們的來源和 SHA-256 檢查碼。它們的授權文字，包括 Viz.js 內 Graphviz 和 Expat 的授權文字，就放在旁邊，名為 `resources/js/LICENSE-*`，並隨 App 一起發佈。Sparkle 不存放在儲存庫中：`cargo xtask dmg` 會下載它的發行版並對照 xtask 中的檢查碼驗證，它的授權則以 `LICENSE-sparkle` 隨 App 一起發佈。

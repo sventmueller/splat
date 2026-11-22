@@ -66,6 +66,8 @@ pub struct SyntaxCounts {
     pub comments: usize,
     /// `]:`
     pub definitions: usize,
+    /// `\|`
+    pub escaped_pipes: usize,
     /// What `memory_estimate` says.
     pub memory: u64,
 }
@@ -84,6 +86,7 @@ impl SyntaxCounts {
                 (b'\\', b'(' | b'[') | (b'$', b'`') => counts.formulas += 1,
                 (b'%', b'%') => counts.comments += 1,
                 (b']', b':') => counts.definitions += 1,
+                (b'\\', b'|') => counts.escaped_pipes += 1,
                 _ => {}
             }
         }
@@ -111,6 +114,7 @@ impl SyntaxCounts {
             formulas: self.formulas + come.formulas - gone.formulas,
             comments: self.comments + come.comments - gone.comments,
             definitions: self.definitions + come.definitions - gone.definitions,
+            escaped_pipes: self.escaped_pipes + come.escaped_pipes - gone.escaped_pipes,
             memory: self.memory + come.memory - gone.memory,
         }
     }
@@ -522,7 +526,7 @@ mod tests {
 
     #[test]
     fn sequences_are_counted_and_follow_a_change() {
-        let old = "^[a] \\(b\\) $`c`$ %%d%% [e]: f\n";
+        let old = "^[a] \\(b\\) $`c`$ %%d%% [e]: f \\|g\n";
         assert_eq!(
             SyntaxCounts::of(old.as_bytes()),
             SyntaxCounts {
@@ -530,6 +534,7 @@ mod tests {
                 formulas: 2,
                 comments: 2,
                 definitions: 1,
+                escaped_pipes: 1,
                 memory: memory_estimate(old),
             }
         );
@@ -542,6 +547,8 @@ mod tests {
             (" ", ""),
             ("\\(b", "\\(\\[b"),
             ("$`c", "$c"),
+            ("\\|g", "|g"),
+            ("f ", "f \\|"),
         ] {
             let new = old.replacen(from, to, 1);
             let (old_change, new_change) = changed(old, &new);

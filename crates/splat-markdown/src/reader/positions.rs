@@ -1,7 +1,6 @@
-//! comrak's inline positions go wrong in a few places: behind a link reference definition at the start of a paragraph,
-//! and behind a link or footnote over several lines in a quote or list. An edit made from such a position lands
-//! somewhere else in the text, so the positions of every leaf are checked against the source. Where they do not fit
-//! they are read from the source again, in the order of the tree; what cannot be found there is given up.
+//! An edit made from a wrong inline position lands somewhere else in the text, so the positions comrak gives every leaf
+//! are checked against the source. Where they do not fit they are read from the source again, in the order of the tree;
+//! what cannot be found there is given up.
 
 use std::ops::Range;
 
@@ -282,8 +281,8 @@ fn footnote_len(rest: &str) -> Option<usize> {
     inline_note_len(rest)
 }
 
-/// How long the inline note `^[…]` at the start of `rest` is, found by its brackets: comrak's end position is unreliable.
-pub(super) fn inline_note_len(rest: &str) -> Option<usize> {
+/// How long the inline note `^[…]` at the start of `rest` is, found by its brackets.
+fn inline_note_len(rest: &str) -> Option<usize> {
     let inner = rest.strip_prefix("^[")?;
     let mut depth = 1;
     let mut chars = inner.char_indices();
@@ -539,7 +538,7 @@ mod tests {
 
     #[test]
     fn texts_find_their_place_behind_a_note_over_several_lines() {
-        stand_where_they_say("> ^[a\n> b] **x** y\n", &[" ", "x", " y", "a\n> b"]);
+        stand_where_they_say("> ^[a\n> b] **x** y\n", &[" ", "x", " y", "a", "b"]);
     }
 
     #[test]

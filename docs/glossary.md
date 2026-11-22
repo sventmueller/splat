@@ -26,7 +26,7 @@ The words the code uses for its own things, with the usual term where one exists
 | `WholeParse` | Why an edit needs a full parse instead. |
 | `TextFacts` | What is known about all of a text (link definitions, footnotes, `SyntaxCounts`), carried along with an edit instead of scanning the text again. |
 | `SyntaxCounts` | How often a text holds `^[`, `\(`, `%%`, `]:` and the like, whose meaning depends on text far away, and its estimated memory. |
-| stand-in definition | A dummy footnote definition parsed along with a part, as comrak sees a reference only with its definition. |
+| stand-in definition | A dummy footnote definition parsed along with a part, as comrak sees a reference only with its definition; likewise a stand-in reference, as comrak keeps a definition only with a reference to it. |
 | `Running`, `Within`, `Segment` | Running text as the preview and the exports show it: typographic punctuation, and the tags, references and citations in it. |
 | `Shorthand`, `Typesetting` | A tag, a reference into a code host or a citation in running text; what decides for a whole document how its punctuation and shorthands show. |
 | `Aligner`, `Spelling` | Where each character of what the parser read stands in the source, past escapes, character references and the prefixes of quotes; `Spelling` says which of these the source may use. |

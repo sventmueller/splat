@@ -726,7 +726,7 @@ mod tests {
 
     #[test]
     fn a_definition_inside_a_definition_is_written_too() {
-        let page = export("a[^1]\n\n[^1]: x\n\n    [^2]: innen\n");
+        let page = export("a[^1]\n\n[^1]: x[^2]\n\n    [^2]: innen\n");
         assert!(page.contains("id=\"fn-1\""), "{page}");
         assert!(page.contains("id=\"fn-2\"") && page.contains("innen"), "{page}");
     }

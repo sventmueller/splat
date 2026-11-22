@@ -129,21 +129,18 @@ fn footnote_definitions_move_behind_the_text() {
 }
 
 #[test]
-fn only_the_last_definition_of_a_label_moves_behind_the_text() {
+fn only_the_first_definition_of_a_label_counts_and_the_others_are_dropped() {
     assert_eq!(
         tree("a[^x]\n\n[^x]: one\n\n[^x]: two\n\nb\n"),
         [
             "Paragraph 1:1-1:5",
             "  \"a\" 1:1-1:1",
             "  FootnoteReference 1:2-1:5",
+            "Paragraph 7:1-7:1",
+            "  \"b\" 7:1-7:1",
             "FootnoteDefinition 3:1-3:9",
             "  Paragraph 3:7-3:9",
             "    \"one\" 3:7-3:9",
-            "Paragraph 7:1-7:1",
-            "  \"b\" 7:1-7:1",
-            "FootnoteDefinition 5:1-5:9",
-            "  Paragraph 5:7-5:9",
-            "    \"two\" 5:7-5:9",
         ]
     );
 }
@@ -180,11 +177,11 @@ fn a_reference_needs_a_definition_in_the_same_parse() {
 }
 
 #[test]
-fn a_definition_without_a_reference_is_dropped_but_numbers_what_it_refers_to() {
+fn a_definition_without_a_reference_is_dropped_with_what_only_it_refers_to() {
     assert_eq!(definitions("[^u]: alone\n\ntext\n"), Vec::<String>::new());
     let hidden = "[^u]: hidden [^s]\n\na[^r]\n\n[^r]: R\n\n[^s]: S\n";
-    assert_eq!(references(hidden), [("r".to_string(), 2)]);
-    assert_eq!(definitions(hidden), ["s", "r"]);
+    assert_eq!(references(hidden), [("r".to_string(), 1)]);
+    assert_eq!(definitions(hidden), ["r"]);
 }
 
 #[test]
@@ -198,7 +195,7 @@ fn inline_notes_are_footnotes_named_by_a_running_number() {
 }
 
 #[test]
-fn an_inline_note_counts_its_positions_from_its_own_text() {
+fn an_inline_note_is_a_definition_where_its_reference_stands() {
     assert_eq!(
         tree("abcdefgh^[b] c"),
         [
@@ -206,88 +203,89 @@ fn an_inline_note_counts_its_positions_from_its_own_text() {
             "  \"abcdefgh\" 1:1-1:8",
             "  FootnoteReference 1:9-1:12",
             "  \" c\" 1:13-1:14",
-            "FootnoteDefinition 1:1-1:0",
-            "  Paragraph 1:1-1:0",
-            "    \"b\" 1:1-1:1",
+            "FootnoteDefinition 1:9-1:12",
+            "  Paragraph 1:11-1:11",
+            "    \"b\" 1:11-1:11",
         ]
     );
 }
 
-/// The reference stays on the note's first line, and the note's second line counts from the prefixes comrak removed.
 #[test]
-fn a_note_over_several_lines_loses_its_place() {
+fn a_note_over_several_lines_of_a_quote_keeps_its_place() {
     assert_eq!(
         tree("> a^[b [c]\n> d] e f"),
         [
             "BlockQuote 1:1-2:8",
             "  Paragraph 1:3-2:8",
             "    \"a\" 1:3-1:3",
-            "    FootnoteReference 1:4-1:13",
-            "    \" e f\" 1:14-1:17",
-            "FootnoteDefinition 1:1-1:0",
-            "  Paragraph 1:1-1:0",
-            "    \"b [c]\" 1:1-1:5",
-            "    SoftBreak 1:6-1:6",
-            "    \"d\" 2:7-2:7",
+            "    FootnoteReference 1:4-2:4",
+            "    \" e f\" 2:5-2:8",
+            "FootnoteDefinition 1:4-2:4",
+            "  Paragraph 1:6-2:3",
+            "    \"b [c]\" 1:6-1:10",
+            "    SoftBreak 1:11-1:11",
+            "    \"d\" 2:3-2:3",
         ]
     );
 }
 
 #[test]
-fn inlines_behind_a_link_reference_definition_count_from_its_line() {
-    let inlines = [
-        "  \"foo \" 1:1-1:4",
-        "  Strong 1:5-1:11",
-        "    \"bar\" 1:7-1:9",
-        "  \" baz\" 1:12-1:15",
-    ];
-    assert_eq!(tree("foo **bar** baz\n")[1..], inlines);
-    assert_eq!(tree("[a]: b\nfoo **bar** baz\n")[1..], inlines);
+fn inlines_behind_a_link_reference_definition_keep_their_place() {
+    assert_eq!(
+        tree("[a]: b\nfoo **bar** baz\n")[1..],
+        [
+            "  \"foo \" 2:1-2:4",
+            "  Strong 2:5-2:11",
+            "    \"bar\" 2:7-2:9",
+            "  \" baz\" 2:12-2:15",
+        ]
+    );
     assert_eq!(
         tree("> [a]: b\n> foo **bar**\n"),
         [
             "BlockQuote 1:1-2:13",
-            "  Paragraph 1:3-2:13",
-            "    \"foo \" 1:3-1:6",
-            "    Strong 1:7-1:13",
-            "      \"bar\" 1:9-1:11",
+            "  Paragraph 2:3-2:13",
+            "    \"foo \" 2:3-2:6",
+            "    Strong 2:7-2:13",
+            "      \"bar\" 2:9-2:11",
         ]
     );
 }
 
 #[test]
-fn a_paragraph_holds_the_link_reference_definitions_at_its_start() {
-    assert_eq!(tree("[a]: b\nfoo\n")[0], "Paragraph 1:1-2:3");
+fn a_paragraph_starts_behind_the_link_reference_definitions_at_its_start() {
+    assert_eq!(tree("[a]: b\nfoo\n")[0], "Paragraph 2:1-2:3");
     assert_eq!(tree("[a]: b\n"), Vec::<String>::new(), "nothing else, nothing shown");
 }
 
 #[test]
-fn inlines_behind_a_link_over_several_lines_lose_their_place() {
+fn inlines_behind_a_link_over_several_lines_of_a_quote_keep_their_place() {
     assert_eq!(
         tree("> [a](b\n> \"c\") **d** e\n"),
         [
             "BlockQuote 1:1-2:14",
             "  Paragraph 1:3-2:14",
-            "    Link 1:3-1:7",
+            "    Link 1:3-2:6",
             "      \"a\" 1:4-1:4",
-            "    \" \" 1:13-1:13",
-            "    Strong 1:14-1:18",
-            "      \"d\" 1:16-1:16",
-            "    \" e\" 1:19-1:20",
+            "    \" \" 2:7-2:7",
+            "    Strong 2:8-2:12",
+            "      \"d\" 2:10-2:10",
+            "    \" e\" 2:13-2:14",
         ]
     );
 }
 
+/// The text of the cell starts at the pipe, behind its backslash.
 #[test]
-fn an_escaped_pipe_takes_a_byte_from_the_positions_behind_it() {
+fn an_escaped_pipe_keeps_the_positions_behind_it() {
     assert_eq!(
         tree("a|b\n-|-\n\\|ä**b**|x\n")[6..],
         [
             "  TableRow 3:1-3:11",
             "    TableCell 3:1-3:9",
-            "      \"|ä\" 3:1-3:3",
-            "      Strong 3:4-3:8",
-            "        \"b\" 3:6-3:6",
+            "      \"|ä\" 3:2-3:4",
+            "      Strong 3:5-3:9",
+            "        \"b\" 3:7-3:7",
             "    TableCell 3:11-3:11",
             "      \"x\" 3:11-3:11",
         ]
@@ -310,8 +308,8 @@ fn a_single_pair_of_pipes_is_an_escaped_tag() {
         tree("a|b\n-|-\n\\|x\\| y|z\n")[7..10],
         [
             "    TableCell 3:1-3:7",
-            "      EscapedTag 3:1-3:3",
-            "        \"x\" 3:2-3:2",
+            "      EscapedTag 3:2-3:5",
+            "        \"x\" 3:3-3:3",
         ]
     );
 }
@@ -330,15 +328,16 @@ fn cells_beyond_the_header_are_dropped() {
     );
 }
 
+/// It ends one column before it starts.
 #[test]
-fn a_missing_cell_is_an_empty_one_on_the_closing_pipe() {
+fn a_missing_cell_is_an_empty_one_in_front_of_the_closing_pipe() {
     assert_eq!(
         tree("| a | b |\n|---|---|\n| 1 |\n")[6..],
         [
             "  TableRow 3:1-3:5",
             "    TableCell 3:2-3:4",
             "      \"1\" 3:3-3:3",
-            "    TableCell 3:5-3:5",
+            "    TableCell 3:5-3:4",
         ]
     );
 }
@@ -355,14 +354,14 @@ fn a_tab_counted_as_spaces_makes_code_longer_than_its_source() {
 }
 
 #[test]
-fn an_html_block_behind_a_tab_ends_past_its_line() {
+fn an_html_block_behind_a_tab_ends_with_its_line() {
     let text = "-\n\t<div>\nb\n";
     assert_eq!(
         tree(text),
         [
-            "List 1:1-2:8",
+            "List 1:1-2:6",
             "  Item 1:1-2:6",
-            "    HtmlBlock 2:2-2:8",
+            "    HtmlBlock 2:2-2:6",
             "Paragraph 3:1-3:1",
             "  \"b\" 3:1-3:1",
         ]
@@ -579,7 +578,7 @@ fn only_a_real_closing_fence_closes_a_fenced_code_block() {
     assert!(!closed("```\na\n"));
 }
 
-/// `vendor/comrak/PATCH.md`: `reference_budget` has to say what this shows.
+/// `reference_budget` in `doc/facts.rs` has to say what this shows.
 #[test]
 fn links_may_expand_to_100_kb_however_short_the_text() {
     let links = |text: &str| {
@@ -618,15 +617,24 @@ fn an_escaped_backslash_is_one_in_the_text_around_it() {
     assert_eq!(tree("a\\\\b\n")[1], "  \"a\\\\b\" 1:1-1:4");
 }
 
-/// `Spelling::CodeSpan` in `aligner.rs`: a line ending reads as a space in a code span only, a lone carriage return as
-/// well, while the one in front of a line feed stays; references, escapes and the line ends of code blocks stay as
-/// written.
+/// `Spelling::CodeSpan` and `Spelling::Verbatim` in `aligner.rs`: each kind of line ending reads as a space in a code
+/// span and as a line feed in a code block, HTML or a formula; references and escapes stay as written.
 #[test]
-fn a_code_span_reads_its_line_endings_as_spaces() {
+fn code_reads_its_line_endings_as_spaces_or_line_feeds() {
     assert_eq!(code("`a\nb`\n"), "a b");
     assert_eq!(code("`a\rb`\n"), "a b");
-    assert_eq!(code("`a\r\nb`\n"), "a\r b");
+    assert_eq!(code("`a\r\nb`\n"), "a b");
     assert_eq!(code("> `a\n> b`\n"), "a b", "the prefix of a quote is gone");
     assert_eq!(code("`&amp; \\*`\n"), "&amp; \\*");
-    assert_eq!(code("```\na\r\nb\r\n```\r\n"), "a\r\nb\r\n");
+    assert_eq!(code("```\na\r\nb\rc\n```\r\n"), "a\nb\nc\n");
+    let html = first("<div>\r\na\r\n</div>\r\n", |value| match value {
+        NodeValue::HtmlBlock(html) => Some(html.literal.clone()),
+        _ => None,
+    });
+    assert_eq!(html, "<div>\na\n</div>\n");
+    let math = first("$$\r\nx\r\n$$\r\n", |value| match value {
+        NodeValue::Math(math) => Some(math.literal.clone()),
+        _ => None,
+    });
+    assert_eq!(math, "\nx\n");
 }

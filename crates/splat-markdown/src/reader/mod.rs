@@ -55,6 +55,16 @@ fn limit_inline_notes(options: &mut Options, text: &str) {
     }
 }
 
+/// Escaped pipes beyond which tables are switched off: comrak puts the positions behind each one of a table right by
+/// looking at all the others, which takes minutes for a hundred thousand.
+pub(super) const MOST_ESCAPED_PIPES: usize = 1000;
+
+fn limit_tables(options: &mut Options, text: &str) {
+    if text.matches("\\|").count() > MOST_ESCAPED_PIPES {
+        options.extension.table = false;
+    }
+}
+
 /// comrak searches the rest of a paragraph for the end of every opening delimiter of a formula as well.
 fn limit_formulas(options: &mut Options, text: &str) {
     let Unclosed { latex, code } = unclosed_formulas(text);
@@ -119,13 +129,13 @@ pub(crate) fn parse_part(text: &str, at_start: bool) -> Vec<Block> {
     }
     limit_inline_notes(&mut opts, text);
     limit_formulas(&mut opts, text);
+    limit_tables(&mut opts, text);
     let root = parse_document(&arena, text, &opts);
     let lines = LineStarts::new(text);
     let cx = Reader {
         text,
         lines: &lines,
         depth: std::cell::Cell::new(0),
-        escapes: Default::default(),
     };
     let mut blocks = Vec::new();
     let mut inline_notes = Vec::new();
@@ -140,7 +150,7 @@ pub(crate) fn parse_part(text: &str, at_start: bool) -> Vec<Block> {
             blocks.extend(cx.block(node));
         }
     }
-    notes::place_inline_notes(text, &mut blocks, inline_notes);
+    notes::place_inline_notes(&cx, &mut blocks, inline_notes);
     blocks.shrink_to_fit();
     blocks
 }
@@ -153,8 +163,6 @@ struct Reader<'t> {
     text: &'t str,
     lines: &'t LineStarts,
     depth: std::cell::Cell<usize>,
-    /// The `\|` of the table cell being read.
-    escapes: std::cell::RefCell<Vec<Byte>>,
 }
 
 struct Level<'c>(&'c std::cell::Cell<usize>);
@@ -183,29 +191,12 @@ impl Reader<'_> {
     }
 
     fn range(&self, sp: Sourcepos) -> Range<Byte> {
-        let escapes = self.escapes.borrow();
-        let start =
-            behind_escaped_pipes(&escapes, self.lines.start(sp.start.line, sp.start.column)).min(self.text.end());
-        let end = behind_escaped_pipes(&escapes, self.lines.end(sp.end.line, sp.end.column)).min(self.text.end());
+        let start = self.lines.start(sp.start.line, sp.start.column).min(self.text.end());
+        let end = self.lines.end(sp.end.line, sp.end.column).min(self.text.end());
         let start = floor_char(self.text, start);
         let end = ceil_char(self.text, end.max(start));
         start..end
     }
-}
-
-/// comrak removes the backslash of `\|` inside table cells before parsing inlines, so its positions behind each escape
-/// are one byte short.
-fn behind_escaped_pipes(escapes: &[Byte], offset: Byte) -> Byte {
-    let (mut low, mut high) = (0, escapes.len());
-    while low < high {
-        let mid = (low + high) / 2;
-        if escapes[mid] - mid < offset {
-            low = mid + 1;
-        } else {
-            high = mid;
-        }
-    }
-    offset + low
 }
 
 fn floor_char(s: &str, at: Byte) -> Byte {
@@ -434,6 +425,14 @@ mod tests {
         assert!(!on("^[".repeat(1002)));
         assert!(on("^[".repeat(1001) + "]"));
         assert!(!on("^[".repeat(1002) + "]"));
+    }
+
+    #[test]
+    fn thousands_of_escaped_pipes_switch_tables_off() {
+        let table = |pipes: usize| format!("a|b\n-|-\n{}|x\n", "\\|".repeat(pipes));
+        let kind = |text: String| parse(&text).blocks[0].kind.clone();
+        assert!(matches!(kind(table(MOST_ESCAPED_PIPES)), BlockKind::Table { .. }));
+        assert_eq!(kind(table(MOST_ESCAPED_PIPES + 1)), BlockKind::Paragraph);
     }
 
     #[test]

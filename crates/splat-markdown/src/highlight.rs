@@ -109,8 +109,8 @@ pub(crate) fn rehighlight(
     let head = old.partition_point(|(r, _)| r.start < window.start);
     let tail = old.partition_point(|(r, _)| r.start < old_end);
     let fresh = highlight_blocks(text, &doc.blocks[splice.new.clone()]);
-    // comrak's blocks can overlap, as an HTML block behind a tab does; a color across the edge of the window then belongs
-    // to both sides, and only the whole text tells which one wins.
+    // Where blocks overlap, a color across the edge of the window belongs to both sides, and only the whole text tells
+    // which one wins.
     let crosses = old[..head].last().is_some_and(|(r, _)| r.end > window.start)
         || old[..tail].last().is_some_and(|(r, _)| r.end > old_end)
         || fresh.iter().any(|(r, _)| r.start < window.start || r.end > window.end);

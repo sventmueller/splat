@@ -13,6 +13,7 @@ fn alert_kind(alert: AlertType) -> AlertKind {
         AlertType::Important => AlertKind::Important,
         AlertType::Warning => AlertKind::Warning,
         AlertType::Caution => AlertKind::Caution,
+        _ => AlertKind::Note,
     }
 }
 
@@ -68,7 +69,7 @@ fn node_text<'a>(node: comrak::nodes::Node<'a>) -> String {
             | NodeValue::HtmlBlock(_)
             | NodeValue::Paragraph
             | NodeValue::Heading(_)
-            | NodeValue::ThematicBreak
+            | NodeValue::ThematicBreak(_)
             | NodeValue::FootnoteDefinition(_)
             | NodeValue::Table(_)
             | NodeValue::TableRow(_)
@@ -76,9 +77,9 @@ fn node_text<'a>(node: comrak::nodes::Node<'a>) -> String {
             | NodeValue::TaskItem(_)
             | NodeValue::HtmlInline(_)
             | NodeValue::Raw(_)
-            | NodeValue::Emph
-            | NodeValue::Strong
-            | NodeValue::Strikethrough
+            | NodeValue::Emph(_)
+            | NodeValue::Strong(_)
+            | NodeValue::Strikethrough(_)
             | NodeValue::Highlight
             | NodeValue::Insert
             | NodeValue::Superscript
@@ -100,7 +101,10 @@ fn node_text<'a>(node: comrak::nodes::Node<'a>) -> String {
             | NodeValue::Subtext
             | NodeValue::BlockDirective(_)
             | NodeValue::CommentInline(_)
-            | NodeValue::MultilineComment(_) => None,
+            | NodeValue::MultilineComment(_)
+            | NodeValue::MathBlock(_)
+            | NodeValue::BlockId(_)
+            | _ => None,
         })
         .collect()
 }
@@ -119,12 +123,8 @@ impl Reader<'_> {
     }
 
     /// A paragraph, or the formula it holds and nothing else.
-    fn paragraph<'a>(&self, node: comrak::nodes::Node<'a>, mut range: Range<Byte>) -> Block {
+    fn paragraph<'a>(&self, node: comrak::nodes::Node<'a>, range: Range<Byte>) -> Block {
         let inlines = self.leaf_inlines(node, &range);
-        // Link reference definitions at its start are part of comrak's paragraph, but of nothing it shows.
-        if let Some(first) = inlines.first() {
-            range.start = range.start.max(first.range.start.min(range.end));
-        }
         if let [only] = inlines.as_slice()
             && let InlineKind::Math { display: true, literal } = &only.kind
         {
@@ -218,14 +218,14 @@ impl Reader<'_> {
             NodeValue::HtmlBlock(h) => BlockKind::HtmlBlock {
                 literal: h.literal.as_str().into(),
             },
-            NodeValue::ThematicBreak => BlockKind::ThematicBreak,
+            NodeValue::ThematicBreak(_) => BlockKind::ThematicBreak,
             NodeValue::FrontMatter(_) => BlockKind::FrontMatter {
                 content: self.front_matter_content(&range),
             },
             NodeValue::Table(t) => BlockKind::Table {
                 alignments: t.alignments.iter().map(table_align).collect(),
             },
-            NodeValue::TableRow(header) => BlockKind::TableRow { header: *header },
+            NodeValue::TableRow(row) => BlockKind::TableRow { header: row.header },
             NodeValue::TableCell => return Some(self.table_cell(node, range)),
             NodeValue::FootnoteDefinition(f) => {
                 let label_end = self.text.at(range.clone()).find("]:").map(|i| range.start + i + 2);
@@ -242,9 +242,9 @@ impl Reader<'_> {
             | NodeValue::Code(_)
             | NodeValue::HtmlInline(_)
             | NodeValue::Raw(_)
-            | NodeValue::Emph
-            | NodeValue::Strong
-            | NodeValue::Strikethrough
+            | NodeValue::Emph(_)
+            | NodeValue::Strong(_)
+            | NodeValue::Strikethrough(_)
             | NodeValue::Highlight
             | NodeValue::Insert
             | NodeValue::Superscript
@@ -261,7 +261,10 @@ impl Reader<'_> {
             | NodeValue::EscapedTag(_)
             | NodeValue::Subtext
             | NodeValue::BlockDirective(_)
-            | NodeValue::CommentInline(_) => return None,
+            | NodeValue::CommentInline(_)
+            | NodeValue::MathBlock(_)
+            | NodeValue::BlockId(_)
+            | _ => return None,
         };
         drop(data);
         let children: Vec<Block> = node.children().filter_map(|c| self.block(c)).collect();
@@ -301,14 +304,7 @@ impl Reader<'_> {
     }
 
     fn table_cell<'a>(&self, node: comrak::nodes::Node<'a>, range: Range<Byte>) -> Block {
-        *self.escapes.borrow_mut() = self
-            .text
-            .at(range.clone())
-            .match_indices("\\|")
-            .map(|(i, _)| range.start + i)
-            .collect();
         let inlines = self.leaf_inlines(node, &range);
-        self.escapes.borrow_mut().clear();
         Block::leaf(BlockKind::TableCell, range, inlines)
     }
 

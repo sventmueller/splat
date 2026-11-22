@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn a_definition_inside_a_definition_is_written_too() {
-        let word = document_xml("a[^1]\n\n[^1]: x\n\n    [^2]: innen\n");
+        let word = document_xml("a[^1]\n\n[^1]: x[^2]\n\n    [^2]: innen\n");
         assert!(word.contains("innen"), "{word}");
     }
 

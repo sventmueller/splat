@@ -415,9 +415,9 @@ mod tests {
     }
 
     #[test]
-    fn a_definition_in_front_of_what_the_reader_could_not_place_counts_all_the_same() {
+    fn definitions_in_front_of_a_paragraph_count_as_well_as_its_links() {
         let text = "[d]: a.md \"T\"\n[e]: <b.md>\n <a href=\"x.md\">html</a> y\n";
-        assert_eq!(said(text), ["a.md at a.md", "b.md at <>b.md"]);
+        assert_eq!(said(text), ["a.md at a.md", "b.md at <>b.md", "x.md elsewhere"]);
         for (text, end) in [
             ("[a]: b\nc", Some(7)),
             ("[a]: b", Some(6)),

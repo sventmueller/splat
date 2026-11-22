@@ -26,13 +26,7 @@ pub(crate) const LIBRARY_ONLY: Floors = Floors {
 };
 
 /// Measured along with the app, but held to no floor.
-pub(crate) const TEST_CODE: [&str; 5] = [
-    "src/editor/selftest",
-    "crates/splat-testkit/",
-    "tests/",
-    "vendor/",
-    "xtask/",
-];
+pub(crate) const TEST_CODE: [&str; 4] = ["src/editor/selftest", "crates/splat-testkit/", "tests/", "xtask/"];
 
 /// Modules held to no floor of their own, and why.
 pub(crate) const NO_FLOOR: [(&str, &str); 1] = [(

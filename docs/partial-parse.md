@@ -15,12 +15,12 @@ Markdown is not local: a fence or an HTML comment runs across blank lines, and s
 |---|---|---|---|
 | 1 | The state of the parser at the ends of the part: open fences, comments, lists, HTML blocks | `neighbours_hold`, `parse_window` for the end of the text | `OpenBlock`, `TooMuch` |
 | 2 | Footnotes that cannot be told from the tree: inline notes, a definition nobody refers to, a reference hidden in text or in the title of a callout | `footnotes_can_be_told` | `Footnotes` |
-| 3 | Numbers of footnotes and the order of their definitions: comrak numbers them in the whole text and moves the definitions behind it | `references_keep_their_numbers`, `footnotes_stay`, `source_order` | `Footnotes` |
+| 3 | Numbers of footnotes and the order of their definitions: comrak numbers them in the whole text, moves the definitions behind it and keeps only the first of a label | `references_keep_their_numbers`, `footnotes_stay`, `source_order` | `Footnotes` |
 | 4 | Link reference definitions: one anywhere turns brackets anywhere into links, and the first of a label counts, compared by Unicode case folding (`label_key`) | `link_definitions_stay`, `link_definitions_of` in `doc/facts.rs` | `LinkDefinitions` |
 | 5 | `%%` comments: an unclosed one runs on to the next one anywhere | `link_definitions_stay`, `read_as_a_whole` | `LooseComment` |
 | 6 | The budget comrak gives reference links in a text | `expansions_after`, `expansions_fit` in `doc/facts.rs` | `LinkDefinitions` |
 | 7 | Front matter: a `---` at the very start pairs with the next `---` line anywhere | `reparse_or_why_not` | `FrontMatter` |
-| 8 | Formulas and inline notes so many that the reader switches them off in the whole text | `read_as_a_whole` | `SwitchedOff` |
+| 8 | Formulas and inline notes, or escaped pipes, so many that the reader switches them or tables off in the whole text | `read_as_a_whole` | `SwitchedOff` |
 | 9 | A part so large that a full parse costs no more, or a text too large to parse | `part_between`, `reparse_or_why_not` | `TooMuch` |
 
 Positions: blocks of a part count from its own start until `PartBlocks::placed_at`, and `TextPart` pairs a part with where it starts, so that neither kind can be mistaken for positions in the whole text.

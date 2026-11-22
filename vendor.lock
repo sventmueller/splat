@@ -25,8 +25,8 @@ resources/js/mathlive-fonts/KaTeX_Size2-Regular.woff2	mathlive	0.111.4	https://c
 resources/js/mathlive-fonts/KaTeX_Size3-Regular.woff2	mathlive	0.111.4	https://cdn.jsdelivr.net/npm/mathlive@0.111.4/fonts/KaTeX_Size3-Regular.woff2	73d591271b1604960cb10bb90fee021670af7297017e0e98480b332d11f51995
 resources/js/mathlive-fonts/KaTeX_Size4-Regular.woff2	mathlive	0.111.4	https://cdn.jsdelivr.net/npm/mathlive@0.111.4/fonts/KaTeX_Size4-Regular.woff2	a4af7d414440a1c1790825cfb700cf9cf43b0f2c4b04f0ebc523011ad9853ec0
 resources/js/mathlive-fonts/KaTeX_Typewriter-Regular.woff2	mathlive	0.111.4	https://cdn.jsdelivr.net/npm/mathlive@0.111.4/fonts/KaTeX_Typewriter-Regular.woff2	71d517d67827787cfabdf186914cc3358eda539e37931941f2b2fd4a21f68c0b
-resources/js/plantuml.js	plantuml	1.2026.9	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.9/plantuml.js	4db57f7f5cf0aac5d4cc703f7ecbf2f250a87b403756d228829e13c90571ca65
-resources/js/viz-global.js	plantuml	1.2026.9	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.9/viz-global.js	fc6ca2de83dd4e3fca967d5214122777890a5cd1ab101115a1f716fc84e6dc5e
+resources/js/plantuml.js	plantuml	1.2026.10	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.10/plantuml.js	f9896d08ec331a3f1f960ccb6ccbd9c0a31df82445456e7c59b9f0cd56f25471
+resources/js/viz-global.js	plantuml	1.2026.10	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.10/viz-global.js	fc6ca2de83dd4e3fca967d5214122777890a5cd1ab101115a1f716fc84e6dc5e
 resources/js/mathjax/tex-mml-svg-mathjax-tex.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/@mathjax/mathjax-tex-font@4.1.3/tex-mml-svg-mathjax-tex.js	6033b303d289a24bf4ae681403ed34ac978992e25ca1d4f86690f038e6565475
 resources/js/mathjax/input/tex/extensions/action.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/action.js	7c46fc1ef8118723bf2f386d704ab289e5dd683471e0ad4e1e717244959b565b
 resources/js/mathjax/input/tex/extensions/amscd.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/amscd.js	81d6115aa4358a98da5e6d477ac4198cbc11c2c2752745b3529a8b6e2761202f
@@ -57,4 +57,4 @@ resources/js/mathjax/input/tex/extensions/unicode.js	mathjax	4.1.3	https://cdn.j
 resources/js/mathjax/input/tex/extensions/upgreek.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/upgreek.js	0f4c96104699aeada37446dfb3d50438efec4e11c58982abaa2ff781d42d3667
 resources/js/mathjax/input/tex/extensions/verb.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/mathjax@4.1.3/input/tex/extensions/verb.js	b2290ff1be4d33c57dd476d87d1753d4cde0a5991612b4a24db881a15c85a250
 resources/js/mathjax/fonts/mathjax-mhchem-font-extension/svg.js	mathjax	4.1.3	https://cdn.jsdelivr.net/npm/@mathjax/mathjax-mhchem-font-extension@4.1.3/svg.js	59cbf08305ddd6bac14dbf2e2a6b3c2f3f6870107ad16d381870fdb0486eea73
-resources/js/themes.js	plantuml	1.2026.9	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.9/themes.js	d6f508704b276b66631cfff05291de3013ab7807972b7cb2b77a14d4beab2c2d
+resources/js/themes.js	plantuml	1.2026.10	https://cdn.jsdelivr.net/npm/@plantuml/core@1.2026.10/themes.js	6b6d2ef1590a29dfc24c1462b56dfd3b31757724da3627af5ea15dc1e991bb6d

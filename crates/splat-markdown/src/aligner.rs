@@ -15,7 +15,7 @@ pub enum Spelling {
     Typographic,
     /// The text of a code span, in which comrak reads every line ending as a space.
     CodeSpan,
-    /// A code block or HTML, which comrak keeps as written.
+    /// A code block or HTML, which comrak keeps as written but for its line endings, each read as a line feed.
     Verbatim,
 }
 
@@ -83,8 +83,22 @@ pub fn spelled(literal: &str, source: &str, spelling: Spelling) -> Option<(usize
             let len = escaped.and_then(|rest| typographic_source(c, rest))?;
             Some((1 + len, c.len_utf8()))
         }
-        Spelling::CodeSpan => (c == ' ' && source.starts_with(['\n', '\r'])).then_some((1, 1)),
-        Spelling::Verbatim => None,
+        Spelling::CodeSpan => (c == ' ')
+            .then(|| line_ending_len(source))
+            .flatten()
+            .map(|len| (len, 1)),
+        Spelling::Verbatim => (c == '\n')
+            .then(|| line_ending_len(source))
+            .flatten()
+            .map(|len| (len, 1)),
+    }
+}
+
+fn line_ending_len(source: &str) -> Option<usize> {
+    if source.starts_with("\r\n") {
+        Some(2)
+    } else {
+        source.starts_with(['\n', '\r']).then_some(1)
     }
 }
 
@@ -274,11 +288,32 @@ mod tests {
                 "a lone carriage return in a code span",
             ),
             (
-                "\r ",
+                " ",
                 "\r\n",
                 &[CodeSpan][..],
+                Some((2, 1)),
+                "both characters of a line ending in a code span",
+            ),
+            (
+                "\n",
+                "\r\n",
+                &[Verbatim][..],
+                Some((2, 1)),
+                "a line ending in code, which comrak reads as a line feed",
+            ),
+            (
+                "\n",
+                "\r",
+                &[Verbatim][..],
                 Some((1, 1)),
-                "the carriage return of a pair stays",
+                "a lone carriage return in code",
+            ),
+            (
+                "\n",
+                "\r\n",
+                &resolved[..],
+                None,
+                "a line feed in text stands for itself",
             ),
             (
                 " ",
@@ -363,8 +398,8 @@ mod tests {
                 "a\r> b",
                 Verbatim,
                 LinePrefixes,
-                Some(vec![(0, 1), (4, 0), (4, 1)]),
-                "a lone CR ends a line",
+                Some(vec![(0, 1), (1, 1), (4, 1)]),
+                "a lone CR ends a line and spells the line feed",
             ),
             (
                 "a>b",

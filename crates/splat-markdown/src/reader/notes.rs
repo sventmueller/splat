@@ -3,13 +3,13 @@ use std::ops::Range;
 
 use super::Reader;
 use crate::doc::facts::LONGEST_LABEL;
-use crate::doc::{Block, BlockKind, Inline, InlineKind, shift_block, walk_blocks, walk_inlines};
-use crate::text::{Byte, LineStarts, growth, offsets, shifted};
+use crate::doc::{Block, BlockKind, InlineKind, walk_blocks, walk_inlines};
+use crate::text::Byte;
 
 /// Puts the inline notes among `blocks`: comrak lists footnotes in the order of their references, and an inline one keeps
 /// its place among them.
 pub(super) fn place_inline_notes<'a>(
-    text: &str,
+    cx: &Reader<'_>,
     blocks: &mut Vec<Block>,
     inline_notes: Vec<(usize, String, comrak::nodes::Node<'a>)>,
 ) {
@@ -26,12 +26,7 @@ pub(super) fn place_inline_notes<'a>(
     });
     let notes: Vec<(usize, Option<Block>)> = inline_notes
         .into_iter()
-        .map(|(at, name, node)| {
-            (
-                at,
-                inline_note(text, references.get(name.as_str()).cloned(), &name, node),
-            )
-        })
+        .map(|(at, name, node)| (at, inline_note(cx, references.get(name.as_str()).cloned(), &name, node)))
         .collect();
     let mut rest = std::mem::take(blocks).into_iter();
     for (at, note) in notes {
@@ -64,51 +59,15 @@ pub(super) fn written_like_inline_notes(text: &str) -> std::collections::HashSet
         .collect()
 }
 
-/// The footnote behind an inline `^[note]`. comrak gives its content positions relative to the note text, so it is
-/// converted from that text and moved to where it stands; the definition covers the reference.
+/// The footnote behind an inline `^[note]`; the definition covers the reference.
 fn inline_note<'a>(
-    text: &str,
+    cx: &Reader<'_>,
     reference: Option<(Range<Byte>, u32)>,
     name: &str,
     node: comrak::nodes::Node<'a>,
 ) -> Option<Block> {
     let (at, number) = reference?;
-    let content = (at.start + 2).min(at.end)..shifted(at.end, -1).max((at.start + 2).min(at.end));
-    let note = text.get(offsets(&content))?;
-    // Over several lines comrak counts positions from quote and list prefixes it removed, so such a note is kept
-    // as plain text.
-    if note.contains('\n') {
-        let text = Inline {
-            kind: InlineKind::Text(note.into()),
-            range: content.clone(),
-            children: Box::default(),
-        };
-        let paragraph = Block::leaf(BlockKind::Paragraph, content.clone(), [text]);
-        return Some(Block::container(
-            BlockKind::FootnoteDefinition {
-                name: name.into(),
-                label: at.start..at.start,
-                number: Some(number),
-            },
-            at,
-            [paragraph],
-        ));
-    }
-    let lines = LineStarts::new(note);
-    let cx = Reader {
-        text: note,
-        lines: &lines,
-        depth: std::cell::Cell::new(0),
-        escapes: Default::default(),
-    };
-    let children: Vec<Block> = node
-        .children()
-        .filter_map(|c| cx.block(c))
-        .map(|mut b| {
-            shift_block(&mut b, growth(content.start, Byte::default()));
-            b
-        })
-        .collect();
+    let children: Vec<Block> = node.children().filter_map(|c| cx.block(c)).collect();
     Some(Block::container(
         BlockKind::FootnoteDefinition {
             name: name.into(),
@@ -171,20 +130,22 @@ mod tests {
     }
 
     #[test]
-    fn a_note_over_lines_of_a_quote_or_list_ends_at_its_bracket_and_what_follows_stays_behind_it() {
+    fn a_note_over_lines_of_a_quote_or_list_ends_at_its_bracket_and_its_text_and_what_follows_find_their_place() {
         for t in ["> a^[b [c]\n> d] e f", "- a^[b [c]\n  d] e f"] {
             let d = parse(t);
             let mut seen = Vec::new();
             walk_blocks(&d.blocks, &mut |b| {
-                if !matches!(b.kind, BlockKind::Paragraph) || b.inlines().len() < 2 {
+                if !matches!(b.kind, BlockKind::Paragraph) {
                     return;
                 }
-                seen = b.inlines().iter().map(|i| i.range.clone()).collect();
-                let note = b
+                let Some(note) = b
                     .inlines()
                     .iter()
                     .find(|i| matches!(i.kind, InlineKind::FootnoteRef { .. }))
-                    .unwrap();
+                else {
+                    return;
+                };
+                seen = b.inlines().iter().map(|i| i.range.clone()).collect();
                 assert!(
                     slice(t, &note.range).starts_with("^[b [c]") && slice(t, &note.range).ends_with("d]"),
                     "{t}"
@@ -192,6 +153,18 @@ mod tests {
             });
             assert!(seen.len() >= 3, "{t}: {seen:?}");
             assert!(seen.windows(2).all(|w| w[0].end <= w[1].start), "{t}: {seen:?}");
+            let note = d
+                .blocks
+                .iter()
+                .find(|b| matches!(b.kind, BlockKind::FootnoteDefinition { .. }))
+                .unwrap();
+            let texts: Vec<&str> = note.children()[0]
+                .inlines()
+                .iter()
+                .filter(|i| matches!(i.kind, InlineKind::Text(_)))
+                .map(|i| slice(t, &i.range))
+                .collect();
+            assert_eq!(texts, ["b [c]", "d"], "{t}");
         }
     }
 

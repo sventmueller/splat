@@ -8,12 +8,13 @@ use std::sync::Arc;
 pub use super::doc::facts::memory_estimate;
 pub(crate) use super::doc::facts::stays_plain;
 use super::doc::facts::{
-    BlocksByPosition, MOST_MEMORY, TextFacts, Unclosed, ends_footnote_label, expansions_fit, footnote_label,
-    holds_loose_comment, link_definitions, may_define_links, reads_alone, reference_expansions, unclosed_after_change,
+    BlocksByPosition, MOST_MEMORY, SyntaxCounts, TextFacts, Unclosed, ends_footnote_label, expansions_fit,
+    footnote_label, holds_loose_comment, link_definitions, may_define_links, reads_alone, reference_expansions,
+    unclosed_after_change,
 };
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, shift_block, walk_blocks, walk_inlines};
 use super::highlight::{Style, highlight, highlight_blocks, rehighlight};
-use super::reader::{UNCLOSED_MARKS, parse_part, parse_shared};
+use super::reader::{MOST_ESCAPED_PIPES, UNCLOSED_MARKS, parse_part, parse_shared};
 use super::text::{
     Byte, TextAt, TextPart, changed, growth, label_key, line_start, next_line_start, previous_line_start, shifted,
 };
@@ -148,30 +149,55 @@ fn holds_link_bracket(text: &str) -> bool {
         .any(|(i, _)| footnote_label(&text[i..]).is_none())
 }
 
-/// Definitions for the labels in `text`; `None` when there are too many to be worth parsing.
-fn stand_ins(text: &str) -> Option<String> {
+/// What makes comrak read the footnotes of `text` as the whole document does: a stand-in definition for each label only
+/// referred to there, and a reference to each label defined there, as comrak drops a definition nothing refers to. `None`
+/// when there are too many to be worth parsing.
+fn stand_ins(text: &str) -> Option<StandIns> {
+    let defined: HashSet<String> = text
+        .match_indices("]:")
+        .filter(|&(i, _)| ends_footnote_label(text, i))
+        .filter_map(|(i, _)| Some(label_key(footnote_label(&text[text[..i].rfind("[^")?..])?)))
+        .collect();
     let mut labels = HashSet::new();
-    let mut definitions = String::new();
+    let mut stand_ins = StandIns::default();
     for (i, _) in text.match_indices("[^") {
         if let Some(label) = footnote_label(&text[i..])
-            && labels.insert(label)
+            && labels.insert(label_key(label))
         {
             if labels.len() > MOST_STAND_INS {
                 return None;
             }
-            definitions.push_str("\n\n[^");
-            definitions.push_str(label);
-            definitions.push_str("]: x\n");
+            if defined.contains(&label_key(label)) {
+                stand_ins.references.push_str(" [^");
+                stand_ins.references.push_str(label);
+                stand_ins.references.push(']');
+            } else {
+                stand_ins.definitions.push_str("\n\n[^");
+                stand_ins.definitions.push_str(label);
+                stand_ins.definitions.push_str("]: x\n");
+            }
         }
     }
-    Some(definitions)
+    Some(stand_ins)
 }
 
-/// The blocks of `text`, a part of the document, with its footnotes recognized and its definitions where they stand, and
-/// its brackets read with the link definitions of the whole text. comrak takes `[^label]` for a reference only with a
-/// definition in the same parse, and moves only the last definition of a label behind the text, which is the stand-in
-/// here. A block left open swallows what stands behind it, which its neighbor shows, so without a neighbor to compare with
-/// that takes a look of its own: the end of the document also ends blocks differently.
+#[derive(Default)]
+struct StandIns {
+    /// One paragraph, behind the text and in front of the definitions.
+    references: String,
+    definitions: String,
+}
+
+impl StandIns {
+    fn is_empty(&self) -> bool {
+        self.references.is_empty() && self.definitions.is_empty()
+    }
+}
+
+/// The blocks of `text`, a part of the document, with its footnotes recognized and its definitions kept, and its brackets
+/// read with the link definitions of the whole text, as comrak takes `[^label]` for a reference only with a definition in
+/// the same parse. A block left open swallows what stands behind it, which its neighbor shows, so without a neighbor to
+/// compare with that takes a look of its own: the end of the document also ends blocks differently.
 fn parse_window(window: &Window) -> Result<PartBlocks, WholeParse> {
     let &Window {
         text,
@@ -187,16 +213,23 @@ fn parse_window(window: &Window) -> Result<PartBlocks, WholeParse> {
     if at_end && !notes.is_empty() {
         return Err(WholeParse::Footnotes);
     }
-    let mut part = parse_part(&format!("{text}{notes}\n\n{links}"), at_start);
+    let references = if notes.references.is_empty() {
+        String::new()
+    } else {
+        format!("\n\n{}", notes.references)
+    };
+    let mut part = parse_part(&format!("{text}{references}{}\n\n{links}", notes.definitions), at_start);
+    let references = text.end()..text.end() + references.len();
     // Text that reads as anything but a definition there is no definition, whatever it looked like in its place.
-    let definitions_start = text.end() + notes.len();
-    if part
-        .iter()
-        .any(|b| b.range.start >= definitions_start && !is_definition(b))
-    {
+    if part.iter().any(|b| {
+        let start = b.range.start;
+        start >= text.end() && !(references.contains(&start) || is_definition(b))
+    }) {
         return Err(WholeParse::LinkDefinitions);
     }
     part.retain(|b| b.range.start < text.end());
+    // comrak moves the definitions behind the text, where the whole document has its own.
+    part.sort_by_key(|b| b.range.start);
     if at_end {
         let alone = parse_part(text, at_start);
         if part.len() != alone.len() || !part.iter().zip(&alone).all(|(a, b)| same_shape(a, b)) {
@@ -308,17 +341,9 @@ fn holds_nested_definition(blocks: &[Block]) -> bool {
 }
 
 /// The indexes of the text blocks and written definitions in source order, as comrak moved the definitions behind the
-/// text. `None` where a definition was moved out of a quote or list, or a second one of a label stayed behind.
+/// text. `None` where a definition was moved out of a quote or list.
 fn source_order(blocks: &[Block], text_blocks: usize) -> Option<Vec<usize>> {
     if blocks[..text_blocks].iter().any(is_definition) {
-        return None;
-    }
-    let mut labels = HashSet::new();
-    let second_of_a_label = blocks[text_blocks..].iter().any(|b| match &b.kind {
-        BlockKind::FootnoteDefinition { name, .. } => !labels.insert(label_key(name)),
-        _ => false,
-    });
-    if second_of_a_label {
         return None;
     }
     let mut order: Vec<usize> = (0..text_blocks).collect();
@@ -369,7 +394,8 @@ fn replace_blocks(doc: &mut Doc, old: Range<usize>, part: Vec<Block>, old_change
 /// Why a change takes parsing all of the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum WholeParse {
-    /// So many unclosed inline notes or formulas that the reader switches them off, which only the whole text can tell.
+    /// So many unclosed inline notes or formulas, or escaped pipes, that the reader switches them or tables off, which only
+    /// the whole text can tell.
     SwitchedOff,
     /// A `%%` that nothing closes yet, which another one anywhere would.
     LooseComment,
@@ -392,9 +418,11 @@ fn opens_front_matter(text: &str) -> bool {
 
 /// Whether something anywhere in the text decides how the part around a change is read. A `^[` that the change adds is
 /// found in the new part.
-fn read_as_a_whole(facts: &TextFacts, new_unclosed: Unclosed) -> Option<WholeParse> {
+fn read_as_a_whole(facts: &TextFacts, new_counts: &SyntaxCounts, new_unclosed: Unclosed) -> Option<WholeParse> {
     let limited = |unclosed: Unclosed| unclosed.latex > UNCLOSED_MARKS || unclosed.code > UNCLOSED_MARKS;
-    if facts.counts.inline_notes > UNCLOSED_MARKS || limited(facts.unclosed_formulas) || limited(new_unclosed) {
+    let pipes = facts.counts.escaped_pipes.max(new_counts.escaped_pipes) > MOST_ESCAPED_PIPES;
+    if facts.counts.inline_notes > UNCLOSED_MARKS || limited(facts.unclosed_formulas) || limited(new_unclosed) || pipes
+    {
         return Some(WholeParse::SwitchedOff);
     }
     facts.loose_comment.then_some(WholeParse::LooseComment)
@@ -505,7 +533,7 @@ impl<'c> Change<'c> {
         if part.new.contains("^[") {
             return Err(WholeParse::Footnotes);
         }
-        // A definition without a reference is not in the tree, but the references in it gave other notes their numbers.
+        // A definition without a reference is not in the tree, and a change elsewhere can bring it back.
         let written = part.in_window.iter().filter(|&&i| i >= self.text_blocks).count();
         if count_footnote_definitions(part.old) != written {
             return Err(WholeParse::Footnotes);
@@ -657,7 +685,7 @@ pub(crate) fn reparse_or_why_not(doc: &mut Doc, new_text: &str) -> Result<Splice
         return Err(WholeParse::TooMuch);
     }
     let unclosed = unclosed_after_change(facts.unclosed_formulas, old_text, new_text, &old_change, &new_change);
-    if let Some(why) = read_as_a_whole(&facts, unclosed) {
+    if let Some(why) = read_as_a_whole(&facts, &counts, unclosed) {
         return Err(why);
     }
     let links = facts.link_definitions.clone().ok_or(WholeParse::LinkDefinitions)?;
@@ -1077,12 +1105,15 @@ mod tests {
     }
 
     #[test]
-    fn a_second_definition_of_a_label_takes_a_full_parse() {
+    fn a_change_beside_a_second_definition_of_a_label_takes_a_full_parse() {
         let old = "a[^1]\n\n[^1]: b\n\n[^1]: c\n";
         assert_eq!(partly(old, &old.replace("c\n", "c\n> \n")), None);
         assert_eq!(partly(old, &old.replacen("\n\n[^1]: c", "\n> \n[^1]: c", 1)), None);
         let cased = "a[^x]\n\n[^X]: b\n\n[^x]: c\n\nd\n\ne\n\nf\n";
-        assert_eq!(partly(cased, &cased.replace("e\n", "ee\n")), None);
+        assert!(
+            partly(cased, &cased.replace("e\n", "ee\n")).is_some(),
+            "comrak drops the second"
+        );
     }
 
     #[test]
@@ -1128,14 +1159,20 @@ mod tests {
 
     #[test]
     fn stand_ins_cover_each_label_once_up_to_a_limit() {
+        let both = |text: &str| stand_ins(text).map(|s| (s.references, s.definitions));
         assert_eq!(
-            stand_ins("[^a] [^b] [^a]").as_deref(),
-            Some("\n\n[^a]: x\n\n\n[^b]: x\n")
+            both("[^a] [^b] [^a]"),
+            Some((String::new(), "\n\n[^a]: x\n\n\n[^b]: x\n".to_string()))
         );
-        assert_eq!(stand_ins("[a] [^] x").as_deref(), Some(""));
+        assert_eq!(
+            both("[^a] [^c]\n\n[^b]: y\n\n[^C]: z\n"),
+            Some((" [^c] [^b]".to_string(), "\n\n[^a]: x\n".to_string())),
+            "a label defined in the text is referred to, compared by case folding"
+        );
+        assert!(stand_ins("[a] [^] x").is_some_and(|s| s.is_empty()));
         let labels = |n: usize| (0..n).map(|i| format!("[^{i}]")).collect::<String>();
         assert!(stand_ins(&labels(MOST_STAND_INS)).is_some());
-        assert_eq!(stand_ins(&labels(MOST_STAND_INS + 1)), None);
+        assert!(stand_ins(&labels(MOST_STAND_INS + 1)).is_none());
     }
 
     #[test]

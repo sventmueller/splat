@@ -3,8 +3,6 @@ use std::ops::Range;
 use comrak::nodes::NodeValue;
 
 use super::Reader;
-use super::notes::INLINE_NOTE;
-use super::positions::inline_note_len;
 use crate::doc::{Inline, InlineKind};
 use crate::markup::{self, AddressFor, Destination, Role, destination};
 use crate::text::{Byte, TextAt};
@@ -12,8 +10,7 @@ use crate::text::{Byte, TextAt};
 impl Reader<'_> {
     pub(super) fn inlines<'a>(&self, node: comrak::nodes::Node<'a>) -> Vec<Inline> {
         let mut raw: Vec<Inline> = node.children().filter_map(|c| self.inline(c)).collect();
-        // comrak's positions for a few extensions, such as inline footnotes over several lines, can run past the
-        // next inline; everything after the tree relies on inlines following each other.
+        // Everything after the tree relies on inlines following each other, which comrak's positions do not promise.
         let mut end = Byte::default();
         for i in &mut raw {
             if i.range.start < end {
@@ -28,13 +25,7 @@ impl Reader<'_> {
 
     fn inline<'a>(&self, node: comrak::nodes::Node<'a>) -> Option<Inline> {
         let data = node.data();
-        let mut range = self.range(data.sourcepos);
-        if let NodeValue::FootnoteReference(f) = &data.value
-            && f.name.starts_with(INLINE_NOTE)
-            && let Some(len) = self.text.get(range.start.get()..).and_then(inline_note_len)
-        {
-            range.end = range.start + len;
-        }
+        let range = self.range(data.sourcepos);
         let Some(_level) = self.enter() else {
             return Some(self.raw_text(range));
         };
@@ -44,9 +35,9 @@ impl Reader<'_> {
             NodeValue::LineBreak => InlineKind::LineBreak,
             NodeValue::Code(c) => InlineKind::Code(c.literal.as_str().into()),
             NodeValue::HtmlInline(h) => InlineKind::Html(h.as_str().into()),
-            NodeValue::Emph => InlineKind::Emph,
-            NodeValue::Strong => InlineKind::Strong,
-            NodeValue::Strikethrough => InlineKind::Strikethrough,
+            NodeValue::Emph(_) => InlineKind::Emph,
+            NodeValue::Strong(_) => InlineKind::Strong,
+            NodeValue::Strikethrough(_) => InlineKind::Strikethrough,
             NodeValue::Link(l) => InlineKind::Link {
                 url: l.url.as_str().into(),
                 title: l.title.as_str().into(),
@@ -89,7 +80,7 @@ impl Reader<'_> {
             | NodeValue::HtmlBlock(_)
             | NodeValue::Paragraph
             | NodeValue::Heading(_)
-            | NodeValue::ThematicBreak
+            | NodeValue::ThematicBreak(_)
             | NodeValue::FootnoteDefinition(_)
             | NodeValue::Table(_)
             | NodeValue::TableRow(_)
@@ -104,9 +95,10 @@ impl Reader<'_> {
             | NodeValue::CalloutTitle
             | NodeValue::Subtext
             | NodeValue::BlockDirective(_)
-            | NodeValue::MultilineComment(_) => {
-                InlineKind::Text(self.text.at(range.clone()).replace("\\|", "|").into())
-            }
+            | NodeValue::MultilineComment(_)
+            | NodeValue::MathBlock(_)
+            | NodeValue::BlockId(_)
+            | _ => InlineKind::Text(self.text.at(range.clone()).replace("\\|", "|").into()),
         };
         drop(data);
         let children = if kind.holds_inlines() {

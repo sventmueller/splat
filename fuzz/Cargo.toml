@@ -9,9 +9,6 @@ cargo-fuzz = true
 
 [workspace]
 
-[patch.crates-io]
-comrak = { path = "../vendor/comrak" }
-
 [dependencies]
 libfuzzer-sys = "0.4"
 splat-testkit = { path = "../crates/splat-testkit" }

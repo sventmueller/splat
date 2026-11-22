@@ -105,11 +105,7 @@ fn crates(root: &Path) -> Result<Vec<Crate>, String> {
             found.insert(parse_crate(line).ok_or_else(|| format!("cargo tree: {line:?}"))?);
         }
     }
-    let own = |c: &Crate| {
-        c.path
-            .as_ref()
-            .is_some_and(|p| p.starts_with(root) && !p.starts_with(root.join("vendor")))
-    };
+    let own = |c: &Crate| c.path.as_ref().is_some_and(|p| p.starts_with(root));
     Ok(found.into_iter().filter(|c| !own(c)).collect())
 }
 
@@ -357,8 +353,8 @@ mod tests {
             ),
             ("objc2", "0.6.5", None, "MIT")
         );
-        let vendored = parse_crate("comrak v0.59.0 (/r/vendor/comrak)|BSD-2-Clause|").unwrap();
-        assert_eq!(vendored.path, Some(PathBuf::from("/r/vendor/comrak")));
+        let own = parse_crate("splat-markdown v0.0.0 (/r/crates/splat-markdown)|MIT OR Apache-2.0|").unwrap();
+        assert_eq!(own.path, Some(PathBuf::from("/r/crates/splat-markdown")));
         assert!(parse_crate("no version|MIT|").is_none() && parse_crate("objc2").is_none());
     }
 
