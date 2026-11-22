@@ -105,11 +105,17 @@ fn a_thousand_hits_in_a_line_each_look_at_no_more_than_their_context() {
 #[test]
 fn a_needle_full_of_repeats_does_not_go_quadratic() {
     let needle = format!("{}b", "a".repeat(5000));
+    // The shortest of three runs: a single one may meet a moment the machine is busy elsewhere, as on a CI runner.
     let found = |len: usize| {
         let text = "a".repeat(len);
-        let started = std::time::Instant::now();
-        assert_eq!(folded(&text, &needle), Vec::<String>::new());
-        started.elapsed()
+        (0..3)
+            .map(|_| {
+                let started = std::time::Instant::now();
+                assert_eq!(folded(&text, &needle), Vec::<String>::new());
+                started.elapsed()
+            })
+            .min()
+            .unwrap_or_default()
     };
     let (small, large) = (found(1 << 20), found(1 << 22));
     assert!(
