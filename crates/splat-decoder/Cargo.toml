@@ -1,6 +1,6 @@
 [package]
 name = "splat-decoder"
-version = "0.0.0"
+version.workspace = true
 description = "The sandboxed service that turns untrusted image data into pixels and PDFs, and the app's side of it; macOS only"
 edition.workspace = true
 license.workspace = true

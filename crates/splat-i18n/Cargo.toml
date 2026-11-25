@@ -1,6 +1,6 @@
 [package]
 name = "splat-i18n"
-version = "0.0.0"
+version.workspace = true
 description = "The interface texts of Splat"
 edition.workspace = true
 license.workspace = true

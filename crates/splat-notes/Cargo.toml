@@ -1,6 +1,6 @@
 [package]
 name = "splat-notes"
-version = "0.0.0"
+version.workspace = true
 description = "The folder of notes around a document of Splat: its tree, searching it, where links lead and what a rename changes"
 edition.workspace = true
 license.workspace = true

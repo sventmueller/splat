@@ -43,6 +43,7 @@ unicode-width = "0.2"
 usvg = "0.47"
 
 [workspace.package]
+version = "1.0.17"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -64,8 +65,7 @@ cast_sign_loss = "warn"
 
 [package]
 name = "splat-app"
-# The app version is in VERSION; xtask writes it into Info.plist.
-version = "0.0.0"
+version.workspace = true
 description = "Markdown editor for macOS with a live, editable preview"
 edition.workspace = true
 license.workspace = true

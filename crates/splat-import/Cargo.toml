@@ -1,6 +1,6 @@
 [package]
 name = "splat-import"
-version = "0.0.0"
+version.workspace = true
 description = "Foreign formats as Markdown: what the pasteboard offers, Word files and Word templates"
 edition.workspace = true
 license.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "splat-testkit"
-version = "0.0.0"
+version.workspace = true
 description = "Random inputs and fuzz checks for the tests of Splat"
 edition.workspace = true
 license.workspace = true

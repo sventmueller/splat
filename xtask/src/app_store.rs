@@ -12,11 +12,13 @@ const PROFILE_DIRS: [&str; 2] = [
     "Library/MobileDevice/Provisioning Profiles",
 ];
 
-/// Builds `target/Splat-<version>.pkg` for App Store Connect and puts a copy into `~/Downloads` for Transporter. The
-/// build number stays: the store needs the version it was given, and a second upload of the same version needs a higher
-/// one in `VERSION`.
+/// Builds `target/Splat-<version>.pkg` of the version Cargo.toml sets for App Store Connect and puts a copy into
+/// `~/Downloads` for Transporter. It raises no version: `cargo xtask dmg` builds it with the one it raises.
 pub(crate) fn app_store() -> Result<PathBuf, String> {
-    let version = version()?;
+    app_store_of(&version()?)
+}
+
+pub(crate) fn app_store_of(version: &str) -> Result<PathBuf, String> {
     let (signer, name) = identity(
         "codesigning",
         &["Apple Distribution:", "3rd Party Mac Developer Application:"],
@@ -26,7 +28,7 @@ pub(crate) fn app_store() -> Result<PathBuf, String> {
         &["3rd Party Mac Developer Installer:", "Mac Installer Distribution:"],
     )?;
     let profile = store_profile()?;
-    let app = assemble(Build::AppStore, &version)?;
+    let app = assemble(Build::AppStore, version)?;
     check_no_coverage(&app)?;
     check_universal(&app)?;
     // The profile is part of what the signature seals.

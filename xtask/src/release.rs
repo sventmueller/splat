@@ -18,17 +18,56 @@ const REPORT_LINE: &str =
 /// Builds the release app signed with the Developer ID, has Apple notarize it, packs it into a disk image with a
 /// link to /Applications and has Apple notarize the image too, so that Gatekeeper opens both on other Macs, each with
 /// its ticket stapled. Only an image that passed all of this becomes `dist/Splat-<version>.dmg`, the copy that goes
-/// into the repository: it replaces older ones there, `dist/appcast.xml` offers it to installed copies with the
-/// notes of `RELEASE_NOTES.md`, and the build number goes up. The package for the Mac App Store is built first, with
-/// the same version.
+/// into the repository: it replaces older ones there and `dist/appcast.xml` offers it to installed copies with the
+/// notes of `RELEASE_NOTES.md`. The version is raised in Cargo.toml for the build, see `release_version`, and
+/// committed with `dist/` as "Release Splat <version>"; a run that fails or is interrupted before the image reaches
+/// `dist/` sets it back. The package for the Mac App Store is built first, with the same version.
 pub(crate) fn dmg() -> Result<PathBuf, String> {
-    let version = version()?;
+    catch_interrupts();
     let dist = root().join("dist");
     let feed_path = dist.join("appcast.xml");
     let previous_feed = fs::read_to_string(&feed_path).ok();
+    let version = release_version(&version()?, previous_feed.as_deref().and_then(published_version))?;
     let notes_path = root().join(NOTES);
     let written = fs::read_to_string(&notes_path).map_err(|e| format!("{}: {e}", notes_path.display()))?;
     let notes = release_notes(&written, previous_feed.as_deref())?;
+    require_committed(&[VERSIONED[0], VERSIONED[1], "dist"])?;
+    let found = deviations(&root())?;
+    if !found.is_empty() {
+        return Err(format!("versions disagree:\n{}", found.join("\n")));
+    }
+    let raised = Raised::to(&version)?;
+    let (image, tools) = notarized_image(&version)?;
+    let file = format!("{APP}-{version}.dmg");
+    let published = dist.join(&file);
+    let signature = stdout(Command::new(tools.join("sign_update")).arg(&image))?;
+    let date = stdout(
+        Command::new("date")
+            .env("LC_ALL", "C")
+            .args(["-u", "+%a, %d %b %Y %H:%M:%S +0000"]),
+    )?;
+    files::create_dir_all(&dist)?;
+    // From here on `dist/` holds the new version, and Cargo.toml has to name it too.
+    raised.keep();
+    // Copied rather than renamed: target/ may be a link to another volume.
+    fs::copy(&image, &published).map_err(|e| format!("{}: {e}", published.display()))?;
+    files::remove_file(&image)?;
+    // GitHub's raw server caches the feed for up to five minutes, so the image the old feed offers stays one release.
+    let offered = previous_feed.as_deref().and_then(offered_image).map(str::to_string);
+    let feed = appcast(&version, &file, signature.trim(), date.trim(), &notes)?;
+    files::write(&feed_path, feed)?;
+    for entry in files::read_dir(&dist)?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name != file && Some(&name) != offered.as_ref() && image_name_len(&name) == Some(name.len()) {
+            run(Command::new("trash").arg(entry.path()))?;
+        }
+    }
+    commit_release(&version)?;
+    Ok(published)
+}
+
+/// The disk image of `version`, notarized and checked by Gatekeeper, in `target/`, and Sparkle's tools.
+fn notarized_image(version: &str) -> Result<(PathBuf, PathBuf), String> {
     let (identity, name) = developer_id()?;
     // Checks the saved login before the release build, which takes minutes.
     run(Command::new("xcrun")
@@ -55,8 +94,8 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
         ));
     }
     // Ahead of the notary rounds, so that a missing store certificate or profile stops the release before they start.
-    println!("{}", app_store()?.display());
-    let app = assemble(Build::Distribution, &version)?;
+    println!("{}", app_store_of(version)?.display());
+    let app = assemble(Build::Distribution, version)?;
     check_no_coverage(&app)?;
     check_universal(&app)?;
     println!("signing {version} with {name}");
@@ -88,30 +127,7 @@ pub(crate) fn dmg() -> Result<PathBuf, String> {
             "--verbose",
         ])
         .arg(&image))?;
-    files::create_dir_all(&dist)?;
-    let file = format!("{APP}-{version}.dmg");
-    let published = dist.join(&file);
-    let signature = stdout(Command::new(tools.join("sign_update")).arg(&image))?;
-    let date = stdout(
-        Command::new("date")
-            .env("LC_ALL", "C")
-            .args(["-u", "+%a, %d %b %Y %H:%M:%S +0000"]),
-    )?;
-    // Copied rather than renamed: target/ may be a link to another volume.
-    fs::copy(&image, &published).map_err(|e| format!("{}: {e}", published.display()))?;
-    files::remove_file(&image)?;
-    // GitHub's raw server caches the feed for up to five minutes, so the image the old feed offers stays one release.
-    let offered = previous_feed.as_deref().and_then(offered_image).map(str::to_string);
-    let feed = appcast(&version, &file, signature.trim(), date.trim(), &notes)?;
-    files::write(&feed_path, feed)?;
-    for entry in files::read_dir(&dist)?.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name != file && Some(&name) != offered.as_ref() && image_name_len(&name) == Some(name.len()) {
-            run(Command::new("trash").arg(entry.path()))?;
-        }
-    }
-    next_build(&version)?;
-    Ok(published)
+    Ok((image, tools))
 }
 
 /// What the update dialog shows: the notes written for this release and the way to report a problem.

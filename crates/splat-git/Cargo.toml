@@ -1,6 +1,6 @@
 [package]
 name = "splat-git"
-version = "0.0.0"
+version.workspace = true
 description = "What a file of Splat holds in the last Git commit, read without Git, and where a text differs from it"
 edition.workspace = true
 license.workspace = true

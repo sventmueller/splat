@@ -1,6 +1,6 @@
 [package]
 name = "splat-editor-state"
-version = "0.0.0"
+version.workspace = true
 description = "What the editor window of Splat knows and decides without a window: its state, text copy, render queue and the meaning of clicks and files"
 edition.workspace = true
 license.workspace = true

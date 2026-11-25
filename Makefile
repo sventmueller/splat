@@ -7,10 +7,10 @@ ROUNDS ?= 20000
 help: ## List the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-build: ## Build target/release/Splat.app, signed with the local certificate; raises the build number
+build: ## Build target/release/Splat.app, signed with the local certificate, with the version of Cargo.toml
 	cargo xtask bundle --release
 
-run: ## Build target/debug/Splat Debug.app and open it; the build number stays
+run: ## Build target/debug/Splat Debug.app and open it
 	cargo xtask run
 
 universal: ## Build target/splat-universal for Apple Silicon and Intel, unsigned, as the disk image carries it; needs rustup
@@ -18,12 +18,12 @@ universal: ## Build target/splat-universal for Apple Silicon and Intel, unsigned
 
 lint: ## Formatting and clippy, also with the selftest feature, warnings fail; the library builds without macOS, needs rustup
 	cargo fmt --all --check
-	cargo clippy --release --workspace --all-targets -- -D warnings
-	cargo clippy --release --package splat-app --all-targets --features selftest -- -D warnings
+	cargo clippy --release --locked --workspace --all-targets -- -D warnings
+	cargo clippy --release --locked --package splat-app --all-targets --features selftest -- -D warnings
 	cargo xtask check-library
 
 check: lint ## lint, all cargo tests, vendored scripts; what CI runs before coverage-library, needs no keychain and no window
-	cargo test --release --workspace
+	cargo test --release --locked --workspace
 	cargo xtask vendor check
 
 test: check ## check, then the selftest without a window
@@ -64,7 +64,7 @@ profile: ## The bench with a call tree of the whole run in target/selftest/profi
 	@test -n "$(FILE)" || { echo "usage: make profile FILE=<file.md>"; exit 2; }
 	cargo xtask selftest bench "$(FILE)" --profile
 
-release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: the Mac App Store package in ~/Downloads, then dist/Splat-<version>.dmg, notarized; replaces the old one
+release: test coverage-library ## After make test and coverage-library, with RELEASE_NOTES.md written: raises the version in Cargo.toml, builds the Mac App Store package in ~/Downloads, then dist/Splat-<version>.dmg, notarized, and commits it as "Release Splat <version>"
 	cargo xtask dmg
 
 appstore: test coverage-library ## After make test and coverage-library: ~/Downloads/Splat-<version>.pkg for Transporter, signed for the Mac App Store, without a disk image; needs its two certificates and profile

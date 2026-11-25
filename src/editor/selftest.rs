@@ -1250,9 +1250,9 @@ fn check_about_window(mtm: MainThreadMarker) {
         ),
     ];
     check(
-        "the About window names the version once, the copyright and the license, and the bundle carries the license \
-         texts of all it contains",
-        !version.is_empty()
+        "the About window names the version once, the one the program was built with, the copyright and the license, \
+         and the bundle carries the license texts of all it contains",
+        version == crate::feedback::VERSION
             && shown.texts.iter().any(|t| t.ends_with(&format!(" {version}")))
             && !shown.texts.iter().any(|t| t.contains(&format!("({version})")))
             && shown.texts.iter().any(|t| t == "© 2026 Sven Müller")
@@ -1261,7 +1261,8 @@ fn check_about_window(mtm: MainThreadMarker) {
                 .iter()
                 .all(|part| acknowledgements.contains(part)),
         &format!(
-            "version {version}, texts {:?}, links {:?}, {} bytes of license texts",
+            "version {version}, built as {}, texts {:?}, links {:?}, {} bytes of license texts",
+            crate::feedback::VERSION,
             shown.texts,
             shown.links,
             acknowledgements.len()

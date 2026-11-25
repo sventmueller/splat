@@ -9,8 +9,8 @@ mod licenses;
 mod packing;
 mod release;
 mod selftest;
+mod version;
 
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -22,6 +22,7 @@ pub(crate) use licenses::*;
 pub(crate) use packing::*;
 pub(crate) use release::*;
 pub(crate) use selftest::*;
+pub(crate) use version::*;
 
 pub(crate) const PACKAGE: &str = "splat-app";
 
@@ -122,6 +123,7 @@ pub(crate) fn target_dir() -> PathBuf {
 
 pub(crate) fn run(cmd: &mut Command) -> Result<(), String> {
     let status = cmd.status().map_err(|e| format!("{cmd:?}: {e}"))?;
+    interrupted()?;
     if status.success() {
         Ok(())
     } else {
@@ -134,43 +136,12 @@ pub(crate) fn stdout(cmd: &mut Command) -> Result<String, String> {
         .stderr(std::process::Stdio::inherit())
         .output()
         .map_err(|e| format!("{cmd:?}: {e}"))?;
+    interrupted()?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
         Err(format!("{cmd:?} failed with {}", out.status))
     }
-}
-
-/// Major, minor and build number, digits only.
-pub(crate) fn is_version(v: &str) -> bool {
-    let parts: Vec<&str> = v.split('.').collect();
-    parts.len() == 3
-        && parts
-            .iter()
-            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
-}
-
-/// The version the next build gets, from VERSION: major and minor are raised by hand, the build number by every
-/// release build.
-pub(crate) fn version() -> Result<String, String> {
-    let path = root().join("VERSION");
-    let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let version = text.trim();
-    if is_version(version) {
-        Ok(version.to_string())
-    } else {
-        Err(format!("{}: {version:?} is not major.minor.build", path.display()))
-    }
-}
-
-/// Raises the build number in VERSION past `built`, the version just built.
-pub(crate) fn next_build(built: &str) -> Result<(), String> {
-    let (head, build) = built.rsplit_once('.').ok_or("no build number")?;
-    let build: u64 = build.parse().map_err(|e| format!("build number {build}: {e}"))?;
-    let next = format!("{head}.{}", build + 1);
-    files::write(root().join("VERSION"), format!("{next}\n"))?;
-    println!("built {built}, next build {next}");
-    Ok(())
 }
 
 /// `std::fs` with the path in every error.
@@ -317,11 +288,5 @@ mod tests {
         assert!(missing_architectures("x86_64 arm64\n").is_empty());
         assert_eq!(missing_architectures("arm64\n"), ["x86_64"]);
         assert_eq!(missing_architectures("arm64e x86_64h\n"), ["arm64", "x86_64"]);
-    }
-
-    #[test]
-    fn versions_have_three_numbers() {
-        assert!(is_version("1.0.1") && is_version("12.3.456"));
-        assert!(!is_version("1.0") && !is_version("1.0.x") && !is_version("1..1") && !is_version("1.0.1.2"));
     }
 }

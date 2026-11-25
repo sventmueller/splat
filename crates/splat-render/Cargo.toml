@@ -1,6 +1,6 @@
 [package]
 name = "splat-render"
-version = "0.0.0"
+version.workspace = true
 description = "The preview's render path that Splat shares with other apps: native text from the layout, formulas and diagrams from a hidden WebKit view, images; macOS only"
 edition.workspace = true
 license.workspace = true

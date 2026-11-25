@@ -1,6 +1,6 @@
 [package]
 name = "splat-ooxml"
-version = "0.0.0"
+version.workspace = true
 description = "What reading and writing Word files share: ZIP archives, their CRC-32 checksums and XML escaping"
 edition.workspace = true
 license.workspace = true

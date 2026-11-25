@@ -364,14 +364,10 @@ impl Build {
     }
 }
 
-/// Builds and signs a bundle for this Mac. A release build raises the build number; debug and selftest builds leave it.
+/// Builds and signs a bundle for this Mac, with the version Cargo.toml sets.
 pub(crate) fn bundle(build: Build) -> Result<PathBuf, String> {
-    let version = version()?;
-    let app = assemble(build, &version)?;
+    let app = assemble(build, &version()?)?;
     sign(&app, signing_identity()?, false, build)?;
-    if build == Build::Release {
-        next_build(&version)?;
-    }
     Ok(app)
 }
 

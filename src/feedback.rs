@@ -1,12 +1,15 @@
 //! The way from the app to the project on GitHub.
 
 use objc2_app_kit::NSWorkspace;
+use objc2_foundation::NSProcessInfo;
 use objc2_foundation::NSURL;
-use objc2_foundation::{NSBundle, NSProcessInfo, NSString};
 
 use crate::util::ns;
 
 pub(crate) const REPOSITORY: &str = "https://github.com/sventmueller/splat";
+
+/// The version of Splat, as Cargo.toml sets it and xtask writes it into the bundle's Info.plist.
+pub(crate) const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn open(address: &str) {
     if crate::test_hooks::keeps_from_the_browser(address) {
@@ -31,17 +34,12 @@ pub fn show_repository() {
 
 /// The problem form with what Splat knows about itself filled in.
 pub fn problem_form() -> String {
-    let version = NSBundle::mainBundle()
-        .objectForInfoDictionaryKey(&ns("CFBundleShortVersionString"))
-        .and_then(|v| v.downcast::<NSString>().ok())
-        .map(|v| v.to_string())
-        .unwrap_or_default();
     let system = NSProcessInfo::processInfo().operatingSystemVersion();
     let macos = format!(
         "{}.{}.{}",
         system.majorVersion, system.minorVersion, system.patchVersion
     );
-    problem_address(&version, &macos, cfg!(target_arch = "aarch64"))
+    problem_address(VERSION, &macos, cfg!(target_arch = "aarch64"))
 }
 
 /// GitHub fills the fields of `.github/ISSUE_TEMPLATE/bug.yml` from the query by their ids.
