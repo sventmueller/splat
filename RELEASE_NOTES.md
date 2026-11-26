@@ -1,2 +1,3 @@
-- **Links that lead nowhere.** In the preview, a link to a file that is not there, a wiki link to a note no folder holds, or a link to a heading the document lacks shows in red, and its tool tip says so. The mark goes once the file or heading is there.
-- **PlantUML 1.2026.10.** Chen diagrams render now.
+- **comrak 1.2.0.** Splat reads Markdown with comrak 1.2.0 and its fixes for the security advisory GHSA-7f8r-4rh5-vr5h: a document built to stall Splat with failing autolinks, long runs of `~~` or `==`, long `>` runs with alerts or chained attribute blocks no longer keeps it busy for minutes. A document with more than 500,000 empty table cells shows its tables as text.
+- **Formulas with backticks.** A formula with a backtick in it, imported from Word or another format, stays a formula instead of turning into code.
+- **Pictures in bold or italic text** keep both in the Word export.
