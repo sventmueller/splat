@@ -19,7 +19,7 @@ fn quick_reference_without_footnotes() -> String {
 }
 
 /// The partial update of a 10 MB document after one keystroke, against a full one: same result, in a fraction of the time.
-/// Run with `cargo test --release -- --ignored partial_updates`.
+/// Run with `cargo test --release -- --ignored partial_updates --test-threads=1`.
 #[test]
 #[ignore]
 fn partial_updates_at_ten_megabytes() {

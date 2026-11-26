@@ -34,9 +34,11 @@ test-gui: ## Click-through, resize and typing selftests; occupy the Mac for abou
 	cargo xtask selftest resize
 	cargo xtask selftest typing
 
+# The 10 MB checks run one at a time, since each needs about 700 MB and the nightly's Mac has 3 cores and 7 GB; their
+# timings go to the log.
 test-long: ## Longer random search (ROUNDS=20000, SPLAT_FUZZ_SEED=<n>) and the 10 MB partial-update check
 	SPLAT_FUZZ_ROUNDS=$(ROUNDS) cargo test --release
-	cargo test --release -- --ignored partial_updates
+	cargo test --release -- --ignored partial_updates --test-threads=1 --nocapture
 	cargo test --profile checked --workspace
 
 # cargo-mutants 27 runs its baseline on the mutated packages alone, whatever test_package in .cargo/mutants.toml says,
