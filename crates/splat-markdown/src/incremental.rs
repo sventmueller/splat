@@ -14,7 +14,7 @@ use super::doc::facts::{
 };
 use super::doc::{Block, BlockKind, Doc, Inline, InlineKind, Splice, shift_block, walk_blocks, walk_inlines};
 use super::highlight::{Style, highlight, highlight_blocks, rehighlight};
-use super::reader::{MOST_ESCAPED_PIPES, UNCLOSED_MARKS, parse_part, parse_shared};
+use super::reader::{MOST_EMPTY_CELLS, MOST_ESCAPED_PIPES, UNCLOSED_MARKS, parse_part, parse_shared};
 use super::text::{
     Byte, TextAt, TextPart, changed, growth, label_key, line_start, next_line_start, previous_line_start, shifted,
 };
@@ -400,8 +400,8 @@ fn replace_blocks(doc: &mut Doc, old: Range<usize>, part: Vec<Block>, old_change
 /// Why a change takes parsing all of the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum WholeParse {
-    /// So many unclosed inline notes or formulas, or escaped pipes, that the reader switches them or tables off, which only
-    /// the whole text can tell.
+    /// So many unclosed inline notes or formulas, or escaped pipes or empty table cells, that the reader switches them or
+    /// tables off, which only the whole text can tell.
     SwitchedOff,
     /// A `%%` that nothing closes yet, which another one anywhere would.
     LooseComment,
@@ -426,7 +426,8 @@ fn opens_front_matter(text: &str) -> bool {
 /// found in the new part.
 fn read_as_a_whole(facts: &TextFacts, new_counts: &SyntaxCounts, new_unclosed: Unclosed) -> Option<WholeParse> {
     let limited = |unclosed: Unclosed| unclosed.latex > UNCLOSED_MARKS || unclosed.code > UNCLOSED_MARKS;
-    let pipes = facts.counts.escaped_pipes.max(new_counts.escaped_pipes) > MOST_ESCAPED_PIPES;
+    let pipes = facts.counts.escaped_pipes.max(new_counts.escaped_pipes) > MOST_ESCAPED_PIPES
+        || facts.counts.empty_cells.max(new_counts.empty_cells) > MOST_EMPTY_CELLS;
     if facts.counts.inline_notes > UNCLOSED_MARKS || limited(facts.unclosed_formulas) || limited(new_unclosed) || pipes
     {
         return Some(WholeParse::SwitchedOff);
@@ -1399,6 +1400,8 @@ mod tests {
         assert_eq!(why(plain, "a\n\nb\n\nc\n\n[r]: u\n"), WholeParse::LinkDefinitions);
         let many_notes = "^[".repeat(UNCLOSED_MARKS + 1);
         assert_eq!(why(&many_notes, &format!("{many_notes}x")), WholeParse::SwitchedOff);
+        let empty_cells = "|".repeat(MOST_EMPTY_CELLS + 2);
+        assert_eq!(why(&empty_cells, &format!("{empty_cells}x")), WholeParse::SwitchedOff);
     }
 
     #[test]

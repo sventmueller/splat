@@ -216,7 +216,9 @@ fn a_formula_that_dollars_cannot_hold_is_written_in_the_form_that_can() {
     let formula = |tex: &str| markdown_of(vec![Span::of(Piece::Math(tex.into()))]);
     assert_eq!(formula("a"), "$a$\n");
     assert_eq!(formula("a$b"), "$`a$b`$\n");
-    assert_eq!(formula("a`$b"), "``$a`$b$``\n");
+    assert_eq!(formula("a`$b"), "$``a`$b``$\n");
+    assert_eq!(formula("`a"), "$`` `a ``$\n");
+    assert_eq!(formula("\\\\$5"), "$`\\\\$5`$\n");
 }
 
 #[test]

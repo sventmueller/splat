@@ -450,12 +450,22 @@ fn write_math(tex: &str, after: char, table: bool, out: &mut String) {
     } else {
         tex
     };
-    let lone_dollar = tex.char_indices().any(|(at, c)| c == '$' && !tex[..at].ends_with('\\'));
+    let lone_dollar = tex
+        .char_indices()
+        .any(|(at, c)| c == '$' && tex[..at].chars().rev().take_while(|&b| b == '\\').count() % 2 == 0);
     if !lone_dollar && !after.is_ascii_digit() && !tex.starts_with('`') && !tex.ends_with('\\') {
         let _ = write!(out, "${written}$");
-    } else if !tex.contains("`$") {
-        let _ = write!(out, "$`{written}`$");
-    } else {
-        write_code(&format!("${tex}$"), table, out);
+        return;
     }
+    // Inside `$`…`$` comrak reads a code span's rules: a fence longer than any run of backticks in the formula, and one
+    // space cut from each end when both ends have one.
+    let longest = written.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+    let fence = "`".repeat(longest + 1);
+    let spaced = written.starts_with(' ') && written.ends_with(' ') && !written.trim().is_empty();
+    let pad = if written.starts_with('`') || written.ends_with('`') || spaced {
+        " "
+    } else {
+        ""
+    };
+    let _ = write!(out, "${fence}{pad}{written}{pad}{fence}$");
 }

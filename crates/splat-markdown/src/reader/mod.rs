@@ -59,8 +59,13 @@ fn limit_inline_notes(options: &mut Options, text: &str) {
 /// looking at all the others, which takes minutes for a hundred thousand.
 pub(super) const MOST_ESCAPED_PIPES: usize = 1000;
 
+/// Empty cells beyond which tables are switched off: comrak builds a node for each, one byte apiece, which takes seconds and
+/// gigabytes for millions.
+pub(super) const MOST_EMPTY_CELLS: usize = 500_000;
+
 fn limit_tables(options: &mut Options, text: &str) {
-    if text.matches("\\|").count() > MOST_ESCAPED_PIPES {
+    let empty_cells = || text.as_bytes().windows(2).filter(|pair| *pair == b"||").count();
+    if text.matches("\\|").count() > MOST_ESCAPED_PIPES || empty_cells() > MOST_EMPTY_CELLS {
         options.extension.table = false;
     }
 }
@@ -433,6 +438,14 @@ mod tests {
         let kind = |text: String| parse(&text).blocks[0].kind.clone();
         assert!(matches!(kind(table(MOST_ESCAPED_PIPES)), BlockKind::Table { .. }));
         assert_eq!(kind(table(MOST_ESCAPED_PIPES + 1)), BlockKind::Paragraph);
+    }
+
+    #[test]
+    fn hundreds_of_thousands_of_empty_cells_switch_tables_off() {
+        let table = |cells: usize| format!("a|b\n-|-\n{}x\n", "|".repeat(cells + 1));
+        let kind = |text: String| parse(&text).blocks[0].kind.clone();
+        assert!(matches!(kind(table(MOST_EMPTY_CELLS)), BlockKind::Table { .. }));
+        assert_eq!(kind(table(MOST_EMPTY_CELLS + 1)), BlockKind::Paragraph);
     }
 
     #[test]
