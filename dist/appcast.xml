@@ -3,16 +3,17 @@
   <channel>
     <title>Splat</title>
     <item>
-      <title>Splat 1.0.17</title>
-      <pubDate>Sun, 22 Nov 2026 12:13:50 +0000</pubDate>
-      <sparkle:version>1.0.17</sparkle:version>
-      <sparkle:shortVersionString>1.0.17</sparkle:shortVersionString>
+      <title>Splat 1.0.18</title>
+      <pubDate>Thu, 26 Nov 2026 10:05:49 +0000</pubDate>
+      <sparkle:version>1.0.18</sparkle:version>
+      <sparkle:shortVersionString>1.0.18</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="markdown"><![CDATA[- **Links that lead nowhere.** In the preview, a link to a file that is not there, a wiki link to a note no folder holds, or a link to a heading the document lacks shows in red, and its tool tip says so. The mark goes once the file or heading is there.
-- **PlantUML 1.2026.10.** Chen diagrams render now.
+      <description sparkle:format="markdown"><![CDATA[- **comrak 1.2.0.** Splat reads Markdown with comrak 1.2.0 and its fixes for the security advisory GHSA-7f8r-4rh5-vr5h: a document built to stall Splat with failing autolinks, long runs of `~~` or `==`, long `>` runs with alerts or chained attribute blocks no longer keeps it busy for minutes. A document with more than 500,000 empty table cells shows its tables as text.
+- **Formulas with backticks.** A formula with a backtick in it, imported from Word or another format, stays a formula instead of turning into code.
+- **Pictures in bold or italic text** keep both in the Word export.
 
 Something wrong or missing? [Report it on GitHub](https://github.com/sventmueller/splat/issues/new/choose).]]></description>
-      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.17.dmg" sparkle:edSignature="AWgCjkPTrdIKUJPFvhNszjZp1q6p8zFb6cJcQVVzMCpXxg/gorcf0iuEZdnDOsaS+t5rS+Cz5uSVj9/A721qBA==" length="14390577" type="application/octet-stream"/>
+      <enclosure url="https://raw.githubusercontent.com/sventmueller/splat/main/dist/Splat-1.0.18.dmg" sparkle:edSignature="PAinsEr2ekFVm/KleUyD1dQxHMeUC8btlgdH7mvQdVY5Q6rrAX48gzobvj1eja5enXOnoGe3kp95aJCcGfFnAg==" length="14399338" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

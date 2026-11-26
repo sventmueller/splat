@@ -43,7 +43,7 @@ unicode-width = "0.2"
 usvg = "0.47"
 
 [workspace.package]
-version = "1.0.17"
+version = "1.0.18"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
