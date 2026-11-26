@@ -161,7 +161,7 @@ impl Writer<'_> {
         match src.and_then(self.export.image) {
             Some(picture) => {
                 let picture = asked_size(picture, e.pixels("width"), e.pixels("height"));
-                runs.picture(&self.picture(picture, alt));
+                runs.picture(&self.picture(picture, alt), props);
             }
             None => runs.push(alt, props),
         }

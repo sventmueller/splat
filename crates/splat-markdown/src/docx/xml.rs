@@ -236,8 +236,17 @@ impl Runs {
         self.xml.push_str("<w:r><w:br/></w:r>");
     }
 
-    pub(super) fn picture(&mut self, drawing: &str) {
-        self.xml.push_str(drawing);
+    /// `drawing` in a run that keeps only the marks of `props` that change nothing on a picture: bold and italic.
+    pub(super) fn picture(&mut self, drawing: &str, props: Props) {
+        let marks = Props {
+            text: TextStyle {
+                bold: props.text.bold,
+                italic: props.text.italic,
+                ..TextStyle::default()
+            },
+            ..Props::default()
+        };
+        let _ = write!(self.xml, "<w:r><w:rPr>{}</w:rPr>{drawing}</w:r>", marks.to_xml());
     }
 
     /// `inner` as a link with the relationship `id`.

@@ -304,7 +304,7 @@ impl<'a> Writer<'a> {
     fn centered_picture(&mut self, picture: Picture, alt: &str) {
         let mut runs = Runs::default();
         let drawing = self.picture(picture, alt);
-        runs.picture(&drawing);
+        runs.picture(&drawing, Props::default());
         let para = ParaProps {
             justify: Some(Align::Center),
             ..ParaProps::default()
@@ -395,7 +395,7 @@ impl<'a> Writer<'a> {
                 Piece::Picture(picture) => match (self.export.image)(picture.url) {
                     Some(found) => {
                         let found = asked_size(found, picture.width, picture.height);
-                        out.picture(&self.picture(found, &picture.alt));
+                        out.picture(&self.picture(found, &picture.alt), props);
                     }
                     None => out.push(&picture.alt, props),
                 },
@@ -415,7 +415,7 @@ impl<'a> Writer<'a> {
                 Piece::Math { literal, display } => {
                     let figure = Figure::Math { tex: literal, display };
                     match (self.export.figure)(&figure) {
-                        Some(found) => out.picture(&self.picture(found, literal)),
+                        Some(found) => out.picture(&self.picture(found, literal), props),
                         None => out.push(&format!("${literal}$"), props.code()),
                     }
                 }
@@ -521,12 +521,12 @@ impl<'a> Writer<'a> {
         let n = self.media.len();
         let ext = if picture.jpeg { "jpeg" } else { "png" };
         format!(
-            "<w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\"><wp:extent cx=\"{cx}\" cy=\"{cy}\"/>\
+            "<w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\"><wp:extent cx=\"{cx}\" cy=\"{cy}\"/>\
              <wp:docPr id=\"{n}\" name=\"image{n}\" descr=\"{alt}\"/><a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">\
              <pic:pic><pic:nvPicPr><pic:cNvPr id=\"{n}\" name=\"image{n}.{ext}\"/><pic:cNvPicPr/></pic:nvPicPr>\
              <pic:blipFill><a:blip r:embed=\"rIdI{n}\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>\
              <pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"{cx}\" cy=\"{cy}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr>\
-             </pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>",
+             </pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>",
             alt = escape_text(alt)
         )
     }
@@ -1293,6 +1293,26 @@ mod tests {
             .filter_map(|run| run.split_once("</w:t>").map(|(text, _)| text))
             .collect();
         assert_eq!(text, "abcd", "{word}");
+    }
+
+    #[test]
+    fn a_picture_keeps_only_the_marks_that_change_nothing_on_it() {
+        let run = |text: &str| {
+            let word = document(text);
+            let at = word.find("<w:drawing>").expect("a picture");
+            let start = word[..at].rfind("<w:r>").unwrap();
+            word[start..at].to_string()
+        };
+        assert_eq!(run("***![](a.png)***\n"), "<w:r><w:rPr><w:b/><w:i/></w:rPr>");
+        for text in [
+            "[![](a.png)](https://x.de)\n",
+            "~~![](a.png)~~\n",
+            "<ins>![](a.png)</ins>\n",
+            "<mark>![](a.png)</mark>\n",
+            "<sup>![](a.png)</sup>\n",
+        ] {
+            assert_eq!(run(text), "<w:r><w:rPr></w:rPr>", "{text}");
+        }
     }
 
     #[test]

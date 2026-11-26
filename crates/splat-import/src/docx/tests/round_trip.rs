@@ -15,6 +15,7 @@ fn what_splat_writes_comes_back_as_it_was() {
         "[Web](https://a.bc/d) und [Post](mailto:a@b.cd)\n",
         "Text[^1] und mehr[^2]\n\n[^1]: Fuß\n\n[^2]: Noch *eine*\n",
         "![Bild](media/image1.png)\n",
+        "> **![Bild](media/image1.png)** und *[![](media/image2.png)](https://a.bc/d)*\n",
         "> Zitat\n>\n> - Punkt\n\nDanach\n",
         "```\nfn a() {\n\n    b\n}\n```\n",
         "Vor\n\n---\n\nNach\n",
